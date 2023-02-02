@@ -24,34 +24,31 @@ impl Violation for TooManyStatements {
     }
 }
 
-fn get_num_statements(stmts: &[Stmt]) -> usize {
+fn num_statements(stmts: &[Stmt]) -> usize {
     let mut count: usize = 0;
     for stmt in stmts {
         // TODO(charlie): Account for pattern match statement.
         match &stmt.node {
             StmtKind::If { body, orelse, .. } => {
                 count += 1;
-                count += get_num_statements(body);
+                count += num_statements(body);
                 if let Some(stmt) = orelse.first() {
-                    // else:
-                    //   if:
-                    // same as elif:
-                    // but otherwise else: counts as its own statement
-                    // necessary to avoid counting else and if separately when they appear after each other
+                    // `elif:` and `else: if:` have the same AST representation.
+                    // Avoid treating `elif:` as two statements.
                     if !matches!(stmt.node, StmtKind::If { .. }) {
                         count += 1;
                     }
-                    count += get_num_statements(orelse);
+                    count += num_statements(orelse);
                 }
             }
             StmtKind::For { body, orelse, .. } | StmtKind::AsyncFor { body, orelse, .. } => {
-                count += get_num_statements(body);
-                count += get_num_statements(orelse);
+                count += num_statements(body);
+                count += num_statements(orelse);
             }
             StmtKind::While { body, orelse, .. } => {
                 count += 1;
-                count += get_num_statements(body);
-                count += get_num_statements(orelse);
+                count += num_statements(body);
+                count += num_statements(orelse);
             }
             StmtKind::Try {
                 body,
@@ -60,13 +57,13 @@ fn get_num_statements(stmts: &[Stmt]) -> usize {
                 finalbody,
             } => {
                 count += 1;
-                count += get_num_statements(body);
+                count += num_statements(body);
                 if !orelse.is_empty() {
-                    count += 1 + get_num_statements(orelse);
+                    count += 1 + num_statements(orelse);
                 }
                 if !finalbody.is_empty() {
-                    // weird, but in making samples for pylint, the finally statement counts as 2
-                    count += 2 + get_num_statements(finalbody);
+                    // Unclear why, but follow Pylint's convention.
+                    count += 2 + num_statements(finalbody);
                 }
                 if handlers.len() > 1 {
                     count += 1;
@@ -74,14 +71,14 @@ fn get_num_statements(stmts: &[Stmt]) -> usize {
                 for handler in handlers {
                     count += 1;
                     let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
-                    count += get_num_statements(body);
+                    count += num_statements(body);
                 }
             }
             StmtKind::FunctionDef { body, .. }
             | StmtKind::AsyncFunctionDef { body, .. }
             | StmtKind::With { body, .. } => {
                 count += 1;
-                count += get_num_statements(body);
+                count += num_statements(body);
             }
             StmtKind::Return { .. } => {}
             _ => {
@@ -99,7 +96,7 @@ pub fn too_many_statements(
     max_statements: usize,
     locator: &Locator,
 ) -> Option<Diagnostic> {
-    let statements = get_num_statements(body) + 1;
+    let statements = num_statements(body) + 1;
     if statements > max_statements {
         Some(Diagnostic::new(
             TooManyStatements {
@@ -118,21 +115,21 @@ mod tests {
     use anyhow::Result;
     use rustpython_parser::parser;
 
-    use super::get_num_statements;
+    use super::num_statements;
 
     #[test]
-    fn test_pass() -> Result<()> {
+    fn pass() -> Result<()> {
         let source: &str = r#"
 def f():
     pass
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 2);
+        assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
 
     #[test]
-    fn test_if_else() -> Result<()> {
+    fn if_else() -> Result<()> {
         let source: &str = r#"
 def f():
     if a:
@@ -141,12 +138,12 @@ def f():
         print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 5);
+        assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
 
     #[test]
-    fn test_if_else_if_corner() -> Result<()> {
+    fn if_else_if_corner() -> Result<()> {
         let source: &str = r#"
 def f():
     if a:
@@ -156,12 +153,12 @@ def f():
             print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 5);
+        assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
 
     #[test]
-    fn test_if_elif() -> Result<()> {
+    fn if_elif() -> Result<()> {
         let source: &str = r#"
 def f():
     if a:
@@ -170,12 +167,12 @@ def f():
         print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 5);
+        assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
 
     #[test]
-    fn test_if_elif_else() -> Result<()> {
+    fn if_elif_else() -> Result<()> {
         let source: &str = r#"
 def f():
     if a:
@@ -188,7 +185,7 @@ def f():
         print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 9); // counter-intuitive, but elif counts as 2 statements according to pylint itself
+        assert_eq!(num_statements(&stmts), 9); // counter-intuitive, but elif counts as 2 statements according to pylint itself
         Ok(())
     }
 
@@ -217,24 +214,24 @@ async def f():
             pass
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 19);
+        assert_eq!(num_statements(&stmts), 19);
         Ok(())
     }
 
     #[test]
-    fn test_for() -> Result<()> {
+    fn for_() -> Result<()> {
         let source: &str = r#"
 def f():  # 2
     for i in range(10):
         pass
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 2);
+        assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
 
     #[test]
-    fn test_for_else() -> Result<()> {
+    fn for_else() -> Result<()> {
         let source: &str = r#"
 def f():  # 3
     for i in range(10):
@@ -243,12 +240,12 @@ def f():  # 3
         print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 3);
+        assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
 
     #[test]
-    fn test_nested_def() -> Result<()> {
+    fn nested_def() -> Result<()> {
         let source: &str = r#"
 def f():
     def g():
@@ -258,12 +255,12 @@ def f():
     print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 5);
+        assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
 
     #[test]
-    fn test_nested_class() -> Result<()> {
+    fn nested_class() -> Result<()> {
         let source: &str = r#"
 def f():
     class A:
@@ -276,23 +273,23 @@ def f():
     print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 3);
+        assert_eq!(num_statements(&stmts), 3);
         Ok(())
     }
 
     #[test]
-    fn test_return_not_counted() -> Result<()> {
+    fn return_not_counted() -> Result<()> {
         let source: &str = r#"
 def f():
     return
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 1);
+        assert_eq!(num_statements(&stmts), 1);
         Ok(())
     }
 
     #[test]
-    fn test_with() -> Result<()> {
+    fn with() -> Result<()> {
         let source: &str = r#"
 def f():  # 6
     with a:
@@ -303,12 +300,12 @@ def f():  # 6
 
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 6);
+        assert_eq!(num_statements(&stmts), 6);
         Ok(())
     }
 
     #[test]
-    fn test_try_except() -> Result<()> {
+    fn try_except() -> Result<()> {
         let source: &str = r#"
 def f():  # 5
     try:
@@ -317,12 +314,12 @@ def f():  # 5
         raise
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 5);
+        assert_eq!(num_statements(&stmts), 5);
         Ok(())
     }
 
     #[test]
-    fn test_try_except_else() -> Result<()> {
+    fn try_except_else() -> Result<()> {
         let source: &str = r#"
 def f():  # 7
     try:
@@ -333,12 +330,12 @@ def f():  # 7
         print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 7);
+        assert_eq!(num_statements(&stmts), 7);
         Ok(())
     }
 
     #[test]
-    fn test_try_except_else_finally() -> Result<()> {
+    fn try_except_else_finally() -> Result<()> {
         let source: &str = r#"
 def f():  # 10
     try:
@@ -351,12 +348,12 @@ def f():  # 10
         pass
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 10);
+        assert_eq!(num_statements(&stmts), 10);
         Ok(())
     }
 
     #[test]
-    fn test_try_except_except() -> Result<()> {
+    fn try_except_except() -> Result<()> {
         let source: &str = r#"
 def f():  # 8
     try:
@@ -367,12 +364,12 @@ def f():  # 8
         raise
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 8);
+        assert_eq!(num_statements(&stmts), 8);
         Ok(())
     }
 
     #[test]
-    fn test_try_except_except_finally() -> Result<()> {
+    fn try_except_except_finally() -> Result<()> {
         let source: &str = r#"
 def f():  # 11
     try:
@@ -385,19 +382,19 @@ def f():  # 11
         print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 11);
+        assert_eq!(num_statements(&stmts), 11);
         Ok(())
     }
 
     #[test]
-    fn test_yield() -> Result<()> {
+    fn yield_() -> Result<()> {
         let source: &str = r#"
 def f():
     for i in range(10):
         yield i
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_num_statements(&stmts), 2);
+        assert_eq!(num_statements(&stmts), 2);
         Ok(())
     }
 }
