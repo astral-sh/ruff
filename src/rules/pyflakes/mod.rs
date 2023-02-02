@@ -208,7 +208,7 @@ mod tests {
 
     /// A re-implementation of the Pyflakes test runner.
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
-    fn flakes(contents: &str, expected: &[Rule]) -> Result<()> {
+    fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(&RuleCodePrefix::F);
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
@@ -229,42 +229,39 @@ mod tests {
             &settings,
             flags::Autofix::Enabled,
             flags::Noqa::Enabled,
-        )?;
+        );
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         let actual = diagnostics
             .iter()
             .map(|diagnostic| diagnostic.kind.rule().clone())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
-        Ok(())
     }
 
     /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_undefined_names.py>
     #[test]
-    fn undefined() -> Result<()> {
-        flakes("bar", &[Rule::UndefinedName])?;
-        Ok(())
+    fn undefined() {
+        flakes("bar", &[Rule::UndefinedName]);
     }
 
     #[test]
-    fn defined_in_list_comp() -> Result<()> {
-        flakes("[a for a in range(10) if a]", &[])?;
-        Ok(())
+    fn defined_in_list_comp() {
+        flakes("[a for a in range(10) if a]", &[]);
     }
 
     #[test]
-    fn undefined_in_list_comp() -> Result<()> {
+    fn undefined_in_list_comp() {
         flakes(
             r#"
         [a for a in range(10)]
         a
         "#,
             &[Rule::UndefinedName],
-        )
+        );
     }
 
     #[test]
-    fn undefined_exception_name() -> Result<()> {
+    fn undefined_exception_name() {
         // Exception names can't be used after the except: block.
         //
         // The exc variable is unused inside the exception handler.
@@ -277,12 +274,11 @@ mod tests {
         exc
         "#,
             &[Rule::UnusedVariable, Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn names_declared_in_except_blocks() -> Result<()> {
+    fn names_declared_in_except_blocks() {
         // Locals declared in except: blocks can be used after the block.
         //
         // This shows the example in test_undefinedExceptionName is
@@ -296,12 +292,11 @@ mod tests {
         e
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn undefined_exception_name_obscuring_local_variable2() -> Result<()> {
+    fn undefined_exception_name_obscuring_local_variable2() {
         // Exception names are unbound after the `except:` block.
         //
         // Last line will raise UnboundLocalError.
@@ -316,12 +311,11 @@ mod tests {
         exc = 'Original value'
         "#,
             &[Rule::UnusedVariable, Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn del_exception_in_except() -> Result<()> {
+    fn del_exception_in_except() {
         // The exception name can be deleted in the except: block.
         flakes(
             r#"
@@ -331,12 +325,11 @@ mod tests {
             del exc
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn functions_need_global_scope() -> Result<()> {
+    fn functions_need_global_scope() {
         flakes(
             r#"
         class a:
@@ -345,68 +338,61 @@ mod tests {
         fu = 1
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn builtins() -> Result<()> {
-        flakes("range(10)", &[])?;
-        Ok(())
+    fn builtins() {
+        flakes("range(10)", &[]);
     }
 
     #[test]
-    fn builtin_windows_error() -> Result<()> {
+    fn builtin_windows_error() {
         // C{WindowsError} is sometimes a builtin name, so no warning is emitted
         // for using it.
-        flakes("WindowsError", &[])?;
-        Ok(())
+        flakes("WindowsError", &[]);
     }
 
     #[test]
-    fn module_annotations() -> Result<()> {
+    fn module_annotations() {
         // Use of the C{__annotations__} in module scope should not emit
         // an undefined name warning when version is greater than or equal to 3.6.
-        flakes("__annotations__", &[])?;
-        Ok(())
+        flakes("__annotations__", &[]);
     }
 
     #[test]
-    fn magic_globals_file() -> Result<()> {
+    fn magic_globals_file() {
         // Use of the C{__file__} magic global should not emit an undefined name
         // warning.
-        flakes("__file__", &[])?;
-        Ok(())
+        flakes("__file__", &[]);
     }
 
     #[test]
-    fn magic_globals_builtins() -> Result<()> {
+    fn magic_globals_builtins() {
         // Use of the C{__builtins__} magic global should not emit an undefined
         // name warning.
-        flakes("__builtins__", &[])?;
-        Ok(())
+        flakes("__builtins__", &[]);
     }
 
     #[test]
-    fn magic_globals_name() -> Result<()> {
+    fn magic_globals_name() {
         // Use of the C{__name__} magic global should not emit an undefined name
         // warning.
-        flakes("__name__", &[])?;
-        Ok(())
+        flakes("__name__", &[]);
     }
 
     #[test]
-    fn magic_module_in_class_scope() -> Result<()> {
+    fn magic_module_in_class_scope() {
         // Use of the C{__module__} magic builtin should not emit an undefined
         // name warning if used in class scope.
-        flakes("__module__", &[Rule::UndefinedName])?;
+        flakes("__module__", &[Rule::UndefinedName]);
         flakes(
             r#"
         class Foo:
             __module__
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         class Foo:
@@ -414,22 +400,21 @@ mod tests {
                 __module__
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn magic_qualname_in_class_scope() -> Result<()> {
+    fn magic_qualname_in_class_scope() {
         // Use of the C{__qualname__} magic builtin should not emit an undefined
         // name warning if used in class scope.
-        flakes("__qualname__", &[Rule::UndefinedName])?;
+        flakes("__qualname__", &[Rule::UndefinedName]);
         flakes(
             r#"
         class Foo:
             __qualname__
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         class Foo:
@@ -437,22 +422,20 @@ mod tests {
                 __qualname__
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn global_import_star() -> Result<()> {
+    fn global_import_star() {
         // Can't find undefined names with import *.
         flakes(
             "from fu import *; bar",
             &[Rule::ImportStarUsed, Rule::ImportStarUsage],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn defined_by_global() -> Result<()> {
+    fn defined_by_global() {
         // "global" can make an otherwise undefined name in another function
         // defined.
         flakes(
@@ -461,14 +444,14 @@ mod tests {
         def b(): fu
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         def c(): bar
         def b(): global bar; bar = 1
         "#,
             &[],
-        )?;
+        );
         // TODO(charlie): Extract globals recursively (such that we don't raise F821).
         flakes(
             r#"
@@ -478,12 +461,11 @@ mod tests {
                 global bar; bar = 1
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn defined_by_global_multiple_names() -> Result<()> {
+    fn defined_by_global_multiple_names() {
         // "global" can accept multiple names.
         flakes(
             r#"
@@ -491,12 +473,11 @@ mod tests {
         def b(): fu; bar
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn global_in_global_scope() -> Result<()> {
+    fn global_in_global_scope() {
         // A global statement in the global scope is ignored.
         flakes(
             r#"
@@ -505,12 +486,11 @@ mod tests {
             print(x)
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn global_reset_name_only() -> Result<()> {
+    fn global_reset_name_only() {
         // A global statement does not prevent other names being undefined.
         flakes(
             r#"
@@ -521,19 +501,17 @@ mod tests {
             global m
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn del() -> Result<()> {
+    fn del() {
         // Del deletes bindings.
-        flakes("a = 1; del a; a", &[Rule::UndefinedName])?;
-        Ok(())
+        flakes("a = 1; del a; a", &[Rule::UndefinedName]);
     }
 
     #[test]
-    fn del_global() -> Result<()> {
+    fn del_global() {
         // Del a global binding from a function.
         flakes(
             r#"
@@ -544,19 +522,17 @@ mod tests {
         a
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn del_undefined() -> Result<()> {
+    fn del_undefined() {
         // Del an undefined name.
-        flakes("del a", &[Rule::UndefinedName])?;
-        Ok(())
+        flakes("del a", &[Rule::UndefinedName]);
     }
 
     #[test]
-    fn del_conditional() -> Result<()> {
+    fn del_conditional() {
         // Ignores conditional bindings deletion.
         flakes(
             r#"
@@ -567,12 +543,11 @@ mod tests {
         assert(test)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn del_conditional_nested() -> Result<()> {
+    fn del_conditional_nested() {
         // Ignored conditional bindings deletion even if they are nested in other
         // blocks.
         flakes(
@@ -585,12 +560,11 @@ mod tests {
         assert(test)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn del_while() -> Result<()> {
+    fn del_while() {
         // Ignore bindings deletion if called inside the body of a while
         // statement.
         flakes(
@@ -602,12 +576,11 @@ mod tests {
             assert(foo)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn del_while_test_usage() -> Result<()> {
+    fn del_while_test_usage() {
         // Ignore bindings deletion if called inside the body of a while
         // statement and name is used inside while's test part.
         flakes(
@@ -619,12 +592,11 @@ mod tests {
                 o = False
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn del_while_nested() -> Result<()> {
+    fn del_while_nested() {
         // Ignore bindings deletions if node is part of while's test, even when
         // del is in a nested block.
         flakes(
@@ -639,12 +611,11 @@ mod tests {
                 o = False
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn global_from_nested_scope() -> Result<()> {
+    fn global_from_nested_scope() {
         // Global names are available from nested scopes.
         flakes(
             r#"
@@ -654,12 +625,11 @@ mod tests {
                 a
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn later_redefined_global_from_nested_scope() -> Result<()> {
+    fn later_redefined_global_from_nested_scope() {
         // Test that referencing a local name that shadows a global, before it is
         // defined, generates a warning.
         flakes(
@@ -671,12 +641,11 @@ mod tests {
             return a
         "#,
             &[Rule::UndefinedLocal],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn later_redefined_global_from_nested_scope2() -> Result<()> {
+    fn later_redefined_global_from_nested_scope2() {
         // Test that referencing a local name in a nested scope that shadows a
         // global declared in an enclosing scope, before it is defined, generates
         // a warning.
@@ -691,12 +660,11 @@ mod tests {
                     return a
         "#,
             &[Rule::UndefinedLocal],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn intermediate_class_scope_ignored() -> Result<()> {
+    fn intermediate_class_scope_ignored() {
         // If a name defined in an enclosing scope is shadowed by a local variable
         // and the name is used locally before it is bound, an unbound local
         // warning is emitted, even if there is a class scope between the enclosing
@@ -713,12 +681,11 @@ mod tests {
             print(x)
         "#,
             &[Rule::UndefinedLocal],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn later_redefined_global_from_nested_scope3() -> Result<()> {
+    fn later_redefined_global_from_nested_scope3() {
         // Test that referencing a local name in a nested scope that shadows a
         // global, before it is defined, generates a warning.
         flakes(
@@ -732,12 +699,11 @@ mod tests {
                 return a
         "#,
             &[Rule::UndefinedLocal],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn undefined_augmented_assignment() -> Result<()> {
+    fn undefined_augmented_assignment() {
         flakes(
             r#"
             def f(seq):
@@ -756,12 +722,11 @@ mod tests {
                 Rule::UnusedVariable,
                 Rule::UndefinedName,
             ],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn nested_class() -> Result<()> {
+    fn nested_class() {
         // Nested classes can access enclosing scope.
         flakes(
             r#"
@@ -775,12 +740,11 @@ mod tests {
         f(123).f()
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn bad_nested_class() -> Result<()> {
+    fn bad_nested_class() {
         // Free variables in nested classes must bind at class creation.
         flakes(
             r#"
@@ -792,12 +756,11 @@ mod tests {
         f()
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn defined_as_star_args() -> Result<()> {
+    fn defined_as_star_args() {
         // Star and double-star arg names are defined.
         flakes(
             r#"
@@ -805,12 +768,11 @@ mod tests {
             print(a, b, c)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn defined_as_star_unpack() -> Result<()> {
+    fn defined_as_star_unpack() {
         // Star names in unpack are defined.
         flakes(
             r#"
@@ -818,26 +780,25 @@ mod tests {
         print(a, b)
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         *a, b = range(10)
         print(a, b)
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         a, *b, c = range(10)
         print(a, b, c)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_as_star_unpack() -> Result<()> {
+    fn used_as_star_unpack() {
         // Star names in unpack are used if RHS is not a tuple/list literal.
         flakes(
             r#"
@@ -845,26 +806,25 @@ mod tests {
             a, *b = range(10)
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         def f():
             (*a, b) = range(10)
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         def f():
             [a, *b, c] = range(10)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn keyword_only_args() -> Result<()> {
+    fn keyword_only_args() {
         // Keyword-only arg names are defined.
         flakes(
             r#"
@@ -872,7 +832,7 @@ mod tests {
             print(a, b)
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         import default_b
@@ -880,12 +840,11 @@ mod tests {
             print(a, b)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn keyword_only_args_undefined() -> Result<()> {
+    fn keyword_only_args_undefined() {
         // Typo in kwonly name.
         flakes(
             r#"
@@ -893,12 +852,11 @@ mod tests {
             print(a, b)
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn annotation_undefined() -> Result<()> {
+    fn annotation_undefined() {
         // Undefined annotations.
         flakes(
             r#"
@@ -907,7 +865,7 @@ mod tests {
                  b: note3=12, **kw: note4) -> note5: pass
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -916,53 +874,46 @@ mod tests {
             def func(a: {1, d}) -> (lambda c: e): pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn meta_class_undefined() -> Result<()> {
+    fn meta_class_undefined() {
         flakes(
             r#"
         from abc import ABCMeta
         class A(metaclass=ABCMeta): pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn defined_in_gen_exp() -> Result<()> {
+    fn defined_in_gen_exp() {
         // Using the loop variable of a generator expression results in no
         // warnings.
-        flakes("(a for a in [1, 2, 3] if a)", &[])?;
+        flakes("(a for a in [1, 2, 3] if a)", &[]);
 
-        flakes("(b for b in (a for a in [1, 2, 3] if a) if b)", &[])?;
-
-        Ok(())
+        flakes("(b for b in (a for a in [1, 2, 3] if a) if b)", &[]);
     }
 
     #[test]
-    fn undefined_in_gen_exp_nested() -> Result<()> {
+    fn undefined_in_gen_exp_nested() {
         // The loop variables of generator expressions nested together are
         // not defined in the other generator.
         flakes(
             "(b for b in (a for a in [1, 2, 3] if b) if b)",
             &[Rule::UndefinedName],
-        )?;
+        );
 
         flakes(
             "(b for b in (a for a in [1, 2, 3] if a) if a)",
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn undefined_with_error_handler() -> Result<()> {
+    fn undefined_with_error_handler() {
         // Some compatibility code checks explicitly for NameError.
         // It should not trigger warnings.
         flakes(
@@ -973,7 +924,7 @@ mod tests {
             socket_map = {}
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         try:
@@ -982,7 +933,7 @@ mod tests {
             raise RuntimeError("Python >= 3.3 is required")
         "#,
             &[],
-        )?;
+        );
         // If NameError is not explicitly handled, generate a warning.
         flakes(
             r#"
@@ -992,7 +943,7 @@ mod tests {
             socket_map = {}
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         try:
@@ -1001,12 +952,11 @@ mod tests {
             socket_map = {}
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn defined_in_class() -> Result<()> {
+    fn defined_in_class() {
         // Defined name for generator expressions and dict/set comprehension.
         flakes(
             r#"
@@ -1018,7 +968,7 @@ mod tests {
             B = dict((i, str(i)) for i in T)
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -1029,12 +979,11 @@ mod tests {
             Y = {x:x for x in T}
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn defined_in_class_nested() -> Result<()> {
+    fn defined_in_class_nested() {
         // Defined name for nested generator expressions in a class.
         flakes(
             r#"
@@ -1044,12 +993,11 @@ mod tests {
             Z = (x for x in (a for a in T))
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn undefined_in_loop() -> Result<()> {
+    fn undefined_in_loop() {
         // The loop variable is defined after the expression is computed.
         flakes(
             r#"
@@ -1057,24 +1005,23 @@ mod tests {
             print(i)
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         [42 for i in range(i)]
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         (42 for i in range(i))
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn defined_from_lambda_in_dictionary_comprehension() -> Result<()> {
+    fn defined_from_lambda_in_dictionary_comprehension() {
         // Defined name referenced from a lambda function within a dict/set
         // comprehension.
         flakes(
@@ -1082,12 +1029,11 @@ mod tests {
         {lambda: id(x) for x in range(10)}
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn defined_from_lambda_in_generator() -> Result<()> {
+    fn defined_from_lambda_in_generator() {
         // Defined name referenced from a lambda function within a generator
         // expression.
         flakes(
@@ -1095,12 +1041,11 @@ mod tests {
         any(lambda: id(x) for x in range(10))
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn undefined_from_lambda_in_dictionary_comprehension() -> Result<()> {
+    fn undefined_from_lambda_in_dictionary_comprehension() {
         // Undefined name referenced from a lambda function within a dict/set
         // comprehension.
         flakes(
@@ -1108,12 +1053,11 @@ mod tests {
         {lambda: id(y) for x in range(10)}
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn undefined_from_lambda_in_comprehension() -> Result<()> {
+    fn undefined_from_lambda_in_comprehension() {
         // Undefined name referenced from a lambda function within a generator
         // expression.
         flakes(
@@ -1121,12 +1065,11 @@ mod tests {
         any(lambda: id(y) for x in range(10))
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn dunder_class() -> Result<()> {
+    fn dunder_class() {
         flakes(
             r#"
         class Test(object):
@@ -1137,90 +1080,76 @@ mod tests {
         t = Test()
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_imports.py>
     #[test]
-    fn unused_import() -> Result<()> {
-        flakes("import fu, bar", &[Rule::UnusedImport, Rule::UnusedImport])?;
+    fn unused_import() {
+        flakes("import fu, bar", &[Rule::UnusedImport, Rule::UnusedImport]);
         flakes(
             "from baz import fu, bar",
             &[Rule::UnusedImport, Rule::UnusedImport],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn unused_import_relative() -> Result<()> {
-        flakes("from . import fu", &[Rule::UnusedImport])?;
-        flakes("from . import fu as baz", &[Rule::UnusedImport])?;
-        flakes("from .. import fu", &[Rule::UnusedImport])?;
-        flakes("from ... import fu", &[Rule::UnusedImport])?;
-        flakes("from .. import fu as baz", &[Rule::UnusedImport])?;
-        flakes("from .bar import fu", &[Rule::UnusedImport])?;
-        flakes("from ..bar import fu", &[Rule::UnusedImport])?;
-        flakes("from ...bar import fu", &[Rule::UnusedImport])?;
-        flakes("from ...bar import fu as baz", &[Rule::UnusedImport])?;
-
-        Ok(())
+    fn unused_import_relative() {
+        flakes("from . import fu", &[Rule::UnusedImport]);
+        flakes("from . import fu as baz", &[Rule::UnusedImport]);
+        flakes("from .. import fu", &[Rule::UnusedImport]);
+        flakes("from ... import fu", &[Rule::UnusedImport]);
+        flakes("from .. import fu as baz", &[Rule::UnusedImport]);
+        flakes("from .bar import fu", &[Rule::UnusedImport]);
+        flakes("from ..bar import fu", &[Rule::UnusedImport]);
+        flakes("from ...bar import fu", &[Rule::UnusedImport]);
+        flakes("from ...bar import fu as baz", &[Rule::UnusedImport]);
     }
 
     #[test]
-    fn aliased_import() -> Result<()> {
+    fn aliased_import() {
         flakes(
             "import fu as FU, bar as FU",
             &[Rule::RedefinedWhileUnused, Rule::UnusedImport],
-        )?;
+        );
         flakes(
             "from moo import fu as FU, bar as FU",
             &[Rule::RedefinedWhileUnused, Rule::UnusedImport],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn aliased_import_shadow_module() -> Result<()> {
+    fn aliased_import_shadow_module() {
         // Imported aliases can shadow the source of the import.
-        flakes("from moo import fu as moo; moo", &[])?;
-        flakes("import fu as fu; fu", &[])?;
-        flakes("import fu.bar as fu; fu", &[])?;
-
-        Ok(())
+        flakes("from moo import fu as moo; moo", &[]);
+        flakes("import fu as fu; fu", &[]);
+        flakes("import fu.bar as fu; fu", &[]);
     }
 
     #[test]
-    fn used_import() -> Result<()> {
-        flakes("import fu; print(fu)", &[])?;
-        flakes("from baz import fu; print(fu)", &[])?;
-        flakes("import fu; del fu", &[])?;
-
-        Ok(())
+    fn used_import() {
+        flakes("import fu; print(fu)", &[]);
+        flakes("from baz import fu; print(fu)", &[]);
+        flakes("import fu; del fu", &[]);
     }
 
     #[test]
-    fn used_import_relative() -> Result<()> {
-        flakes("from . import fu; assert fu", &[])?;
-        flakes("from .bar import fu; assert fu", &[])?;
-        flakes("from .. import fu; assert fu", &[])?;
-        flakes("from ..bar import fu as baz; assert baz", &[])?;
-
-        Ok(())
+    fn used_import_relative() {
+        flakes("from . import fu; assert fu", &[]);
+        flakes("from .bar import fu; assert fu", &[]);
+        flakes("from .. import fu; assert fu", &[]);
+        flakes("from ..bar import fu as baz; assert baz", &[]);
     }
 
     #[test]
-    fn redefined_while_unused() -> Result<()> {
-        flakes("import fu; fu = 3", &[Rule::RedefinedWhileUnused])?;
-        flakes("import fu; fu, bar = 3", &[Rule::RedefinedWhileUnused])?;
-        flakes("import fu; [fu, bar] = 3", &[Rule::RedefinedWhileUnused])?;
-
-        Ok(())
+    fn redefined_while_unused() {
+        flakes("import fu; fu = 3", &[Rule::RedefinedWhileUnused]);
+        flakes("import fu; fu, bar = 3", &[Rule::RedefinedWhileUnused]);
+        flakes("import fu; [fu, bar] = 3", &[Rule::RedefinedWhileUnused]);
     }
 
     #[test]
-    fn redefined_if() -> Result<()> {
+    fn redefined_if() {
         // Test that importing a module twice within an if
         // block does raise a warning.
         flakes(
@@ -1232,13 +1161,11 @@ mod tests {
         os.path
         "#,
             &[Rule::RedefinedWhileUnused],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_if_else() -> Result<()> {
+    fn redefined_if_else() {
         // Test that importing a module twice in if
         // and else blocks does not raise a warning.
         flakes(
@@ -1251,13 +1178,11 @@ mod tests {
         os.path
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_try() -> Result<()> {
+    fn redefined_try() {
         // Test that importing a module twice in a try block
         // does raise a warning.
         flakes(
@@ -1270,13 +1195,11 @@ mod tests {
         os.path
         "#,
             &[Rule::RedefinedWhileUnused],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_try_except() -> Result<()> {
+    fn redefined_try_except() {
         // Test that importing a module twice in a try
         // and except block does not raise a warning.
         flakes(
@@ -1288,13 +1211,11 @@ mod tests {
         os.path
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_try_nested() -> Result<()> {
+    fn redefined_try_nested() {
         // Test that importing a module twice using a nested
         // try/except and if blocks does not issue a warning.
         flakes(
@@ -1308,13 +1229,11 @@ mod tests {
         os.path
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_try_except_multi() -> Result<()> {
+    fn redefined_try_except_multi() {
         flakes(
             r#"
         try:
@@ -1328,13 +1247,11 @@ mod tests {
         mixer(123)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_try_else() -> Result<()> {
+    fn redefined_try_else() {
         flakes(
             r#"
         try:
@@ -1346,13 +1263,11 @@ mod tests {
         mixer(123)
         "#,
             &[Rule::RedefinedWhileUnused],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_try_except_else() -> Result<()> {
+    fn redefined_try_except_else() {
         flakes(
             r#"
         try:
@@ -1365,13 +1280,11 @@ mod tests {
         print(funca, funcb)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_try_except_finally() -> Result<()> {
+    fn redefined_try_except_finally() {
         flakes(
             r#"
         try:
@@ -1383,13 +1296,11 @@ mod tests {
         print(a)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_try_except_else_finally() -> Result<()> {
+    fn redefined_try_except_else_finally() {
         flakes(
             r#"
         try:
@@ -1404,13 +1315,11 @@ mod tests {
         print(a, b)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_by_function() -> Result<()> {
+    fn redefined_by_function() {
         flakes(
             r#"
         import fu
@@ -1418,13 +1327,11 @@ mod tests {
             pass
         "#,
             &[Rule::RedefinedWhileUnused],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_in_nested_function() -> Result<()> {
+    fn redefined_in_nested_function() {
         // Test that shadowing a global name with a nested function definition
         // generates a warning.
         flakes(
@@ -1436,13 +1343,11 @@ mod tests {
                     pass
         "#,
             &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_in_nested_function_twice() -> Result<()> {
+    fn redefined_in_nested_function_twice() {
         // Test that shadowing a global name with a nested function definition
         // generates a warning.
         flakes(
@@ -1460,13 +1365,11 @@ mod tests {
                 Rule::UnusedImport,
                 Rule::RedefinedWhileUnused,
             ],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_but_used_later() -> Result<()> {
+    fn redefined_but_used_later() {
         // Test that a global import which is redefined locally,
         // but used later in another scope does not generate a warning.
         flakes(
@@ -1482,13 +1385,11 @@ mod tests {
             def test_send_defaults(self):
                 transport.Transport()"#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_by_class() -> Result<()> {
+    fn redefined_by_class() {
         flakes(
             r#"
         import fu
@@ -1496,13 +1397,11 @@ mod tests {
             pass
         "#,
             &[Rule::RedefinedWhileUnused],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_by_subclass() -> Result<()> {
+    fn redefined_by_subclass() {
         // If an imported name is redefined by a class statement which also uses
         // that name in the bases list, no warning is emitted.
         flakes(
@@ -1512,13 +1411,11 @@ mod tests {
             pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_in_class() -> Result<()> {
+    fn redefined_in_class() {
         // Test that shadowing a global with a class attribute does not produce a
         // warning.
         flakes(
@@ -1529,13 +1426,11 @@ mod tests {
         print(fu)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn import_in_class() -> Result<()> {
+    fn import_in_class() {
         // Test that import within class is a locally scoped attribute.
         flakes(
             r#"
@@ -1543,7 +1438,7 @@ mod tests {
             import fu
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -1553,13 +1448,11 @@ mod tests {
         fu
         "#,
             &[Rule::UndefinedName],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_function() -> Result<()> {
+    fn used_in_function() {
         flakes(
             r#"
         import fu
@@ -1567,13 +1460,11 @@ mod tests {
             print(fu)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn shadowed_by_parameter() -> Result<()> {
+    fn shadowed_by_parameter() {
         flakes(
             r#"
         import fu
@@ -1581,7 +1472,7 @@ mod tests {
             print(fu)
         "#,
             &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        )?;
+        );
 
         flakes(
             r#"
@@ -1591,60 +1482,49 @@ mod tests {
         print(fu)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn new_assignment() -> Result<()> {
-        flakes("fu = None", &[])?;
-
-        Ok(())
+    fn new_assignment() {
+        flakes("fu = None", &[]);
     }
 
     #[test]
-    fn used_in_getattr() -> Result<()> {
-        flakes("import fu; fu.bar.baz", &[])?;
-        flakes("import fu; \"bar\".fu.baz", &[Rule::UnusedImport])?;
-
-        Ok(())
+    fn used_in_getattr() {
+        flakes("import fu; fu.bar.baz", &[]);
+        flakes("import fu; \"bar\".fu.baz", &[Rule::UnusedImport]);
     }
 
     #[test]
-    fn used_in_slice() -> Result<()> {
-        flakes("import fu; print(fu.bar[1:])", &[])?;
-        Ok(())
+    fn used_in_slice() {
+        flakes("import fu; print(fu.bar[1:])", &[]);
     }
 
     #[test]
-    fn used_in_if_body() -> Result<()> {
+    fn used_in_if_body() {
         flakes(
             r#"
         import fu
         if True: print(fu)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_if_conditional() -> Result<()> {
+    fn used_in_if_conditional() {
         flakes(
             r#"
         import fu
         if fu: pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_elif_conditional() -> Result<()> {
+    fn used_in_elif_conditional() {
         flakes(
             r#"
         import fu
@@ -1652,13 +1532,11 @@ mod tests {
         elif fu: pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_else() -> Result<()> {
+    fn used_in_else() {
         flakes(
             r#"
         import fu
@@ -1666,20 +1544,16 @@ mod tests {
         else: print(fu)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_call() -> Result<()> {
-        flakes("import fu; fu.bar()", &[])?;
-
-        Ok(())
+    fn used_in_call() {
+        flakes("import fu; fu.bar()", &[]);
     }
 
     #[test]
-    fn used_in_class() -> Result<()> {
+    fn used_in_class() {
         flakes(
             r#"
         import fu
@@ -1687,13 +1561,11 @@ mod tests {
             bar = fu
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_class_base() -> Result<()> {
+    fn used_in_class_base() {
         flakes(
             r#"
         import fu
@@ -1701,13 +1573,11 @@ mod tests {
             pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn not_used_in_nested_scope() -> Result<()> {
+    fn not_used_in_nested_scope() {
         flakes(
             r#"
         import fu
@@ -1716,13 +1586,11 @@ mod tests {
         print(fu)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_for() -> Result<()> {
+    fn used_in_for() {
         flakes(
             r#"
         import fu
@@ -1730,13 +1598,11 @@ mod tests {
             print(fu)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_for_else() -> Result<()> {
+    fn used_in_for_else() {
         flakes(
             r#"
         import fu
@@ -1746,13 +1612,11 @@ mod tests {
             print(fu)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_by_for() -> Result<()> {
+    fn redefined_by_for() {
         flakes(
             r#"
         import fu
@@ -1760,13 +1624,11 @@ mod tests {
             pass
         "#,
             &[Rule::ImportShadowedByLoopVar],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn shadowed_by_for() -> Result<()> {
+    fn shadowed_by_for() {
         // Test that shadowing a global name with a for loop variable generates a
         // warning.
         flakes(
@@ -1777,13 +1639,11 @@ mod tests {
             pass
         "#,
             &[Rule::ImportShadowedByLoopVar],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn shadowed_by_for_deep() -> Result<()> {
+    fn shadowed_by_for_deep() {
         // Test that shadowing a global name with a for loop variable nested in a
         // tuple unpack generates a warning.
         flakes(
@@ -1794,7 +1654,7 @@ mod tests {
             pass
         "#,
             &[Rule::ImportShadowedByLoopVar],
-        )?;
+        );
         flakes(
             r#"
         import fu
@@ -1803,13 +1663,11 @@ mod tests {
             pass
         "#,
             &[Rule::ImportShadowedByLoopVar],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_return() -> Result<()> {
+    fn used_in_return() {
         flakes(
             r#"
         import fu
@@ -1817,71 +1675,57 @@ mod tests {
             return fu
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_operators() -> Result<()> {
-        flakes("import fu; 3 + fu.bar", &[])?;
-        flakes("import fu; 3 % fu.bar", &[])?;
-        flakes("import fu; 3 - fu.bar", &[])?;
-        flakes("import fu; 3 * fu.bar", &[])?;
-        flakes("import fu; 3 ** fu.bar", &[])?;
-        flakes("import fu; 3 / fu.bar", &[])?;
-        flakes("import fu; 3 // fu.bar", &[])?;
-        flakes("import fu; -fu.bar", &[])?;
-        flakes("import fu; ~fu.bar", &[])?;
-        flakes("import fu; 1 == fu.bar", &[])?;
-        flakes("import fu; 1 | fu.bar", &[])?;
-        flakes("import fu; 1 & fu.bar", &[])?;
-        flakes("import fu; 1 ^ fu.bar", &[])?;
-        flakes("import fu; 1 >> fu.bar", &[])?;
-        flakes("import fu; 1 << fu.bar", &[])?;
-
-        Ok(())
+    fn used_in_operators() {
+        flakes("import fu; 3 + fu.bar", &[]);
+        flakes("import fu; 3 % fu.bar", &[]);
+        flakes("import fu; 3 - fu.bar", &[]);
+        flakes("import fu; 3 * fu.bar", &[]);
+        flakes("import fu; 3 ** fu.bar", &[]);
+        flakes("import fu; 3 / fu.bar", &[]);
+        flakes("import fu; 3 // fu.bar", &[]);
+        flakes("import fu; -fu.bar", &[]);
+        flakes("import fu; ~fu.bar", &[]);
+        flakes("import fu; 1 == fu.bar", &[]);
+        flakes("import fu; 1 | fu.bar", &[]);
+        flakes("import fu; 1 & fu.bar", &[]);
+        flakes("import fu; 1 ^ fu.bar", &[]);
+        flakes("import fu; 1 >> fu.bar", &[]);
+        flakes("import fu; 1 << fu.bar", &[]);
     }
 
     #[test]
-    fn used_in_assert() -> Result<()> {
-        flakes("import fu; assert fu.bar", &[])?;
-
-        Ok(())
+    fn used_in_assert() {
+        flakes("import fu; assert fu.bar", &[]);
     }
 
     #[test]
-    fn used_in_subscript() -> Result<()> {
-        flakes("import fu; fu.bar[1]", &[])?;
-
-        Ok(())
+    fn used_in_subscript() {
+        flakes("import fu; fu.bar[1]", &[]);
     }
 
     #[test]
-    fn used_in_logic() -> Result<()> {
-        flakes("import fu; fu and False", &[])?;
-        flakes("import fu; fu or False", &[])?;
-        flakes("import fu; not fu.bar", &[])?;
-
-        Ok(())
+    fn used_in_logic() {
+        flakes("import fu; fu and False", &[]);
+        flakes("import fu; fu or False", &[]);
+        flakes("import fu; not fu.bar", &[]);
     }
 
     #[test]
-    fn used_in_list() -> Result<()> {
-        flakes("import fu; [fu]", &[])?;
-
-        Ok(())
+    fn used_in_list() {
+        flakes("import fu; [fu]", &[]);
     }
 
     #[test]
-    fn used_in_tuple() -> Result<()> {
-        flakes("import fu; (fu,)", &[])?;
-
-        Ok(())
+    fn used_in_tuple() {
+        flakes("import fu; (fu,)", &[]);
     }
 
     #[test]
-    fn used_in_try() -> Result<()> {
+    fn used_in_try() {
         flakes(
             r#"
         import fu
@@ -1889,13 +1733,11 @@ mod tests {
         except: pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_except() -> Result<()> {
+    fn used_in_except() {
         flakes(
             r#"
         import fu
@@ -1903,13 +1745,11 @@ mod tests {
         except: pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn redefined_by_except() -> Result<()> {
+    fn redefined_by_except() {
         flakes(
             r#"
         import fu
@@ -1917,26 +1757,22 @@ mod tests {
         except Exception as fu: pass
         "#,
             &[Rule::RedefinedWhileUnused, Rule::UnusedVariable],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_raise() -> Result<()> {
+    fn used_in_raise() {
         flakes(
             r#"
         import fu
         raise fu.bar
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_yield() -> Result<()> {
+    fn used_in_yield() {
         flakes(
             r#"
         import fu
@@ -1944,21 +1780,17 @@ mod tests {
             yield fu
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_dict() -> Result<()> {
-        flakes("import fu; {fu:None}", &[])?;
-        flakes("import fu; {1:fu}", &[])?;
-
-        Ok(())
+    fn used_in_dict() {
+        flakes("import fu; {fu:None}", &[]);
+        flakes("import fu; {1:fu}", &[]);
     }
 
     #[test]
-    fn used_in_parameter_default() -> Result<()> {
+    fn used_in_parameter_default() {
         flakes(
             r#"
         import fu
@@ -1966,43 +1798,33 @@ mod tests {
             pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_attribute_assign() -> Result<()> {
-        flakes("import fu; fu.bar = 1", &[])?;
-
-        Ok(())
+    fn used_in_attribute_assign() {
+        flakes("import fu; fu.bar = 1", &[]);
     }
 
     #[test]
-    fn used_in_keyword_arg() -> Result<()> {
-        flakes("import fu; fu.bar(stuff=fu)", &[])?;
-
-        Ok(())
+    fn used_in_keyword_arg() {
+        flakes("import fu; fu.bar(stuff=fu)", &[]);
     }
 
     #[test]
-    fn used_in_assignment() -> Result<()> {
-        flakes("import fu; bar=fu", &[])?;
-        flakes("import fu; n=0; n+=fu", &[])?;
-
-        Ok(())
+    fn used_in_assignment() {
+        flakes("import fu; bar=fu", &[]);
+        flakes("import fu; n=0; n+=fu", &[]);
     }
 
     #[test]
-    fn used_in_list_comp() -> Result<()> {
-        flakes("import fu; [fu for _ in range(1)]", &[])?;
-        flakes("import fu; [1 for _ in range(1) if fu]", &[])?;
-
-        Ok(())
+    fn used_in_list_comp() {
+        flakes("import fu; [fu for _ in range(1)]", &[]);
+        flakes("import fu; [1 for _ in range(1) if fu]", &[]);
     }
 
     #[test]
-    fn used_in_try_finally() -> Result<()> {
+    fn used_in_try_finally() {
         flakes(
             r#"
         import fu
@@ -2010,7 +1832,7 @@ mod tests {
         finally: fu
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -2019,13 +1841,11 @@ mod tests {
         finally: pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_while() -> Result<()> {
+    fn used_in_while() {
         flakes(
             r#"
         import fu
@@ -2033,7 +1853,7 @@ mod tests {
             fu
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -2041,13 +1861,11 @@ mod tests {
         while fu: pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_global() -> Result<()> {
+    fn used_in_global() {
         // A 'global' statement shadowing an unused import should not prevent it
         // from being reported.
         flakes(
@@ -2056,13 +1874,11 @@ mod tests {
         def f(): global fu
         "#,
             &[Rule::UnusedImport],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_and_global() -> Result<()> {
+    fn used_and_global() {
         // A 'global' statement shadowing a used import should not cause it to be
         // reported as unused.
         flakes(
@@ -2072,13 +1888,11 @@ mod tests {
             def g(): foo.is_used()
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn assigned_to_global() -> Result<()> {
+    fn assigned_to_global() {
         // Binding an import to a declared global should not cause it to be
         // reported as unused.
         flakes(
@@ -2087,55 +1901,45 @@ mod tests {
             def g(): foo.is_used()
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_exec() -> Result<()> {
-        flakes("import fu; exec('print(1)', fu.bar)", &[])?;
-
-        Ok(())
+    fn used_in_exec() {
+        flakes("import fu; exec('print(1)', fu.bar)", &[]);
     }
 
     #[test]
-    fn used_in_lambda() -> Result<()> {
+    fn used_in_lambda() {
         flakes(
             r#"import fu;
         lambda: fu
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn shadowed_by_lambda() -> Result<()> {
+    fn shadowed_by_lambda() {
         flakes(
             "import fu; lambda fu: fu",
             &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        )?;
-        flakes("import fu; lambda fu: fu\nfu()", &[])?;
-
-        Ok(())
+        );
+        flakes("import fu; lambda fu: fu\nfu()", &[]);
     }
 
     #[test]
-    fn used_in_slice_obj() -> Result<()> {
+    fn used_in_slice_obj() {
         flakes(
             r#"import fu;
         "meow"[::fu]
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn unused_in_nested_scope() -> Result<()> {
+    fn unused_in_nested_scope() {
         flakes(
             r#"
         def bar():
@@ -2143,13 +1947,11 @@ mod tests {
         fu
         "#,
             &[Rule::UnusedImport, Rule::UndefinedName],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn methods_dont_use_class_scope() -> Result<()> {
+    fn methods_dont_use_class_scope() {
         flakes(
             r#"
         class bar:
@@ -2158,13 +1960,11 @@ mod tests {
                 fu
         "#,
             &[Rule::UndefinedName],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn nested_functions_nest_scope() -> Result<()> {
+    fn nested_functions_nest_scope() {
         flakes(
             r#"
         def a():
@@ -2173,13 +1973,11 @@ mod tests {
             import fu
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn nested_class_and_function_scope() -> Result<()> {
+    fn nested_class_and_function_scope() {
         flakes(
             r#"
         def a():
@@ -2189,13 +1987,11 @@ mod tests {
                     print(fu)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn package_import() -> Result<()> {
+    fn package_import() {
         // If a dotted name is imported and used, no warning is reported.
         flakes(
             r#"
@@ -2203,22 +1999,18 @@ mod tests {
         fu.bar
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn unused_package_import() -> Result<()> {
+    fn unused_package_import() {
         // If a dotted name is imported and not used, an unused import warning is
         // reported.
-        flakes("import fu.bar", &[Rule::UnusedImport])?;
-
-        Ok(())
+        flakes("import fu.bar", &[Rule::UnusedImport]);
     }
 
     #[test]
-    fn duplicate_submodule_import() -> Result<()> {
+    fn duplicate_submodule_import() {
         // If a submodule of a package is imported twice, an unused import warning and a
         // redefined while unused warning are reported.
         flakes(
@@ -2227,7 +2019,7 @@ mod tests {
         fu.bar
         "#,
             &[Rule::RedefinedWhileUnused],
-        )?;
+        );
         flakes(
             r#"
         import fu.bar
@@ -2235,13 +2027,11 @@ mod tests {
         fu.bar
         "#,
             &[Rule::RedefinedWhileUnused],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn different_submodule_import() -> Result<()> {
+    fn different_submodule_import() {
         // If two different submodules of a package are imported, no duplicate import
         // warning is reported for the package.
         flakes(
@@ -2250,7 +2040,7 @@ mod tests {
         fu.bar, fu.baz
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         import fu.bar
@@ -2258,13 +2048,11 @@ mod tests {
         fu.bar, fu.baz
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_package_with_submodule_import() -> Result<()> {
+    fn used_package_with_submodule_import() {
         // Usage of package marks submodule imports as used.
         flakes(
             r#"
@@ -2273,7 +2061,7 @@ mod tests {
         fu.x
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -2282,13 +2070,11 @@ mod tests {
         fu.x
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_package_with_submodule_import_of_alias() -> Result<()> {
+    fn used_package_with_submodule_import_of_alias() {
         // Usage of package by alias marks submodule imports as used.
         flakes(
             r#"
@@ -2297,7 +2083,7 @@ mod tests {
         f.bar.do_something()
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -2306,13 +2092,11 @@ mod tests {
         f.bar.blah.do_something()
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn unused_package_with_submodule_import() -> Result<()> {
+    fn unused_package_with_submodule_import() {
         // When a package and its submodule are imported, only report once.
         flakes(
             r#"
@@ -2320,23 +2104,19 @@ mod tests {
         import fu.bar
         "#,
             &[Rule::UnusedImport],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn assign_rhs_first() -> Result<()> {
-        flakes("import fu; fu = fu", &[])?;
-        flakes("import fu; fu, bar = fu", &[])?;
-        flakes("import fu; [fu, bar] = fu", &[])?;
-        flakes("import fu; fu += fu", &[])?;
-
-        Ok(())
+    fn assign_rhs_first() {
+        flakes("import fu; fu = fu", &[]);
+        flakes("import fu; fu, bar = fu", &[]);
+        flakes("import fu; [fu, bar] = fu", &[]);
+        flakes("import fu; fu += fu", &[]);
     }
 
     #[test]
-    fn trying_multiple_imports() -> Result<()> {
+    fn trying_multiple_imports() {
         flakes(
             r#"
         try:
@@ -2346,13 +2126,11 @@ mod tests {
         fu
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn non_global_does_not_redefine() -> Result<()> {
+    fn non_global_does_not_redefine() {
         flakes(
             r#"
         import fu
@@ -2362,13 +2140,11 @@ mod tests {
         fu
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn functions_run_later() -> Result<()> {
+    fn functions_run_later() {
         flakes(
             r#"
         def a():
@@ -2376,13 +2152,11 @@ mod tests {
         import fu
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn function_names_are_bound_now() -> Result<()> {
+    fn function_names_are_bound_now() {
         flakes(
             r#"
         import fu
@@ -2391,20 +2165,16 @@ mod tests {
         fu
         "#,
             &[Rule::RedefinedWhileUnused],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn ignore_non_import_redefinitions() -> Result<()> {
-        flakes("a = 1; a = 2", &[])?;
-
-        Ok(())
+    fn ignore_non_import_redefinitions() {
+        flakes("a = 1; a = 2", &[]);
     }
 
     #[test]
-    fn imported_in_class() -> Result<()> {
+    fn imported_in_class() {
         // Imports in class scope can be used through self.
         flakes(
             r#"
@@ -2414,13 +2184,11 @@ mod tests {
                 self.i
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn import_used_in_method_definition() -> Result<()> {
+    fn import_used_in_method_definition() {
         // Method named 'foo' with default args referring to module named 'foo'.
         flakes(
             r#"
@@ -2431,28 +2199,24 @@ mod tests {
                 pass
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn future_import() -> Result<()> {
+    fn future_import() {
         // __future__ is special.
-        flakes("from __future__ import division", &[])?;
+        flakes("from __future__ import division", &[]);
         flakes(
             r#"
         "docstring is allowed before future import"
         from __future__ import division
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn future_import_first() -> Result<()> {
+    fn future_import_first() {
         // __future__ imports must come before anything else.
         flakes(
             r#"
@@ -2460,7 +2224,7 @@ mod tests {
         from __future__ import division
         "#,
             &[Rule::LateFutureImport],
-        )?;
+        );
         flakes(
             r#"
         from foo import bar
@@ -2468,13 +2232,11 @@ mod tests {
         bar
         "#,
             &[Rule::LateFutureImport],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn future_import_used() -> Result<()> {
+    fn future_import_used() {
         // __future__ is special, but names are injected in the namespace.
         flakes(
             r#"
@@ -2484,39 +2246,33 @@ mod tests {
         assert print_function is not division
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn future_import_undefined() -> Result<()> {
+    fn future_import_undefined() {
         // Importing undefined names from __future__ fails.
         flakes(
             r#"
         from __future__ import print_statement
         "#,
             &[Rule::FutureFeatureNotDefined],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn future_import_star() -> Result<()> {
+    fn future_import_star() {
         // Importing '*' from __future__ fails.
         flakes(
             r#"
         from __future__ import *
         "#,
             &[Rule::FutureFeatureNotDefined],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn ignored_in_function() -> Result<()> {
+    fn ignored_in_function() {
         // An C{__all__} definition does not suppress unused import warnings in a
         // function scope.
         flakes(
@@ -2526,13 +2282,11 @@ mod tests {
             __all__ = ["bar"]
         "#,
             &[Rule::UnusedImport, Rule::UnusedVariable],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn ignored_in_class() -> Result<()> {
+    fn ignored_in_class() {
         // An C{__all__} definition in a class does not suppress unused import warnings.
         flakes(
             r#"
@@ -2541,26 +2295,22 @@ mod tests {
             __all__ = ["bar"]
         "#,
             &[Rule::UnusedImport],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn ignored_when_not_directly_assigned() -> Result<()> {
+    fn ignored_when_not_directly_assigned() {
         flakes(
             r#"
         import bar
         (__all__,) = ("foo",)
         "#,
             &[Rule::UnusedImport],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn warning_suppressed() -> Result<()> {
+    fn warning_suppressed() {
         // If a name is imported and unused but is named in C{__all__}, no warning
         // is reported.
         flakes(
@@ -2569,20 +2319,18 @@ mod tests {
         __all__ = ["foo"]
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         import foo
         __all__ = ("foo",)
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn augmented_assignment() -> Result<()> {
+    fn augmented_assignment() {
         // The C{__all__} variable is defined incrementally.
         flakes(
             r#"
@@ -2594,13 +2342,11 @@ mod tests {
             __all__ += ['c', 'd']
         "#,
             &[Rule::UndefinedExport, Rule::UndefinedExport],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn list_concatenation_assignment() -> Result<()> {
+    fn list_concatenation_assignment() {
         // The C{__all__} variable is defined through list concatenation.
         flakes(
             r#"
@@ -2613,13 +2359,11 @@ mod tests {
                 Rule::UndefinedExport,
                 Rule::UndefinedExport,
             ],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn tuple_concatenation_assignment() -> Result<()> {
+    fn tuple_concatenation_assignment() {
         // The C{__all__} variable is defined through tuple concatenation.
         flakes(
             r#"
@@ -2632,39 +2376,33 @@ mod tests {
                 Rule::UndefinedExport,
                 Rule::UndefinedExport,
             ],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn all_with_attributes() -> Result<()> {
+    fn all_with_attributes() {
         flakes(
             r#"
         from foo import bar
         __all__ = [bar.__name__]
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn all_with_names() -> Result<()> {
+    fn all_with_names() {
         flakes(
             r#"
         from foo import bar
         __all__ = [bar]
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn all_with_attributes_added() -> Result<()> {
+    fn all_with_attributes_added() {
         flakes(
             r#"
         from foo import bar
@@ -2672,13 +2410,11 @@ mod tests {
         __all__ = [bar.__name__] + [baz.__name__]
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn all_mixed_attributes_and_strings() -> Result<()> {
+    fn all_mixed_attributes_and_strings() {
         flakes(
             r#"
         from foo import bar
@@ -2686,26 +2422,22 @@ mod tests {
         __all__ = ['bar', baz.__name__]
         "#,
             &[],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn unbound_exported() -> Result<()> {
+    fn unbound_exported() {
         // If C{__all__} includes a name which is not bound, a warning is emitted.
         flakes(
             r#"
         __all__ = ["foo"]
         "#,
             &[Rule::UndefinedExport],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn import_star_exported() -> Result<()> {
+    fn import_star_exported() {
         // Report undefined if import * is used
         flakes(
             r#"
@@ -2719,14 +2451,12 @@ mod tests {
                 Rule::ImportStarUsage,
                 Rule::ImportStarUsage,
             ],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[ignore]
     #[test]
-    fn import_star_not_exported() -> Result<()> {
+    fn import_star_not_exported() {
         // Report unused import when not needed to satisfy __all__.
         flakes(
             r#"
@@ -2735,34 +2465,28 @@ mod tests {
         __all__ = ['a']
         "#,
             &[Rule::ImportStarUsed, Rule::UnusedImport],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_in_gen_exp() -> Result<()> {
+    fn used_in_gen_exp() {
         // Using a global in a generator expression results in no warnings.
-        flakes("import fu; (fu for _ in range(1))", &[])?;
-        flakes("import fu; (1 for _ in range(1) if fu)", &[])?;
-
-        Ok(())
+        flakes("import fu; (fu for _ in range(1))", &[]);
+        flakes("import fu; (1 for _ in range(1) if fu)", &[]);
     }
 
     #[test]
-    fn redefined_by_gen_exp() -> Result<()> {
+    fn redefined_by_gen_exp() {
         // Re-using a global name as the loop variable for a generator
         // expression results in a redefinition warning.
         flakes(
             "import fu; (1 for fu in range(1))",
             &[Rule::UnusedImport, Rule::RedefinedWhileUnused],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_as_decorator() -> Result<()> {
+    fn used_as_decorator() {
         // Using a global name in a decorator statement results in no warnings,
         // but using an undefined name in a decorator statement results in an
         // undefined name warning.
@@ -2774,17 +2498,17 @@ mod tests {
             return "hello"
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
         from interior import decorate
-        @decorate('value", &[])?;
+        @decorate('value", &[]);
         def f():
             return "hello"
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -2793,13 +2517,11 @@ mod tests {
             return "hello"
         "#,
             &[Rule::UndefinedName],
-        )?;
-
-        Ok(())
+        );
     }
 
     #[test]
-    fn used_as_class_decorator() -> Result<()> {
+    fn used_as_class_decorator() {
         // Using an imported name as a class decorator results in no warnings,
         // but using an undefined name as a class decorator results in an
         // undefined name warning.
@@ -2811,7 +2533,7 @@ mod tests {
             pass
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -2821,7 +2543,7 @@ mod tests {
             pass
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -2830,14 +2552,12 @@ mod tests {
             pass
         "#,
             &[Rule::UndefinedName],
-        )?;
-
-        Ok(())
+        );
     }
 
     /// See: <https://github.com/PyCQA/pyflakes/blob/04ecb0c324ef3b61124e2f80f9e1af6c3a4c7b26/pyflakes/test/test_type_annotations.py>
     #[test]
-    fn typing_overload() -> Result<()> {
+    fn typing_overload() {
         // Allow intentional redefinitions via @typing.overload.
         flakes(
             r#"
@@ -2867,12 +2587,11 @@ mod tests {
             return s
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn typing_extensions_overload() -> Result<()> {
+    fn typing_extensions_overload() {
         // Allow intentional redefinitions via @typing_extensions.overload.
         flakes(
             r#"
@@ -2902,12 +2621,11 @@ mod tests {
             return s
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn typing_overload_async() -> Result<()> {
+    fn typing_overload_async() {
         // Allow intentional redefinitions via @typing.overload (async).
         flakes(
             r#"
@@ -2925,12 +2643,11 @@ mod tests {
             return s
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn overload_with_multiple_decorators() -> Result<()> {
+    fn overload_with_multiple_decorators() {
         flakes(
             r#"
             from typing import overload
@@ -2950,12 +2667,11 @@ mod tests {
             def f(x): return x
        "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn overload_in_class() -> Result<()> {
+    fn overload_in_class() {
         flakes(
             r#"
         from typing import overload
@@ -2972,12 +2688,11 @@ mod tests {
             def f(self, x): return x
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn aliased_typing_import() -> Result<()> {
+    fn aliased_typing_import() {
         // Detect when typing is imported as another name.
         flakes(
             r#"
@@ -2995,12 +2710,11 @@ mod tests {
             return s
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn not_a_typing_overload() -> Result<()> {
+    fn not_a_typing_overload() {
         // regression test for @typing.overload detection bug in 2.1.0.
         flakes(
             r#"
@@ -3015,26 +2729,25 @@ mod tests {
                 pass
         "#,
             &[Rule::RedefinedWhileUnused],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn variable_annotations() -> Result<()> {
+    fn variable_annotations() {
         flakes(
             r#"
         name: str
         age: int
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         name: str = 'Bob'
         age: int = 18
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         class C:
@@ -3042,7 +2755,7 @@ mod tests {
             age: int
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         class C:
@@ -3050,7 +2763,7 @@ mod tests {
             age: int = 18
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         def f():
@@ -3058,7 +2771,7 @@ mod tests {
             age: int
         "#,
             &[Rule::UnusedAnnotation, Rule::UnusedAnnotation],
-        )?;
+        );
         flakes(
             r#"
         def f():
@@ -3072,7 +2785,7 @@ mod tests {
                 Rule::UnusedVariable,
                 Rule::UndefinedName,
             ],
-        )?;
+        );
         flakes(
             r#"
         def f():
@@ -3080,7 +2793,7 @@ mod tests {
             print(name)
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         from typing import Any
@@ -3088,33 +2801,33 @@ mod tests {
             a: Any
         "#,
             &[Rule::UnusedAnnotation],
-        )?;
+        );
         flakes(
             r#"
         foo: not_a_real_type
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         foo: not_a_real_type = None
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         class C:
             foo: not_a_real_type
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         class C:
             foo: not_a_real_type = None
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         def f():
@@ -3122,7 +2835,7 @@ mod tests {
                 foo: not_a_real_type
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         def f():
@@ -3130,171 +2843,169 @@ mod tests {
                 foo: not_a_real_type = None
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         from foo import Bar
         bar: Bar
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from foo import Bar
         bar: 'Bar'
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         import foo
         bar: foo.Bar
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         import foo
         bar: 'foo.Bar'
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from foo import Bar
         def f(bar: Bar): pass
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from foo import Bar
         def f(bar: 'Bar'): pass
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from foo import Bar
         def f(bar) -> Bar: return bar
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from foo import Bar
         def f(bar) -> 'Bar': return bar
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         bar: 'Bar'
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         bar: 'foo.Bar'
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         from foo import Bar
         bar: str
         "#,
             &[Rule::UnusedImport],
-        )?;
+        );
         flakes(
             r#"
         from foo import Bar
         def f(bar: str): pass
         "#,
             &[Rule::UnusedImport],
-        )?;
+        );
         flakes(
             r#"
         def f(a: A) -> A: pass
         class A: pass
         "#,
             &[Rule::UndefinedName, Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         def f(a: 'A') -> 'A': return a
         class A: pass
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         a: A
         class A: pass
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         a: 'A'
         class A: pass
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         T: object
         def f(t: T): pass
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
         flakes(
             r#"
         T: object
         def g(t: 'T'): pass
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         a: 'A B'
         "#,
             &[Rule::ForwardAnnotationSyntaxError],
-        )?;
+        );
         flakes(
             r#"
         a: 'A; B'
         "#,
             &[Rule::ForwardAnnotationSyntaxError],
-        )?;
+        );
         flakes(
             r#"
         a: '1 + 2'
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         a: 'a: "A"'
         "#,
             &[Rule::ForwardAnnotationSyntaxError],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn variable_annotation_references_self_name_undefined() -> Result<()> {
+    fn variable_annotation_references_self_name_undefined() {
         flakes(
             r#"
         x: int = x
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn type_alias_annotations() -> Result<()> {
+    fn type_alias_annotations() {
         flakes(
             r#"
         from typing_extensions import TypeAlias
@@ -3303,7 +3014,7 @@ mod tests {
         bar: TypeAlias = Bar
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from typing_extensions import TypeAlias
@@ -3312,7 +3023,7 @@ mod tests {
         bar: TypeAlias = 'Bar'
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from typing_extensions import TypeAlias
@@ -3322,7 +3033,7 @@ mod tests {
             bar: TypeAlias = Bar
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from typing_extensions import TypeAlias
@@ -3332,7 +3043,7 @@ mod tests {
             bar: TypeAlias = 'Bar'
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from typing_extensions import TypeAlias
@@ -3340,7 +3051,7 @@ mod tests {
         bar: TypeAlias
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         from typing_extensions import TypeAlias
@@ -3349,12 +3060,11 @@ mod tests {
         bar: TypeAlias
         "#,
             &[Rule::UnusedImport],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn annotating_an_import() -> Result<()> {
+    fn annotating_an_import() {
         flakes(
             r#"
             from a import b, c
@@ -3362,12 +3072,11 @@ mod tests {
             print(b)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn unused_annotation() -> Result<()> {
+    fn unused_annotation() {
         // Unused annotations are fine in module and class scope.
         flakes(
             r#"
@@ -3376,14 +3085,14 @@ mod tests {
             y: int
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
         def f():
             x: int
         "#,
             &[Rule::UnusedAnnotation],
-        )?;
+        );
         // This should only print one UnusedVariable message.
         flakes(
             r#"
@@ -3392,36 +3101,33 @@ mod tests {
             x = 3
         "#,
             &[Rule::UnusedVariable],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn unassigned_annotation_is_undefined() -> Result<()> {
+    fn unassigned_annotation_is_undefined() {
         flakes(
             r#"
         name: str
         print(name)
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn annotated_async_def() -> Result<()> {
+    fn annotated_async_def() {
         flakes(
             r#"
         class c: pass
         async def func(c: c) -> None: pass
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn postponed_annotations() -> Result<()> {
+    fn postponed_annotations() {
         flakes(
             r#"
         from __future__ import annotations
@@ -3431,7 +3137,7 @@ mod tests {
         class B: pass
         "#,
             &[],
-        )?;
+        );
 
         flakes(
             r#"
@@ -3442,7 +3148,7 @@ mod tests {
         class B: pass
         "#,
             &[Rule::UndefinedName],
-        )?;
+        );
 
         flakes(
             r#"
@@ -3452,12 +3158,11 @@ mod tests {
         def g(t: 'T'): pass
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn type_annotation_clobbers_all() -> Result<()> {
+    fn type_annotation_clobbers_all() {
         flakes(
             r#"
         from typing import TYPE_CHECKING, List
@@ -3470,12 +3175,11 @@ mod tests {
             __all__: List[str]
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn return_annotation_is_class_scope_variable() -> Result<()> {
+    fn return_annotation_is_class_scope_variable() {
         flakes(
             r#"
         from typing import TypeVar
@@ -3486,12 +3190,11 @@ mod tests {
                 return x
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn return_annotation_is_function_body_variable() -> Result<()> {
+    fn return_annotation_is_function_body_variable() {
         flakes(
             r#"
         class Test:
@@ -3500,12 +3203,11 @@ mod tests {
                 return Y
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn positional_only_argument_annotations() -> Result<()> {
+    fn positional_only_argument_annotations() {
         flakes(
             r#"
         from x import C
@@ -3513,12 +3215,11 @@ mod tests {
         def f(c: C, /): ...
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn partially_quoted_type_annotation() -> Result<()> {
+    fn partially_quoted_type_annotation() {
         flakes(
             r#"
         from queue import Queue
@@ -3528,12 +3229,11 @@ mod tests {
             return None
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn partially_quoted_type_assignment() -> Result<()> {
+    fn partially_quoted_type_assignment() {
         flakes(
             r#"
         from queue import Queue
@@ -3542,12 +3242,11 @@ mod tests {
         MaybeQueue = Optional['Queue[str]']
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn nested_partially_quoted_type_assignment() -> Result<()> {
+    fn nested_partially_quoted_type_assignment() {
         flakes(
             r#"
         from queue import Queue
@@ -3556,12 +3255,11 @@ mod tests {
         Func = Callable[['Queue[str]'], None]
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn quoted_type_cast() -> Result<()> {
+    fn quoted_type_cast() {
         flakes(
             r#"
         from typing import cast, Optional
@@ -3569,12 +3267,11 @@ mod tests {
         maybe_int = cast('Optional[int]', 42)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn type_cast_literal_str_to_str() -> Result<()> {
+    fn type_cast_literal_str_to_str() {
         // Checks that our handling of quoted type annotations in the first
         // argument to `cast` doesn't cause issues when (only) the _second_
         // argument is a literal str which looks a bit like a type annotation.
@@ -3585,12 +3282,11 @@ mod tests {
         a_string = cast(str, 'Optional[int]')
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn quoted_type_cast_renamed_import() -> Result<()> {
+    fn quoted_type_cast_renamed_import() {
         flakes(
             r#"
         from typing import cast as tsac, Optional as Maybe
@@ -3598,12 +3294,11 @@ mod tests {
         maybe_int = tsac('Maybe[int]', 42)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn quoted_type_var_constraints() -> Result<()> {
+    fn quoted_type_var_constraints() {
         flakes(
             r#"
         from typing import TypeVar, Optional
@@ -3611,12 +3306,11 @@ mod tests {
         T = TypeVar('T', 'str', 'Optional[int]', bytes)
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn quoted_type_var_bound() -> Result<()> {
+    fn quoted_type_var_bound() {
         flakes(
             r#"
         from typing import TypeVar, Optional, List
@@ -3625,12 +3319,11 @@ mod tests {
         S = TypeVar('S', int, bound='List[int]')
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn literal_type_typing() -> Result<()> {
+    fn literal_type_typing() {
         flakes(
             r#"
         from typing import Literal
@@ -3639,12 +3332,11 @@ mod tests {
             return None
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn literal_type_typing_extensions() -> Result<()> {
+    fn literal_type_typing_extensions() {
         flakes(
             r#"
         from typing_extensions import Literal
@@ -3653,12 +3345,11 @@ mod tests {
             return None
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn annotated_type_typing_missing_forward_type_multiple_args() -> Result<()> {
+    fn annotated_type_typing_missing_forward_type_multiple_args() {
         flakes(
             r#"
         from typing import Annotated
@@ -3667,12 +3358,11 @@ mod tests {
             return None
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn annotated_type_typing_with_string_args() -> Result<()> {
+    fn annotated_type_typing_with_string_args() {
         flakes(
             r#"
         from typing import Annotated
@@ -3681,12 +3371,11 @@ mod tests {
             return None
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn annotated_type_typing_with_string_args_in_union() -> Result<()> {
+    fn annotated_type_typing_with_string_args_in_union() {
         flakes(
             r#"
         from typing import Annotated, Union
@@ -3695,14 +3384,13 @@ mod tests {
             return None
         "#,
             &[Rule::UndefinedName],
-        )?;
-        Ok(())
+        );
     }
 
     // We err on the side of assuming strings are forward references.
     #[ignore]
     #[test]
-    fn literal_type_some_other_module() -> Result<()> {
+    fn literal_type_some_other_module() {
         // err on the side of false-negatives for types named Literal.
         flakes(
             r#"
@@ -3715,12 +3403,11 @@ mod tests {
             return None
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn literal_union_type_typing() -> Result<()> {
+    fn literal_union_type_typing() {
         flakes(
             r#"
         from typing import Literal
@@ -3729,14 +3416,13 @@ mod tests {
             return None
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     // TODO(charlie): Support nested deferred string annotations.
     #[ignore]
     #[test]
-    fn deferred_twice_annotation() -> Result<()> {
+    fn deferred_twice_annotation() {
         flakes(
             r#"
             from queue import Queue
@@ -3746,12 +3432,11 @@ mod tests {
                 return None
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn partial_string_annotations_with_future_annotations() -> Result<()> {
+    fn partial_string_annotations_with_future_annotations() {
         flakes(
             r#"
             from __future__ import annotations
@@ -3763,12 +3448,11 @@ mod tests {
                 return None
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn forward_annotations_for_classes_in_scope() -> Result<()> {
+    fn forward_annotations_for_classes_in_scope() {
         flakes(
             r#"
         from typing import Optional
@@ -3782,12 +3466,11 @@ mod tests {
             class D: pass
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn idiomiatic_typing_guards() -> Result<()> {
+    fn idiomiatic_typing_guards() {
         // typing.TYPE_CHECKING: python3.5.3+.
         flakes(
             r#"
@@ -3800,7 +3483,7 @@ mod tests {
                 pass
         "#,
             &[],
-        )?;
+        );
         // False: the old, more-compatible approach.
         flakes(
             r#"
@@ -3811,7 +3494,7 @@ mod tests {
                 pass
         "#,
             &[],
-        )?;
+        );
         // Some choose to assign a constant and do it that way.
         flakes(
             r#"
@@ -3824,12 +3507,11 @@ mod tests {
                 pass
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn typing_guard_for_protocol() -> Result<()> {
+    fn typing_guard_for_protocol() {
         flakes(
             r#"
             from typing import TYPE_CHECKING
@@ -3844,12 +3526,11 @@ mod tests {
                     pass
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn typed_names_correct_forward_ref() -> Result<()> {
+    fn typed_names_correct_forward_ref() {
         flakes(
             r#"
             from typing import TypedDict, List, NamedTuple
@@ -3860,7 +3541,7 @@ mod tests {
             List[NamedTuple("a", [("a", int)])]
         "#,
             &[],
-        )?;
+        );
         flakes(
             r#"
             from typing import TypedDict, List, NamedTuple, TypeVar
@@ -3882,7 +3563,7 @@ mod tests {
                 Rule::UndefinedName,
                 Rule::UndefinedName,
             ],
-        )?;
+        );
         flakes(
             r#"
             from typing import NamedTuple, TypeVar, cast
@@ -3894,12 +3575,11 @@ mod tests {
             cast(A["E"], [])
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 
     #[test]
-    fn named_types_classes() -> Result<()> {
+    fn named_types_classes() {
         flakes(
             r#"
             from typing import TypedDict, NamedTuple
@@ -3910,7 +3590,6 @@ mod tests {
                 y: NamedTuple("v", [("vv", int)])
         "#,
             &[],
-        )?;
-        Ok(())
+        );
     }
 }

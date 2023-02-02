@@ -39,7 +39,7 @@ pub fn check_path(
     settings: &Settings,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
-) -> Result<Vec<Diagnostic>> {
+) -> Vec<Diagnostic> {
     // Aggregate all diagnostics.
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -146,8 +146,7 @@ pub fn check_path(
 
     // Ignore diagnostics based on per-file-ignores.
     if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
-        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores)?;
-
+        let ignores = fs::ignores_from_path(path, &settings.per_file_ignores);
         if !ignores.is_empty() {
             diagnostics.retain(|diagnostic| !ignores.contains(&diagnostic.kind.rule()));
         }
@@ -170,7 +169,7 @@ pub fn check_path(
         );
     }
 
-    Ok(diagnostics)
+    diagnostics
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -209,7 +208,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         settings,
         flags::Autofix::Disabled,
         flags::Noqa::Disabled,
-    )?;
+    );
 
     add_noqa(
         path,
@@ -229,7 +228,7 @@ pub fn lint_only(
     package: Option<&Path>,
     settings: &Settings,
     autofix: flags::Autofix,
-) -> Result<Vec<Message>> {
+) -> Vec<Message> {
     // Tokenize once.
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
 
@@ -259,11 +258,11 @@ pub fn lint_only(
         settings,
         autofix,
         flags::Noqa::Enabled,
-    )?;
+    );
 
     // Convert from diagnostics to messages.
     let path_lossy = path.to_string_lossy();
-    Ok(diagnostics
+    diagnostics
         .into_iter()
         .map(|diagnostic| {
             let source = if settings.show_source {
@@ -273,7 +272,7 @@ pub fn lint_only(
             };
             Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
         })
-        .collect())
+        .collect()
 }
 
 /// Generate `Diagnostic`s from source code content, iteratively autofixing
@@ -283,7 +282,7 @@ pub fn lint_fix(
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
-) -> Result<(String, usize, Vec<Message>)> {
+) -> (String, usize, Vec<Message>) {
     let mut contents = contents.to_string();
 
     // Track the number of fixed errors across iterations.
@@ -323,7 +322,7 @@ pub fn lint_fix(
             settings,
             flags::Autofix::Enabled,
             flags::Noqa::Enabled,
-        )?;
+        );
 
         // Apply autofix.
         if let Some((fixed_contents, applied)) = fix_file(&diagnostics, &locator) {
@@ -372,6 +371,6 @@ quoting the contents of `{}`, along with the `pyproject.toml` settings and execu
                 Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
             })
             .collect();
-        return Ok((contents, fixed, messages));
+        return (contents, fixed, messages);
     }
 }

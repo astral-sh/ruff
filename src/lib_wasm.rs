@@ -199,8 +199,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         &settings,
         flags::Autofix::Enabled,
         flags::Noqa::Enabled,
-    )
-    .map_err(|e| e.to_string())?;
+    );
 
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
