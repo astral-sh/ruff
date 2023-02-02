@@ -20,7 +20,7 @@ repos:
         types: [rust]
       - id: clippy
         name: clippy
-        entry: cargo clippy --workspace --all-targets --all-features
+        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
         language: rust
         pass_filenames: false
       - id: dev-generate-all
