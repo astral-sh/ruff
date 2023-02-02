@@ -38,6 +38,33 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+    #[test]
+    fn ignore_fully_untyped() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_annotations/ignore_fully_untyped.py"),
+            &Settings {
+                flake8_annotations: super::settings::Settings {
+                    ignore_fully_untyped: true,
+                    ..Default::default()
+                },
+                ..Settings::for_rules(vec![
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingTypeArgs,
+                    Rule::MissingTypeKwargs,
+                    Rule::MissingTypeSelf,
+                    Rule::MissingTypeCls,
+                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
+                    Rule::DynamicallyTypedExpression,
+                ])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
 
     #[test]
     fn suppress_dummy_args() -> Result<()> {
@@ -79,7 +106,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 

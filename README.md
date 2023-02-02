@@ -2663,6 +2663,25 @@ allow-star-arg-any = true
 
 ---
 
+#### [`ignore-fully-untyped`](#ignore-fully-untyped)
+
+Whether to suppress `ANN*` rules for any declaration
+that hasn't been typed at all.
+This makes it easier to gradually add types to a codebase.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-annotations]
+ignore-fully-untyped = true
+```
+
+---
+
 #### [`mypy-init-return`](#mypy-init-return)
 
 Whether to allow the omission of a return type hint for `__init__` if at

@@ -185,12 +185,16 @@ fn is_none_returning(body: &[Stmt]) -> bool {
 }
 
 /// ANN401
-fn check_dynamically_typed<F>(checker: &mut Checker, annotation: &Expr, func: F)
-where
+fn check_dynamically_typed<F>(
+    checker: &mut Checker,
+    annotation: &Expr,
+    func: F,
+    diagnostics: &mut Vec<Diagnostic>,
+) where
     F: FnOnce() -> String,
 {
     if checker.match_typing_expr(annotation, "Any") {
-        checker.diagnostics.push(Diagnostic::new(
+        diagnostics.push(Diagnostic::new(
             DynamicallyTypedExpression { name: func() },
             Range::from_located(annotation),
         ));
@@ -212,7 +216,14 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
         | DefinitionKind::Method(stmt) => {
             let is_method = matches!(definition.kind, DefinitionKind::Method(_));
             let (name, args, returns, body) = match_function_def(stmt);
-            let mut has_any_typed_arg = false;
+            // Keep track of whether we've seen any typed arguments or return values.
+            let mut has_any_typed_arg = false; // Any argument has been typed?
+            let mut has_typed_return = false; // Return value has been typed?
+            let mut has_typed_self_or_cls = false; // Has a typed `self` or `cls` argument?
+
+            // Temporary storage for diagnostics; we emit them at the end
+            // unless configured to suppress ANN* for declarations that are fully untyped.
+            let mut diagnostics = Vec::new();
 
             // ANN001, ANN401
             for arg in args
@@ -236,7 +247,12 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .rules
                         .enabled(&Rule::DynamicallyTypedExpression)
                     {
-                        check_dynamically_typed(checker, annotation, || arg.node.arg.to_string());
+                        check_dynamically_typed(
+                            checker,
+                            annotation,
+                            || arg.node.arg.to_string(),
+                            &mut diagnostics,
+                        );
                     }
                 } else {
                     if !(checker.settings.flake8_annotations.suppress_dummy_args
@@ -269,7 +285,12 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             .enabled(&Rule::DynamicallyTypedExpression)
                         {
                             let name = &arg.node.arg;
-                            check_dynamically_typed(checker, expr, || format!("*{name}"));
+                            check_dynamically_typed(
+                                checker,
+                                expr,
+                                || format!("*{name}"),
+                                &mut diagnostics,
+                            );
                         }
                     }
                 } else {
@@ -277,7 +298,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
                         if checker.settings.rules.enabled(&Rule::MissingTypeArgs) {
-                            checker.diagnostics.push(Diagnostic::new(
+                            diagnostics.push(Diagnostic::new(
                                 MissingTypeArgs {
                                     name: arg.node.arg.to_string(),
                                 },
@@ -299,7 +320,12 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             .enabled(&Rule::DynamicallyTypedExpression)
                         {
                             let name = &arg.node.arg;
-                            check_dynamically_typed(checker, expr, || format!("**{name}"));
+                            check_dynamically_typed(
+                                checker,
+                                expr,
+                                || format!("**{name}"),
+                                &mut diagnostics,
+                            );
                         }
                     }
                 } else {
@@ -307,7 +333,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                     {
                         if checker.settings.rules.enabled(&Rule::MissingTypeKwargs) {
-                            checker.diagnostics.push(Diagnostic::new(
+                            diagnostics.push(Diagnostic::new(
                                 MissingTypeKwargs {
                                     name: arg.node.arg.to_string(),
                                 },
@@ -324,7 +350,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     if arg.node.annotation.is_none() {
                         if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
                             if checker.settings.rules.enabled(&Rule::MissingTypeCls) {
-                                checker.diagnostics.push(Diagnostic::new(
+                                diagnostics.push(Diagnostic::new(
                                     MissingTypeCls {
                                         name: arg.node.arg.to_string(),
                                     },
@@ -333,7 +359,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             }
                         } else {
                             if checker.settings.rules.enabled(&Rule::MissingTypeSelf) {
-                                checker.diagnostics.push(Diagnostic::new(
+                                diagnostics.push(Diagnostic::new(
                                     MissingTypeSelf {
                                         name: arg.node.arg.to_string(),
                                     },
@@ -341,18 +367,21 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                 ));
                             }
                         }
+                    } else {
+                        has_typed_self_or_cls = true;
                     }
                 }
             }
 
             // ANN201, ANN202, ANN401
             if let Some(expr) = &returns {
+                has_typed_return = true;
                 if checker
                     .settings
                     .rules
                     .enabled(&Rule::DynamicallyTypedExpression)
                 {
-                    check_dynamically_typed(checker, expr, || name.to_string());
+                    check_dynamically_typed(checker, expr, || name.to_string(), &mut diagnostics);
                 }
             } else {
                 // Allow omission of return annotation if the function only returns `None`
@@ -369,7 +398,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .rules
                         .enabled(&Rule::MissingReturnTypeClassMethod)
                     {
-                        checker.diagnostics.push(Diagnostic::new(
+                        diagnostics.push(Diagnostic::new(
                             MissingReturnTypeClassMethod {
                                 name: name.to_string(),
                             },
@@ -384,7 +413,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .rules
                         .enabled(&Rule::MissingReturnTypeStaticMethod)
                     {
-                        checker.diagnostics.push(Diagnostic::new(
+                        diagnostics.push(Diagnostic::new(
                             MissingReturnTypeStaticMethod {
                                 name: name.to_string(),
                             },
@@ -416,7 +445,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                     Err(e) => error!("Failed to generate fix: {e}"),
                                 }
                             }
-                            checker.diagnostics.push(diagnostic);
+                            diagnostics.push(diagnostic);
                         }
                     }
                 } else if is_method && visibility::is_magic(cast::name(stmt)) {
@@ -425,7 +454,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .rules
                         .enabled(&Rule::MissingReturnTypeSpecialMethod)
                     {
-                        checker.diagnostics.push(Diagnostic::new(
+                        diagnostics.push(Diagnostic::new(
                             MissingReturnTypeSpecialMethod {
                                 name: name.to_string(),
                             },
@@ -440,7 +469,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                 .rules
                                 .enabled(&Rule::MissingReturnTypePublicFunction)
                             {
-                                checker.diagnostics.push(Diagnostic::new(
+                                diagnostics.push(Diagnostic::new(
                                     MissingReturnTypePublicFunction {
                                         name: name.to_string(),
                                     },
@@ -454,7 +483,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                 .rules
                                 .enabled(&Rule::MissingReturnTypePrivateFunction)
                             {
-                                checker.diagnostics.push(Diagnostic::new(
+                                diagnostics.push(Diagnostic::new(
                                     MissingReturnTypePrivateFunction {
                                         name: name.to_string(),
                                     },
@@ -465,6 +494,15 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     }
                 }
             }
+            // If settings say so, don't report any of the
+            // diagnostics gathered here if there were no type annotations at all.
+            if checker.settings.flake8_annotations.ignore_fully_untyped
+                && !(has_any_typed_arg || has_typed_self_or_cls || has_typed_return)
+            {
+                return;
+            }
+
+            checker.diagnostics.extend(diagnostics);
         }
     }
 }

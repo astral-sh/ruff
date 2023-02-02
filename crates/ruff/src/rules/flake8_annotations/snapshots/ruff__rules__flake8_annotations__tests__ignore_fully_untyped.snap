@@ -1,0 +1,93 @@
+---
+source: crates/ruff/src/rules/flake8_annotations/mod.rs
+expression: diagnostics
+---
+- kind:
+    MissingTypeFunctionArgument:
+      name: a
+  location:
+    row: 6
+    column: 23
+  end_location:
+    row: 6
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: b
+  location:
+    row: 6
+    column: 26
+  end_location:
+    row: 6
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    MissingReturnTypePublicFunction:
+      name: error_partially_typed_1
+  location:
+    row: 26
+    column: 4
+  end_location:
+    row: 26
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: b
+  location:
+    row: 26
+    column: 36
+  end_location:
+    row: 26
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: b
+  location:
+    row: 30
+    column: 36
+  end_location:
+    row: 30
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    MissingReturnTypePublicFunction:
+      name: error_partially_typed_3
+  location:
+    row: 34
+    column: 4
+  end_location:
+    row: 34
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: a
+  location:
+    row: 39
+    column: 41
+  end_location:
+    row: 39
+    column: 42
+  fix: ~
+  parent: ~
+- kind:
+    MissingReturnTypePublicFunction:
+      name: error_typed_self
+  location:
+    row: 45
+    column: 8
+  end_location:
+    row: 45
+    column: 24
+  fix: ~
+  parent: ~
+
