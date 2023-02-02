@@ -7,32 +7,36 @@ adjusts the images in the README.md to support the given target.
 import argparse
 from pathlib import Path
 
+URL = "https://user-images.githubusercontent.com/1309177/{}.svg"
+URL_LIGHT = URL.format("212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928")
+URL_DARK = URL.format("212613422-7faaf278-706b-4294-ad92-236ffcab3430")
+
 # https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#specifying-the-theme-an-image-is-shown-to
-GITHUB = """
+GITHUB = f"""
 <p align="center">
   <picture align="center">
-    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1309177/212613422-7faaf278-706b-4294-ad92-236ffcab3430.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
-    <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="{URL_DARK}">
+    <source media="(prefers-color-scheme: light)" srcset="{URL_LIGHT}">
+    <img alt="Shows a bar chart with benchmark results." src="{URL_LIGHT}">
   </picture>
 </p>
 """
 
 # https://github.com/pypi/warehouse/issues/11251
-PYPI = """
+PYPI = f"""
 <p align="center">
-  <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg">
+  <img alt="Shows a bar chart with benchmark results." src="{URL_LIGHT}">
 </p>
 """
 
 # https://squidfunk.github.io/mkdocs-material/reference/images/#light-and-dark-mode
-MK_DOCS = """
+MK_DOCS = f"""
 <p align="center">
-  <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613257-5f4bca12-6d6b-4c79-9bac-51a4c6d08928.svg#only-light">
+  <img alt="Shows a bar chart with benchmark results." src="{URL_LIGHT}#only-light">
 </p>
 
 <p align="center">
-  <img alt="Shows a bar chart with benchmark results." src="https://user-images.githubusercontent.com/1309177/212613422-7faaf278-706b-4294-ad92-236ffcab3430.svg#only-dark">
+  <img alt="Shows a bar chart with benchmark results." src="{URL_DARK}#only-dark">
 </p>
 """
 
