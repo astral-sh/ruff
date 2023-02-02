@@ -1,10 +1,14 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use anyhow::Result;
 use libcst_native::{
     AsName, AssignTargetExpression, Attribute, Codegen, CodegenState, Dot, Expression, Import,
     ImportAlias, ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
+use serde::{Deserialize, Serialize};
 
 use crate::ast::helpers::collect_call_path;
 use crate::ast::types::Range;
@@ -14,8 +18,32 @@ use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::{Locator, Stylist};
-use crate::violations;
-use crate::violations::MockReference;
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MockReference {
+    Import,
+    Attribute,
+}
+
+define_violation!(
+    pub struct RewriteMockImport {
+        pub reference_type: MockReference,
+    }
+);
+impl AlwaysAutofixableViolation for RewriteMockImport {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`mock` is deprecated, use `unittest.mock`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let RewriteMockImport { reference_type } = self;
+        match reference_type {
+            MockReference::Import => "Import from `unittest.mock` instead".to_string(),
+            MockReference::Attribute => "Replace `mock.mock` with `mock`".to_string(),
+        }
+    }
+}
 
 /// Return a vector of all non-`mock` imports.
 fn clean_import_aliases(aliases: Vec<ImportAlias>) -> (Vec<ImportAlias>, Vec<Option<AsName>>) {
@@ -209,7 +237,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
         if collect_call_path(value).as_slice() == ["mock", "mock"] {
             let mut diagnostic = Diagnostic::new(
-                violations::RewriteMockImport {
+                RewriteMockImport {
                     reference_type: MockReference::Attribute,
                 },
                 Range::from_located(value),
@@ -256,7 +284,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 for name in names {
                     if name.node.name == "mock" || name.node.name == "mock.mock" {
                         let mut diagnostic = Diagnostic::new(
-                            violations::RewriteMockImport {
+                            RewriteMockImport {
                                 reference_type: MockReference::Import,
                             },
                             Range::from_located(name),
@@ -284,7 +312,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
 
             if module == "mock" {
                 let mut diagnostic = Diagnostic::new(
-                    violations::RewriteMockImport {
+                    RewriteMockImport {
                         reference_type: MockReference::Import,
                     },
                     Range::from_located(stmt),

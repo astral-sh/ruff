@@ -1,3 +1,5 @@
+use ruff_macros::derive_message_formats;
+
 use std::cmp::Ordering;
 
 use log::error;
@@ -6,8 +8,6 @@ use rustpython_ast::Location;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
-
-use ruff_macros::derive_message_formats;
 
 use crate::ast::types::{Range, RefEquality};
 use crate::ast::whitespace::indentation;

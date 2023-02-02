@@ -1,5 +1,8 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use anyhow::{bail, Result};
 use log::debug;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
@@ -10,7 +13,24 @@ use crate::python::identifiers::is_identifier;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violations;
+
+define_violation!(
+    pub struct ConvertNamedTupleFunctionalToClass {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for ConvertNamedTupleFunctionalToClass {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ConvertNamedTupleFunctionalToClass { name } = self;
+        format!("Convert `{name}` from `NamedTuple` functional to class syntax")
+    }
+
+    fn autofix_title(&self) -> String {
+        let ConvertNamedTupleFunctionalToClass { name } = self;
+        format!("Convert `{name}` to class syntax")
+    }
+}
 
 /// Return the typename, args, keywords, and base class.
 fn match_named_tuple_assign<'a>(
@@ -154,7 +174,7 @@ pub fn convert_named_tuple_functional_to_class(
         return;
     };
     let mut diagnostic = Diagnostic::new(
-        violations::ConvertNamedTupleFunctionalToClass {
+        ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
         },
         Range::from_located(stmt),

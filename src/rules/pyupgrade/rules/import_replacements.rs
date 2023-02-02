@@ -1,7 +1,6 @@
 use itertools::Itertools;
-use rustpython_ast::{Alias, AliasData, Stmt};
-
 use ruff_macros::derive_message_formats;
+use rustpython_ast::{Alias, AliasData, Stmt};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;

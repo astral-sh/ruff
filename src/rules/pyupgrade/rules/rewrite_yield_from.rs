@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
@@ -7,7 +10,20 @@ use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct RewriteYieldFrom;
+);
+impl AlwaysAutofixableViolation for RewriteYieldFrom {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Replace `yield` over `for` loop with `yield from`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `yield from`".to_string()
+    }
+}
 
 /// Return `true` if the two expressions are equivalent, and consistent solely
 /// of tuples and names.
@@ -157,8 +173,7 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
                 continue;
             }
 
-            let mut diagnostic =
-                Diagnostic::new(violations::RewriteYieldFrom, Range::from_located(item.stmt));
+            let mut diagnostic = Diagnostic::new(RewriteYieldFrom, Range::from_located(item.stmt));
             if checker.patch(diagnostic.kind.rule()) {
                 let contents = checker
                     .locator

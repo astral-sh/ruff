@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
@@ -5,7 +8,20 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
-use crate::violations;
+
+define_violation!(
+    pub struct UnnecessaryEncodeUTF8;
+);
+impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Unnecessary call to `encode` as UTF-8")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove unnecessary `encode`".to_string()
+    }
+}
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 
@@ -60,15 +76,13 @@ fn delete_default_encode_arg_or_kwarg(
     patch: bool,
 ) -> Option<Diagnostic> {
     if let Some(arg) = args.get(0) {
-        let mut diagnostic =
-            Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
             diagnostic.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
         }
         Some(diagnostic)
     } else if let Some(kwarg) = kwargs.get(0) {
-        let mut diagnostic =
-            Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
         if patch {
             diagnostic.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
         }
@@ -85,8 +99,7 @@ fn replace_with_bytes_literal(
     locator: &Locator,
     patch: bool,
 ) -> Diagnostic {
-    let mut diagnostic =
-        Diagnostic::new(violations::UnnecessaryEncodeUTF8, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
     if patch {
         let content = locator.slice_source_code_range(&Range::new(
             constant.location,
