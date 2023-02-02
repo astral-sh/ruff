@@ -37,6 +37,7 @@ mod tests {
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
     #[test_case(Rule::TooManyArgs, Path::new("too_many_args.py"); "PLR0913")]
+    #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -86,6 +87,22 @@ mod tests {
             &Settings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap().into(),
                 ..Settings::for_rules(vec![Rule::TooManyArgs])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn max_statements() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_statements_params.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    max_statements: 1,
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyStatements])
             },
         )?;
         assert_yaml_snapshot!(diagnostics);
