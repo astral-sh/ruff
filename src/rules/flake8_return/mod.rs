@@ -1,4 +1,5 @@
 //! Rules from [flake8-return](https://pypi.org/project/flake8-return/).
+mod branch;
 mod helpers;
 pub(crate) mod rules;
 mod visitor;
