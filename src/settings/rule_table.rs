@@ -6,7 +6,7 @@ use super::hashable::HashableHashMap;
 use crate::registry::Rule;
 
 /// A table to keep track of which rules are enabled
-/// and whether or not they should be autofixed.
+/// and Whether they should be autofixed.
 #[derive(Debug, Hash)]
 pub struct RuleTable {
     /// Maps rule codes to a boolean indicating if the rule should be autofixed.
