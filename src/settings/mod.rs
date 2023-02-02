@@ -243,6 +243,14 @@ impl From<&Configuration> for RuleTable {
         // The fixable set keeps track of which rules are fixable.
         let mut fixable_set: FxHashSet<Rule> = RuleSelector::All.into_iter().collect();
 
+        // Ignores normally only subtract from the current set of selected
+        // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
+        // would be effectless. Instead we carry over the ignores to the next
+        // selection in that case, creating a way for ignores to be reused
+        // across config files (which otherwise wouldn't be possible since ruff
+        // only has `extended` but no `extended-by`).
+        let mut carryover_ignores: Option<&[RuleSelector]> = None;
+
         let mut redirects = FxHashMap::default();
 
         for selection in &config.rule_selections {
@@ -261,6 +269,8 @@ impl From<&Configuration> for RuleTable {
             // whether to enable or disable the given rule.
             let mut select_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
 
+            let carriedover_ignores = carryover_ignores.take();
+
             for spec in Specificity::iter() {
                 for selector in selection
                     .select
@@ -273,7 +283,12 @@ impl From<&Configuration> for RuleTable {
                         select_map_updates.insert(rule, true);
                     }
                 }
-                for selector in selection.ignore.iter().filter(|s| s.specificity() == spec) {
+                for selector in selection
+                    .ignore
+                    .iter()
+                    .chain(carriedover_ignores.into_iter().flatten())
+                    .filter(|s| s.specificity() == spec)
+                {
                     for rule in selector {
                         select_map_updates.insert(rule, false);
                     }
@@ -293,13 +308,20 @@ impl From<&Configuration> for RuleTable {
                 }
             }
 
-            if selection.select.is_some() {
+            if let Some(select) = &selection.select {
                 // If the `select` option is given we reassign the whole select_set
                 // (overriding everything that has been defined previously).
                 select_set = select_map_updates
                     .into_iter()
                     .filter_map(|(rule, enabled)| enabled.then_some(rule))
                     .collect();
+
+                if select.is_empty()
+                    && selection.extend_select.is_empty()
+                    && !selection.ignore.is_empty()
+                {
+                    carryover_ignores = Some(&selection.ignore);
+                }
             } else {
                 // Otherwise we apply the updates on top of the existing select_set.
                 for (rule, enabled) in select_map_updates {
@@ -496,6 +518,38 @@ mod tests {
             },
         ]);
         let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn carry_over_ignore() {
+        let actual = resolve_rules([
+            RuleSelection {
+                select: Some(vec![]),
+                ignore: vec![RuleCodePrefix::W292.into()],
+                ..RuleSelection::default()
+            },
+            RuleSelection {
+                select: Some(vec![RuleCodePrefix::W.into()]),
+                ..RuleSelection::default()
+            },
+        ]);
+        let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
+        assert_eq!(actual, expected);
+
+        let actual = resolve_rules([
+            RuleSelection {
+                select: Some(vec![]),
+                ignore: vec![RuleCodePrefix::W292.into()],
+                ..RuleSelection::default()
+            },
+            RuleSelection {
+                select: Some(vec![RuleCodePrefix::W.into()]),
+                ignore: vec![RuleCodePrefix::W505.into()],
+                ..RuleSelection::default()
+            },
+        ]);
+        let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
     }
 }

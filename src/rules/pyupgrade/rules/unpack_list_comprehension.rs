@@ -1,10 +1,26 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct RewriteListComprehension;
+);
+impl AlwaysAutofixableViolation for RewriteListComprehension {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Replace unpacked list comprehension with a generator expression")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with generator expression".to_string()
+    }
+}
 
 /// Returns `true` if `expr` contains an `ExprKind::Await`.
 fn contains_await(expr: &Expr) -> bool {
@@ -79,10 +95,8 @@ pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value:
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(
-                violations::RewriteListComprehension,
-                Range::from_located(value),
-            );
+            let mut diagnostic =
+                Diagnostic::new(RewriteListComprehension, Range::from_located(value));
             if checker.patch(diagnostic.kind.rule()) {
                 let existing = checker
                     .locator

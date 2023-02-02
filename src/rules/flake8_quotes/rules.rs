@@ -1,15 +1,102 @@
-use rustpython_ast::Location;
-use rustpython_parser::lexer::{LexResult, Tok};
-
+use super::settings::Quote;
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
 
-use super::settings::Quote;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::Location;
+use rustpython_parser::lexer::{LexResult, Tok};
+
+define_violation!(
+    pub struct BadQuotesInlineString {
+        pub quote: Quote,
+    }
+);
+impl AlwaysAutofixableViolation for BadQuotesInlineString {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BadQuotesInlineString { quote } = self;
+        match quote {
+            Quote::Single => format!("Double quotes found but single quotes preferred"),
+            Quote::Double => format!("Single quotes found but double quotes preferred"),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let BadQuotesInlineString { quote } = self;
+        match quote {
+            Quote::Single => "Replace double quotes with single quotes".to_string(),
+            Quote::Double => "Replace single quotes with double quotes".to_string(),
+        }
+    }
+}
+
+define_violation!(
+    pub struct BadQuotesMultilineString {
+        pub quote: Quote,
+    }
+);
+impl AlwaysAutofixableViolation for BadQuotesMultilineString {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BadQuotesMultilineString { quote } = self;
+        match quote {
+            Quote::Single => format!("Double quote multiline found but single quotes preferred"),
+            Quote::Double => format!("Single quote multiline found but double quotes preferred"),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let BadQuotesMultilineString { quote } = self;
+        match quote {
+            Quote::Single => "Replace double multiline quotes with single quotes".to_string(),
+            Quote::Double => "Replace single multiline quotes with double quotes".to_string(),
+        }
+    }
+}
+
+define_violation!(
+    pub struct BadQuotesDocstring {
+        pub quote: Quote,
+    }
+);
+impl AlwaysAutofixableViolation for BadQuotesDocstring {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BadQuotesDocstring { quote } = self;
+        match quote {
+            Quote::Single => format!("Double quote docstring found but single quotes preferred"),
+            Quote::Double => format!("Single quote docstring found but double quotes preferred"),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let BadQuotesDocstring { quote } = self;
+        match quote {
+            Quote::Single => "Replace double quotes docstring with single quotes".to_string(),
+            Quote::Double => "Replace single quotes docstring with double quotes".to_string(),
+        }
+    }
+}
+
+define_violation!(
+    pub struct AvoidQuoteEscape;
+);
+impl AlwaysAutofixableViolation for AvoidQuoteEscape {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Change outer quotes to avoid escaping inner quotes")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Change outer quotes to avoid escaping inner quotes".to_string()
+    }
+}
 
 fn good_single(quote: &Quote) -> char {
     match quote {
@@ -102,7 +189,7 @@ fn docstring(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::BadQuotesDocstring {
+        BadQuotesDocstring {
             quote: quotes_settings.docstring_quotes.clone(),
         },
         Range::new(start, end),
@@ -178,7 +265,7 @@ fn strings(
             }
 
             let mut diagnostic = Diagnostic::new(
-                violations::BadQuotesMultilineString {
+                BadQuotesMultilineString {
                     quote: quotes_settings.multiline_quotes.clone(),
                 },
                 Range::new(*start, *end),
@@ -215,7 +302,7 @@ fn strings(
                     && !string_contents.contains(bad_single(&quotes_settings.inline_quotes))
                 {
                     let mut diagnostic =
-                        Diagnostic::new(violations::AvoidQuoteEscape, Range::new(*start, *end));
+                        Diagnostic::new(AvoidQuoteEscape, Range::new(*start, *end));
                     if matches!(autofix, flags::Autofix::Enabled)
                         && settings.rules.should_fix(&Rule::AvoidQuoteEscape)
                     {
@@ -272,7 +359,7 @@ fn strings(
             // If we're not using the preferred type, only allow use to avoid escapes.
             if !relax_quote {
                 let mut diagnostic = Diagnostic::new(
-                    violations::BadQuotesInlineString {
+                    BadQuotesInlineString {
                         quote: quotes_settings.inline_quotes.clone(),
                     },
                     Range::new(*start, *end),

@@ -265,12 +265,15 @@ impl UnittestAssert {
                     .get("expr")
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
-                let bool = create_expr(ExprKind::Constant {
-                    value: Constant::Bool(matches!(self, UnittestAssert::True)),
-                    kind: None,
-                });
-                let expr = compare(expr, Cmpop::Is, &bool);
-                Ok(assert(&expr, msg))
+                Ok(if matches!(self, UnittestAssert::False) {
+                    let unary_expr = create_expr(ExprKind::UnaryOp {
+                        op: Unaryop::Not,
+                        operand: Box::new(create_expr(expr.node.clone())),
+                    });
+                    assert(&unary_expr, msg)
+                } else {
+                    assert(expr, msg)
+                })
             }
             UnittestAssert::Equal
             | UnittestAssert::Equals

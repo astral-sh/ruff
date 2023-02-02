@@ -11,9 +11,9 @@ mod tests {
 
     use super::settings::Quote;
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test_case(Path::new("doubles.py"))]
     #[test_case(Path::new("doubles_escaped.py"))]
@@ -24,9 +24,7 @@ mod tests {
     fn require_singles(path: &Path) -> Result<()> {
         let snapshot = format!("require_singles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_quotes")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_quotes").join(path).as_path(),
             &Settings {
                 flake8_quotes: super::settings::Settings {
                     inline_quotes: Quote::Single,
@@ -55,9 +53,7 @@ mod tests {
     fn require_doubles(path: &Path) -> Result<()> {
         let snapshot = format!("require_doubles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_quotes")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_quotes").join(path).as_path(),
             &Settings {
                 flake8_quotes: super::settings::Settings {
                     inline_quotes: Quote::Double,
@@ -90,9 +86,7 @@ mod tests {
     fn require_docstring_doubles(path: &Path) -> Result<()> {
         let snapshot = format!("require_docstring_doubles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_quotes")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_quotes").join(path).as_path(),
             &Settings {
                 flake8_quotes: super::settings::Settings {
                     inline_quotes: Quote::Single,
@@ -125,9 +119,7 @@ mod tests {
     fn require_docstring_singles(path: &Path) -> Result<()> {
         let snapshot = format!("require_docstring_singles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_quotes")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_quotes").join(path).as_path(),
             &Settings {
                 flake8_quotes: super::settings::Settings {
                     inline_quotes: Quote::Single,

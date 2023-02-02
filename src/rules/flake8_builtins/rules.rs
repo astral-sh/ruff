@@ -1,10 +1,50 @@
-use rustpython_ast::Located;
-
 use super::types::ShadowingType;
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::python::builtins::BUILTINS;
 use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::Located;
+
+define_violation!(
+    pub struct BuiltinVariableShadowing {
+        pub name: String,
+    }
+);
+impl Violation for BuiltinVariableShadowing {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BuiltinVariableShadowing { name } = self;
+        format!("Variable `{name}` is shadowing a python builtin")
+    }
+}
+
+define_violation!(
+    pub struct BuiltinArgumentShadowing {
+        pub name: String,
+    }
+);
+impl Violation for BuiltinArgumentShadowing {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BuiltinArgumentShadowing { name } = self;
+        format!("Argument `{name}` is shadowing a python builtin")
+    }
+}
+
+define_violation!(
+    pub struct BuiltinAttributeShadowing {
+        pub name: String,
+    }
+);
+impl Violation for BuiltinAttributeShadowing {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BuiltinAttributeShadowing { name } = self;
+        format!("Class attribute `{name}` is shadowing a python builtin")
+    }
+}
 
 /// Check builtin name shadowing.
 pub fn builtin_shadowing<T>(
@@ -16,15 +56,15 @@ pub fn builtin_shadowing<T>(
     if BUILTINS.contains(&name) && !ignorelist.contains(&name.to_string()) {
         Some(Diagnostic::new::<DiagnosticKind>(
             match node_type {
-                ShadowingType::Variable => violations::BuiltinVariableShadowing {
+                ShadowingType::Variable => BuiltinVariableShadowing {
                     name: name.to_string(),
                 }
                 .into(),
-                ShadowingType::Argument => violations::BuiltinArgumentShadowing {
+                ShadowingType::Argument => BuiltinArgumentShadowing {
                     name: name.to_string(),
                 }
                 .into(),
-                ShadowingType::Attribute => violations::BuiltinAttributeShadowing {
+                ShadowingType::Attribute => BuiltinAttributeShadowing {
                     name: name.to_string(),
                 }
                 .into(),

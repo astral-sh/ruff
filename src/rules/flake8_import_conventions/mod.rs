@@ -10,14 +10,14 @@ mod tests {
     use rustc_hash::FxHashMap;
 
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test]
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_import_conventions/defaults.py"),
+            Path::new("flake8_import_conventions/defaults.py"),
             &Settings::for_rule(Rule::ImportAliasIsNotConventional),
         )?;
         assert_yaml_snapshot!("defaults", diagnostics);
@@ -27,7 +27,7 @@ mod tests {
     #[test]
     fn custom() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_import_conventions/custom.py"),
+            Path::new("flake8_import_conventions/custom.py"),
             &Settings {
                 flake8_import_conventions: super::settings::Options {
                     aliases: None,
@@ -47,7 +47,7 @@ mod tests {
     #[test]
     fn remove_defaults() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_import_conventions/remove_default.py"),
+            Path::new("flake8_import_conventions/remove_default.py"),
             &Settings {
                 flake8_import_conventions: super::settings::Options {
                     aliases: Some(FxHashMap::from_iter([
@@ -69,7 +69,7 @@ mod tests {
     #[test]
     fn override_defaults() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_import_conventions/override_default.py"),
+            Path::new("flake8_import_conventions/override_default.py"),
             &Settings {
                 flake8_import_conventions: super::settings::Options {
                     aliases: None,
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn from_imports() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_import_conventions/from_imports.py"),
+            Path::new("flake8_import_conventions/from_imports.py"),
             &Settings {
                 flake8_import_conventions: super::settings::Options {
                     aliases: None,

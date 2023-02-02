@@ -52,8 +52,8 @@ mod visibility;
 
 use cfg_if::cfg_if;
 pub use rule_selector::RuleSelector;
+pub use rules::pycodestyle::rules::IOError;
 pub use violation::{AutofixKind, Availability as AutofixAvailability};
-pub use violations::IOError;
 
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
@@ -67,3 +67,6 @@ cfg_if! {
         pub use lib_wasm::check;
     }
 }
+
+#[cfg(test)]
+mod test;

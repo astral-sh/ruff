@@ -18,16 +18,52 @@
 //!     method()
 //! ```
 
-use rustc_hash::FxHashMap;
-use rustpython_ast::{Expr, ExprKind, Stmt};
-
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::{helpers, visitor};
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::{AutofixKind, Availability, Violation};
+use ruff_macros::derive_message_formats;
+use rustc_hash::FxHashMap;
+use rustpython_ast::{Expr, ExprKind, Stmt};
+
+define_violation!(
+    pub struct UnusedLoopControlVariable {
+        /// The name of the loop control variable.
+        pub name: String,
+        /// Whether the variable is safe to rename. A variable is unsafe to
+        /// rename if it _might_ be used by magic control flow (e.g.,
+        /// `locals()`).
+        pub safe: bool,
+    }
+);
+impl Violation for UnusedLoopControlVariable {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnusedLoopControlVariable { name, safe } = self;
+        if *safe {
+            format!("Loop control variable `{name}` not used within loop body")
+        } else {
+            format!("Loop control variable `{name}` may not be used within loop body")
+        }
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let UnusedLoopControlVariable { safe, .. } = self;
+        if *safe {
+            Some(|UnusedLoopControlVariable { name, .. }| {
+                format!("Rename unused `{name}` to `_{name}`")
+            })
+        } else {
+            None
+        }
+    }
+}
 
 /// Identify all `ExprKind::Name` nodes in an AST.
 struct NameFinder<'a> {
@@ -84,7 +120,7 @@ pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: 
 
         let safe = !helpers::uses_magic_variable_access(checker, body);
         let mut diagnostic = Diagnostic::new(
-            violations::UnusedLoopControlVariable {
+            UnusedLoopControlVariable {
                 name: name.to_string(),
                 safe,
             },

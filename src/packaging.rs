@@ -119,50 +119,26 @@ pub fn detect_package_roots<'a>(
 mod tests {
     use std::path::PathBuf;
 
-    use crate::packaging::detect_package_root;
+    use crate::{packaging::detect_package_root, test::test_resource_path};
 
     #[test]
     fn package_detection() {
         assert_eq!(
-            detect_package_root(
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("resources/test/package/src/package")
-                    .as_path(),
-                &[],
-            ),
-            Some(
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("resources/test/package/src/package")
-                    .as_path()
-            )
+            detect_package_root(&test_resource_path("package/src/package"), &[],),
+            Some(test_resource_path("package/src/package").as_path())
+        );
+
+        assert_eq!(
+            detect_package_root(&test_resource_path("project/python_modules/core/core"), &[],),
+            Some(test_resource_path("project/python_modules/core/core").as_path())
         );
 
         assert_eq!(
             detect_package_root(
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("resources/test/project/python_modules/core/core")
-                    .as_path(),
+                &test_resource_path("project/examples/docs/docs/concepts"),
                 &[],
             ),
-            Some(
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("resources/test/project/python_modules/core/core")
-                    .as_path()
-            )
-        );
-
-        assert_eq!(
-            detect_package_root(
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("resources/test/project/examples/docs/docs/concepts")
-                    .as_path(),
-                &[],
-            ),
-            Some(
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("resources/test/project/examples/docs/docs")
-                    .as_path()
-            )
+            Some(test_resource_path("project/examples/docs/docs").as_path())
         );
 
         assert_eq!(

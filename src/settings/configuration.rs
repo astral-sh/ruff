@@ -21,7 +21,6 @@ use crate::rules::{
     pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::options::Options;
-use crate::settings::pyproject::load_options;
 use crate::settings::types::{
     FilePattern, PerFileIgnore, PythonVersion, SerializationFormat, Version,
 };
@@ -86,10 +85,6 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn from_toml(path: &Path, project_root: &Path) -> Result<Self> {
-        Self::from_options(load_options(path)?, project_root)
-    }
-
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
         Ok(Configuration {
             rule_selections: vec![RuleSelection {

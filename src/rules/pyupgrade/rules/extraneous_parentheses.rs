@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::types::Range;
@@ -5,7 +8,20 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
-use crate::violations;
+
+define_violation!(
+    pub struct ExtraneousParentheses;
+);
+impl AlwaysAutofixableViolation for ExtraneousParentheses {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Avoid extraneous parentheses")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove extraneous parentheses".to_string()
+    }
+}
 
 // See: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_main.py#L148
 fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(usize, usize)> {
@@ -120,7 +136,7 @@ pub fn extraneous_parentheses(
                     return diagnostics;
                 };
                 let mut diagnostic =
-                    Diagnostic::new(violations::ExtraneousParentheses, Range::new(*start, *end));
+                    Diagnostic::new(ExtraneousParentheses, Range::new(*start, *end));
                 if matches!(autofix, flags::Autofix::Enabled)
                     && settings.rules.should_fix(&Rule::ExtraneousParentheses)
                 {

@@ -1,10 +1,34 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Expr;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct UsePEP585Annotation {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for UsePEP585Annotation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UsePEP585Annotation { name } = self;
+        format!(
+            "Use `{}` instead of `{}` for type annotations",
+            name.to_lowercase(),
+            name,
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        let UsePEP585Annotation { name } = self;
+        format!("Replace `{name}` with `{}`", name.to_lowercase(),)
+    }
+}
 
 /// UP006
 pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
@@ -13,7 +37,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
         .and_then(|call_path| call_path.last().copied())
     {
         let mut diagnostic = Diagnostic::new(
-            violations::UsePEP585Annotation {
+            UsePEP585Annotation {
                 name: binding.to_string(),
             },
             Range::from_located(expr),

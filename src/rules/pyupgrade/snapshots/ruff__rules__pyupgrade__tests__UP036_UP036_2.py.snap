@@ -1,0 +1,221 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 7
+    column: 7
+  fix:
+    content:
+      - 3+6
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 7
+      column: 7
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 12
+    column: 7
+  fix:
+    content:
+      - 3+6
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 12
+      column: 7
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 17
+    column: 7
+  fix:
+    content:
+      - 3+6
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 17
+      column: 7
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 22
+    column: 7
+  fix:
+    content:
+      - 3+6
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 22
+      column: 7
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 24
+    column: 0
+  end_location:
+    row: 27
+    column: 7
+  fix:
+    content:
+      - 3+6
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 27
+      column: 7
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 29
+    column: 0
+  end_location:
+    row: 32
+    column: 7
+  fix:
+    content:
+      - 3+6
+    location:
+      row: 29
+      column: 0
+    end_location:
+      row: 32
+      column: 7
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 34
+    column: 0
+  end_location:
+    row: 37
+    column: 7
+  fix:
+    content:
+      - 3+6
+    location:
+      row: 34
+      column: 0
+    end_location:
+      row: 37
+      column: 7
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 39
+    column: 0
+  end_location:
+    row: 40
+    column: 8
+  fix:
+    content:
+      - pass
+    location:
+      row: 39
+      column: 0
+    end_location:
+      row: 40
+      column: 8
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 42
+    column: 0
+  end_location:
+    row: 43
+    column: 8
+  fix:
+    content:
+      - ""
+    location:
+      row: 42
+      column: 0
+    end_location:
+      row: 44
+      column: 0
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 46
+    column: 4
+  end_location:
+    row: 47
+    column: 12
+  fix:
+    content:
+      - pass
+    location:
+      row: 46
+      column: 4
+    end_location:
+      row: 47
+      column: 12
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 49
+    column: 0
+  end_location:
+    row: 52
+    column: 8
+  fix:
+    content:
+      - ""
+    location:
+      row: 49
+      column: 0
+    end_location:
+      row: 51
+      column: 2
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 54
+    column: 0
+  end_location:
+    row: 57
+    column: 8
+  fix:
+    content:
+      - pass
+    location:
+      row: 54
+      column: 0
+    end_location:
+      row: 57
+      column: 8
+  parent: ~
+

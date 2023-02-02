@@ -78,4 +78,34 @@ expression: diagnostics
       row: 87
       column: 19
   parent: ~
+- kind:
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
+  location:
+    row: 134
+    column: 4
+  end_location:
+    row: 136
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
+  location:
+    row: 154
+    column: 4
+  end_location:
+    row: 156
+    column: 24
+  fix:
+    content:
+      - return all(not check(x) for x in iterable)
+    location:
+      row: 154
+      column: 4
+    end_location:
+      row: 157
+      column: 15
+  parent: ~
 

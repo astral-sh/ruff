@@ -21,3 +21,10 @@ if isinstance(a, int) and isinstance(b, bool) or isinstance(a, float):
 
 if isinstance(a, bool) or isinstance(b, str):
     pass
+
+def f():
+    # OK
+    def isinstance(a, b):
+        return False
+    if isinstance(a, int) or isinstance(a, float):
+        pass

@@ -12,9 +12,9 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::types::PythonVersion;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::UselessMetaclassType, Path::new("UP001.py"); "UP001")]
@@ -58,12 +58,15 @@ mod tests {
     #[test_case(Rule::FunctoolsCache, Path::new("UP033.py"); "UP033")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]
     #[test_case(Rule::ImportReplacements, Path::new("UP035.py"); "UP035")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_0.py"); "UP036_0")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_1.py"); "UP036_1")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_2.py"); "UP036_2")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_3.py"); "UP036_3")]
+    #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_4.py"); "UP036_4")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyupgrade")
-                .join(path)
-                .as_path(),
+            Path::new("pyupgrade").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -73,7 +76,7 @@ mod tests {
     #[test]
     fn future_annotations_pep_585_p37() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
+            Path::new("pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(Rule::UsePEP585Annotation)
@@ -86,7 +89,7 @@ mod tests {
     #[test]
     fn future_annotations_pep_585_py310() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
+            Path::new("pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py310,
                 ..settings::Settings::for_rule(Rule::UsePEP585Annotation)
@@ -99,7 +102,7 @@ mod tests {
     #[test]
     fn future_annotations_pep_604_p37() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
+            Path::new("pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
                 ..settings::Settings::for_rule(Rule::UsePEP604Annotation)
@@ -112,7 +115,7 @@ mod tests {
     #[test]
     fn future_annotations_pep_604_py310() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyupgrade/future_annotations.py"),
+            Path::new("pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py310,
                 ..settings::Settings::for_rule(Rule::UsePEP604Annotation)
@@ -125,7 +128,7 @@ mod tests {
     #[test]
     fn datetime_utc_alias_py311() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pyupgrade/UP017.py"),
+            Path::new("pyupgrade/UP017.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py311,
                 ..settings::Settings::for_rule(Rule::DatetimeTimezoneUTC)

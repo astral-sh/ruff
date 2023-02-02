@@ -1,0 +1,49 @@
+---
+source: src/rules/flake8_self/mod.rs
+expression: diagnostics
+---
+- kind:
+    PrivateMemberAccess:
+      access: foo._private_thing
+  location:
+    row: 28
+    column: 6
+  end_location:
+    row: 28
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    PrivateMemberAccess:
+      access: foo.__really_private_thing
+  location:
+    row: 29
+    column: 6
+  end_location:
+    row: 29
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    PrivateMemberAccess:
+      access: foo._private_func
+  location:
+    row: 30
+    column: 6
+  end_location:
+    row: 30
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    PrivateMemberAccess:
+      access: foo.__really_private_func
+  location:
+    row: 31
+    column: 6
+  end_location:
+    row: 31
+    column: 31
+  fix: ~
+  parent: ~
+

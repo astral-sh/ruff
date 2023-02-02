@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::ExprKind;
 use rustpython_parser::ast::Expr;
 
@@ -6,7 +9,20 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct LRUCacheWithoutParameters;
+);
+impl AlwaysAutofixableViolation for LRUCacheWithoutParameters {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Unnecessary parameters to `functools.lru_cache`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove unnecessary parameters".to_string()
+    }
+}
 
 /// UP011
 pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Expr]) {
@@ -27,7 +43,7 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
             })
         {
             let mut diagnostic = Diagnostic::new(
-                violations::LRUCacheWithoutParameters,
+                LRUCacheWithoutParameters,
                 Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
             );
             if checker.patch(diagnostic.kind.rule()) {

@@ -37,22 +37,24 @@ will enable all `F` rules, including `F401`, as the command line's `--select` re
 The `remove-six-compat` rule has been removed. This rule was only useful for one-time Python 2-to-3
 upgrades.
 
-## 0.0.238
+## 0.0.237
 
 ### `--explain`, `--clean`, and `--generate-shell-completion` are now subcommands ([#2190](https://github.com/charliermarsh/ruff/pull/2190))
 
 `--explain`, `--clean`, and `--generate-shell-completion` are now implemented as subcommands:
 
-    ruff .         # Still works! And will always work.
-    ruff check .   # New! Also works.
+```console
+ruff .         # Still works! And will always work.
+ruff check .   # New! Also works.
 
-    ruff --explain E402   # Still works.
-    ruff rule E402        # New! Also works. (And preferred.)
+ruff --explain E402   # Still works.
+ruff rule E402        # New! Also works. (And preferred.)
 
-    # Oops! The command has to come first.
-    ruff --format json --explain E402   # No longer works.
-    ruff --explain E402 --format json   # Still works!
-    ruff rule E402   --format json      # Works! (And preferred.)
+# Oops! The command has to come first.
+ruff --format json --explain E402   # No longer works.
+ruff --explain E402 --format json   # Still works!
+ruff rule E402   --format json      # Works! (And preferred.)
+```
 
 This change is largely backwards compatible -- most users should experience
 no change in behavior. However, please note the following exceptions:
@@ -60,7 +62,9 @@ no change in behavior. However, please note the following exceptions:
 * Subcommands will now fail when invoked with unsupported arguments, instead
   of silently ignoring them. For example, the following will now fail:
 
-      ruff --clean --respect-gitignore
+  ```console
+  ruff --clean --respect-gitignore
+  ```
 
   (the `clean` command doesn't support `--respect-gitignore`.)
 

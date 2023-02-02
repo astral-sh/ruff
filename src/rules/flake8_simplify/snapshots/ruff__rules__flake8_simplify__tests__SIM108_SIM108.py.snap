@@ -23,6 +23,17 @@ expression: diagnostics
   parent: ~
 - kind:
     UseTernaryOperator:
+      contents: abc = x if x > 0 else -x
+  location:
+    row: 58
+    column: 0
+  end_location:
+    row: 63
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UseTernaryOperator:
       contents: b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
   location:
     row: 82
@@ -39,5 +50,38 @@ expression: diagnostics
     end_location:
       row: 85
       column: 45
+  parent: ~
+- kind:
+    UseTernaryOperator:
+      contents: exitcode = 0 if True else 1
+  location:
+    row: 97
+    column: 0
+  end_location:
+    row: 100
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    UseTernaryOperator:
+      contents: x = 3 if True else 5
+  location:
+    row: 104
+    column: 0
+  end_location:
+    row: 105
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UseTernaryOperator:
+      contents: x = 3 if True else 5
+  location:
+    row: 109
+    column: 0
+  end_location:
+    row: 112
+    column: 9
+  fix: ~
   parent: ~
 

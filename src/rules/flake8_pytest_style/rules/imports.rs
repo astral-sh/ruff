@@ -1,8 +1,20 @@
 use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct IncorrectPytestImport;
+);
+impl Violation for IncorrectPytestImport {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Found incorrect import of pytest, use simple `import pytest` instead")
+    }
+}
 
 fn is_pytest_or_subpackage(imported_name: &str) -> bool {
     imported_name == "pytest" || imported_name.starts_with("pytest.")
@@ -14,7 +26,7 @@ pub fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Di
         if let Some(alias) = asname {
             if alias != name {
                 return Some(Diagnostic::new(
-                    violations::IncorrectPytestImport,
+                    IncorrectPytestImport,
                     Range::from_located(import_from),
                 ));
             }
@@ -39,7 +51,7 @@ pub fn import_from(
     if let Some(module) = module {
         if is_pytest_or_subpackage(module) {
             return Some(Diagnostic::new(
-                violations::IncorrectPytestImport,
+                IncorrectPytestImport,
                 Range::from_located(import_from),
             ));
         }

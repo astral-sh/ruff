@@ -1,12 +1,38 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use itertools::Itertools;
 use log::error;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Alias, AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
+use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::{autofix, violations};
+
+define_violation!(
+    pub struct UnnecessaryBuiltinImport {
+        pub names: Vec<String>,
+    }
+);
+impl AlwaysAutofixableViolation for UnnecessaryBuiltinImport {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnnecessaryBuiltinImport { names } = self;
+        if names.len() == 1 {
+            let import = &names[0];
+            format!("Unnecessary builtin import: `{import}`")
+        } else {
+            let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
+            format!("Unnecessary builtin imports: {imports}")
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove unnecessary builtin import".to_string()
+    }
+}
 
 const BUILTINS: &[&str] = &[
     "*",
@@ -69,7 +95,7 @@ pub fn unnecessary_builtin_import(
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryBuiltinImport {
+        UnnecessaryBuiltinImport {
             names: unused_imports
                 .iter()
                 .map(|alias| alias.node.name.to_string())

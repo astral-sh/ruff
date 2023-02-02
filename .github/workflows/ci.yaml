@@ -56,7 +56,7 @@ jobs:
   cargo-test:
     strategy:
       matrix:
-        os: [ ubuntu-latest, windows-latest ]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     name: "cargo test | ${{ matrix.os }}"
     steps:
@@ -95,8 +95,8 @@ jobs:
       - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --linter pylint
       - run: cargo check
       - run: |
-         ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
-         ./scripts/add_rule.py --name FirstRule --code TST001 --linter test
+          ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
+          ./scripts/add_rule.py --name FirstRule --code TST001 --linter test
       - run: cargo check
 
   maturin-build:
@@ -118,7 +118,7 @@ jobs:
     name: "spell check"
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - uses: crate-ci/typos@master
-      with:
-        files: .
+      - uses: actions/checkout@v3
+      - uses: crate-ci/typos@master
+        with:
+          files: .

@@ -11,9 +11,9 @@ mod tests {
     use test_case::test_case;
 
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test_case(Rule::AssertUsed, Path::new("S101.py"); "S101")]
     #[test_case(Rule::ExecUsed, Path::new("S102.py"); "S102")]
@@ -35,9 +35,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_bandit")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_bandit").join(path).as_path(),
             &Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -47,7 +45,7 @@ mod tests {
     #[test]
     fn check_hardcoded_tmp_additional_dirs() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_bandit/S108.py"),
+            Path::new("flake8_bandit/S108.py"),
             &Settings {
                 flake8_bandit: super::settings::Settings {
                     hardcoded_tmp_directory: vec![
@@ -68,7 +66,7 @@ mod tests {
     #[test]
     fn check_typed_exception() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_bandit/S110.py"),
+            Path::new("flake8_bandit/S110.py"),
             &Settings {
                 flake8_bandit: super::settings::Settings {
                     check_typed_exception: true,

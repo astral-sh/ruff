@@ -1,7 +1,10 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use anyhow::{anyhow, bail, Result};
 use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Expr;
 
 use crate::ast::types::Range;
@@ -11,7 +14,20 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::source_code::{Locator, Stylist};
-use crate::violations;
+
+define_violation!(
+    pub struct FormatLiterals;
+);
+impl AlwaysAutofixableViolation for FormatLiterals {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use implicit references for positional format fields")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove explicit positional indexes".to_string()
+    }
+}
 
 // An opening curly brace, followed by any integer, followed by any text,
 // followed by a closing brace.
@@ -112,7 +128,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(violations::FormatLiterals, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(FormatLiterals, Range::from_located(expr));
     if checker.patch(diagnostic.kind.rule()) {
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846

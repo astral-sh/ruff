@@ -5,8 +5,20 @@ use crate::ast::helpers::{collect_arg_names, compose_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct PatchWithLambda;
+);
+impl Violation for PatchWithLambda {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use `return_value=` instead of patching with `lambda`")
+    }
+}
 
 const PATCH_NAMES: &[&str] = &[
     "mocker.patch",
@@ -72,10 +84,7 @@ fn check_patch_call(
             visitor.visit_expr(body);
 
             if !visitor.uses_args {
-                return Some(Diagnostic::new(
-                    violations::PatchWithLambda,
-                    Range::from_located(call),
-                ));
+                return Some(Diagnostic::new(PatchWithLambda, Range::from_located(call)));
             }
         }
     }

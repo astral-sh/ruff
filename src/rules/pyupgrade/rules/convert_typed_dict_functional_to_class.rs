@@ -1,5 +1,8 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use anyhow::{bail, Result};
 use log::debug;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
@@ -10,7 +13,24 @@ use crate::python::identifiers::is_identifier;
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violations;
+
+define_violation!(
+    pub struct ConvertTypedDictFunctionalToClass {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for ConvertTypedDictFunctionalToClass {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ConvertTypedDictFunctionalToClass { name } = self;
+        format!("Convert `{name}` from `TypedDict` functional to class syntax")
+    }
+
+    fn autofix_title(&self) -> String {
+        let ConvertTypedDictFunctionalToClass { name } = self;
+        format!("Convert `{name}` to class syntax")
+    }
+}
 
 /// Return the class name, arguments, keywords and base class for a `TypedDict`
 /// assignment.
@@ -201,7 +221,7 @@ pub fn convert_typed_dict_functional_to_class(
     };
 
     let mut diagnostic = Diagnostic::new(
-        violations::ConvertTypedDictFunctionalToClass {
+        ConvertTypedDictFunctionalToClass {
             name: class_name.to_string(),
         },
         Range::from_located(stmt),

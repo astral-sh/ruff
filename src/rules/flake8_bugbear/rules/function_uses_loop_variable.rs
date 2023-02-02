@@ -1,13 +1,27 @@
-use rustc_hash::FxHashSet;
-use rustpython_ast::{Comprehension, Expr, ExprContext, ExprKind, Stmt, StmtKind};
-
 use crate::ast::helpers::collect_arg_names;
 use crate::ast::types::{Node, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustc_hash::FxHashSet;
+use rustpython_ast::{Comprehension, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+
+define_violation!(
+    pub struct FunctionUsesLoopVariable {
+        pub name: String,
+    }
+);
+impl Violation for FunctionUsesLoopVariable {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let FunctionUsesLoopVariable { name } = self;
+        format!("Function definition does not bind loop variable `{name}`")
+    }
+}
 
 #[derive(Default)]
 struct LoadedNamesVisitor<'a> {
@@ -260,7 +274,7 @@ where
                 if !checker.flake8_bugbear_seen.contains(&expr) {
                     checker.flake8_bugbear_seen.push(expr);
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::FunctionUsesLoopVariable {
+                        FunctionUsesLoopVariable {
                             name: name.to_string(),
                         },
                         range,

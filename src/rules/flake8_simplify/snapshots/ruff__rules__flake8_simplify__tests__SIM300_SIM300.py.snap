@@ -211,4 +211,23 @@ expression: diagnostics
       row: 12
       column: 21
   parent: ~
+- kind:
+    YodaConditions:
+      suggestion: (number - 100) > 0
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 18
+  fix:
+    content:
+      - (number - 100) > 0
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 17
+  parent: ~
 

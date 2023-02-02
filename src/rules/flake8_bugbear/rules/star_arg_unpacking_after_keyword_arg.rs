@@ -7,12 +7,23 @@
 //! by the unpacked sequence, and this change of ordering can surprise and
 //! mislead readers.
 
-use rustpython_ast::{Expr, ExprKind, Keyword};
-
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Expr, ExprKind, Keyword};
+
+define_violation!(
+    pub struct StarArgUnpackingAfterKeywordArg;
+);
+impl Violation for StarArgUnpackingAfterKeywordArg {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Star-arg unpacking after a keyword argument is strongly discouraged")
+    }
+}
 
 /// B026
 pub fn star_arg_unpacking_after_keyword_arg(
@@ -31,7 +42,7 @@ pub fn star_arg_unpacking_after_keyword_arg(
             continue;
         }
         checker.diagnostics.push(Diagnostic::new(
-            violations::StarArgUnpackingAfterKeywordArg,
+            StarArgUnpackingAfterKeywordArg,
             Range::from_located(arg),
         ));
     }

@@ -1,11 +1,52 @@
-use rustpython_ast::{Expr, ExprKind, Location};
-
 use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Expr, ExprKind, Location};
+
+define_violation!(
+    pub struct IncorrectMarkParenthesesStyle {
+        pub mark_name: String,
+        pub expected_parens: String,
+        pub actual_parens: String,
+    }
+);
+impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let IncorrectMarkParenthesesStyle {
+            mark_name,
+            expected_parens,
+            actual_parens,
+        } = self;
+        format!(
+            "Use `@pytest.mark.{mark_name}{expected_parens}` over \
+             `@pytest.mark.{mark_name}{actual_parens}`"
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add/remove parentheses".to_string()
+    }
+}
+
+define_violation!(
+    pub struct UseFixturesWithoutParameters;
+);
+impl AlwaysAutofixableViolation for UseFixturesWithoutParameters {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Useless `pytest.mark.usefixtures` without parameters")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove `usefixtures` decorator or pass parameters".to_string()
+    }
+}
 
 fn pytest_mark_parentheses(
     checker: &mut Checker,
@@ -15,7 +56,7 @@ fn pytest_mark_parentheses(
     actual: &str,
 ) {
     let mut diagnostic = Diagnostic::new(
-        violations::IncorrectMarkParenthesesStyle {
+        IncorrectMarkParenthesesStyle {
             mark_name: get_mark_name(decorator).to_string(),
             expected_parens: preferred.to_string(),
             actual_parens: actual.to_string(),
@@ -68,10 +109,8 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
     }
 
     if !has_parameters {
-        let mut diagnostic = Diagnostic::new(
-            violations::UseFixturesWithoutParameters,
-            Range::from_located(decorator),
-        );
+        let mut diagnostic =
+            Diagnostic::new(UseFixturesWithoutParameters, Range::from_located(decorator));
         if checker.patch(diagnostic.kind.rule()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
             diagnostic.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));

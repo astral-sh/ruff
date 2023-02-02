@@ -10,6 +10,7 @@ YODA == age  # SIM300
 YODA > age  # SIM300
 YODA >= age  # SIM300
 JediOrder.YODA == age  # SIM300
+0 < (number - 100)  # SIM300
 
 # OK
 compare == "yoda"
@@ -24,3 +25,4 @@ age < YODA
 age <= YODA
 YODA == YODA
 age == JediOrder.YODA
+(number - 100) > 0

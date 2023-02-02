@@ -1,10 +1,22 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 use rustpython_parser::ast::StmtKind;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct OpenFileWithContextHandler;
+);
+impl Violation for OpenFileWithContextHandler {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use context handler for opening files")
+    }
+}
 
 /// Return `true` if the current expression is nested in an `await
 /// exit_stack.enter_async_context` call.
@@ -94,7 +106,7 @@ pub fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
             }
 
             checker.diagnostics.push(Diagnostic::new(
-                violations::OpenFileWithContextHandler,
+                OpenFileWithContextHandler,
                 Range::from_located(func),
             ));
         }
