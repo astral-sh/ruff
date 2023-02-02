@@ -266,8 +266,8 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
             }
         }
         ExprKind::NamedExpr { target, value } => {
-            visitor.visit_expr(target);
             visitor.visit_expr(value);
+            visitor.visit_expr(target);
         }
         ExprKind::BinOp { left, op, right } => {
             visitor.visit_expr(left);

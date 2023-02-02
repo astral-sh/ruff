@@ -4449,7 +4449,7 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_assignments(&mut self) {
         self.deferred_assignments.reverse();
-        while let Some((scopes, _parents)) = self.deferred_assignments.pop() {
+        while let Some((scopes, ..)) = self.deferred_assignments.pop() {
             let scope_index = scopes[scopes.len() - 1];
             let parent_scope_index = scopes[scopes.len() - 2];
             if self.settings.rules.enabled(&Rule::UnusedVariable) {
