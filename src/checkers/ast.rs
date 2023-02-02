@@ -28,7 +28,6 @@ use crate::ast::{branch_detection, cast, helpers, operations, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::noqa::Directive;
 use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
-use crate::python::future::ALL_FEATURE_NAMES;
 use crate::python::typing;
 use crate::python::typing::{Callable, SubscriptKind};
 use crate::registry::{Diagnostic, Rule};
@@ -44,7 +43,6 @@ use crate::rules::{
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-use crate::violations::DeferralKeyword;
 use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
 use crate::{autofix, docstrings, noqa, violations, visibility};
 
@@ -55,7 +53,7 @@ type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 #[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
     // Input data.
-    path: &'a Path,
+    pub(crate) path: &'a Path,
     package: Option<&'a Path>,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
@@ -720,17 +718,7 @@ where
             }
             StmtKind::Return { .. } => {
                 if self.settings.rules.enabled(&Rule::ReturnOutsideFunction) {
-                    if let Some(&index) = self.scope_stack.last() {
-                        if matches!(
-                            self.scopes[index].kind,
-                            ScopeKind::Class(_) | ScopeKind::Module
-                        ) {
-                            self.diagnostics.push(Diagnostic::new(
-                                violations::ReturnOutsideFunction,
-                                Range::from_located(stmt),
-                            ));
-                        }
-                    }
+                    pyflakes::rules::return_outside_function(self, stmt);
                 }
             }
             StmtKind::ClassDef {
@@ -1170,21 +1158,14 @@ where
                         }
 
                         if self.settings.rules.enabled(&Rule::FutureFeatureNotDefined) {
-                            if !ALL_FEATURE_NAMES.contains(&&*alias.node.name) {
-                                self.diagnostics.push(Diagnostic::new(
-                                    violations::FutureFeatureNotDefined {
-                                        name: alias.node.name.to_string(),
-                                    },
-                                    Range::from_located(alias),
-                                ));
-                            }
+                            pyflakes::rules::future_feature_not_defined(self, alias);
                         }
 
                         if self.settings.rules.enabled(&Rule::LateFutureImport)
                             && !self.futures_allowed
                         {
                             self.diagnostics.push(Diagnostic::new(
-                                violations::LateFutureImport,
+                                pyflakes::rules::LateFutureImport,
                                 Range::from_located(stmt),
                             ));
                         }
@@ -1207,7 +1188,7 @@ where
                                 [*(self.scope_stack.last().expect("No current scope found"))];
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
-                                    violations::ImportStarNotPermitted {
+                                    pyflakes::rules::ImportStarNotPermitted {
                                         name: helpers::format_import_from(
                                             level.as_ref(),
                                             module.as_deref(),
@@ -1220,7 +1201,7 @@ where
 
                         if self.settings.rules.enabled(&Rule::ImportStarUsed) {
                             self.diagnostics.push(Diagnostic::new(
-                                violations::ImportStarUsed {
+                                pyflakes::rules::ImportStarUsed {
                                     name: helpers::format_import_from(
                                         level.as_ref(),
                                         module.as_deref(),
@@ -2197,7 +2178,7 @@ where
                                             .enabled(&Rule::StringDotFormatInvalidFormat)
                                         {
                                             self.diagnostics.push(Diagnostic::new(
-                                                violations::StringDotFormatInvalidFormat {
+                                                pyflakes::rules::StringDotFormatInvalidFormat {
                                                     message: pyflakes::format::error_to_string(&e),
                                                 },
                                                 location,
@@ -2753,41 +2734,17 @@ where
             }
             ExprKind::Yield { .. } => {
                 if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
-                    let scope = self.current_scope();
-                    if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.diagnostics.push(Diagnostic::new(
-                            violations::YieldOutsideFunction {
-                                keyword: DeferralKeyword::Yield,
-                            },
-                            Range::from_located(expr),
-                        ));
-                    }
+                    pyflakes::rules::yield_outside_function(self, expr);
                 }
             }
             ExprKind::YieldFrom { .. } => {
                 if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
-                    let scope = self.current_scope();
-                    if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.diagnostics.push(Diagnostic::new(
-                            violations::YieldOutsideFunction {
-                                keyword: DeferralKeyword::YieldFrom,
-                            },
-                            Range::from_located(expr),
-                        ));
-                    }
+                    pyflakes::rules::yield_outside_function(self, expr);
                 }
             }
             ExprKind::Await { .. } => {
                 if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
-                    let scope = self.current_scope();
-                    if matches!(scope.kind, ScopeKind::Class(_) | ScopeKind::Module) {
-                        self.diagnostics.push(Diagnostic::new(
-                            violations::YieldOutsideFunction {
-                                keyword: DeferralKeyword::Await,
-                            },
-                            Range::from_located(expr),
-                        ));
-                    }
+                    pyflakes::rules::yield_outside_function(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::AwaitOutsideAsync) {
                     pylint::rules::await_outside_async(self, expr);
@@ -2870,7 +2827,7 @@ where
                                     .enabled(&Rule::PercentFormatUnsupportedFormatCharacter)
                                 {
                                     self.diagnostics.push(Diagnostic::new(
-                                        violations::PercentFormatUnsupportedFormatCharacter {
+                                        pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
                                             char: c,
                                         },
                                         location,
@@ -2884,7 +2841,7 @@ where
                                     .enabled(&Rule::PercentFormatInvalidFormat)
                                 {
                                     self.diagnostics.push(Diagnostic::new(
-                                        violations::PercentFormatInvalidFormat {
+                                        pyflakes::rules::PercentFormatInvalidFormat {
                                             message: e.to_string(),
                                         },
                                         location,
@@ -3574,7 +3531,7 @@ where
                             if !self.bindings[*index].used() {
                                 if self.settings.rules.enabled(&Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
-                                        violations::UnusedVariable {
+                                        pyflakes::rules::UnusedVariable {
                                             name: name.to_string(),
                                         },
                                         name_range,
@@ -3894,7 +3851,7 @@ impl<'a> Checker<'a> {
                 if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
-                            violations::ImportShadowedByLoopVar {
+                            pyflakes::rules::ImportShadowedByLoopVar {
                                 name: name.to_string(),
                                 line: existing.range.location.row(),
                             },
@@ -3913,7 +3870,7 @@ impl<'a> Checker<'a> {
                     {
                         if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
                             self.diagnostics.push(Diagnostic::new(
-                                violations::RedefinedWhileUnused {
+                                pyflakes::rules::RedefinedWhileUnused {
                                     name: name.to_string(),
                                     line: existing.range.location.row(),
                                 },
@@ -4080,7 +4037,7 @@ impl<'a> Checker<'a> {
                     from_list.sort();
 
                     self.diagnostics.push(Diagnostic::new(
-                        violations::ImportStarUsage {
+                        pyflakes::rules::ImportStarUsage {
                             name: id.to_string(),
                             sources: from_list,
                         },
@@ -4114,7 +4071,7 @@ impl<'a> Checker<'a> {
                 }
 
                 self.diagnostics.push(Diagnostic::new(
-                    violations::UndefinedName { name: id.clone() },
+                    pyflakes::rules::UndefinedName { name: id.clone() },
                     Range::from_located(expr),
                 ));
             }
@@ -4322,7 +4279,7 @@ impl<'a> Checker<'a> {
                 && self.settings.rules.enabled(&Rule::UndefinedName)
             {
                 self.diagnostics.push(Diagnostic::new(
-                    violations::UndefinedName {
+                    pyflakes::rules::UndefinedName {
                         name: id.to_string(),
                     },
                     Range::from_located(expr),
@@ -4390,7 +4347,7 @@ impl<'a> Checker<'a> {
                     .enabled(&Rule::ForwardAnnotationSyntaxError)
                 {
                     self.diagnostics.push(Diagnostic::new(
-                        violations::ForwardAnnotationSyntaxError {
+                        pyflakes::rules::ForwardAnnotationSyntaxError {
                             body: expression.to_string(),
                         },
                         range,
@@ -4597,7 +4554,7 @@ impl<'a> Checker<'a> {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
                                     diagnostics.push(Diagnostic::new(
-                                        violations::UndefinedExport {
+                                        pyflakes::rules::UndefinedExport {
                                             name: name.to_string(),
                                         },
                                         all_binding.range,
@@ -4637,7 +4594,7 @@ impl<'a> Checker<'a> {
                         if let Some(indices) = self.redefinitions.get(index) {
                             for index in indices {
                                 diagnostics.push(Diagnostic::new(
-                                    violations::RedefinedWhileUnused {
+                                    pyflakes::rules::RedefinedWhileUnused {
                                         name: (*name).to_string(),
                                         line: binding.range.location.row(),
                                     },
@@ -4668,7 +4625,7 @@ impl<'a> Checker<'a> {
                             for &name in names {
                                 if !scope.values.contains_key(name) {
                                     diagnostics.push(Diagnostic::new(
-                                        violations::ImportStarUsage {
+                                        pyflakes::rules::ImportStarUsage {
                                             name: name.to_string(),
                                             sources: from_list.clone(),
                                         },
@@ -4834,7 +4791,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedImport {
+                            pyflakes::rules::UnusedImport {
                                 name: full_name.to_string(),
                                 ignore_init,
                                 multiple,
@@ -4860,7 +4817,7 @@ impl<'a> Checker<'a> {
                     let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedImport {
+                            pyflakes::rules::UnusedImport {
                                 name: full_name.to_string(),
                                 ignore_init,
                                 multiple,

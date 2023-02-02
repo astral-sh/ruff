@@ -1,187 +1,67 @@
-pub use assert_tuple::assert_tuple;
-pub use f_string_missing_placeholders::f_string_missing_placeholders;
-pub use if_tuple::if_tuple;
-pub use invalid_literal_comparisons::invalid_literal_comparison;
-pub use invalid_print_syntax::invalid_print_syntax;
-pub use raise_not_implemented::raise_not_implemented;
-pub use repeated_keys::repeated_keys;
+pub use assert_tuple::{assert_tuple, AssertTuple};
+pub use break_outside_loop::{break_outside_loop, BreakOutsideLoop};
+pub use continue_outside_loop::{continue_outside_loop, ContinueOutsideLoop};
+pub use default_except_not_last::{default_except_not_last, DefaultExceptNotLast};
+pub use f_string_missing_placeholders::{
+    f_string_missing_placeholders, FStringMissingPlaceholders,
+};
+pub use forward_annotation_syntax_error::ForwardAnnotationSyntaxError;
+pub use if_tuple::{if_tuple, IfTuple};
+pub use imports::{
+    future_feature_not_defined, FutureFeatureNotDefined, ImportShadowedByLoopVar,
+    ImportStarNotPermitted, ImportStarUsage, ImportStarUsed, LateFutureImport, UnusedImport,
+};
+pub use invalid_literal_comparisons::{invalid_literal_comparison, IsLiteral};
+pub use invalid_print_syntax::{invalid_print_syntax, InvalidPrintSyntax};
+pub use raise_not_implemented::{raise_not_implemented, RaiseNotImplemented};
+pub use redefined_while_unused::RedefinedWhileUnused;
+pub use repeated_keys::{
+    repeated_keys, MultiValueRepeatedKeyLiteral, MultiValueRepeatedKeyVariable,
+};
+pub use return_outside_function::{return_outside_function, ReturnOutsideFunction};
+pub use starred_expressions::{
+    starred_expressions, ExpressionsInStarAssignment, TwoStarredExpressions,
+};
 pub(crate) use strings::{
     percent_format_expected_mapping, percent_format_expected_sequence,
     percent_format_extra_named_arguments, percent_format_missing_arguments,
     percent_format_mixed_positional_and_named, percent_format_positional_count_mismatch,
     percent_format_star_requires_sequence, string_dot_format_extra_named_arguments,
     string_dot_format_extra_positional_arguments, string_dot_format_missing_argument,
-    string_dot_format_mixing_automatic,
+    string_dot_format_mixing_automatic, PercentFormatExpectedMapping,
+    PercentFormatExpectedSequence, PercentFormatExtraNamedArguments, PercentFormatInvalidFormat,
+    PercentFormatMissingArgument, PercentFormatMixedPositionalAndNamed,
+    PercentFormatPositionalCountMismatch, PercentFormatStarRequiresSequence,
+    PercentFormatUnsupportedFormatCharacter, StringDotFormatExtraNamedArguments,
+    StringDotFormatExtraPositionalArguments, StringDotFormatInvalidFormat,
+    StringDotFormatMissingArguments, StringDotFormatMixingAutomatic,
 };
-pub use unused_annotation::unused_annotation;
-pub use unused_variable::unused_variable;
+pub use undefined_export::UndefinedExport;
+pub use undefined_local::{undefined_local, UndefinedLocal};
+pub use undefined_name::UndefinedName;
+pub use unused_annotation::{unused_annotation, UnusedAnnotation};
+pub use unused_variable::{unused_variable, UnusedVariable};
+pub use yield_outside_function::{yield_outside_function, YieldOutsideFunction};
 
 mod assert_tuple;
+mod break_outside_loop;
+mod continue_outside_loop;
+mod default_except_not_last;
 mod f_string_missing_placeholders;
+mod forward_annotation_syntax_error;
 mod if_tuple;
+mod imports;
 mod invalid_literal_comparisons;
 mod invalid_print_syntax;
 mod raise_not_implemented;
+mod redefined_while_unused;
 mod repeated_keys;
+mod return_outside_function;
+mod starred_expressions;
 mod strings;
+mod undefined_export;
+mod undefined_local;
+mod undefined_name;
 mod unused_annotation;
 mod unused_variable;
-
-use std::string::ToString;
-
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind};
-
-use crate::ast::helpers::except_range;
-use crate::ast::types::{Binding, Range, Scope, ScopeKind};
-use crate::registry::Diagnostic;
-use crate::source_code::Locator;
-use crate::violations;
-
-/// F821
-pub fn undefined_local(name: &str, scopes: &[&Scope], bindings: &[Binding]) -> Option<Diagnostic> {
-    let current = &scopes.last().expect("No current scope found");
-    if matches!(current.kind, ScopeKind::Function(_)) && !current.values.contains_key(name) {
-        for scope in scopes.iter().rev().skip(1) {
-            if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
-                if let Some(binding) = scope.values.get(name).map(|index| &bindings[*index]) {
-                    if let Some((scope_id, location)) = binding.runtime_usage {
-                        if scope_id == current.id {
-                            return Some(Diagnostic::new(
-                                violations::UndefinedLocal {
-                                    name: name.to_string(),
-                                },
-                                location,
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-/// F707
-pub fn default_except_not_last(
-    handlers: &[Excepthandler],
-    locator: &Locator,
-) -> Option<Diagnostic> {
-    for (idx, handler) in handlers.iter().enumerate() {
-        let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
-        if type_.is_none() && idx < handlers.len() - 1 {
-            return Some(Diagnostic::new(
-                violations::DefaultExceptNotLast,
-                except_range(handler, locator),
-            ));
-        }
-    }
-
-    None
-}
-
-/// F621, F622
-pub fn starred_expressions(
-    elts: &[Expr],
-    check_too_many_expressions: bool,
-    check_two_starred_expressions: bool,
-    location: Range,
-) -> Option<Diagnostic> {
-    let mut has_starred: bool = false;
-    let mut starred_index: Option<usize> = None;
-    for (index, elt) in elts.iter().enumerate() {
-        if matches!(elt.node, ExprKind::Starred { .. }) {
-            if has_starred && check_two_starred_expressions {
-                return Some(Diagnostic::new(violations::TwoStarredExpressions, location));
-            }
-            has_starred = true;
-            starred_index = Some(index);
-        }
-    }
-
-    if check_too_many_expressions {
-        if let Some(starred_index) = starred_index {
-            if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {
-                return Some(Diagnostic::new(
-                    violations::ExpressionsInStarAssignment,
-                    location,
-                ));
-            }
-        }
-    }
-
-    None
-}
-
-/// F701
-pub fn break_outside_loop<'a>(
-    stmt: &'a Stmt,
-    parents: &mut impl Iterator<Item = &'a Stmt>,
-) -> Option<Diagnostic> {
-    let mut allowed: bool = false;
-    let mut child = stmt;
-    for parent in parents {
-        match &parent.node {
-            StmtKind::For { orelse, .. }
-            | StmtKind::AsyncFor { orelse, .. }
-            | StmtKind::While { orelse, .. } => {
-                if !orelse.contains(child) {
-                    allowed = true;
-                    break;
-                }
-            }
-            StmtKind::FunctionDef { .. }
-            | StmtKind::AsyncFunctionDef { .. }
-            | StmtKind::ClassDef { .. } => {
-                break;
-            }
-            _ => {}
-        }
-        child = parent;
-    }
-
-    if allowed {
-        None
-    } else {
-        Some(Diagnostic::new(
-            violations::BreakOutsideLoop,
-            Range::from_located(stmt),
-        ))
-    }
-}
-
-/// F702
-pub fn continue_outside_loop<'a>(
-    stmt: &'a Stmt,
-    parents: &mut impl Iterator<Item = &'a Stmt>,
-) -> Option<Diagnostic> {
-    let mut allowed: bool = false;
-    let mut child = stmt;
-    for parent in parents {
-        match &parent.node {
-            StmtKind::For { orelse, .. }
-            | StmtKind::AsyncFor { orelse, .. }
-            | StmtKind::While { orelse, .. } => {
-                if !orelse.contains(child) {
-                    allowed = true;
-                    break;
-                }
-            }
-            StmtKind::FunctionDef { .. }
-            | StmtKind::AsyncFunctionDef { .. }
-            | StmtKind::ClassDef { .. } => {
-                break;
-            }
-            _ => {}
-        }
-        child = parent;
-    }
-
-    if allowed {
-        None
-    } else {
-        Some(Diagnostic::new(
-            violations::ContinueOutsideLoop,
-            Range::from_located(stmt),
-        ))
-    }
-}
+mod yield_outside_function;

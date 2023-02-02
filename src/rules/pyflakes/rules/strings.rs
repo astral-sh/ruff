@@ -1,3 +1,5 @@
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
 use std::string::ToString;
 
 use log::error;
@@ -13,7 +15,192 @@ use super::super::format::FormatSummary;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
+
+define_violation!(
+    pub struct PercentFormatInvalidFormat {
+        pub message: String,
+    }
+);
+impl Violation for PercentFormatInvalidFormat {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PercentFormatInvalidFormat { message } = self;
+        format!("`%`-format string has invalid format string: {message}")
+    }
+}
+
+define_violation!(
+    pub struct PercentFormatExpectedMapping;
+);
+impl Violation for PercentFormatExpectedMapping {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`%`-format string expected mapping but got sequence")
+    }
+}
+
+define_violation!(
+    pub struct PercentFormatExpectedSequence;
+);
+impl Violation for PercentFormatExpectedSequence {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`%`-format string expected sequence but got mapping")
+    }
+}
+
+define_violation!(
+    pub struct PercentFormatExtraNamedArguments {
+        pub missing: Vec<String>,
+    }
+);
+impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PercentFormatExtraNamedArguments { missing } = self;
+        let message = missing.join(", ");
+        format!("`%`-format string has unused named argument(s): {message}")
+    }
+
+    fn autofix_title(&self) -> String {
+        let PercentFormatExtraNamedArguments { missing } = self;
+        let message = missing.join(", ");
+        format!("Remove extra named arguments: {message}")
+    }
+}
+
+define_violation!(
+    pub struct PercentFormatMissingArgument {
+        pub missing: Vec<String>,
+    }
+);
+impl Violation for PercentFormatMissingArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PercentFormatMissingArgument { missing } = self;
+        let message = missing.join(", ");
+        format!("`%`-format string is missing argument(s) for placeholder(s): {message}")
+    }
+}
+
+define_violation!(
+    pub struct PercentFormatMixedPositionalAndNamed;
+);
+impl Violation for PercentFormatMixedPositionalAndNamed {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`%`-format string has mixed positional and named placeholders")
+    }
+}
+
+define_violation!(
+    pub struct PercentFormatPositionalCountMismatch {
+        pub wanted: usize,
+        pub got: usize,
+    }
+);
+impl Violation for PercentFormatPositionalCountMismatch {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PercentFormatPositionalCountMismatch { wanted, got } = self;
+        format!("`%`-format string has {wanted} placeholder(s) but {got} substitution(s)")
+    }
+}
+
+define_violation!(
+    pub struct PercentFormatStarRequiresSequence;
+);
+impl Violation for PercentFormatStarRequiresSequence {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`%`-format string `*` specifier requires sequence")
+    }
+}
+
+define_violation!(
+    pub struct PercentFormatUnsupportedFormatCharacter {
+        pub char: char,
+    }
+);
+impl Violation for PercentFormatUnsupportedFormatCharacter {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let PercentFormatUnsupportedFormatCharacter { char } = self;
+        format!("`%`-format string has unsupported format character '{char}'")
+    }
+}
+
+define_violation!(
+    pub struct StringDotFormatInvalidFormat {
+        pub message: String,
+    }
+);
+impl Violation for StringDotFormatInvalidFormat {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let StringDotFormatInvalidFormat { message } = self;
+        format!("`.format` call has invalid format string: {message}")
+    }
+}
+
+define_violation!(
+    pub struct StringDotFormatExtraNamedArguments {
+        pub missing: Vec<String>,
+    }
+);
+impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let StringDotFormatExtraNamedArguments { missing } = self;
+        let message = missing.join(", ");
+        format!("`.format` call has unused named argument(s): {message}")
+    }
+
+    fn autofix_title(&self) -> String {
+        let StringDotFormatExtraNamedArguments { missing } = self;
+        let message = missing.join(", ");
+        format!("Remove extra named arguments: {message}")
+    }
+}
+
+define_violation!(
+    pub struct StringDotFormatExtraPositionalArguments {
+        pub missing: Vec<String>,
+    }
+);
+impl Violation for StringDotFormatExtraPositionalArguments {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let StringDotFormatExtraPositionalArguments { missing } = self;
+        let message = missing.join(", ");
+        format!("`.format` call has unused arguments at position(s): {message}")
+    }
+}
+
+define_violation!(
+    pub struct StringDotFormatMissingArguments {
+        pub missing: Vec<String>,
+    }
+);
+impl Violation for StringDotFormatMissingArguments {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let StringDotFormatMissingArguments { missing } = self;
+        let message = missing.join(", ");
+        format!("`.format` call is missing argument(s) for placeholder(s): {message}")
+    }
+}
+
+define_violation!(
+    pub struct StringDotFormatMixingAutomatic;
+);
+impl Violation for StringDotFormatMixingAutomatic {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`.format` string mixes automatic and manual numbering")
+    }
+}
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
     keywords.iter().any(|k| {
@@ -42,10 +229,9 @@ pub(crate) fn percent_format_expected_mapping(
             | ExprKind::Set { .. }
             | ExprKind::ListComp { .. }
             | ExprKind::SetComp { .. }
-            | ExprKind::GeneratorExp { .. } => checker.diagnostics.push(Diagnostic::new(
-                violations::PercentFormatExpectedMapping,
-                location,
-            )),
+            | ExprKind::GeneratorExp { .. } => checker
+                .diagnostics
+                .push(Diagnostic::new(PercentFormatExpectedMapping, location)),
             _ => {}
         }
     }
@@ -64,10 +250,9 @@ pub(crate) fn percent_format_expected_sequence(
             ExprKind::Dict { .. } | ExprKind::DictComp { .. }
         )
     {
-        checker.diagnostics.push(Diagnostic::new(
-            violations::PercentFormatExpectedSequence,
-            location,
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(PercentFormatExpectedSequence, location));
     }
 }
 
@@ -114,7 +299,7 @@ pub(crate) fn percent_format_extra_named_arguments(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::PercentFormatExtraNamedArguments {
+        PercentFormatExtraNamedArguments {
             missing: missing.iter().map(|&arg| arg.to_string()).collect(),
         },
         location,
@@ -174,7 +359,7 @@ pub(crate) fn percent_format_missing_arguments(
 
         if !missing.is_empty() {
             checker.diagnostics.push(Diagnostic::new(
-                violations::PercentFormatMissingArgument {
+                PercentFormatMissingArgument {
                     missing: missing.iter().map(|&s| s.clone()).collect(),
                 },
                 location,
@@ -191,7 +376,7 @@ pub(crate) fn percent_format_mixed_positional_and_named(
 ) {
     if !(summary.num_positional == 0 || summary.keywords.is_empty()) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::PercentFormatMixedPositionalAndNamed,
+            PercentFormatMixedPositionalAndNamed,
             location,
         ));
     }
@@ -220,7 +405,7 @@ pub(crate) fn percent_format_positional_count_mismatch(
 
             if found != summary.num_positional {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::PercentFormatPositionalCountMismatch {
+                    PercentFormatPositionalCountMismatch {
                         wanted: summary.num_positional,
                         got: found,
                     },
@@ -241,9 +426,9 @@ pub(crate) fn percent_format_star_requires_sequence(
 ) {
     if summary.starred {
         match &right.node {
-            ExprKind::Dict { .. } | ExprKind::DictComp { .. } => checker.diagnostics.push(
-                Diagnostic::new(violations::PercentFormatStarRequiresSequence, location),
-            ),
+            ExprKind::Dict { .. } | ExprKind::DictComp { .. } => checker
+                .diagnostics
+                .push(Diagnostic::new(PercentFormatStarRequiresSequence, location)),
             _ => {}
         }
     }
@@ -280,7 +465,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::StringDotFormatExtraNamedArguments {
+        StringDotFormatExtraNamedArguments {
             missing: missing.iter().map(|&arg| arg.to_string()).collect(),
         },
         location,
@@ -321,7 +506,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     }
 
     checker.diagnostics.push(Diagnostic::new(
-        violations::StringDotFormatExtraPositionalArguments {
+        StringDotFormatExtraPositionalArguments {
             missing: missing
                 .iter()
                 .map(std::string::ToString::to_string)
@@ -368,7 +553,7 @@ pub(crate) fn string_dot_format_missing_argument(
 
     if !missing.is_empty() {
         checker.diagnostics.push(Diagnostic::new(
-            violations::StringDotFormatMissingArguments { missing },
+            StringDotFormatMissingArguments { missing },
             location,
         ));
     }
@@ -381,9 +566,8 @@ pub(crate) fn string_dot_format_mixing_automatic(
     location: Range,
 ) {
     if !(summary.autos.is_empty() || summary.indexes.is_empty()) {
-        checker.diagnostics.push(Diagnostic::new(
-            violations::StringDotFormatMixingAutomatic,
-            location,
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(StringDotFormatMixingAutomatic, location));
     }
 }
