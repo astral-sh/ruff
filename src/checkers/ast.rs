@@ -4260,8 +4260,7 @@ impl<'a> Checker<'a> {
                 }
                 _ => false,
             } {
-                let (all_names, all_names_flags) =
-                    extract_all_names(parent, current, &self.bindings);
+                let (all_names, all_names_flags) = extract_all_names(self, parent, current);
 
                 if self.settings.rules.enabled(&Rule::InvalidAllFormat)
                     && matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT)

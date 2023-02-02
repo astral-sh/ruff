@@ -6,9 +6,10 @@ use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
 use crate::ast::helpers::any_over_expr;
-use crate::ast::types::{Binding, BindingKind, Scope};
+use crate::ast::types::{BindingKind, Scope};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
+use crate::checkers::ast::Checker;
 
 bitflags! {
     #[derive(Default)]
@@ -20,9 +21,9 @@ bitflags! {
 
 /// Extract the names bound to a given __all__ assignment.
 pub fn extract_all_names(
+    checker: &Checker,
     stmt: &Stmt,
     scope: &Scope,
-    bindings: &[Binding],
 ) -> (Vec<String>, AllNamesFlags) {
     fn add_to_names(names: &mut Vec<String>, elts: &[Expr], flags: &mut AllNamesFlags) {
         for elt in elts {
@@ -38,13 +39,66 @@ pub fn extract_all_names(
         }
     }
 
+    fn extract_elts<'a>(
+        checker: &'a Checker,
+        expr: &'a Expr,
+    ) -> (Option<&'a Vec<Expr>>, AllNamesFlags) {
+        match &expr.node {
+            ExprKind::List { elts, .. } => {
+                return (Some(elts), AllNamesFlags::empty());
+            }
+            ExprKind::Tuple { elts, .. } => {
+                return (Some(elts), AllNamesFlags::empty());
+            }
+            ExprKind::ListComp { .. } => {
+                // Allow comprehensions, even though we can't statically analyze them.
+                return (None, AllNamesFlags::empty());
+            }
+            ExprKind::Call {
+                func,
+                args,
+                keywords,
+                ..
+            } => {
+                // Allow `tuple()` and `list()` calls.
+                if keywords.is_empty() && args.len() <= 1 {
+                    if checker.resolve_call_path(func).map_or(false, |call_path| {
+                        call_path.as_slice() == ["", "tuple"]
+                            || call_path.as_slice() == ["", "list"]
+                    }) {
+                        if args.is_empty() {
+                            return (None, AllNamesFlags::empty());
+                        }
+                        match &args[0].node {
+                            ExprKind::List { elts, .. }
+                            | ExprKind::Set { elts, .. }
+                            | ExprKind::Tuple { elts, .. } => {
+                                return (Some(elts), AllNamesFlags::empty());
+                            }
+                            ExprKind::ListComp { .. }
+                            | ExprKind::SetComp { .. }
+                            | ExprKind::GeneratorExp { .. } => {
+                                // Allow comprehensions, even though we can't statically analyze
+                                // them.
+                                return (None, AllNamesFlags::empty());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        (None, AllNamesFlags::INVALID_FORMAT)
+    }
+
     let mut names: Vec<String> = vec![];
     let mut flags = AllNamesFlags::empty();
 
     // Grab the existing bound __all__ values.
     if let StmtKind::AugAssign { .. } = &stmt.node {
         if let Some(index) = scope.values.get("__all__") {
-            if let BindingKind::Export(existing) = &bindings[*index].kind {
+            if let BindingKind::Export(existing) = &checker.bindings[*index].kind {
                 names.extend_from_slice(existing);
             }
         }
@@ -56,45 +110,36 @@ pub fn extract_all_names(
         StmtKind::AugAssign { value, .. } => Some(value),
         _ => None,
     } {
-        match &value.node {
-            ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
-                add_to_names(&mut names, elts, &mut flags);
-            }
-            ExprKind::BinOp { left, right, .. } => {
-                let mut current_left = left;
-                let mut current_right = right;
-                while let Some(elts) = match &current_right.node {
-                    ExprKind::List { elts, .. } => Some(elts),
-                    ExprKind::Tuple { elts, .. } => Some(elts),
-                    _ => {
-                        flags |= AllNamesFlags::INVALID_FORMAT;
-                        None
-                    }
-                } {
+        if let ExprKind::BinOp { left, right, .. } = &value.node {
+            let mut current_left = left;
+            let mut current_right = right;
+            loop {
+                // Process the right side, which should be a "real" value.
+                let (elts, new_flags) = extract_elts(checker, current_right);
+                flags |= new_flags;
+                if let Some(elts) = elts {
                     add_to_names(&mut names, elts, &mut flags);
-                    match &current_left.node {
-                        ExprKind::BinOp { left, right, .. } => {
-                            current_left = left;
-                            current_right = right;
-                        }
-                        ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
-                            add_to_names(&mut names, elts, &mut flags);
-                            break;
-                        }
-                        _ => {
-                            flags |= AllNamesFlags::INVALID_FORMAT;
-                            break;
-                        }
+                }
+
+                // Process the left side, which can be a "real" value or the "rest" of the
+                // binary operation.
+                if let ExprKind::BinOp { left, right, .. } = &current_left.node {
+                    current_left = left;
+                    current_right = right;
+                } else {
+                    let (elts, new_flags) = extract_elts(checker, current_left);
+                    flags |= new_flags;
+                    if let Some(elts) = elts {
+                        add_to_names(&mut names, elts, &mut flags);
                     }
+                    break;
                 }
             }
-            ExprKind::ListComp { .. } => {
-                // Allow list comprehensions, even though we can't statically analyze them.
-                // TODO(charlie): Allow `list()` and `tuple()` calls too, and extract the members
-                // from them (even if, e.g., it's `list({...})`).
-            }
-            _ => {
-                flags |= AllNamesFlags::INVALID_FORMAT;
+        } else {
+            let (elts, new_flags) = extract_elts(checker, value);
+            flags |= new_flags;
+            if let Some(elts) = elts {
+                add_to_names(&mut names, elts, &mut flags);
             }
         }
     }
