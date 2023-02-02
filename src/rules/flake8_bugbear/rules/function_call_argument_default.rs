@@ -1,13 +1,31 @@
-use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
-
 use super::mutable_argument_default::is_mutable_func;
 use crate::ast::helpers::{compose_call_path, to_call_path};
 use crate::ast::types::{CallPath, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
+
+define_violation!(
+    pub struct FunctionCallArgumentDefault {
+        pub name: Option<String>,
+    }
+);
+impl Violation for FunctionCallArgumentDefault {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let FunctionCallArgumentDefault { name } = self;
+        if let Some(name) = name {
+            format!("Do not perform function call `{name}` in argument defaults")
+        } else {
+            format!("Do not perform function call in argument defaults")
+        }
+    }
+}
 
 const IMMUTABLE_FUNCS: &[&[&str]] = &[
     &["", "tuple"],
@@ -48,7 +66,7 @@ where
                     && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((
-                        violations::FunctionCallArgumentDefault {
+                        FunctionCallArgumentDefault {
                             name: compose_call_path(expr),
                         }
                         .into(),
