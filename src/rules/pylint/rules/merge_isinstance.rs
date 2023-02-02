@@ -6,8 +6,25 @@ use crate::ast::hashable::HashableExpr;
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct ConsiderMergingIsinstance {
+        pub obj: String,
+        pub types: Vec<String>,
+    }
+);
+impl Violation for ConsiderMergingIsinstance {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ConsiderMergingIsinstance { obj, types } = self;
+        let types = types.join(", ");
+        format!("Merge these isinstance calls: `isinstance({obj}, ({types}))`")
+    }
+}
 
 /// PLR1701
 pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values: &[Expr]) {
@@ -43,7 +60,7 @@ pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values:
     for (obj, (num_calls, types)) in obj_to_types {
         if num_calls > 1 && types.len() > 1 {
             checker.diagnostics.push(Diagnostic::new(
-                violations::ConsiderMergingIsinstance {
+                ConsiderMergingIsinstance {
                     obj: unparse_expr(obj.as_expr(), checker.stylist),
                     types: types
                         .iter()
