@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{ImportBlock, Importable};
 use crate::python::sys::KNOWN_STANDARD_LIBRARY;
+use crate::settings::types::PythonVersion;
 
 #[derive(
     Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash,
@@ -34,6 +35,7 @@ enum Reason<'a> {
     NoMatch,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn categorize(
     module_base: &str,
     level: Option<&usize>,
@@ -42,6 +44,7 @@ pub fn categorize(
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
+    target_version: PythonVersion,
 ) -> ImportType {
     let (import_type, reason) = {
         if level.map_or(false, |level| *level > 0) {
@@ -54,7 +57,11 @@ pub fn categorize(
             (ImportType::StandardLibrary, Reason::ExtraStandardLibrary)
         } else if module_base == "__future__" {
             (ImportType::Future, Reason::Future)
-        } else if KNOWN_STANDARD_LIBRARY.contains(module_base) {
+        } else if KNOWN_STANDARD_LIBRARY
+            .get(&target_version)
+            .unwrap()
+            .contains(module_base)
+        {
             (ImportType::StandardLibrary, Reason::KnownStandardLibrary)
         } else if same_package(package, module_base) {
             (ImportType::FirstParty, Reason::SamePackage)
@@ -98,6 +105,7 @@ pub fn categorize_imports<'a>(
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
+    target_version: PythonVersion,
 ) -> BTreeMap<ImportType, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<ImportType, ImportBlock> = BTreeMap::default();
     // Categorize `StmtKind::Import`.
@@ -110,6 +118,7 @@ pub fn categorize_imports<'a>(
             known_first_party,
             known_third_party,
             extra_standard_library,
+            target_version,
         );
         block_by_type
             .entry(import_type)
@@ -127,6 +136,7 @@ pub fn categorize_imports<'a>(
             known_first_party,
             known_third_party,
             extra_standard_library,
+            target_version,
         );
         block_by_type
             .entry(classification)
@@ -144,6 +154,7 @@ pub fn categorize_imports<'a>(
             known_first_party,
             known_third_party,
             extra_standard_library,
+            target_version,
         );
         block_by_type
             .entry(classification)
@@ -161,6 +172,7 @@ pub fn categorize_imports<'a>(
             known_first_party,
             known_third_party,
             extra_standard_library,
+            target_version,
         );
         block_by_type
             .entry(classification)
