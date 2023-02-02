@@ -17,6 +17,7 @@ use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingComma};
 
+use crate::rules::isort::types::ImportBlock;
 use crate::source_code::{Locator, Stylist};
 
 mod annotate;
@@ -29,6 +30,7 @@ mod order;
 pub(crate) mod rules;
 pub mod settings;
 mod sorting;
+mod split;
 pub(crate) mod track;
 mod types;
 
@@ -129,6 +131,7 @@ pub fn format_imports(
     variables: &BTreeSet<String>,
     no_lines_before: &BTreeSet<ImportType>,
     lines_after_imports: isize,
+    forced_separate: &[String],
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -136,6 +139,86 @@ pub fn format_imports(
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports);
 
+    let mut output = String::new();
+
+    for block in split::split_by_forced_separate(block, forced_separate) {
+        let block_output = format_import_block(
+            block,
+            line_length,
+            stylist,
+            src,
+            package,
+            extra_standard_library,
+            force_single_line,
+            force_sort_within_sections,
+            force_wrap_aliases,
+            known_first_party,
+            known_third_party,
+            order_by_type,
+            relative_imports_order,
+            single_line_exclusions,
+            split_on_trailing_comma,
+            classes,
+            constants,
+            variables,
+            no_lines_before,
+        );
+
+        if !block_output.is_empty() && !output.is_empty() {
+            // If we are about to output something, and had already
+            // output a block, separate them.
+            output.push_str(stylist.line_ending());
+        }
+        output.push_str(block_output.as_str());
+    }
+
+    match trailer {
+        None => {}
+        Some(Trailer::Sibling) => {
+            if lines_after_imports >= 0 {
+                for _ in 0..lines_after_imports {
+                    output.push_str(stylist.line_ending());
+                }
+            } else {
+                output.push_str(stylist.line_ending());
+            }
+        }
+        Some(Trailer::FunctionDef | Trailer::ClassDef) => {
+            if lines_after_imports >= 0 {
+                for _ in 0..lines_after_imports {
+                    output.push_str(stylist.line_ending());
+                }
+            } else {
+                output.push_str(stylist.line_ending());
+                output.push_str(stylist.line_ending());
+            }
+        }
+    }
+    output
+}
+
+#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
+fn format_import_block(
+    block: ImportBlock,
+    line_length: usize,
+    stylist: &Stylist,
+    src: &[PathBuf],
+    package: Option<&Path>,
+    extra_standard_library: &BTreeSet<String>,
+    force_single_line: bool,
+    force_sort_within_sections: bool,
+    force_wrap_aliases: bool,
+    known_first_party: &BTreeSet<String>,
+    known_third_party: &BTreeSet<String>,
+    order_by_type: bool,
+    relative_imports_order: RelativeImportsOrder,
+    single_line_exclusions: &BTreeSet<String>,
+    split_on_trailing_comma: bool,
+    classes: &BTreeSet<String>,
+    constants: &BTreeSet<String>,
+    variables: &BTreeSet<String>,
+    no_lines_before: &BTreeSet<ImportType>,
+) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
     let block_by_type = categorize_imports(
         block,
@@ -211,28 +294,6 @@ pub fn format_imports(
                 }
             }
             is_first_statement = false;
-        }
-    }
-    match trailer {
-        None => {}
-        Some(Trailer::Sibling) => {
-            if lines_after_imports >= 0 {
-                for _ in 0..lines_after_imports {
-                    output.push_str(stylist.line_ending());
-                }
-            } else {
-                output.push_str(stylist.line_ending());
-            }
-        }
-        Some(Trailer::FunctionDef | Trailer::ClassDef) => {
-            if lines_after_imports >= 0 {
-                for _ in 0..lines_after_imports {
-                    output.push_str(stylist.line_ending());
-                }
-            } else {
-                output.push_str(stylist.line_ending());
-                output.push_str(stylist.line_ending());
-            }
         }
     }
     output
@@ -674,6 +735,29 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("forced_separate.py"))]
+    fn forced_separate(path: &Path) -> Result<()> {
+        let snapshot = format!("{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    forced_separate: vec![
+                        // The order will be retained by the split mechanism.
+                        "tests".to_string(),
+                        "not_there".to_string(), // doesn't appear, shouldn't matter
+                        "experiments".to_string(),
+                    ],
+                    ..super::settings::Settings::default()
+                },
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }

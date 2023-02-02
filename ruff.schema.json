@@ -937,6 +937,16 @@
             "null"
           ]
         },
+        "forced-separate": {
+          "description": "A list of modules to separate into auxiliary block(s) of imports, in the order specified.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
           "type": [

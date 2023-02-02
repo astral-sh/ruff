@@ -3476,6 +3476,24 @@ combine-as-imports = true
 
 ---
 
+#### [`forced-separate`](#forced-separate)
+
+A list of modules to separate into auxiliary block(s) of imports,
+in the order specified.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+forced-separate = ["tests"]
+```
+
+---
+
 #### [`known-first-party`](#known-first-party)
 
 A list of modules to consider first-party, regardless of whether they
