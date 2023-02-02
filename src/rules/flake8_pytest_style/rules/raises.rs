@@ -4,8 +4,46 @@ use super::helpers::is_empty_or_null_string;
 use crate::ast::helpers::{format_call_path, to_call_path};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::{Diagnostic, Rule};
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct RaisesWithMultipleStatements;
+);
+impl Violation for RaisesWithMultipleStatements {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`pytest.raises()` block should contain a single simple statement")
+    }
+}
+
+define_violation!(
+    pub struct RaisesTooBroad {
+        pub exception: String,
+    }
+);
+impl Violation for RaisesTooBroad {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let RaisesTooBroad { exception } = self;
+        format!(
+            "`pytest.raises({exception})` is too broad, set the `match` parameter or use a more \
+             specific exception"
+        )
+    }
+}
+
+define_violation!(
+    pub struct RaisesWithoutException;
+);
+impl Violation for RaisesWithoutException {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("set the expected exception in `pytest.raises()`")
+    }
+}
 
 fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
     checker.resolve_call_path(func).map_or(false, |call_path| {
@@ -32,7 +70,7 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: 
         {
             if args.is_empty() && keywords.is_empty() {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::RaisesWithoutException,
+                    RaisesWithoutException,
                     Range::from_located(func),
                 ));
             }
@@ -88,7 +126,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
 
         if is_too_complex {
             checker.diagnostics.push(Diagnostic::new(
-                violations::RaisesWithMultipleStatements,
+                RaisesWithMultipleStatements,
                 Range::from_located(stmt),
             ));
         }
@@ -117,7 +155,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
         }
     }) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::RaisesTooBroad {
+            RaisesTooBroad {
                 exception: call_path,
             },
             Range::from_located(exception),

@@ -1,14 +1,47 @@
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
-
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Generator;
-use crate::violations;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
+
+define_violation!(
+    pub struct ParametrizeNamesWrongType {
+        pub expected: types::ParametrizeNameType,
+    }
+);
+impl AlwaysAutofixableViolation for ParametrizeNamesWrongType {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ParametrizeNamesWrongType { expected } = self;
+        format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let ParametrizeNamesWrongType { expected } = self;
+        format!("Use a `{expected}` for parameter names")
+    }
+}
+
+define_violation!(
+    pub struct ParametrizeValuesWrongType {
+        pub values: types::ParametrizeValuesType,
+        pub row: types::ParametrizeValuesRowType,
+    }
+);
+impl Violation for ParametrizeValuesWrongType {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ParametrizeValuesWrongType { values, row } = self;
+        format!("Wrong values type in `@pytest.mark.parametrize` expected `{values}` of `{row}`")
+    }
+}
 
 fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
     decorators
@@ -66,7 +99,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType {
+                            ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from_located(expr),
@@ -98,7 +131,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     }
                     types::ParametrizeNameType::List => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType {
+                            ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from_located(expr),
@@ -140,7 +173,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     types::ParametrizeNameType::Tuple => {}
                     types::ParametrizeNameType::List => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType {
+                            ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from_located(expr),
@@ -162,7 +195,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     }
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType {
+                            ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from_located(expr),
@@ -191,7 +224,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     types::ParametrizeNameType::List => {}
                     types::ParametrizeNameType::Tuple => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType {
+                            ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from_located(expr),
@@ -215,7 +248,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     }
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
-                            violations::ParametrizeNamesWrongType {
+                            ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from_located(expr),
@@ -261,7 +294,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         ExprKind::List { elts, .. } => {
             if values_type != types::ParametrizeValuesType::List {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::ParametrizeValuesWrongType {
+                    ParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
                     },
@@ -275,7 +308,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         ExprKind::Tuple { elts, .. } => {
             if values_type != types::ParametrizeValuesType::Tuple {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::ParametrizeValuesWrongType {
+                    ParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
                     },
@@ -292,7 +325,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     let mut diagnostic = Diagnostic::new(
-        violations::ParametrizeNamesWrongType {
+        ParametrizeNamesWrongType {
             expected: types::ParametrizeNameType::Csv,
         },
         Range::from_located(expr),
@@ -319,7 +352,7 @@ fn handle_value_rows(
             ExprKind::Tuple { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::ParametrizeValuesWrongType {
+                        ParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
                         },
@@ -330,7 +363,7 @@ fn handle_value_rows(
             ExprKind::List { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::ParametrizeValuesWrongType {
+                        ParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
                         },
