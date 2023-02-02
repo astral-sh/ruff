@@ -1,10 +1,29 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Keyword, Stmt};
 
 use super::super::fixes;
 use crate::ast::types::{Binding, BindingKind, Range, Scope};
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct UselessObjectInheritance {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for UselessObjectInheritance {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UselessObjectInheritance { name } = self;
+        format!("Class `{name}` inherits from `object`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove `object` inheritance".to_string()
+    }
+}
 
 fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Option<Diagnostic> {
     for expr in bases {
@@ -27,7 +46,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
             continue;
         }
         return Some(Diagnostic::new(
-            violations::UselessObjectInheritance {
+            UselessObjectInheritance {
                 name: name.to_string(),
             },
             Range::from_located(expr),

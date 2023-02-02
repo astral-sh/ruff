@@ -1,12 +1,38 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use itertools::Itertools;
 use log::error;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Alias, AliasData, Located};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
+use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::{autofix, violations};
+
+define_violation!(
+    pub struct UnnecessaryFutureImport {
+        pub names: Vec<String>,
+    }
+);
+impl AlwaysAutofixableViolation for UnnecessaryFutureImport {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnnecessaryFutureImport { names } = self;
+        if names.len() == 1 {
+            let import = &names[0];
+            format!("Unnecessary `__future__` import `{import}` for target Python version")
+        } else {
+            let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
+            format!("Unnecessary `__future__` imports {imports} for target Python version")
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove unnecessary `__future__` import".to_string()
+    }
+}
 
 const PY33_PLUS_REMOVE_FUTURES: &[&str] = &[
     "nested_scopes",
@@ -49,7 +75,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::UnnecessaryFutureImport {
+        UnnecessaryFutureImport {
             names: unused_imports
                 .iter()
                 .map(|alias| alias.node.name.to_string())

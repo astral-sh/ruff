@@ -1,7 +1,10 @@
 use crate::ast::helpers;
 use crate::ast::types::{Range, Scope, ScopeKind};
+
 use crate::registry::Diagnostic;
-use crate::violations;
+
+use crate::rules::pyupgrade::rules::SuperCallWithParameters;
+
 use rustpython_ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
 /// UP008
@@ -68,7 +71,7 @@ pub fn super_args(
 
     if first_arg_id == parent_name && second_arg_id == parent_arg {
         return Some(Diagnostic::new(
-            violations::SuperCallWithParameters,
+            SuperCallWithParameters,
             Range::from_located(expr),
         ));
     }

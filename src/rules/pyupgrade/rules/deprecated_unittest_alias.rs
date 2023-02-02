@@ -1,4 +1,7 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use once_cell::sync::Lazy;
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind};
 
@@ -6,7 +9,25 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct DeprecatedUnittestAlias {
+        pub alias: String,
+        pub target: String,
+    }
+);
+impl AlwaysAutofixableViolation for DeprecatedUnittestAlias {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DeprecatedUnittestAlias { alias, target } = self;
+        format!("`{alias}` is deprecated, use `{target}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DeprecatedUnittestAlias { alias, target } = self;
+        format!("Replace `{target}` with `{alias}`")
+    }
+}
 
 static DEPRECATED_ALIASES: Lazy<FxHashMap<&'static str, &'static str>> = Lazy::new(|| {
     FxHashMap::from_iter([
@@ -43,7 +64,7 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         return;
     }
     let mut diagnostic = Diagnostic::new(
-        violations::DeprecatedUnittestAlias {
+        DeprecatedUnittestAlias {
             alias: attr.to_string(),
             target: target.to_string(),
         },

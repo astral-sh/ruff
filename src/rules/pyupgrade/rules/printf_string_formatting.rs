@@ -1,3 +1,7 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
+
 use std::str::FromStr;
 
 use rustpython_ast::Location;
@@ -17,7 +21,20 @@ use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyupgrade::helpers::curly_escape;
-use crate::violations;
+
+define_violation!(
+    pub struct PrintfStringFormatting;
+);
+impl AlwaysAutofixableViolation for PrintfStringFormatting {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use format specifiers instead of percent format")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with format specifiers".to_string()
+    }
+}
 
 fn simplify_conversion_flag(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();
@@ -406,10 +423,7 @@ pub(crate) fn printf_string_formatting(
     // Add the `.format` call.
     contents.push_str(&format!(".format{params_string}"));
 
-    let mut diagnostic = Diagnostic::new(
-        violations::PrintfStringFormatting,
-        Range::from_located(expr),
-    );
+    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, Range::from_located(expr));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,

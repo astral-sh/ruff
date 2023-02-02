@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
 use super::super::types::Primitive;
@@ -5,7 +8,24 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct TypeOfPrimitive {
+        pub primitive: Primitive,
+    }
+);
+impl AlwaysAutofixableViolation for TypeOfPrimitive {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let TypeOfPrimitive { primitive } = self;
+        format!("Use `{}` instead of `type(...)`", primitive.builtin())
+    }
+
+    fn autofix_title(&self) -> String {
+        let TypeOfPrimitive { primitive } = self;
+        format!("Replace `type(...)` with `{}`", primitive.builtin())
+    }
+}
 
 /// UP003
 pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
@@ -24,10 +44,7 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
     let Some(primitive) = Primitive::from_constant(value) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(
-        violations::TypeOfPrimitive { primitive },
-        Range::from_located(expr),
-    );
+    let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, Range::from_located(expr));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             primitive.builtin(),

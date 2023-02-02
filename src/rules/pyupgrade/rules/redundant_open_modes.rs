@@ -1,3 +1,7 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
+
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
@@ -12,7 +16,34 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
-use crate::violations;
+
+define_violation!(
+    pub struct RedundantOpenModes {
+        pub replacement: Option<String>,
+    }
+);
+impl AlwaysAutofixableViolation for RedundantOpenModes {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let RedundantOpenModes { replacement } = self;
+        match replacement {
+            None => format!("Unnecessary open mode parameters"),
+            Some(replacement) => {
+                format!("Unnecessary open mode parameters, use \"{replacement}\"")
+            }
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let RedundantOpenModes { replacement } = self;
+        match replacement {
+            None => "Remove open mode parameters".to_string(),
+            Some(replacement) => {
+                format!("Replace with \"{replacement}\"")
+            }
+        }
+    }
+}
 
 const OPEN_FUNC_NAME: &str = "open";
 const MODE_KEYWORD_ARGUMENT: &str = "mode";
@@ -81,7 +112,7 @@ fn create_check(
     patch: bool,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
-        violations::RedundantOpenModes {
+        RedundantOpenModes {
             replacement: replacement_value.clone(),
         },
         Range::from_located(expr),

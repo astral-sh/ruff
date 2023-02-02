@@ -1,4 +1,7 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use itertools::Itertools;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
 use crate::ast::helpers::compose_call_path;
@@ -6,7 +9,26 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct OSErrorAlias {
+        pub name: Option<String>,
+    }
+);
+impl AlwaysAutofixableViolation for OSErrorAlias {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Replace aliased errors with `OSError`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let OSErrorAlias { name } = self;
+        match name {
+            None => "Replace with builtin `OSError`".to_string(),
+            Some(name) => format!("Replace `{name}` with builtin `OSError`"),
+        }
+    }
+}
 
 const ERROR_NAMES: &[&str] = &["EnvironmentError", "IOError", "WindowsError"];
 const ERROR_MODULES: &[&str] = &["mmap", "select", "socket"];
@@ -145,7 +167,7 @@ fn handle_making_changes(
             final_str.push(')');
         }
         let mut diagnostic = Diagnostic::new(
-            violations::OSErrorAlias {
+            OSErrorAlias {
                 name: compose_call_path(target),
             },
             Range::from_located(target),

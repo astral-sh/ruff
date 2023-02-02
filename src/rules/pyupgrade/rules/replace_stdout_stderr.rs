@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, Keyword};
 
 use crate::ast::helpers::find_keyword;
@@ -7,7 +10,20 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::{Locator, Stylist};
-use crate::violations;
+
+define_violation!(
+    pub struct ReplaceStdoutStderr;
+);
+impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Sending stdout and stderr to pipe is deprecated, use `capture_output`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `capture_output` keyword argument".to_string()
+    }
+}
 
 #[derive(Debug)]
 struct MiddleContent<'a> {
@@ -116,8 +132,7 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keywo
             return;
         }
 
-        let mut diagnostic =
-            Diagnostic::new(violations::ReplaceStdoutStderr, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, Range::from_located(expr));
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) = generate_fix(checker.stylist, checker.locator, stdout, stderr) {
                 diagnostic.amend(fix);
