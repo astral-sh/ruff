@@ -1,11 +1,14 @@
-use rustpython_ast::{Cmpop, Expr, ExprKind};
-
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::cst::matchers::{match_comparison, match_expression};
 use crate::fix::Fix;
 use crate::python::string::{self};
 use crate::registry::Diagnostic;
+use crate::source_code::{Locator, Stylist};
 use crate::violations;
+use anyhow::Result;
+use libcst_native::{Codegen, CodegenState, CompOp};
+use rustpython_ast::{Cmpop, Expr, ExprKind};
 
 /// Return `true` if an [`Expr`] is a constant or a constant-like name.
 fn is_constant_like(expr: &Expr) -> bool {
@@ -16,6 +19,79 @@ fn is_constant_like(expr: &Expr) -> bool {
         ExprKind::Name { id, .. } => string::is_upper(id),
         _ => false,
     }
+}
+
+/// Generate a fix to reverse a comparison.
+fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Result<String> {
+    let range = Range::from_located(expr);
+    let contents = locator.slice_source_code_range(&range);
+
+    let mut expression = match_expression(contents)?;
+    let mut comparison = match_comparison(&mut expression)?;
+
+    let left = (*comparison.left).clone();
+
+    // Copy the right side to the left side.
+    comparison.left = Box::new(comparison.comparisons[0].comparator.clone());
+
+    // Copy the left side to the right side.
+    comparison.comparisons[0].comparator = left;
+
+    // Reverse the operator.
+    let op = comparison.comparisons[0].operator.clone();
+    comparison.comparisons[0].operator = match op {
+        CompOp::LessThan {
+            whitespace_before,
+            whitespace_after,
+        } => CompOp::GreaterThan {
+            whitespace_before,
+            whitespace_after,
+        },
+        CompOp::GreaterThan {
+            whitespace_before,
+            whitespace_after,
+        } => CompOp::LessThan {
+            whitespace_before,
+            whitespace_after,
+        },
+        CompOp::LessThanEqual {
+            whitespace_before,
+            whitespace_after,
+        } => CompOp::GreaterThanEqual {
+            whitespace_before,
+            whitespace_after,
+        },
+        CompOp::GreaterThanEqual {
+            whitespace_before,
+            whitespace_after,
+        } => CompOp::LessThanEqual {
+            whitespace_before,
+            whitespace_after,
+        },
+        CompOp::Equal {
+            whitespace_before,
+            whitespace_after,
+        } => CompOp::Equal {
+            whitespace_before,
+            whitespace_after,
+        },
+        CompOp::NotEqual {
+            whitespace_before,
+            whitespace_after,
+        } => CompOp::NotEqual {
+            whitespace_before,
+            whitespace_after,
+        },
+        _ => unreachable!("Expected comparison operator"),
+    };
+
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
+    expression.codegen(&mut state);
+    Ok(state.to_string())
 }
 
 /// SIM300
@@ -41,38 +117,25 @@ pub fn yoda_conditions(
         return;
     }
 
-    // Slice exact content to preserve formatting.
-    let constant = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(left));
-    let variable = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(right));
-
-    // Reverse the operation.
-    let reversed_op = match op {
-        Cmpop::Eq => "==",
-        Cmpop::NotEq => "!=",
-        Cmpop::Lt => ">",
-        Cmpop::LtE => ">=",
-        Cmpop::Gt => "<",
-        Cmpop::GtE => "<=",
-        _ => unreachable!("Expected comparison operator"),
-    };
-
-    let suggestion = format!("{variable} {reversed_op} {constant}");
-    let mut diagnostic = Diagnostic::new(
-        violations::YodaConditions {
-            suggestion: suggestion.to_string(),
-        },
-        Range::from_located(expr),
-    );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
-            suggestion,
-            left.location,
-            right.end_location.unwrap(),
+    if let Ok(suggestion) = reverse_comparison(expr, checker.locator, checker.stylist) {
+        let mut diagnostic = Diagnostic::new(
+            violations::YodaConditions {
+                suggestion: Some(suggestion.to_string()),
+            },
+            Range::from_located(expr),
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.amend(Fix::replacement(
+                suggestion,
+                left.location,
+                right.end_location.unwrap(),
+            ));
+        }
+        checker.diagnostics.push(diagnostic);
+    } else {
+        checker.diagnostics.push(Diagnostic::new(
+            violations::YodaConditions { suggestion: None },
+            Range::from_located(expr),
         ));
     }
-    checker.diagnostics.push(diagnostic);
 }

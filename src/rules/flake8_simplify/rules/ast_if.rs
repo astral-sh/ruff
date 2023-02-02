@@ -307,18 +307,13 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         return;
     }
 
-    // Don't flag if the statement expression contains any comments.
-    if has_comments(stmt, checker.locator) {
-        return;
-    }
-
     let mut diagnostic = Diagnostic::new(
         violations::UseTernaryOperator {
             contents: contents.clone(),
         },
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch(diagnostic.kind.rule()) && !has_comments(stmt, checker.locator) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,
@@ -443,18 +438,13 @@ pub fn use_dict_get_with_default(
         return;
     }
 
-    // Don't flag if the statement expression contains any comments.
-    if has_comments(stmt, checker.locator) {
-        return;
-    }
-
     let mut diagnostic = Diagnostic::new(
         violations::DictGetWithDefault {
             contents: contents.clone(),
         },
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch(diagnostic.kind.rule()) && !has_comments(stmt, checker.locator) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,

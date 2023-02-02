@@ -937,6 +937,16 @@
             "null"
           ]
         },
+        "forced-separate": {
+          "description": "A list of modules to separate into auxiliary block(s) of imports, in the order specified.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
           "type": [
@@ -956,6 +966,14 @@
           "items": {
             "type": "string"
           }
+        },
+        "lines-after-imports": {
+          "description": "The number of blank lines to place after imports. -1 for automatic determination.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int"
         },
         "no-lines-before": {
           "description": "A list of sections that should _not_ be delineated from the previous section via empty lines.",
@@ -1102,7 +1120,7 @@
       "type": "object",
       "properties": {
         "keep-runtime-typing": {
-          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively.",
+          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively, and enabling it is equivalent to disabling `use-pep585-annotation` (`UP006`) and `use-pep604-annotation` (`UP007`) entirely.",
           "type": [
             "boolean",
             "null"
@@ -1115,7 +1133,7 @@
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
-          "description": "Whether or not line-length violations (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
+          "description": "Whether line-length violations (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
           "type": [
             "boolean",
             "null"
@@ -1830,6 +1848,10 @@
         "SIM4",
         "SIM40",
         "SIM401",
+        "SLF",
+        "SLF0",
+        "SLF00",
+        "SLF001",
         "T",
         "T1",
         "T10",
@@ -1907,6 +1929,7 @@
         "UP033",
         "UP034",
         "UP035",
+        "UP036",
         "W",
         "W2",
         "W29",

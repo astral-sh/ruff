@@ -1,0 +1,149 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 5
+    column: 53
+  fix:
+    content:
+      - pass
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 5
+      column: 53
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 12
+    column: 53
+  fix:
+    content:
+      - ""
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 13
+      column: 0
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 20
+    column: 51
+  fix:
+    content:
+      - ""
+    location:
+      row: 17
+      column: 4
+    end_location:
+      row: 19
+      column: 4
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 25
+    column: 53
+  fix:
+    content:
+      - ""
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 26
+      column: 0
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 27
+    column: 4
+  end_location:
+    row: 28
+    column: 53
+  fix:
+    content:
+      - ""
+    location:
+      row: 27
+      column: 0
+    end_location:
+      row: 29
+      column: 0
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 32
+    column: 4
+  end_location:
+    row: 35
+    column: 51
+  fix:
+    content:
+      - ""
+    location:
+      row: 32
+      column: 4
+    end_location:
+      row: 34
+      column: 4
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 37
+    column: 4
+  end_location:
+    row: 40
+    column: 51
+  fix:
+    content:
+      - "    cmd = [sys.executable, \"-m\", \"test\", \"-j0\"]"
+    location:
+      row: 37
+      column: 0
+    end_location:
+      row: 40
+      column: 51
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 42
+    column: 4
+  end_location:
+    row: 45
+    column: 51
+  fix:
+    content:
+      - ""
+    location:
+      row: 42
+      column: 4
+    end_location:
+      row: 44
+      column: 6
+  parent: ~
+

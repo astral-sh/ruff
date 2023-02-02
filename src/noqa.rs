@@ -10,7 +10,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::registry::{Diagnostic, Rule};
 use crate::rule_redirects::get_redirect_target;
-use crate::settings::hashable::HashableHashSet;
 use crate::source_code::LineEnding;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -81,12 +80,17 @@ pub fn add_noqa(
     path: &Path,
     diagnostics: &[Diagnostic],
     contents: &str,
+    commented_lines: &[usize],
     noqa_line_for: &IntMap<usize, usize>,
-    external: &HashableHashSet<String>,
     line_ending: &LineEnding,
 ) -> Result<usize> {
-    let (count, output) =
-        add_noqa_inner(diagnostics, contents, noqa_line_for, external, line_ending);
+    let (count, output) = add_noqa_inner(
+        diagnostics,
+        contents,
+        commented_lines,
+        noqa_line_for,
+        line_ending,
+    );
     fs::write(path, output)?;
     Ok(count)
 }
@@ -94,30 +98,65 @@ pub fn add_noqa(
 fn add_noqa_inner(
     diagnostics: &[Diagnostic],
     contents: &str,
+    commented_lines: &[usize],
     noqa_line_for: &IntMap<usize, usize>,
-    external: &HashableHashSet<String>,
     line_ending: &LineEnding,
 ) -> (usize, String) {
     let mut matches_by_line: FxHashMap<usize, FxHashSet<&Rule>> = FxHashMap::default();
-    for (lineno, line) in contents.lines().enumerate() {
+    let lines: Vec<&str> = contents.lines().collect();
+    for (lineno, line) in lines.iter().enumerate() {
         // If we hit an exemption for the entire file, bail.
         if is_file_exempt(line) {
             return (0, contents.to_string());
         }
 
+        // Grab the noqa (logical) line number for the current (physical) line.
+        let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
+
         let mut codes: FxHashSet<&Rule> = FxHashSet::default();
         for diagnostic in diagnostics {
-            // TODO(charlie): Consider respecting parent `noqa` directives. For now, we'll
-            // add a `noqa` for every diagnostic, on its own line. This could lead to
-            // duplication, whereby some parent `noqa` directives become
-            // redundant.
             if diagnostic.location.row() == lineno + 1 {
+                // Is the violation ignored by a `noqa` directive on the parent line?
+                if let Some(parent_lineno) = diagnostic.parent.map(|location| location.row()) {
+                    let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
+                    if commented_lines.contains(noqa_lineno) {
+                        match extract_noqa_directive(lines[noqa_lineno - 1]) {
+                            Directive::All(..) => {
+                                continue;
+                            }
+                            Directive::Codes(.., codes) => {
+                                if includes(diagnostic.kind.rule(), &codes) {
+                                    continue;
+                                }
+                            }
+                            Directive::None => {}
+                        }
+                    }
+                }
+
+                // Is the diagnostic ignored by a `noqa` directive on the same line?
+                let diagnostic_lineno = diagnostic.location.row();
+                let noqa_lineno = noqa_line_for
+                    .get(&diagnostic_lineno)
+                    .unwrap_or(&diagnostic_lineno);
+                if commented_lines.contains(noqa_lineno) {
+                    match extract_noqa_directive(lines[noqa_lineno - 1]) {
+                        Directive::All(..) => {
+                            continue;
+                        }
+                        Directive::Codes(.., codes) => {
+                            if includes(diagnostic.kind.rule(), &codes) {
+                                continue;
+                            }
+                        }
+                        Directive::None => {}
+                    }
+                }
+
+                // The diagnostic is not ignored by any `noqa` directive; add it to the list.
                 codes.insert(diagnostic.kind.rule());
             }
         }
-
-        // Grab the noqa (logical) line number for the current (physical) line.
-        let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
 
         if !codes.is_empty() {
             matches_by_line
@@ -151,22 +190,13 @@ fn add_noqa_inner(
                         output.push_str(line_ending);
                         count += 1;
                     }
-                    Directive::All(_, start, _) => {
-                        // Add existing content.
-                        output.push_str(line[..start].trim_end());
-
-                        // Add `noqa` directive.
-                        output.push_str("  # noqa: ");
-
-                        // Add codes.
-                        let codes: Vec<&str> =
-                            rules.iter().map(|r| r.code()).sorted_unstable().collect();
-                        let suffix = codes.join(", ");
-                        output.push_str(&suffix);
+                    Directive::All(..) => {
+                        // Leave the line as-is.
+                        output.push_str(line);
                         output.push_str(line_ending);
-                        count += 1;
                     }
                     Directive::Codes(_, start_byte, _, existing) => {
+                        println!("existing: {:?}", existing);
                         // Reconstruct the line based on the preserved rule codes.
                         // This enables us to tally the number of edits.
                         let mut formatted = String::with_capacity(line.len());
@@ -181,7 +211,7 @@ fn add_noqa_inner(
                         let codes: Vec<&str> = rules
                             .iter()
                             .map(|r| r.code())
-                            .chain(existing.into_iter().filter(|code| external.contains(*code)))
+                            .chain(existing.into_iter())
                             .sorted_unstable()
                             .collect();
                         let suffix = codes.join(", ");
@@ -212,7 +242,6 @@ mod tests {
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
     use crate::registry::Diagnostic;
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
-    use crate::settings::hashable::HashableHashSet;
     use crate::source_code::LineEnding;
     use crate::violations;
 
@@ -234,13 +263,13 @@ mod tests {
     fn modification() {
         let diagnostics = vec![];
         let contents = "x = 1";
+        let commented_lines = vec![];
         let noqa_line_for = IntMap::default();
-        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
+            &commented_lines,
             &noqa_line_for,
-            &external,
             &LineEnding::Lf,
         );
         assert_eq!(count, 0);
@@ -253,13 +282,13 @@ mod tests {
             Range::new(Location::new(1, 0), Location::new(1, 0)),
         )];
         let contents = "x = 1";
+        let commented_lines = vec![1];
         let noqa_line_for = IntMap::default();
-        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
+            &commented_lines,
             &noqa_line_for,
-            &external,
             &LineEnding::Lf,
         );
         assert_eq!(count, 1);
@@ -278,13 +307,13 @@ mod tests {
             ),
         ];
         let contents = "x = 1  # noqa: E741\n";
+        let commented_lines = vec![1];
         let noqa_line_for = IntMap::default();
-        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
+            &commented_lines,
             &noqa_line_for,
-            &external,
             &LineEnding::Lf,
         );
         assert_eq!(count, 1);
@@ -303,16 +332,16 @@ mod tests {
             ),
         ];
         let contents = "x = 1  # noqa";
+        let commented_lines = vec![1];
         let noqa_line_for = IntMap::default();
-        let external = HashableHashSet::default();
         let (count, output) = add_noqa_inner(
             &diagnostics,
             contents,
+            &commented_lines,
             &noqa_line_for,
-            &external,
             &LineEnding::Lf,
         );
-        assert_eq!(count, 1);
-        assert_eq!(output, "x = 1  # noqa: E741, F841\n");
+        assert_eq!(count, 0);
+        assert_eq!(output, "x = 1  # noqa\n");
     }
 }

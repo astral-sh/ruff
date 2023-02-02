@@ -8,9 +8,9 @@
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
 
-An extremely fast Python linter, written in Rust.
+[**Discord**](https://discord.gg/Z8KbeK24) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
 
-This README is also available as [documentation](https://beta.ruff.rs/docs/).
+An extremely fast Python linter, written in Rust.
 
 <p align="center">
   <picture align="center">
@@ -31,28 +31,25 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
 - 📦  Built-in caching, to avoid re-analyzing unchanged files
 - 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
 - ⚖️  [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
-- 🔌  Native re-implementations of dozens of Flake8 plugins, like [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
+- 🔌  Native re-implementations of dozens of Flake8 plugins, like [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
 - ⌨️  First-party editor integrations for [VS Code](https://github.com/charliermarsh/ruff-vscode) and [more](https://github.com/charliermarsh/ruff-lsp)
 - 🌎  Monorepo-friendly, with [hierarchical and cascading configuration](#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
 
-Ruff can be used to replace [Flake8](https://pypi.org/project/flake8/) (plus a variety of plugins), [`isort`](https://pypi.org/project/isort/),
-[`pydocstyle`](https://pypi.org/project/pydocstyle/), [`yesqa`](https://github.com/asottile/yesqa),
-[`eradicate`](https://pypi.org/project/eradicate/), [`pyupgrade`](https://pypi.org/project/pyupgrade/),
-and [`autoflake`](https://pypi.org/project/autoflake/), all while executing tens or hundreds of
-times faster than any individual tool.
-
-Ruff goes beyond the responsibilities of a traditional linter, instead functioning as an advanced
-code transformation tool capable of upgrading type annotations, rewriting class definitions, sorting
-imports, and more.
+Ruff can be used to replace [Flake8](https://pypi.org/project/flake8/) (plus dozens of plugins),
+[isort](https://pypi.org/project/isort/), [pydocstyle](https://pypi.org/project/pydocstyle/),
+[yesqa](https://github.com/asottile/yesqa), [eradicate](https://pypi.org/project/eradicate/),
+[pyupgrade](https://pypi.org/project/pyupgrade/), and [autoflake](https://pypi.org/project/autoflake/),
+all while executing tens or hundreds of times faster than any individual tool.
 
 Ruff is extremely actively developed and used in major open-source projects like:
 
 - [pandas](https://github.com/pandas-dev/pandas)
 - [FastAPI](https://github.com/tiangolo/fastapi)
 - [Apache Airflow](https://github.com/apache/airflow)
+- [SciPy](https://github.com/scipy/scipy)
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Zulip](https://github.com/zulip/zulip)
 - [Pydantic](https://github.com/pydantic/pydantic)
@@ -61,7 +58,6 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
 - [Hatch](https://github.com/pypa/hatch)
 - [Jupyter](https://github.com/jupyter-server/jupyter_server)
-- [SciPy](https://github.com/scipy/scipy)
 - [Great Expectations](https://github.com/great-expectations/great_expectations)
 - [Polars](https://github.com/pola-rs/polars)
 - [Ibis](https://github.com/ibis-project/ibis)
@@ -77,7 +73,8 @@ Ruff is extremely actively developed and used in major open-source projects like
 - [featuretools](https://github.com/alteryx/featuretools)
 - [meson-python](https://github.com/mesonbuild/meson-python)
 
-Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
+Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster) or
+the most recent [project update](https://notes.crmarsh.com/ruff-the-first-200-releases).
 
 ## Testimonials
 
@@ -115,6 +112,8 @@ developer of [Zulip](https://github.com/zulip/zulip):
 <!-- End section: Overview -->
 
 ## Table of Contents
+
+This README is also available as [documentation](https://beta.ruff.rs/docs/).
 
 1. [Installation and Usage](#installation-and-usage)
 1. [Configuration](#configuration)
@@ -159,16 +158,19 @@ developer of [Zulip](https://github.com/zulip/zulip):
    1. [Pylint (PL)](#pylint-pl)
    1. [tryceratops (TRY)](#tryceratops-try)
    1. [flake8-raise (RSE)](#flake8-raise-rse)
+   1. [flake8-self (SLF)](#flake8-self-slf)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
 1. [Contributing](#contributing)
-1. [Releases](#releases)
+1. [Support](#support)
 1. [Benchmarks](#benchmarks)
 1. [Reference](#reference)
 1. [License](#license)
 
 ## Installation and Usage
+
+This README is also available as [documentation](https://beta.ruff.rs/docs/).
 
 <!-- Begin section: Installation and Usage -->
 
@@ -327,14 +329,14 @@ docstring-quotes = "double"
 
 Ruff mirrors Flake8's rule code system, in which each rule code consists of a one-to-three letter
 prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
-(e.g., `F` for Pyflakes, `E` for `pycodestyle`, `ANN` for `flake8-annotations`). The set of enabled
+(e.g., `F` for Pyflakes, `E` for pycodestyle, `ANN` for flake8-annotations). The set of enabled
 rules is determined by the `select` and `ignore` options, which support both the full code (e.g.,
 `F401`) and the prefix (e.g., `F`).
 
 As a special-case, Ruff also supports the `ALL` code, which enables all rules. Note that some of the
-`pydocstyle` rules conflict (e.g., `D203` and `D211`) as they represent alternative docstring
+pydocstyle rules conflict (e.g., `D203` and `D211`) as they represent alternative docstring
 formats. Enabling `ALL` without further configuration may result in suboptimal behavior, especially
-for the `pydocstyle` plugin.
+for the pydocstyle plugin.
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
@@ -342,7 +344,7 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
   explicit.
 - Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
 - Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
-  you might consider expanding to `select = ["E", "F", "B"]` to enable the popular `flake8-bugbear`
+  you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
   extension.
 - By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
   consider turning off autofix for specific rules or categories (see: [FAQ](#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
@@ -849,6 +851,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP033 | functools-cache | Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)` | 🛠 |
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
 | UP035 | import-replacements | Import from `{module}` instead: {names} | 🛠 |
+| UP036 | outdated-version-block | Version block is outdated for minimum Python version | 🛠 |
 
 ### flake8-2020 (YTT)
 
@@ -1266,7 +1269,7 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH120 | pathlib-dirname | `os.path.dirname` should be replaced by `.parent` |  |
 | PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
 | PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
-| PTH123 | pathlib-open | `open("foo")` should be replaced by`Path("foo").open()` |  |
+| PTH123 | pathlib-open | `open("foo")` should be replaced by `Path("foo").open()` |  |
 | PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
 
 ### eradicate (ERA)
@@ -1366,6 +1369,14 @@ For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception |  |
+
+### flake8-self (SLF)
+
+For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| SLF001 | private-member-access | Private member accessed: `{access}` |  |
 
 ### Ruff-specific rules (RUF)
 
@@ -1633,52 +1644,53 @@ implements all of the `F` rules (which originate from Pyflakes), along with a su
 Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
 natively, including:
 
-- [`autoflake`](https://pypi.org/project/autoflake/) ([#1647](https://github.com/charliermarsh/ruff/issues/1647))
-- [`eradicate`](https://pypi.org/project/eradicate/)
-- [`flake8-2020`](https://pypi.org/project/flake8-2020/)
-- [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
-- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
-- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
-- [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
-- [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
-- [`flake8-commas`](https://pypi.org/project/flake8-commas/)
-- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-datetimez`](https://pypi.org/project/flake8-datetimez/)
-- [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
-- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
-- [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
-- [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
-- [`flake8-executable`](https://pypi.org/project/flake8-executable/)
-- [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
-- [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
-- [`flake8-logging-format`](https://pypi.org/project/flake8-logging-format/)
-- [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
-- [`flake8-pie`](https://pypi.org/project/flake8-pie/)
-- [`flake8-print`](https://pypi.org/project/flake8-print/)
-- [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
-- [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
-- [`flake8-raise`](https://pypi.org/project/flake8-raise/)
-- [`flake8-return`](https://pypi.org/project/flake8-return/)
-- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
-- [`flake8-super`](https://pypi.org/project/flake8-super/)
-- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
-- [`flake8-type-checking`](https://pypi.org/project/flake8-type-checking/)
-- [`flake8-use-pathlib`](https://pypi.org/project/flake8-use-pathlib/)
-- [`isort`](https://pypi.org/project/isort/)
-- [`mccabe`](https://pypi.org/project/mccabe/)
-- [`pandas-vet`](https://pypi.org/project/pandas-vet/)
-- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
-- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
-- [`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980))
-- [`pyupgrade`](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827))
-- [`yesqa`](https://github.com/asottile/yesqa)
+- [autoflake](https://pypi.org/project/autoflake/) ([#1647](https://github.com/charliermarsh/ruff/issues/1647))
+- [eradicate](https://pypi.org/project/eradicate/)
+- [flake8-2020](https://pypi.org/project/flake8-2020/)
+- [flake8-annotations](https://pypi.org/project/flake8-annotations/)
+- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
+- [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
+- [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
+- [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
+- [flake8-builtins](https://pypi.org/project/flake8-builtins/)
+- [flake8-commas](https://pypi.org/project/flake8-commas/)
+- [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
+- [flake8-debugger](https://pypi.org/project/flake8-debugger/)
+- [flake8-docstrings](https://pypi.org/project/flake8-docstrings/)
+- [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
+- [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
+- [flake8-executable](https://pypi.org/project/flake8-executable/)
+- [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
+- [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
+- [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
+- [flake8-pie](https://pypi.org/project/flake8-pie/)
+- [flake8-print](https://pypi.org/project/flake8-print/)
+- [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
+- [flake8-quotes](https://pypi.org/project/flake8-quotes/)
+- [flake8-raise](https://pypi.org/project/flake8-raise/)
+- [flake8-return](https://pypi.org/project/flake8-return/)
+- [flake8-self](https://pypi.org/project/flake8-self/)
+- [flake8-simplify](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
+- [flake8-super](https://pypi.org/project/flake8-super/)
+- [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
+- [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+- [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
+- [isort](https://pypi.org/project/isort/)
+- [mccabe](https://pypi.org/project/mccabe/)
+- [pandas-vet](https://pypi.org/project/pandas-vet/)
+- [pep8-naming](https://pypi.org/project/pep8-naming/)
+- [pydocstyle](https://pypi.org/project/pydocstyle/)
+- [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980))
+- [pyupgrade](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827))
+- [yesqa](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different rule codes and prefixes than would be found in the
 originating Flake8 plugins. For example, Ruff uses `TID252` to represent the `I252` rule from
-`flake8-tidy-imports`. This helps minimize conflicts across plugins and allows any individual plugin
+flake8-tidy-imports. This helps minimize conflicts across plugins and allows any individual plugin
 to be toggled on or off with a single (e.g.) `--select TID`, as opposed to `--select I2` (to avoid
-conflicts with the `isort` rules, like `I001`).
+conflicts with the isort rules, like `I001`).
 
 Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
 
@@ -1688,8 +1700,8 @@ Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flak
 
 There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
 
-- Ruff doesn't implement all the "opinionated" lint rules from `flake8-bugbear`.
-- Depending on your project structure, Ruff and `isort` can differ in their detection of first-party
+- Ruff doesn't implement all the "opinionated" lint rules from flake8-bugbear.
+- Depending on your project structure, Ruff and isort can differ in their detection of first-party
   code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
   code is nested in a `src` directory.)
 
@@ -1724,45 +1736,46 @@ feedback on type errors.
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
 
-- [`flake8-2020`](https://pypi.org/project/flake8-2020/)
-- [`flake8-annotations`](https://pypi.org/project/flake8-annotations/)
-- [`flake8-bandit`](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
-- [`flake8-blind-except`](https://pypi.org/project/flake8-blind-except/)
-- [`flake8-boolean-trap`](https://pypi.org/project/flake8-boolean-trap/)
-- [`flake8-bugbear`](https://pypi.org/project/flake8-bugbear/)
-- [`flake8-builtins`](https://pypi.org/project/flake8-builtins/)
-- [`flake8-commas`](https://pypi.org/project/flake8-commas/)
-- [`flake8-comprehensions`](https://pypi.org/project/flake8-comprehensions/)
-- [`flake8-datetimez`](https://pypi.org/project/flake8-datetimez/)
-- [`flake8-debugger`](https://pypi.org/project/flake8-debugger/)
-- [`flake8-docstrings`](https://pypi.org/project/flake8-docstrings/)
-- [`flake8-eradicate`](https://pypi.org/project/flake8-eradicate/)
-- [`flake8-errmsg`](https://pypi.org/project/flake8-errmsg/)
-- [`flake8-executable`](https://pypi.org/project/flake8-executable/)
-- [`flake8-implicit-str-concat`](https://pypi.org/project/flake8-implicit-str-concat/)
-- [`flake8-import-conventions`](https://github.com/joaopalmeiro/flake8-import-conventions)
-- [`flake8-logging-format`](https://pypi.org/project/flake8-logging-format/)
-- [`flake8-no-pep420`](https://pypi.org/project/flake8-no-pep420)
-- [`flake8-pie`](https://pypi.org/project/flake8-pie/)
-- [`flake8-print`](https://pypi.org/project/flake8-print/)
-- [`flake8-pytest-style`](https://pypi.org/project/flake8-pytest-style/)
-- [`flake8-quotes`](https://pypi.org/project/flake8-quotes/)
-- [`flake8-raise`](https://pypi.org/project/flake8-raise/)
-- [`flake8-return`](https://pypi.org/project/flake8-return/)
-- [`flake8-simplify`](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
-- [`flake8-super`](https://pypi.org/project/flake8-super/)
-- [`flake8-tidy-imports`](https://pypi.org/project/flake8-tidy-imports/)
-- [`flake8-type-checking`](https://pypi.org/project/flake8-type-checking/)
-- [`flake8-use-pathlib`](https://pypi.org/project/flake8-use-pathlib/)
-- [`mccabe`](https://pypi.org/project/mccabe/)
-- [`pandas-vet`](https://pypi.org/project/pandas-vet/)
-- [`pep8-naming`](https://pypi.org/project/pep8-naming/)
-- [`pydocstyle`](https://pypi.org/project/pydocstyle/)
+- [flake8-2020](https://pypi.org/project/flake8-2020/)
+- [flake8-annotations](https://pypi.org/project/flake8-annotations/)
+- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
+- [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
+- [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
+- [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
+- [flake8-builtins](https://pypi.org/project/flake8-builtins/)
+- [flake8-commas](https://pypi.org/project/flake8-commas/)
+- [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
+- [flake8-debugger](https://pypi.org/project/flake8-debugger/)
+- [flake8-docstrings](https://pypi.org/project/flake8-docstrings/)
+- [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
+- [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
+- [flake8-executable](https://pypi.org/project/flake8-executable/)
+- [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
+- [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
+- [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
+- [flake8-pie](https://pypi.org/project/flake8-pie/)
+- [flake8-print](https://pypi.org/project/flake8-print/)
+- [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
+- [flake8-quotes](https://pypi.org/project/flake8-quotes/)
+- [flake8-raise](https://pypi.org/project/flake8-raise/)
+- [flake8-return](https://pypi.org/project/flake8-return/)
+- [flake8-self](https://pypi.org/project/flake8-self/)
+- [flake8-simplify](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
+- [flake8-super](https://pypi.org/project/flake8-super/)
+- [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
+- [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+- [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
+- [mccabe](https://pypi.org/project/mccabe/)
+- [pandas-vet](https://pypi.org/project/pandas-vet/)
+- [pep8-naming](https://pypi.org/project/pep8-naming/)
+- [pydocstyle](https://pypi.org/project/pydocstyle/)
 
-Ruff can also replace [`isort`](https://pypi.org/project/isort/),
-[`yesqa`](https://github.com/asottile/yesqa), [`eradicate`](https://pypi.org/project/eradicate/),
-[`pygrep-hooks`](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980)), and a subset of the rules
-implemented in [`pyupgrade`](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827)).
+Ruff can also replace [isort](https://pypi.org/project/isort/),
+[yesqa](https://github.com/asottile/yesqa), [eradicate](https://pypi.org/project/eradicate/),
+[pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980)), and a subset of the rules
+implemented in [pyupgrade](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827)).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an Issue.
 
@@ -1782,16 +1795,16 @@ on Rust at all.
 Ruff does not yet support third-party plugins, though a plugin system is within-scope for the
 project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
 
-### How does Ruff's import sorting compare to [`isort`](https://pypi.org/project/isort/)?
+### How does Ruff's import sorting compare to [isort](https://pypi.org/project/isort/)?
 
-Ruff's import sorting is intended to be nearly equivalent to `isort` when used `profile = "black"`.
+Ruff's import sorting is intended to be nearly equivalent to isort when used `profile = "black"`.
 There are a few known, minor differences in how Ruff and isort break ties between similar imports,
 and in how Ruff and isort treat inline comments in some cases (see: [#1381](https://github.com/charliermarsh/ruff/issues/1381),
 [#2104](https://github.com/charliermarsh/ruff/issues/2104)).
 
-Like `isort`, Ruff's import sorting is compatible with Black.
+Like isort, Ruff's import sorting is compatible with Black.
 
-Ruff does not yet support all of `isort`'s configuration options, though it does support many of
+Ruff does not yet support all of isort's configuration options, though it does support many of
 them. You can find the supported settings in the [API reference](#isort). For example, you can set
 `known-first-party` like so:
 
@@ -1837,7 +1850,7 @@ Yes! To enable specific docstring convention, add the following to your `pyproje
 convention = "google"  # Accepts: "google", "numpy", or "pep257".
 ```
 
-For example, if you're coming from `flake8-docstrings`, and your originating configuration uses
+For example, if you're coming from flake8-docstrings, and your originating configuration uses
 `--docstring-convention=numpy`, you'd instead set `convention = "numpy"` in your `pyproject.toml`,
 as above.
 
@@ -1922,14 +1935,16 @@ If you find a case where Ruff's autofix breaks your code, please file an Issue!
 
 ## Contributing
 
-Contributions are welcome and hugely appreciated. To get started, check out the
-[contributing guidelines](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md).
+Contributions are welcome and highly appreciated. To get started, check out the
+[**contributing guidelines**](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md). You
+can also join us on [**Discord**](https://discord.gg/Z8KbeK24).
 
-## Releases
+## Support
 
-Ruff is distributed on [PyPI](https://pypi.org/project/ruff/), and published via [`maturin`](https://github.com/PyO3/maturin).
+Having trouble? Check out the existing issues on [**GitHub**](https://github.com/charliermarsh/ruff/issues),
+or feel free to [**open a new one**](https://github.com/charliermarsh/ruff/issues/new).
 
-See: `.github/workflows/release.yaml`.
+You can also ask for help on [**Discord**](https://discord.gg/Z8KbeK24).
 
 ## Benchmarks
 
@@ -3462,6 +3477,24 @@ combine-as-imports = true
 
 ---
 
+#### [`forced-separate`](#forced-separate)
+
+A list of modules to separate into auxiliary block(s) of imports,
+in the order specified.
+
+**Default value**: `[]`
+
+**Type**: `Vec<String>`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+forced-separate = ["tests"]
+```
+
+---
+
 #### [`known-first-party`](#known-first-party)
 
 A list of modules to consider first-party, regardless of whether they
@@ -3494,6 +3527,25 @@ can be identified as such via introspection of the local filesystem.
 ```toml
 [tool.ruff.isort]
 known-third-party = ["src"]
+```
+
+---
+
+#### [`lines-after-imports`](#lines-after-imports)
+
+The number of blank lines to place after imports.
+-1 for automatic determination.
+
+**Default value**: `-1`
+
+**Type**: `int`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+# Use a single line after each import block.
+lines-after-imports = 1
 ```
 
 ---
@@ -3715,7 +3767,7 @@ staticmethod-decorators = ["staticmethod", "stcmthd"]
 
 #### [`ignore-overlong-task-comments`](#ignore-overlong-task-comments)
 
-Whether or not line-length violations (`E501`) should be triggered for
+Whether line-length violations (`E501`) should be triggered for
 comments starting with `task-tags` (by default: ["TODO", "FIXME",
 and "XXX"]).
 
@@ -3832,7 +3884,9 @@ Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604
 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from
 __future__ import annotations`. Note that this setting is only
 applicable when the target Python version is below 3.9 and 3.10
-respectively.
+respectively, and enabling it is equivalent to disabling
+`use-pep585-annotation` (`UP006`) and `use-pep604-annotation`
+(`UP007`) entirely.
 
 **Default value**: `false`
 

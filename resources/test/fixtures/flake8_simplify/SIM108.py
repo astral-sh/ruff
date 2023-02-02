@@ -54,7 +54,7 @@ else:
     randbytes = _get_random_bytes
 
 
-# OK (includes comments)
+# SIM108 (without fix due to comments)
 if x > 0:
     # test test
     abc = x
@@ -93,8 +93,20 @@ if True:
         b = ddddddddddddddddddddddddddddddddddddd
 
 
-# OK (trailing comments)
+# SIM108 (without fix due to trailing comment)
 if True:
     exitcode = 0
 else:
     exitcode = 1  # Trailing comment
+
+
+# SIM108
+if True: x = 3  # Foo
+else: x = 5
+
+
+# SIM108
+if True:  # Foo
+    x = 3
+else:
+    x = 5
