@@ -37,7 +37,7 @@ will enable all `F` rules, including `F401`, as the command line's `--select` re
 The `remove-six-compat` rule has been removed. This rule was only useful for one-time Python 2-to-3
 upgrades.
 
-## 0.0.238
+## 0.0.237
 
 ### `--explain`, `--clean`, and `--generate-shell-completion` are now subcommands ([#2190](https://github.com/charliermarsh/ruff/pull/2190))
 
