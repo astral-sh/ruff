@@ -11,7 +11,6 @@ use crate::rules::flake8_debugger::types::DebuggerUsingType;
 use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
-use crate::rules::flake8_quotes::settings::Quote;
 use crate::rules::pyupgrade::types::Primitive;
 use crate::violation::{AlwaysAutofixableViolation, AutofixKind, Availability, Violation};
 
@@ -1178,94 +1177,6 @@ impl AlwaysAutofixableViolation for PPrintFound {
 
     fn autofix_title(&self) -> String {
         "Remove `pprint`".to_string()
-    }
-}
-
-// flake8-quotes
-
-define_violation!(
-    pub struct BadQuotesInlineString {
-        pub quote: Quote,
-    }
-);
-impl AlwaysAutofixableViolation for BadQuotesInlineString {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let BadQuotesInlineString { quote } = self;
-        match quote {
-            Quote::Single => format!("Double quotes found but single quotes preferred"),
-            Quote::Double => format!("Single quotes found but double quotes preferred"),
-        }
-    }
-
-    fn autofix_title(&self) -> String {
-        let BadQuotesInlineString { quote } = self;
-        match quote {
-            Quote::Single => "Replace double quotes with single quotes".to_string(),
-            Quote::Double => "Replace single quotes with double quotes".to_string(),
-        }
-    }
-}
-
-define_violation!(
-    pub struct BadQuotesMultilineString {
-        pub quote: Quote,
-    }
-);
-impl AlwaysAutofixableViolation for BadQuotesMultilineString {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let BadQuotesMultilineString { quote } = self;
-        match quote {
-            Quote::Single => format!("Double quote multiline found but single quotes preferred"),
-            Quote::Double => format!("Single quote multiline found but double quotes preferred"),
-        }
-    }
-
-    fn autofix_title(&self) -> String {
-        let BadQuotesMultilineString { quote } = self;
-        match quote {
-            Quote::Single => "Replace double multiline quotes with single quotes".to_string(),
-            Quote::Double => "Replace single multiline quotes with double quotes".to_string(),
-        }
-    }
-}
-
-define_violation!(
-    pub struct BadQuotesDocstring {
-        pub quote: Quote,
-    }
-);
-impl AlwaysAutofixableViolation for BadQuotesDocstring {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let BadQuotesDocstring { quote } = self;
-        match quote {
-            Quote::Single => format!("Double quote docstring found but single quotes preferred"),
-            Quote::Double => format!("Single quote docstring found but double quotes preferred"),
-        }
-    }
-
-    fn autofix_title(&self) -> String {
-        let BadQuotesDocstring { quote } = self;
-        match quote {
-            Quote::Single => "Replace double quotes docstring with single quotes".to_string(),
-            Quote::Double => "Replace single quotes docstring with double quotes".to_string(),
-        }
-    }
-}
-
-define_violation!(
-    pub struct AvoidQuoteEscape;
-);
-impl AlwaysAutofixableViolation for AvoidQuoteEscape {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Change outer quotes to avoid escaping inner quotes")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Change outer quotes to avoid escaping inner quotes".to_string()
     }
 }
 
