@@ -483,6 +483,8 @@ ruff_macros::define_rule_mapping!(
     G202 => rules::flake8_logging_format::violations::LoggingRedundantExcInfo,
     // flake8-raise
     RSE102 => rules::flake8_raise::rules::UnnecessaryParenOnRaiseException,
+    // flake8-self
+    SLF001 => rules::flake8_self::rules::PrivateMemberAccess,
     // ruff
     RUF001 => violations::AmbiguousUnicodeCharacterString,
     RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
@@ -615,6 +617,9 @@ pub enum Linter {
     /// [flake8-raise](https://pypi.org/project/flake8-raise/)
     #[prefix = "RSE"]
     Flake8Raise,
+    /// [flake8-self](https://pypi.org/project/flake8-self/)
+    #[prefix = "SLF"]
+    Flake8Self,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

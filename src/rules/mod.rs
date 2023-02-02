@@ -23,6 +23,7 @@ pub mod flake8_pytest_style;
 pub mod flake8_quotes;
 pub mod flake8_raise;
 pub mod flake8_return;
+pub mod flake8_self;
 pub mod flake8_simplify;
 pub mod flake8_tidy_imports;
 pub mod flake8_type_checking;
