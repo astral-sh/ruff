@@ -12,7 +12,7 @@ mod tests {
     use test_case::test_case;
     use textwrap::dedent;
 
-    use crate::linter::check_path;
+    use crate::linter::{check_path, LinterResult};
     use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
@@ -28,7 +28,9 @@ mod tests {
         let indexer: Indexer = tokens.as_slice().into();
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
-        let diagnostics = check_path(
+        let LinterResult {
+            data: diagnostics, ..
+        } = check_path(
             Path::new("<filename>"),
             None,
             &contents,
