@@ -13,7 +13,6 @@ define_violation!(
         pub max_statements: usize,
     }
 );
-
 impl Violation for TooManyStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,22 +27,19 @@ impl Violation for TooManyStatements {
 fn get_num_statements(stmts: &[Stmt]) -> usize {
     let mut count: usize = 0;
     for stmt in stmts {
-        // TODO: Match will need be added once it's in ast.rs
+        // TODO(charlie): Account for pattern match statement.
         match &stmt.node {
             StmtKind::If { body, orelse, .. } => {
                 count += 1;
                 count += get_num_statements(body);
-                if !orelse.is_empty() {
+                if let Some(stmt) = orelse.first() {
                     // else:
                     //   if:
                     // same as elif:
                     // but otherwise else: counts as its own statement
                     // necessary to avoid counting else and if separately when they appear after each other
-                    match orelse.first().unwrap().node {
-                        StmtKind::If { .. } => {}
-                        _ => {
-                            count += 1;
-                        }
+                    if !matches!(stmt.node, StmtKind::If { .. }) {
+                        count += 1;
                     }
                     count += get_num_statements(orelse);
                 }
@@ -52,11 +48,7 @@ fn get_num_statements(stmts: &[Stmt]) -> usize {
                 count += get_num_statements(body);
                 count += get_num_statements(orelse);
             }
-            StmtKind::While {
-                test: _,
-                body,
-                orelse,
-            } => {
+            StmtKind::While { body, orelse, .. } => {
                 count += 1;
                 count += get_num_statements(body);
                 count += get_num_statements(orelse);
@@ -107,7 +99,7 @@ pub fn too_many_statements(
     max_statements: usize,
     locator: &Locator,
 ) -> Option<Diagnostic> {
-    let statements: usize = get_num_statements(body) + 1;
+    let statements = get_num_statements(body) + 1;
     if statements > max_statements {
         Some(Diagnostic::new(
             TooManyStatements {
