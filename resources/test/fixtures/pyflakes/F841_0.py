@@ -86,3 +86,11 @@ def f():
         open("") as ((this, that)),
     ):
         print("hello")
+
+
+def f():
+    exponential, base_multiplier = 1, 2
+    hash_map = {
+        (exponential := (exponential * base_multiplier) % 3): i + 1 for i in range(2)
+    }
+    return hash_map
