@@ -821,7 +821,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP003 | type-of-primitive | Use `{}` instead of `type(...)` | 🛠 |
 | UP004 | useless-object-inheritance | Class `{name}` inherits from `object` | 🛠 |
 | UP005 | deprecated-unittest-alias | `{alias}` is deprecated, use `{target}` | 🛠 |
-| UP006 | use-pep585-annotation | Use `{}` instead of `{}` for type annotations | 🛠 |
+| UP006 | use-pep585-annotation | Use `dict` / `list` instead of `typing.Dict / typing.List` for type annotations | 🛠 |
 | UP007 | use-pep604-annotation | Use `X \| Y` for type annotations | 🛠 |
 | UP008 | super-call-with-parameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
 | UP009 | pep3120-unnecessary-coding-comment | UTF-8 encoding declaration is unnecessary | 🛠 |
