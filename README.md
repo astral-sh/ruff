@@ -1344,7 +1344,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | ---- | ---- | ------- | --- |
 | PLR0133 | constant-comparison | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
 | PLR0206 | property-with-parameters | Cannot have defined parameters for properties |  |
-| PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias |  |
+| PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias | 🛠 |
 | PLR0913 | too-many-args | Too many arguments to function call ({c_args}/{max_args}) |  |
 | PLR0915 | too-many-statements | Too many statements ({statements}/{max_statements}) |  |
 | PLR1701 | consider-merging-isinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
