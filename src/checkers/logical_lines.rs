@@ -5,7 +5,7 @@ use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
-use crate::rules::pycodestyle::rules::space_around_operator;
+use crate::rules::pycodestyle::rules::{extraneous_whitespace, space_around_operator};
 use crate::settings::Settings;
 use crate::source_code::Locator;
 
@@ -15,11 +15,17 @@ struct LogicalLine {
     mapping: Vec<(usize, Location)>,
     /// Whether the logical line contains an operator.
     operator: bool,
+    /// Whether the logical line contains a comment.
+    bracket: bool,
+    /// Whether the logical line contains a punctuation mark.
+    punctuation: bool,
 }
 
 fn build_line(tokens: &[(Location, &Tok, Location)], locator: &Locator) -> LogicalLine {
     let mut logical = String::with_capacity(88);
     let mut operator = false;
+    let mut bracket = false;
+    let mut punctuation = false;
     let mut mapping = Vec::new();
     let mut prev: Option<&Location> = None;
     let mut length = 0;
@@ -67,9 +73,20 @@ fn build_line(tokens: &[(Location, &Tok, Location)], locator: &Locator) -> Logic
             );
         }
 
+        if !bracket {
+            bracket |= matches!(
+                tok,
+                Tok::Lpar | Tok::Lsqb | Tok::Lbrace | Tok::Rpar | Tok::Rsqb | Tok::Rbrace
+            );
+        }
+
+        if !punctuation {
+            punctuation |= matches!(tok, Tok::Comma | Tok::Semi | Tok::Colon);
+        }
+
         // TODO(charlie): "Mute" strings.
         let text = if let Tok::String { .. } = tok {
-            "\"\""
+            "\"xxx\""
         } else {
             locator.slice_source_code_range(&Range {
                 location: *start,
@@ -80,12 +97,12 @@ fn build_line(tokens: &[(Location, &Tok, Location)], locator: &Locator) -> Logic
         if let Some(prev) = prev {
             if prev.row() != start.row() {
                 let prev_text = locator.slice_source_code_range(&Range {
-                    location: *prev,
-                    end_location: Location::new(prev.row() + 1, 0),
+                    location: Location::new(prev.row(), prev.column() - 1),
+                    end_location: Location::new(prev.row(), prev.column()),
                 });
                 if prev_text == ","
                     || ((prev_text != "{" && prev_text != "[" && prev_text != "(")
-                        && (text != "}" || text != "]" || text != ")"))
+                        && (text != "}" && text != "]" && text != ")"))
                 {
                     logical.push(' ');
                     length += 1;
@@ -108,6 +125,8 @@ fn build_line(tokens: &[(Location, &Tok, Location)], locator: &Locator) -> Logic
     LogicalLine {
         text: logical,
         operator,
+        bracket,
+        punctuation,
         mapping,
     }
 }
@@ -139,9 +158,24 @@ pub fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
     for line in iter_logical_lines(tokens, locator) {
+        let mapping_offsets = line.mapping.iter().map(|(offset, _)| *offset).collect_vec();
         if line.operator {
-            let mapping_offsets = line.mapping.iter().map(|(offset, _)| *offset).collect_vec();
             for (index, kind) in space_around_operator(&line.text) {
+                let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
+                let location = Location::new(pos.row(), pos.column() + index - token_offset);
+                if settings.rules.enabled(kind.rule()) {
+                    diagnostics.push(Diagnostic {
+                        kind,
+                        location,
+                        end_location: location,
+                        fix: None,
+                        parent: None,
+                    });
+                }
+            }
+        }
+        if line.bracket || line.punctuation {
+            for (index, kind) in extraneous_whitespace(&line.text) {
                 let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
                 let location = Location::new(pos.row(), pos.column() + index - token_offset);
                 if settings.rules.enabled(kind.rule()) {
@@ -201,7 +235,7 @@ z = x + 1"#;
             .map(|line| line.text)
             .collect();
         let expected = vec![
-            "x = [ 1, 2, 3, ]".to_string(),
+            "x = [1, 2, 3, ]".to_string(),
             "y = 2".to_string(),
             "z = x + 1".to_string(),
         ];
@@ -214,7 +248,7 @@ z = x + 1"#;
             .into_iter()
             .map(|line| line.text)
             .collect();
-        let expected = vec!["x = \"\"".to_string()];
+        let expected = vec!["x = \"xxx\"".to_string()];
         assert_eq!(actual, expected);
 
         let contents = r#"
@@ -242,7 +276,7 @@ f()"#;
             .into_iter()
             .map(|line| line.text)
             .collect();
-        let expected = vec!["def f():", "\"\"", "x = 1", "f()"];
+        let expected = vec!["def f():", "\"xxx\"", "x = 1", "f()"];
         assert_eq!(actual, expected);
     }
 }

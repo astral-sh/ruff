@@ -16,6 +16,9 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
+    #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
+    #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
+    #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
     #[test_case(Rule::TabBeforeOperator, Path::new("E22.py"))]
     #[test_case(Rule::MultipleSpacesBeforeOperator, Path::new("E22.py"))]
     #[test_case(Rule::TabAfterOperator, Path::new("E22.py"))]

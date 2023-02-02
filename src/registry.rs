@@ -13,6 +13,9 @@ use crate::violation::Violation;
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
     E101 => rules::pycodestyle::rules::MixedSpacesAndTabs,
+    E201 => rules::pycodestyle::rules::WhitespaceAfterOpenBracket,
+    E202 => rules::pycodestyle::rules::WhitespaceBeforeCloseBracket,
+    E203 => rules::pycodestyle::rules::WhitespaceBeforePunctuation,
     E221 => rules::pycodestyle::rules::MultipleSpacesBeforeOperator,
     E222 => rules::pycodestyle::rules::MultipleSpacesAfterOperator,
     E223 => rules::pycodestyle::rules::TabBeforeOperator,
@@ -690,9 +693,12 @@ impl Rule {
         match self {
             Rule::UnusedNOQA => &LintSource::NoQa,
             Rule::TabBeforeOperator
-            | Rule::MultipleSpacesBeforeOperator
             | Rule::MultipleSpacesAfterOperator
-            | Rule::TabAfterOperator => &LintSource::LogicalLines,
+            | Rule::MultipleSpacesBeforeOperator
+            | Rule::TabAfterOperator
+            | Rule::WhitespaceAfterOpenBracket
+            | Rule::WhitespaceBeforeCloseBracket
+            | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::DocLineTooLong

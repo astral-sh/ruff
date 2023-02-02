@@ -701,6 +701,9 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | E101 | mixed-spaces-and-tabs | Indentation contains mixed spaces and tabs |  |
+| E201 | whitespace-after-open-bracket | Whitespace after '(' |  |
+| E202 | whitespace-before-close-bracket | Whitespace before ')' |  |
+| E203 | whitespace-before-punctuation | Whitespace before ',', ';', or ':' |  |
 | E221 | multiple-spaces-before-operator | Multiple spaces before operator |  |
 | E222 | multiple-spaces-after-operator | Multiple spaces after operator |  |
 | E223 | tab-before-operator | Tab before operator |  |

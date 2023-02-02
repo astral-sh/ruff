@@ -50,6 +50,7 @@ impl Violation for MultipleSpacesAfterOperator {
 static OPERATOR_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"[^,\s](\s*)(?:[-+*/|!<=>%&^]+|:=)(\s*)").unwrap());
 
+/// E221, E222, E223, E224
 pub fn space_around_operator(line: &str) -> Vec<(usize, DiagnosticKind)> {
     let mut diagnostics = vec![];
     for line_match in OPERATOR_REGEX.captures_iter(line) {

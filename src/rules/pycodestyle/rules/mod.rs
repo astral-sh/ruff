@@ -5,6 +5,10 @@ pub use do_not_assign_lambda::{do_not_assign_lambda, DoNotAssignLambda};
 pub use do_not_use_bare_except::{do_not_use_bare_except, DoNotUseBareExcept};
 pub use doc_line_too_long::{doc_line_too_long, DocLineTooLong};
 pub use errors::{syntax_error, IOError, SyntaxError};
+pub use extraneous_whitespace::{
+    extraneous_whitespace, WhitespaceAfterOpenBracket, WhitespaceBeforeCloseBracket,
+    WhitespaceBeforePunctuation,
+};
 pub use imports::{
     module_import_not_at_top_of_file, multiple_imports_on_one_line, ModuleImportNotAtTopOfFile,
     MultipleImportsOnOneLine,
@@ -28,6 +32,7 @@ mod do_not_assign_lambda;
 mod do_not_use_bare_except;
 mod doc_line_too_long;
 mod errors;
+mod extraneous_whitespace;
 mod imports;
 mod invalid_escape_sequence;
 mod line_too_long;
