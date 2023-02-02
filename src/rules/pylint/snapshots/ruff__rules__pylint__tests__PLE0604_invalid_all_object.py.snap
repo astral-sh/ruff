@@ -12,4 +12,14 @@ expression: diagnostics
     column: 7
   fix: ~
   parent: ~
+- kind:
+    InvalidAllObject: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 7
+  fix: ~
+  parent: ~
 

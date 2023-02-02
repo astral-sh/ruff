@@ -1,0 +1,16 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UndefinedExport:
+      name: b
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 7
+  fix: ~
+  parent: ~
+

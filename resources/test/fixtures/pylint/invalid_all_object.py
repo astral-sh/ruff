@@ -4,8 +4,12 @@ __all__ = (
     Worm,
 )
 
+__all__ = list([None, "Fruit", "Worm"])  # [invalid-all-object]
+
+
 class Fruit:
     pass
+
 
 class Worm:
     pass
