@@ -95,9 +95,9 @@ ruff_macros::define_rule_mapping!(
     PLR0913 => rules::pylint::rules::TooManyArgs,
     PLR0915 => rules::pylint::rules::TooManyStatements,
     // flake8-builtins
-    A001 => violations::BuiltinVariableShadowing,
-    A002 => violations::BuiltinArgumentShadowing,
-    A003 => violations::BuiltinAttributeShadowing,
+    A001 => rules::flake8_builtins::rules::BuiltinVariableShadowing,
+    A002 => rules::flake8_builtins::rules::BuiltinArgumentShadowing,
+    A003 => rules::flake8_builtins::rules::BuiltinAttributeShadowing,
     // flake8-bugbear
     B002 => rules::flake8_bugbear::rules::UnaryPrefixIncrement,
     B003 => rules::flake8_bugbear::rules::AssignmentToOsEnviron,

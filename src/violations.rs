@@ -947,47 +947,6 @@ impl Violation for GlobalVariableNotAssigned {
     }
 }
 
-// flake8-builtins
-
-define_violation!(
-    pub struct BuiltinVariableShadowing {
-        pub name: String,
-    }
-);
-impl Violation for BuiltinVariableShadowing {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let BuiltinVariableShadowing { name } = self;
-        format!("Variable `{name}` is shadowing a python builtin")
-    }
-}
-
-define_violation!(
-    pub struct BuiltinArgumentShadowing {
-        pub name: String,
-    }
-);
-impl Violation for BuiltinArgumentShadowing {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let BuiltinArgumentShadowing { name } = self;
-        format!("Argument `{name}` is shadowing a python builtin")
-    }
-}
-
-define_violation!(
-    pub struct BuiltinAttributeShadowing {
-        pub name: String,
-    }
-);
-impl Violation for BuiltinAttributeShadowing {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let BuiltinAttributeShadowing { name } = self;
-        format!("Class attribute `{name}` is shadowing a python builtin")
-    }
-}
-
 // flake8-blind-except
 
 define_violation!(
