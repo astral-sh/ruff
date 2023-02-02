@@ -170,10 +170,10 @@ ruff_macros::define_rule_mapping!(
     T201 => violations::PrintFound,
     T203 => violations::PPrintFound,
     // flake8-quotes
-    Q000 => violations::BadQuotesInlineString,
-    Q001 => violations::BadQuotesMultilineString,
-    Q002 => violations::BadQuotesDocstring,
-    Q003 => violations::AvoidQuoteEscape,
+    Q000 => rules::flake8_quotes::rules::BadQuotesInlineString,
+    Q001 => rules::flake8_quotes::rules::BadQuotesMultilineString,
+    Q002 => rules::flake8_quotes::rules::BadQuotesDocstring,
+    Q003 => rules::flake8_quotes::rules::AvoidQuoteEscape,
     // flake8-annotations
     ANN001 => violations::MissingTypeFunctionArgument,
     ANN002 => violations::MissingTypeArgs,
