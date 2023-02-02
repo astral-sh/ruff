@@ -76,7 +76,6 @@ fn get_num_statements(stmts: &[Stmt]) -> usize {
                     // weird, but in making samples for pylint, the finally statement counts as 2
                     count += 2 + get_num_statements(finalbody);
                 }
-                println!("{} {} {}", body.len(), orelse.len(), finalbody.len());
                 if handlers.len() > 1 {
                     count += 1;
                 }
