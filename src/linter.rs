@@ -4,7 +4,6 @@ use anyhow::Result;
 use colored::Colorize;
 use rustpython_parser::lexer::LexResult;
 
-use crate::ast::types::Range;
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
@@ -17,9 +16,10 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::add_noqa;
 use crate::registry::{Diagnostic, LintSource, Rule};
+use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-use crate::{directives, fs, rustpython_helpers, violations};
+use crate::{directives, fs, rustpython_helpers};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -115,12 +115,7 @@ pub fn check_path(
             }
             Err(parse_error) => {
                 if settings.rules.enabled(&Rule::SyntaxError) {
-                    diagnostics.push(Diagnostic::new(
-                        violations::SyntaxError {
-                            message: parse_error.error.to_string(),
-                        },
-                        Range::new(parse_error.location, parse_error.location),
-                    ));
+                    pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
                 }
             }
         }
