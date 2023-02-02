@@ -2575,19 +2575,32 @@ impl AlwaysAutofixableViolation for AndFalse {
 
 define_violation!(
     pub struct YodaConditions {
-        pub suggestion: String,
+        pub suggestion: Option<String>,
     }
 );
-impl AlwaysAutofixableViolation for YodaConditions {
+impl Violation for YodaConditions {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let YodaConditions { suggestion } = self;
-        format!("Yoda conditions are discouraged, use `{suggestion}` instead")
+        if let Some(suggestion) = suggestion {
+            format!("Yoda conditions are discouraged, use `{suggestion}` instead")
+        } else {
+            format!("Yoda conditions are discouraged")
+        }
     }
 
-    fn autofix_title(&self) -> String {
-        let YodaConditions { suggestion } = self;
-        format!("Replace Yoda condition with `{suggestion}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let YodaConditions { suggestion, .. } = self;
+        if suggestion.is_some() {
+            Some(|YodaConditions { suggestion }| {
+                let suggestion = suggestion.as_ref().unwrap();
+                format!("Replace Yoda condition with `{suggestion}`")
+            })
+        } else {
+            None
+        }
     }
 }
 

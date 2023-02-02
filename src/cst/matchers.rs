@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use libcst_native::{
-    Call, Expr, Expression, Import, ImportFrom, Module, SmallStatement, Statement,
+    Call, Comparison, Expr, Expression, Import, ImportFrom, Module, SmallStatement, Statement,
 };
 
 pub fn match_module(module_text: &str) -> Result<Module> {
@@ -34,7 +34,7 @@ pub fn match_import<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut Import
         if let Some(SmallStatement::Import(expr)) = expr.body.first_mut() {
             Ok(expr)
         } else {
-            bail!("Expected SmallStatement::Expr")
+            bail!("Expected SmallStatement::Import")
         }
     } else {
         bail!("Expected Statement::Simple")
@@ -46,7 +46,7 @@ pub fn match_import_from<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut I
         if let Some(SmallStatement::ImportFrom(expr)) = expr.body.first_mut() {
             Ok(expr)
         } else {
-            bail!("Expected SmallStatement::Expr")
+            bail!("Expected SmallStatement::ImportFrom")
         }
     } else {
         bail!("Expected Statement::Simple")
@@ -57,6 +57,16 @@ pub fn match_call<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut 
     if let Expression::Call(call) = expression {
         Ok(call)
     } else {
-        bail!("Expected SmallStatement::Expr")
+        bail!("Expected Expression::Call")
+    }
+}
+
+pub fn match_comparison<'a, 'b>(
+    expression: &'a mut Expression<'b>,
+) -> Result<&'a mut Comparison<'b>> {
+    if let Expression::Comparison(comparison) = expression {
+        Ok(comparison)
+    } else {
+        bail!("Expected Expression::Comparison")
     }
 }
