@@ -3,11 +3,12 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use itertools::Either::{Left, Right};
+
 use annotate::annotate_imports;
 use categorize::categorize_imports;
 pub use categorize::{categorize, ImportType};
 use comments::Comment;
-use itertools::Either::{Left, Right};
 use normalize::normalize_imports;
 use order::order_imports;
 use settings::RelativeImportsOrder;
@@ -127,6 +128,7 @@ pub fn format_imports(
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
     no_lines_before: &BTreeSet<ImportType>,
+    lines_after_imports: isize,
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -214,11 +216,23 @@ pub fn format_imports(
     match trailer {
         None => {}
         Some(Trailer::Sibling) => {
-            output.push_str(stylist.line_ending());
+            if lines_after_imports >= 0 {
+                for _ in 0..lines_after_imports {
+                    output.push_str(stylist.line_ending());
+                }
+            } else {
+                output.push_str(stylist.line_ending());
+            }
         }
         Some(Trailer::FunctionDef | Trailer::ClassDef) => {
-            output.push_str(stylist.line_ending());
-            output.push_str(stylist.line_ending());
+            if lines_after_imports >= 0 {
+                for _ in 0..lines_after_imports {
+                    output.push_str(stylist.line_ending());
+                }
+            } else {
+                output.push_str(stylist.line_ending());
+                output.push_str(stylist.line_ending());
+            }
         }
     }
     output
@@ -232,12 +246,13 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use super::categorize::ImportType;
-    use super::settings::RelativeImportsOrder;
     use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
+
+    use super::categorize::ImportType;
+    use super::settings::RelativeImportsOrder;
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]
@@ -631,6 +646,27 @@ mod tests {
                         ImportType::FirstParty,
                         ImportType::LocalFolder,
                     ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("lines_after_imports_nothing_after.py"))]
+    #[test_case(Path::new("lines_after_imports_func_after.py"))]
+    #[test_case(Path::new("lines_after_imports_class_after.py"))]
+    fn lines_after_imports(path: &Path) -> Result<()> {
+        let snapshot = format!("lines_after_imports_{}", path.to_string_lossy());
+        let mut diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    lines_after_imports: 3,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],

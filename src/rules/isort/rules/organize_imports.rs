@@ -55,6 +55,7 @@ fn matches_ignoring_indentation(val1: &str, val2: &str) -> bool {
         })
 }
 
+#[allow(clippy::cast_sign_loss)]
 /// I001
 pub fn organize_imports(
     block: &Block,
@@ -117,6 +118,7 @@ pub fn organize_imports(
         &settings.isort.constants,
         &settings.isort.variables,
         &settings.isort.no_lines_before,
+        settings.isort.lines_after_imports,
     );
 
     // Expand the span the entire range, including leading and trailing space.

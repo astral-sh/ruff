@@ -3500,6 +3500,25 @@ known-third-party = ["src"]
 
 ---
 
+#### [`lines-after-imports`](#lines-after-imports)
+
+The number of blank lines to place after imports.
+-1 for automatic determination.
+
+**Default value**: `-1`
+
+**Type**: `int`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+# Use a single line after each import block.
+lines-after-imports = 1
+```
+
+---
+
 #### [`no-lines-before`](#no-lines-before)
 
 A list of sections that should _not_ be delineated from the previous
