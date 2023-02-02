@@ -32,9 +32,9 @@ pub(crate) fn ignores_from_path<'a>(
         HashableGlobMatcher,
         HashableHashSet<Rule>,
     )],
-) -> Result<FxHashSet<&'a Rule>> {
-    let (file_path, file_basename) = extract_path_names(path)?;
-    Ok(pattern_code_pairs
+) -> FxHashSet<&'a Rule> {
+    let (file_path, file_basename) = extract_path_names(path).expect("Unable to parse filename");
+    pattern_code_pairs
         .iter()
         .filter_map(|(absolute, basename, codes)| {
             if basename.is_match(file_basename) {
@@ -58,7 +58,7 @@ pub(crate) fn ignores_from_path<'a>(
             None
         })
         .flatten()
-        .collect())
+        .collect()
 }
 
 /// Convert any path to an absolute path (based on the current working
