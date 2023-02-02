@@ -265,15 +265,15 @@ impl UnittestAssert {
                     .get("expr")
                     .ok_or_else(|| anyhow!("Missing argument `expr`"))?;
                 let msg = args.get("msg").copied();
-                if matches!(self, UnittestAssert::False) {
+                Ok(if matches!(self, UnittestAssert::False) {
                     let unary_expr = create_expr(ExprKind::UnaryOp {
                         op: Unaryop::Not,
                         operand: Box::new(create_expr(expr.node.clone())),
                     });
-                    Ok(assert(&unary_expr, msg))
+                    assert(&unary_expr, msg)
                 } else {
-                    Ok(assert(expr, msg))
-                }
+                    assert(expr, msg)
+                })
             }
             UnittestAssert::Equal
             | UnittestAssert::Equals
