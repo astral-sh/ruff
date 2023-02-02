@@ -1944,7 +1944,7 @@ where
 
                 if flake8_type_checking::helpers::is_type_checking_block(self, test) {
                     if self.settings.rules.enabled(&Rule::EmptyTypeCheckingBlock) {
-                        flake8_type_checking::rules::empty_type_checking_block(self, test, body);
+                        flake8_type_checking::rules::empty_type_checking_block(self, body);
                     }
 
                     let prev_in_type_checking_block = self.in_type_checking_block;
