@@ -1,11 +1,25 @@
-use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
-
 use crate::ast::helpers;
 use crate::ast::helpers::{find_keyword, is_const_true};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
+
+define_violation!(
+    pub struct BlindExcept {
+        pub name: String,
+    }
+);
+impl Violation for BlindExcept {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BlindExcept { name } = self;
+        format!("Do not catch blind exception: `{name}`")
+    }
+}
 
 /// BLE001
 pub fn blind_except(
@@ -67,7 +81,7 @@ pub fn blind_except(
             }
 
             checker.diagnostics.push(Diagnostic::new(
-                violations::BlindExcept {
+                BlindExcept {
                     name: id.to_string(),
                 },
                 Range::from_located(type_),

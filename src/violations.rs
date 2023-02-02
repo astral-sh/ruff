@@ -943,21 +943,6 @@ impl Violation for GlobalVariableNotAssigned {
     }
 }
 
-// flake8-blind-except
-
-define_violation!(
-    pub struct BlindExcept {
-        pub name: String,
-    }
-);
-impl Violation for BlindExcept {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let BlindExcept { name } = self;
-        format!("Do not catch blind exception: `{name}`")
-    }
-}
-
 // flake8-debugger
 
 define_violation!(
