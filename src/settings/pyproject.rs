@@ -99,9 +99,7 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
 pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
-    if path.as_ref().ends_with("ruff.toml") {
-        parse_ruff_toml(path)
-    } else if path.as_ref().ends_with("pyproject.toml") {
+    if path.as_ref().ends_with("pyproject.toml") {
         let pyproject = parse_pyproject_toml(&path).map_err(|err| {
             anyhow!(
                 "Failed to parse `{}`: {}",
@@ -114,10 +112,7 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
             .and_then(|tool| tool.ruff)
             .unwrap_or_default())
     } else {
-        Err(anyhow!(
-            "Unrecognized settings file: `{}`",
-            path.as_ref().to_string_lossy()
-        ))
+        parse_ruff_toml(path)
     }
 }
 
