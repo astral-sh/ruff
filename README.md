@@ -1374,7 +1374,7 @@ For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| SLF001 | private-member-access | Private member accessed |  |
+| SLF001 | private-member-access | Private member accessed: `{access}` |  |
 
 ### Ruff-specific rules (RUF)
 

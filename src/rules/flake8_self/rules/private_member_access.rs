@@ -8,12 +8,15 @@ use crate::violation::Violation;
 use rustpython_ast::{Expr, ExprKind};
 
 define_violation!(
-    pub struct PrivateMemberAccess;
+    pub struct PrivateMemberAccess {
+        pub access: String,
+    }
 );
 impl Violation for PrivateMemberAccess {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Private member accessed")
+        let PrivateMemberAccess { access } = self;
+        format!("Private member accessed: `{access}`")
     }
 }
 
@@ -29,7 +32,9 @@ pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
 
             if !VALID_IDS.contains(&id.as_str()) {
                 checker.diagnostics.push(Diagnostic::new(
-                    PrivateMemberAccess,
+                    PrivateMemberAccess {
+                        access: format!("{}.{}", id, attr),
+                    },
                     Range::from_located(expr),
                 ));
             }
