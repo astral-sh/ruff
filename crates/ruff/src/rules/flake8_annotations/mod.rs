@@ -45,10 +45,8 @@ mod tests {
             Path::new("flake8_annotations/suppress_dummy_args.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
-                    mypy_init_return: false,
                     suppress_dummy_args: true,
-                    suppress_none_returning: false,
-                    allow_star_arg_any: false,
+                    ..Default::default()
                 },
                 ..Settings::for_rules(vec![
                     Rule::MissingTypeFunctionArgument,
@@ -70,9 +68,7 @@ mod tests {
             &Settings {
                 flake8_annotations: super::settings::Settings {
                     mypy_init_return: true,
-                    suppress_dummy_args: false,
-                    suppress_none_returning: false,
-                    allow_star_arg_any: false,
+                    ..Default::default()
                 },
                 ..Settings::for_rules(vec![
                     Rule::MissingReturnTypePublicFunction,
@@ -93,10 +89,8 @@ mod tests {
             Path::new("flake8_annotations/suppress_none_returning.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
-                    mypy_init_return: false,
-                    suppress_dummy_args: false,
                     suppress_none_returning: true,
-                    allow_star_arg_any: false,
+                    ..Default::default()
                 },
                 ..Settings::for_rules(vec![
                     Rule::MissingReturnTypePublicFunction,
@@ -117,10 +111,8 @@ mod tests {
             Path::new("flake8_annotations/allow_star_arg_any.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
-                    mypy_init_return: false,
-                    suppress_dummy_args: false,
-                    suppress_none_returning: false,
                     allow_star_arg_any: true,
+                    ..Default::default()
                 },
                 ..Settings::for_rules(vec![Rule::DynamicallyTypedExpression])
             },
