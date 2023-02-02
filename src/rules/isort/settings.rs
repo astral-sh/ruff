@@ -215,13 +215,14 @@ pub struct Options {
     pub no_lines_before: Option<Vec<ImportType>>,
     #[option(
         default = r#"-1"#,
-        value_type = "isize",
+        value_type = "int",
         example = r#"
+            # Use a single line after each import block.
             lines-after-imports = 1
         "#
     )]
     /// The number of blank lines to place after imports.
-    /// -1 for automatic determination
+    /// -1 for automatic determination.
     pub lines_after_imports: Option<isize>,
 }
 
