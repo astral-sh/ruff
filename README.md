@@ -158,6 +158,7 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [Pylint (PL)](#pylint-pl)
    1. [tryceratops (TRY)](#tryceratops-try)
    1. [flake8-raise (RSE)](#flake8-raise-rse)
+   1. [flake8-self (SLF)](#flake8-self-slf)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1368,6 +1369,14 @@ For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
 | ---- | ---- | ------- | --- |
 | RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception |  |
 
+### flake8-self (SLF)
+
+For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| SLF001 | private-member-access | Private member accessed: `{access}` |  |
+
 ### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
@@ -1661,6 +1670,7 @@ natively, including:
 - [flake8-quotes](https://pypi.org/project/flake8-quotes/)
 - [flake8-raise](https://pypi.org/project/flake8-raise/)
 - [flake8-return](https://pypi.org/project/flake8-return/)
+- [flake8-self](https://pypi.org/project/flake8-self/)
 - [flake8-simplify](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
@@ -1750,6 +1760,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [flake8-quotes](https://pypi.org/project/flake8-quotes/)
 - [flake8-raise](https://pypi.org/project/flake8-raise/)
 - [flake8-return](https://pypi.org/project/flake8-return/)
+- [flake8-self](https://pypi.org/project/flake8-self/)
 - [flake8-simplify](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
 - [flake8-super](https://pypi.org/project/flake8-super/)
 - [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
