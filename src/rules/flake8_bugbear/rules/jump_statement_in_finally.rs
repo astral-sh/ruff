@@ -1,15 +1,29 @@
-use rustpython_ast::{Stmt, StmtKind};
-
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Stmt, StmtKind};
+
+define_violation!(
+    pub struct JumpStatementInFinally {
+        pub name: String,
+    }
+);
+impl Violation for JumpStatementInFinally {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let JumpStatementInFinally { name } = self;
+        format!("`{name}` inside `finally` blocks cause exceptions to be silenced")
+    }
+}
 
 fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
     for stmt in body {
         if f(stmt) {
             checker.diagnostics.push(Diagnostic::new(
-                violations::JumpStatementInFinally {
+                JumpStatementInFinally {
                     name: match &stmt.node {
                         StmtKind::Break { .. } => "break".to_string(),
                         StmtKind::Continue { .. } => "continue".to_string(),

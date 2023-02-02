@@ -1,10 +1,20 @@
-use rustpython_ast::{Expr, ExprKind};
-
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Expr, ExprKind};
 
+define_violation!(
+    pub struct AssignmentToOsEnviron;
+);
+impl Violation for AssignmentToOsEnviron {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Assigning to `os.environ` doesn't clear the environment")
+    }
+}
 /// B003
 pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
     if targets.len() != 1 {
@@ -24,7 +34,7 @@ pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
         return;
     }
     checker.diagnostics.push(Diagnostic::new(
-        violations::AssignmentToOsEnviron,
+        AssignmentToOsEnviron,
         Range::from_located(target),
     ));
 }

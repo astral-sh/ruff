@@ -1,14 +1,32 @@
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
-
 use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::python::identifiers::{is_identifier, is_mangled_private};
 use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
+
+define_violation!(
+    pub struct SetAttrWithConstant;
+);
+impl AlwaysAutofixableViolation for SetAttrWithConstant {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!(
+            "Do not call `setattr` with a constant attribute value. It is not any safer than \
+             normal property access."
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace `setattr` with assignment".to_string()
+    }
+}
 
 fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String {
     let stmt = Stmt::new(
@@ -59,8 +77,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // (i.e., it's directly within an `StmtKind::Expr`).
     if let StmtKind::Expr { value: child } = &checker.current_stmt().node {
         if expr == child.as_ref() {
-            let mut diagnostic =
-                Diagnostic::new(violations::SetAttrWithConstant, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, Range::from_located(expr));
 
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
