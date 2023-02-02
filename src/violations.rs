@@ -1,6 +1,4 @@
 #![allow(clippy::useless_format)]
-use std::fmt;
-
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
 
