@@ -3,7 +3,8 @@ source: src/rules/flake8_self/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PrivateMemberAccess: ~
+    PrivateMemberAccess:
+      access: foo._private_thing
   location:
     row: 28
     column: 6
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PrivateMemberAccess: ~
+    PrivateMemberAccess:
+      access: foo.__really_private_thing
   location:
     row: 29
     column: 6
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PrivateMemberAccess: ~
+    PrivateMemberAccess:
+      access: foo._private_func
   location:
     row: 30
     column: 6
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PrivateMemberAccess: ~
+    PrivateMemberAccess:
+      access: foo.__really_private_func
   location:
     row: 31
     column: 6
