@@ -37,3 +37,9 @@ second = first + [
     # touch
     6,
 ]
+
+[] + foo + [
+]
+
+[] + foo + [  # This will be preserved, but doesn't prevent the fix
+]

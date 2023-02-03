@@ -560,19 +560,34 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
 
 /// Returns `true` if a statement or expression includes at least one comment.
 pub fn has_comments<T>(located: &Located<T>, locator: &Locator) -> bool {
-    has_comments_in(
-        Range::new(
-            Location::new(located.location.row(), 0),
-            Location::new(located.end_location.unwrap().row() + 1, 0),
-        ),
-        locator,
-    )
+    let start = if match_leading_content(located, locator) {
+        located.location
+    } else {
+        Location::new(located.location.row(), 0)
+    };
+    let end = if match_trailing_content(located, locator) {
+        located.end_location.unwrap()
+    } else {
+        Location::new(located.end_location.unwrap().row() + 1, 0)
+    };
+    has_comments_in(Range::new(start, end), locator)
 }
 
 /// Returns `true` if a [`Range`] includes at least one comment.
 pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
-    lexer::make_tokenizer(locator.slice_source_code_range(&range))
-        .any(|result| result.map_or(false, |(_, tok, _)| matches!(tok, Tok::Comment(..))))
+    for tok in lexer::make_tokenizer(locator.slice_source_code_range(&range)) {
+        match tok {
+            Ok((_, tok, _)) => {
+                if matches!(tok, Tok::Comment(..)) {
+                    return true;
+                }
+            }
+            Err(_) => {
+                return false;
+            }
+        }
+    }
+    false
 }
 
 /// Returns `true` if a call is an argumented `super` invocation.
@@ -673,18 +688,18 @@ pub fn to_relative(absolute: Location, base: Location) -> Location {
     }
 }
 
-/// Return `true` if a `Stmt` has leading content.
-pub fn match_leading_content(stmt: &Stmt, locator: &Locator) -> bool {
-    let range = Range::new(Location::new(stmt.location.row(), 0), stmt.location);
+/// Return `true` if a [`Located`] has leading content.
+pub fn match_leading_content<T>(located: &Located<T>, locator: &Locator) -> bool {
+    let range = Range::new(Location::new(located.location.row(), 0), located.location);
     let prefix = locator.slice_source_code_range(&range);
     prefix.chars().any(|char| !char.is_whitespace())
 }
 
-/// Return `true` if a `Stmt` has trailing content.
-pub fn match_trailing_content(stmt: &Stmt, locator: &Locator) -> bool {
+/// Return `true` if a [`Located`] has trailing content.
+pub fn match_trailing_content<T>(located: &Located<T>, locator: &Locator) -> bool {
     let range = Range::new(
-        stmt.end_location.unwrap(),
-        Location::new(stmt.end_location.unwrap().row() + 1, 0),
+        located.end_location.unwrap(),
+        Location::new(located.end_location.unwrap().row() + 1, 0),
     );
     let suffix = locator.slice_source_code_range(&range);
     for char in suffix.chars() {
@@ -698,11 +713,11 @@ pub fn match_trailing_content(stmt: &Stmt, locator: &Locator) -> bool {
     false
 }
 
-/// If a `Stmt` has a trailing comment, return the index of the hash.
-pub fn match_trailing_comment(stmt: &Stmt, locator: &Locator) -> Option<usize> {
+/// If a [`Located`] has a trailing comment, return the index of the hash.
+pub fn match_trailing_comment<T>(located: &Located<T>, locator: &Locator) -> Option<usize> {
     let range = Range::new(
-        stmt.end_location.unwrap(),
-        Location::new(stmt.end_location.unwrap().row() + 1, 0),
+        located.end_location.unwrap(),
+        Location::new(located.end_location.unwrap().row() + 1, 0),
     );
     let suffix = locator.slice_source_code_range(&range);
     for (i, char) in suffix.chars().enumerate() {
