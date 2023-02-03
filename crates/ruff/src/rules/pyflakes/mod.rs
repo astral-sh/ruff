@@ -15,7 +15,7 @@ mod tests {
     use textwrap::dedent;
 
     use crate::linter::{check_path, LinterResult};
-    use crate::registry::{Rule, RuleCodePrefix};
+    use crate::registry::{Linter, Rule};
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
     use crate::test::test_path;
@@ -239,7 +239,7 @@ mod tests {
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
-        let settings = settings::Settings::for_rules(&RuleCodePrefix::F);
+        let settings = settings::Settings::for_rules(&Linter::Pyflakes);
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_contents(&contents, &locator);

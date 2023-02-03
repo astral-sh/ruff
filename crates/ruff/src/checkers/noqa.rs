@@ -4,10 +4,11 @@ use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
+use crate::codes::NoqaCode;
 use crate::fix::Fix;
 use crate::noqa;
 use crate::noqa::{is_file_exempt, Directive};
-use crate::registry::{Diagnostic, DiagnosticKind, NoqaCode, Rule};
+use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::{flags, Settings};

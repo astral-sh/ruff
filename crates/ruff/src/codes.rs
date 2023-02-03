@@ -1,5 +1,6 @@
 use crate::registry::{Linter, Rule};
 
+#[ruff_macros::map_codes]
 pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
     #[allow(clippy::enum_glob_use)]
     use Linter::*;
