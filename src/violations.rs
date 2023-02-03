@@ -4,37 +4,7 @@ use ruff_macros::derive_message_formats;
 
 use crate::define_violation;
 
-use crate::violation::{AlwaysAutofixableViolation, Violation};
-
-// flake8-print
-
-define_violation!(
-    pub struct PrintFound;
-);
-impl AlwaysAutofixableViolation for PrintFound {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`print` found")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `print`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct PPrintFound;
-);
-impl AlwaysAutofixableViolation for PPrintFound {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`pprint` found")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `pprint`".to_string()
-    }
-}
+use crate::violation::Violation;
 
 // flake8-errmsg
 

@@ -167,8 +167,8 @@ ruff_macros::define_rule_mapping!(
     ISC002 => rules::flake8_implicit_str_concat::rules::MultiLineImplicitStringConcatenation,
     ISC003 => rules::flake8_implicit_str_concat::rules::ExplicitStringConcatenation,
     // flake8-print
-    T201 => violations::PrintFound,
-    T203 => violations::PPrintFound,
+    T201 => rules::flake8_print::rules::PrintFound,
+    T203 => rules::flake8_print::rules::PPrintFound,
     // flake8-quotes
     Q000 => rules::flake8_quotes::rules::BadQuotesInlineString,
     Q001 => rules::flake8_quotes::rules::BadQuotesMultilineString,
