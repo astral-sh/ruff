@@ -918,7 +918,7 @@ where
                         pylint::rules::useless_import_alias(self, alias);
                     }
                     if self.settings.rules.enabled(&Rule::ConsiderUsingFromImport) {
-                        pylint::rules::use_from_import(self, alias, stmt, names);
+                        pylint::rules::use_from_import(self, stmt, alias, names);
                     }
 
                     if let Some(asname) = &alias.node.asname {

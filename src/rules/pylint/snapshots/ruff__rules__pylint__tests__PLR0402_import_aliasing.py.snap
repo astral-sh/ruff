@@ -6,6 +6,7 @@ expression: diagnostics
     ConsiderUsingFromImport:
       module: os
       name: path
+      fixable: true
   location:
     row: 9
     column: 7
@@ -26,6 +27,7 @@ expression: diagnostics
     ConsiderUsingFromImport:
       module: foo.bar
       name: foobar
+      fixable: true
   location:
     row: 11
     column: 7
@@ -46,6 +48,7 @@ expression: diagnostics
     ConsiderUsingFromImport:
       module: foo.bar
       name: foobar
+      fixable: false
   location:
     row: 12
     column: 7
