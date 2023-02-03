@@ -51,7 +51,6 @@ serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }
 similar = { version = "2.2.1" }
 textwrap = { version = "0.16.0" }
-update-informer = { version = "0.6.0", default-features = false, features = ["pypi"], optional = true }
 walkdir = { version = "2.3.2" }
 strum = "0.24.1"
 
@@ -59,10 +58,6 @@ strum = "0.24.1"
 assert_cmd = { version = "2.0.4" }
 strum = { version = "0.24.1" }
 ureq = { version = "2.5.0", features = [] }
-
-[features]
-default = ["update-informer"]
-update-informer = ["dep:update-informer"]
 
 [package.metadata.maturin]
 name = "ruff"

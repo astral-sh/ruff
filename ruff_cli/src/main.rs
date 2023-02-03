@@ -31,8 +31,6 @@ mod diagnostics;
 mod iterators;
 mod printer;
 mod resolve;
-#[cfg(all(feature = "update-informer"))]
-pub mod updates;
 
 fn inner_main() -> Result<ExitCode> {
     let mut args: Vec<_> = std::env::args_os().collect();
@@ -258,14 +256,10 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
             }
         }
 
-        // Check for updates if we're in a non-silent log level.
-        #[cfg(feature = "update-informer")]
-        if update_check
-            && !is_stdin
-            && log_level >= LogLevel::Default
-            && atty::is(atty::Stream::Stdout)
-        {
-            drop(updates::check_for_updates());
+        if update_check {
+            warn_user_once!(
+                "update-check has been removed; setting it will be an error in a future version."
+            );
         }
 
         if !cli.exit_zero {
