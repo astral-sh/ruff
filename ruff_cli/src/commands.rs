@@ -136,7 +136,7 @@ pub fn run(
 
     diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
-    debug!("Checked files in: {:?}", duration);
+    debug!("Checked {:?} files in: {:?}", paths.len(), duration);
 
     Ok(diagnostics)
 }
