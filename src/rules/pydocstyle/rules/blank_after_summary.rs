@@ -18,7 +18,7 @@ fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String
     "Insert single blank line".to_string()
 }
 impl Violation for BlankLineAfterSummary {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
