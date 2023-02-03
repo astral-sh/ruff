@@ -91,7 +91,7 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
 }
 
 /// Returns the [`Expr`] representing the name of the exception.
-fn match_name(exc: &Expr) -> Option<&Expr> {
+const fn match_name(exc: &Expr) -> Option<&Expr> {
     match &exc.node {
         ExprKind::Name { .. } => Some(exc),
         ExprKind::Call { func, .. } => {

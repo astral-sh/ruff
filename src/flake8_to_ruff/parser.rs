@@ -72,7 +72,7 @@ struct State {
 }
 
 impl State {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             seen_sep: true,
             seen_colon: false,

@@ -225,7 +225,7 @@ struct ImportReplacer<'a> {
 }
 
 impl<'a> ImportReplacer<'a> {
-    fn new(
+    const fn new(
         stmt: &'a Stmt,
         module: &'a str,
         members: &'a [AliasData],

@@ -86,7 +86,7 @@ pub struct Configuration {
 
 impl Configuration {
     pub fn from_options(options: Options, project_root: &Path) -> Result<Self> {
-        Ok(Configuration {
+        Ok(Self {
             rule_selections: vec![RuleSelection {
                 select: options.select,
                 ignore: options
@@ -197,7 +197,7 @@ impl Configuration {
     }
 
     #[must_use]
-    pub fn combine(self, config: Configuration) -> Self {
+    pub fn combine(self, config: Self) -> Self {
         Self {
             rule_selections: config
                 .rule_selections

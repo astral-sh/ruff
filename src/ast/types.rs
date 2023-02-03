@@ -23,7 +23,7 @@ pub struct Range {
 }
 
 impl Range {
-    pub fn new(location: Location, end_location: Location) -> Self {
+    pub const fn new(location: Location, end_location: Location) -> Self {
         Self {
             location,
             end_location,
@@ -179,13 +179,13 @@ impl<'a> Binding<'a> {
         }
     }
 
-    pub fn used(&self) -> bool {
+    pub const fn used(&self) -> bool {
         self.runtime_usage.is_some()
             || self.synthetic_usage.is_some()
             || self.typing_usage.is_some()
     }
 
-    pub fn is_definition(&self) -> bool {
+    pub const fn is_definition(&self) -> bool {
         matches!(
             self.kind,
             BindingKind::ClassDefinition

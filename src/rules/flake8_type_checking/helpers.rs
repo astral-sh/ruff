@@ -38,7 +38,7 @@ pub fn is_type_checking_block(checker: &Checker, test: &Expr) -> bool {
     false
 }
 
-pub fn is_valid_runtime_import(binding: &Binding) -> bool {
+pub const fn is_valid_runtime_import(binding: &Binding) -> bool {
     if matches!(
         binding.kind,
         BindingKind::Importation(..)

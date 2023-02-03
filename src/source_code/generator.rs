@@ -57,8 +57,12 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
 }
 
 impl<'a> Generator<'a> {
-    pub fn new(indent: &'a Indentation, quote: &'a Quote, line_ending: &'a LineEnding) -> Self {
-        Generator {
+    pub const fn new(
+        indent: &'a Indentation,
+        quote: &'a Quote,
+        line_ending: &'a LineEnding,
+    ) -> Self {
+        Self {
             // Style preferences.
             indent,
             quote,

@@ -97,7 +97,7 @@ impl From<&Quote> for char {
 pub struct Indentation(String);
 
 impl Indentation {
-    pub fn new(indentation: String) -> Self {
+    pub const fn new(indentation: String) -> Self {
         Self(indentation)
     }
 }
@@ -142,7 +142,7 @@ impl Default for LineEnding {
 }
 
 impl LineEnding {
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             LineEnding::CrLf => "\r\n",
             LineEnding::Lf => "\n",

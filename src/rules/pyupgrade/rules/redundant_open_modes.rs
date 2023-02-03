@@ -63,13 +63,13 @@ impl FromStr for OpenMode {
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
         match string {
-            "U" => Ok(OpenMode::U),
-            "Ur" => Ok(OpenMode::Ur),
-            "Ub" => Ok(OpenMode::Ub),
-            "rUb" => Ok(OpenMode::RUb),
-            "r" => Ok(OpenMode::R),
-            "rt" => Ok(OpenMode::Rt),
-            "wt" => Ok(OpenMode::Wt),
+            "U" => Ok(Self::U),
+            "Ur" => Ok(Self::Ur),
+            "Ub" => Ok(Self::Ub),
+            "rUb" => Ok(Self::RUb),
+            "r" => Ok(Self::R),
+            "rt" => Ok(Self::Rt),
+            "wt" => Ok(Self::Wt),
             _ => Err(anyhow!("Unknown open mode: {}", string)),
         }
     }
@@ -78,13 +78,13 @@ impl FromStr for OpenMode {
 impl OpenMode {
     fn replacement_value(&self) -> Option<String> {
         match *self {
-            OpenMode::U => None,
-            OpenMode::Ur => None,
-            OpenMode::Ub => Some(String::from("\"rb\"")),
-            OpenMode::RUb => Some(String::from("\"rb\"")),
-            OpenMode::R => None,
-            OpenMode::Rt => None,
-            OpenMode::Wt => Some(String::from("\"w\"")),
+            Self::U => None,
+            Self::Ur => None,
+            Self::Ub => Some(String::from("\"rb\"")),
+            Self::RUb => Some(String::from("\"rb\"")),
+            Self::R => None,
+            Self::Rt => None,
+            Self::Wt => Some(String::from("\"w\"")),
         }
     }
 }

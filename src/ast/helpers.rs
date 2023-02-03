@@ -445,7 +445,7 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
 
 /// Return `true` if the [`Expr`] is a singleton (`None`, `True`, `False`, or
 /// `...`).
-pub fn is_singleton(expr: &Expr) -> bool {
+pub const fn is_singleton(expr: &Expr) -> bool {
     matches!(
         expr.node,
         ExprKind::Constant {
@@ -479,7 +479,7 @@ pub fn find_keyword<'a>(keywords: &'a [Keyword], keyword_name: &str) -> Option<&
 }
 
 /// Return `true` if an [`Expr`] is `None`.
-pub fn is_const_none(expr: &Expr) -> bool {
+pub const fn is_const_none(expr: &Expr) -> bool {
     matches!(
         &expr.node,
         ExprKind::Constant {
@@ -490,7 +490,7 @@ pub fn is_const_none(expr: &Expr) -> bool {
 }
 
 /// Return `true` if an [`Expr`] is `True`.
-pub fn is_const_true(expr: &Expr) -> bool {
+pub const fn is_const_true(expr: &Expr) -> bool {
     matches!(
         &expr.node,
         ExprKind::Constant {
@@ -753,11 +753,10 @@ pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
         binding.kind,
         BindingKind::ClassDefinition | BindingKind::FunctionDefinition
     ) {
-        if let Some(source) = &binding.source {
-            identifier_range(source, locator)
-        } else {
-            binding.range
-        }
+        binding
+            .source
+            .as_ref()
+            .map_or(binding.range, |source| identifier_range(source, locator))
     } else {
         binding.range
     }
@@ -959,7 +958,7 @@ pub fn followed_by_multi_statement_line(stmt: &Stmt, locator: &Locator) -> bool 
 }
 
 /// Return `true` if a `Stmt` is a docstring.
-pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
+pub const fn is_docstring_stmt(stmt: &Stmt) -> bool {
     if let StmtKind::Expr { value } = &stmt.node {
         matches!(
             value.node,

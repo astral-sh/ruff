@@ -75,7 +75,7 @@ pub struct Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    pub fn new(
+    pub const fn new(
         format: &'a SerializationFormat,
         log_level: &'a LogLevel,
         autofix: &'a fix::FixMode,

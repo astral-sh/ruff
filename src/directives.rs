@@ -22,9 +22,9 @@ impl Flags {
             .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports))
         {
-            Flags::NOQA | Flags::ISORT
+            Self::NOQA | Self::ISORT
         } else {
-            Flags::NOQA
+            Self::NOQA
         }
     }
 }
