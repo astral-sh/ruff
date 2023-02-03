@@ -476,8 +476,6 @@ Miscellaneous:
           The name of the file when passing it through stdin
   -e, --exit-zero
           Exit with status code "0", even upon detecting lint violations
-      --update-check
-          Enable or disable automatic update checks
 
 Log levels:
   -v, --verbose  Enable verbose logging

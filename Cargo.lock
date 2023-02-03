@@ -609,15 +609,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "directories"
-version = "4.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f51c5d4ddabd36886dd3e1438cb358cdcb0d7c499cb99cb4ac2e38e18b5cb210"
-dependencies = [
- "dirs-sys",
-]
-
-[[package]]
 name = "dirs"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2007,7 +1998,6 @@ dependencies = [
  "similar",
  "strum",
  "textwrap",
- "update-informer",
  "ureq",
  "walkdir",
 ]
@@ -2759,19 +2749,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
-name = "update-informer"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "152ff185ca29f7f487c51ca785b0f1d85970c4581f4cdd12ed499227890200f5"
-dependencies = [
- "directories",
- "semver",
- "serde",
- "serde_json",
- "ureq",
-]
-
-[[package]]
 name = "ureq"
 version = "2.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2782,8 +2759,6 @@ dependencies = [
  "log",
  "once_cell",
  "rustls",
- "serde",
- "serde_json",
  "url",
  "webpki",
  "webpki-roots",

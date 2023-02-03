@@ -3,17 +3,18 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use ::ruff::logging::{set_up_logging, LogLevel};
-use ::ruff::resolver::PyprojectDiscovery;
-use ::ruff::settings::types::SerializationFormat;
-use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
-use args::{Args, CheckArgs, Command};
 use clap::{CommandFactory, Parser, Subcommand};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
+
+use ::ruff::logging::{set_up_logging, LogLevel};
+use ::ruff::resolver::PyprojectDiscovery;
+use ::ruff::settings::types::SerializationFormat;
+use ::ruff::settings::CliSettings;
+use ::ruff::{fix, fs, warn_user_once};
+use args::{Args, CheckArgs, Command};
 use printer::{Printer, Violations};
-use ruff::settings::CliSettings;
 
 pub(crate) mod args;
 mod cache;
@@ -22,8 +23,6 @@ mod diagnostics;
 mod iterators;
 mod printer;
 mod resolve;
-#[cfg(all(feature = "update-informer"))]
-pub mod updates;
 
 fn inner_main() -> Result<ExitCode> {
     let mut args: Vec<_> = std::env::args_os().collect();
@@ -256,14 +255,10 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
             }
         }
 
-        // Check for updates if we're in a non-silent log level.
-        #[cfg(feature = "update-informer")]
-        if update_check
-            && !is_stdin
-            && log_level >= LogLevel::Default
-            && atty::is(atty::Stream::Stdout)
-        {
-            drop(updates::check_for_updates());
+        if update_check {
+            warn_user_once!(
+                "update-check has been removed; setting it will cause an error in a future version."
+            );
         }
 
         if !cli.exit_zero {

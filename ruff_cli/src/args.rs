@@ -211,11 +211,12 @@ pub struct CheckArgs {
     /// Exit with status code "0", even upon detecting lint violations.
     #[arg(short, long, help_heading = "Miscellaneous")]
     pub exit_zero: bool,
-    /// Enable or disable automatic update checks.
+    /// Does nothing and will be removed in the future.
     #[arg(
         long,
         overrides_with("no_update_check"),
-        help_heading = "Miscellaneous"
+        help_heading = "Miscellaneous",
+        hide = true
     )]
     update_check: bool,
     #[clap(long, overrides_with("update_check"), hide = true)]
