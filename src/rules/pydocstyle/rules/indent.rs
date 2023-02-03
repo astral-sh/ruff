@@ -6,7 +6,48 @@ use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
-use crate::violations;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct IndentWithSpaces;
+);
+impl Violation for IndentWithSpaces {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Docstring should be indented with spaces, not tabs")
+    }
+}
+
+define_violation!(
+    pub struct NoUnderIndentation;
+);
+impl AlwaysAutofixableViolation for NoUnderIndentation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Docstring is under-indented")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Increase indentation".to_string()
+    }
+}
+
+define_violation!(
+    pub struct NoOverIndentation;
+);
+impl AlwaysAutofixableViolation for NoOverIndentation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Docstring is over-indented")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove over-indentation".to_string()
+    }
+}
 
 /// D206, D207, D208
 pub fn indent(checker: &mut Checker, docstring: &Docstring) {
@@ -47,7 +88,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 && line_indent.len() < docstring.indentation.len()
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::NoUnderIndentation,
+                    NoUnderIndentation,
                     Range::new(
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, 0),
@@ -82,7 +123,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
     if checker.settings.rules.enabled(&Rule::IndentWithSpaces) {
         if has_seen_tab {
             checker.diagnostics.push(Diagnostic::new(
-                violations::IndentWithSpaces,
+                IndentWithSpaces,
                 Range::from_located(docstring.expr),
             ));
         }
@@ -97,7 +138,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                     // We report over-indentation on every line. This isn't great, but
                     // enables autofix.
                     let mut diagnostic = Diagnostic::new(
-                        violations::NoOverIndentation,
+                        NoOverIndentation,
                         Range::new(
                             Location::new(docstring.expr.location.row() + i, 0),
                             Location::new(docstring.expr.location.row() + i, 0),
@@ -121,7 +162,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
             let line_indent = whitespace::leading_space(lines[i]);
             if line_indent.len() > docstring.indentation.len() {
                 let mut diagnostic = Diagnostic::new(
-                    violations::NoOverIndentation,
+                    NoOverIndentation,
                     Range::new(
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, 0),

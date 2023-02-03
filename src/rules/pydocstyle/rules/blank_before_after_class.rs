@@ -5,7 +5,58 @@ use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::rules::regexes::COMMENT_REGEX;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct OneBlankLineBeforeClass {
+        pub lines: usize,
+    }
+);
+impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("1 blank line required before class docstring")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Insert 1 blank line before class docstring".to_string()
+    }
+}
+
+define_violation!(
+    pub struct OneBlankLineAfterClass {
+        pub lines: usize,
+    }
+);
+impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("1 blank line required after class docstring")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Insert 1 blank line after class docstring".to_string()
+    }
+}
+
+define_violation!(
+    pub struct NoBlankLineBeforeClass {
+        pub lines: usize,
+    }
+);
+impl AlwaysAutofixableViolation for NoBlankLineBeforeClass {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("No blank lines allowed before class docstring")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove blank line(s) before class docstring".to_string()
+    }
+}
 
 /// D203, D204, D211
 pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
@@ -40,7 +91,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         {
             if blank_lines_before != 0 {
                 let mut diagnostic = Diagnostic::new(
-                    violations::NoBlankLineBeforeClass {
+                    NoBlankLineBeforeClass {
                         lines: blank_lines_before,
                     },
                     Range::from_located(docstring.expr),
@@ -62,7 +113,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         {
             if blank_lines_before != 1 {
                 let mut diagnostic = Diagnostic::new(
-                    violations::OneBlankLineBeforeClass {
+                    OneBlankLineBeforeClass {
                         lines: blank_lines_before,
                     },
                     Range::from_located(docstring.expr),
@@ -105,7 +156,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             .count();
         if blank_lines_after != 1 {
             let mut diagnostic = Diagnostic::new(
-                violations::OneBlankLineAfterClass {
+                OneBlankLineAfterClass {
                     lines: blank_lines_after,
                 },
                 Range::from_located(docstring.expr),

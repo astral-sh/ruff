@@ -2,7 +2,20 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct FirstLineCapitalized;
+);
+impl Violation for FirstLineCapitalized {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("First word of the first line should be properly capitalized")
+    }
+}
 
 /// D403
 pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
@@ -30,7 +43,7 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
         return;
     };
     checker.diagnostics.push(Diagnostic::new(
-        violations::FirstLineCapitalized,
+        FirstLineCapitalized,
         Range::from_located(docstring.expr),
     ));
 }

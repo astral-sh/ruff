@@ -1,22 +1,39 @@
-pub use backslashes::backslashes;
-pub use blank_after_summary::blank_after_summary;
-pub use blank_before_after_class::blank_before_after_class;
-pub use blank_before_after_function::blank_before_after_function;
-pub use capitalized::capitalized;
-pub use ends_with_period::ends_with_period;
-pub use ends_with_punctuation::ends_with_punctuation;
-pub use if_needed::if_needed;
-pub use indent::indent;
-pub use multi_line_summary_start::multi_line_summary_start;
-pub use newline_after_last_paragraph::newline_after_last_paragraph;
-pub use no_signature::no_signature;
-pub use no_surrounding_whitespace::no_surrounding_whitespace;
-pub use not_empty::not_empty;
-pub use not_missing::not_missing;
-pub use one_liner::one_liner;
-pub use sections::sections;
-pub use starts_with_this::starts_with_this;
-pub use triple_quotes::triple_quotes;
+pub use backslashes::{backslashes, UsesRPrefixForBackslashedContent};
+pub use blank_after_summary::{blank_after_summary, BlankLineAfterSummary};
+pub use blank_before_after_class::{
+    blank_before_after_class, NoBlankLineBeforeClass, OneBlankLineAfterClass,
+    OneBlankLineBeforeClass,
+};
+pub use blank_before_after_function::{
+    blank_before_after_function, NoBlankLineAfterFunction, NoBlankLineBeforeFunction,
+};
+pub use capitalized::{capitalized, FirstLineCapitalized};
+pub use ends_with_period::{ends_with_period, EndsInPeriod};
+pub use ends_with_punctuation::{ends_with_punctuation, EndsInPunctuation};
+pub use if_needed::{if_needed, SkipDocstring};
+pub use indent::{indent, IndentWithSpaces, NoOverIndentation, NoUnderIndentation};
+pub use multi_line_summary_start::{
+    multi_line_summary_start, MultiLineSummaryFirstLine, MultiLineSummarySecondLine,
+};
+pub use newline_after_last_paragraph::{newline_after_last_paragraph, NewLineAfterLastParagraph};
+pub use no_signature::{no_signature, NoSignature};
+pub use no_surrounding_whitespace::{no_surrounding_whitespace, NoSurroundingWhitespace};
+pub use non_imperative_mood::{non_imperative_mood, NonImperativeMood};
+pub use not_empty::{not_empty, NonEmpty};
+pub use not_missing::{
+    not_missing, MagicMethod, PublicClass, PublicFunction, PublicInit, PublicMethod, PublicModule,
+    PublicNestedClass, PublicPackage,
+};
+pub use one_liner::{one_liner, FitsOnOneLine};
+pub use sections::{
+    sections, BlankLineAfterLastSection, BlankLineAfterSection, BlankLineBeforeSection,
+    CapitalizeSectionName, DashedUnderlineAfterSection, DocumentAllArguments,
+    NewLineAfterSectionName, NoBlankLinesBetweenHeaderAndContent, NonEmptySection,
+    SectionNameEndsInColon, SectionNotOverIndented, SectionUnderlineAfterName,
+    SectionUnderlineMatchesSectionLength, SectionUnderlineNotOverIndented,
+};
+pub use starts_with_this::{starts_with_this, NoThisPrefix};
+pub use triple_quotes::{triple_quotes, UsesTripleQuotes};
 
 mod backslashes;
 mod blank_after_summary;
@@ -31,7 +48,7 @@ mod multi_line_summary_start;
 mod newline_after_last_paragraph;
 mod no_signature;
 mod no_surrounding_whitespace;
-pub mod non_imperative_mood;
+mod non_imperative_mood;
 mod not_empty;
 mod not_missing;
 mod one_liner;
