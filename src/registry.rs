@@ -644,21 +644,21 @@ pub trait RuleNamespace: Sized {
     fn url(&self) -> Option<&'static str>;
 }
 
-/// The prefix, name and selector for an upstream linter category.
-pub struct UpstreamCategory(pub &'static str, pub &'static str, pub RuleCodePrefix);
+/// The prefix and name for an upstream linter category.
+pub struct UpstreamCategory(pub RuleCodePrefix, pub &'static str);
 
 impl Linter {
     pub fn upstream_categories(&self) -> Option<&'static [UpstreamCategory]> {
         match self {
             Linter::Pycodestyle => Some(&[
-                UpstreamCategory("E", "Error", RuleCodePrefix::E),
-                UpstreamCategory("W", "Warning", RuleCodePrefix::W),
+                UpstreamCategory(RuleCodePrefix::E, "Error"),
+                UpstreamCategory(RuleCodePrefix::W, "Warning"),
             ]),
             Linter::Pylint => Some(&[
-                UpstreamCategory("PLC", "Convention", RuleCodePrefix::PLC),
-                UpstreamCategory("PLE", "Error", RuleCodePrefix::PLE),
-                UpstreamCategory("PLR", "Refactor", RuleCodePrefix::PLR),
-                UpstreamCategory("PLW", "Warning", RuleCodePrefix::PLW),
+                UpstreamCategory(RuleCodePrefix::PLC, "Convention"),
+                UpstreamCategory(RuleCodePrefix::PLE, "Error"),
+                UpstreamCategory(RuleCodePrefix::PLR, "Refactor"),
+                UpstreamCategory(RuleCodePrefix::PLW, "Warning"),
             ]),
             _ => None,
         }
