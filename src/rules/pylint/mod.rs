@@ -36,7 +36,7 @@ mod tests {
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
-    #[test_case(Rule::TooManyArgs, Path::new("too_many_args.py"); "PLR0913")]
+    #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
@@ -67,13 +67,13 @@ mod tests {
     #[test]
     fn max_args() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pylint/too_many_args_params.py"),
+            Path::new("pylint/too_many_arguments_params.py"),
             &Settings {
                 pylint: pylint::settings::Settings {
                     max_args: 4,
                     ..pylint::settings::Settings::default()
                 },
-                ..Settings::for_rules(vec![Rule::TooManyArgs])
+                ..Settings::for_rules(vec![Rule::TooManyArguments])
             },
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -83,10 +83,10 @@ mod tests {
     #[test]
     fn max_args_with_dummy_variables() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pylint/too_many_args_params.py"),
+            Path::new("pylint/too_many_arguments_params.py"),
             &Settings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap().into(),
-                ..Settings::for_rules(vec![Rule::TooManyArgs])
+                ..Settings::for_rules(vec![Rule::TooManyArguments])
             },
         )?;
         assert_yaml_snapshot!(diagnostics);

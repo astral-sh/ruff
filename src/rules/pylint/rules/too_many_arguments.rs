@@ -8,22 +8,22 @@ use ruff_macros::derive_message_formats;
 use rustpython_ast::{Arguments, Stmt};
 
 define_violation!(
-    pub struct TooManyArgs {
+    pub struct TooManyArguments {
         pub c_args: usize,
         pub max_args: usize,
     }
 );
 
-impl Violation for TooManyArgs {
+impl Violation for TooManyArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let TooManyArgs { c_args, max_args } = self;
+        let TooManyArguments { c_args, max_args } = self;
         format!("Too many arguments to function call ({c_args}/{max_args})")
     }
 }
 
 /// PLR0913
-pub fn too_many_args(checker: &mut Checker, args: &Arguments, stmt: &Stmt) {
+pub fn too_many_arguments(checker: &mut Checker, args: &Arguments, stmt: &Stmt) {
     let num_args = args
         .args
         .iter()
@@ -31,7 +31,7 @@ pub fn too_many_args(checker: &mut Checker, args: &Arguments, stmt: &Stmt) {
         .count();
     if num_args > checker.settings.pylint.max_args {
         checker.diagnostics.push(Diagnostic::new(
-            TooManyArgs {
+            TooManyArguments {
                 c_args: num_args,
                 max_args: checker.settings.pylint.max_args,
             },

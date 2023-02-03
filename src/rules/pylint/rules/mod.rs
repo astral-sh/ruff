@@ -8,7 +8,7 @@ pub use magic_value_comparison::{magic_value_comparison, MagicValueComparison};
 pub use merge_isinstance::{merge_isinstance, ConsiderMergingIsinstance};
 pub use nonlocal_without_binding::NonlocalWithoutBinding;
 pub use property_with_parameters::{property_with_parameters, PropertyWithParameters};
-pub use too_many_args::{too_many_args, TooManyArgs};
+pub use too_many_arguments::{too_many_arguments, TooManyArguments};
 pub use too_many_statements::{too_many_statements, TooManyStatements};
 pub use unnecessary_direct_lambda_call::{
     unnecessary_direct_lambda_call, UnnecessaryDirectLambdaCall,
@@ -30,7 +30,7 @@ mod magic_value_comparison;
 mod merge_isinstance;
 mod nonlocal_without_binding;
 mod property_with_parameters;
-mod too_many_args;
+mod too_many_arguments;
 mod too_many_statements;
 mod unnecessary_direct_lambda_call;
 mod use_from_import;
