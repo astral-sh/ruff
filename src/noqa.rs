@@ -196,7 +196,6 @@ fn add_noqa_inner(
                         output.push_str(line_ending);
                     }
                     Directive::Codes(_, start_byte, _, existing) => {
-                        println!("existing: {:?}", existing);
                         // Reconstruct the line based on the preserved rule codes.
                         // This enables us to tally the number of edits.
                         let mut formatted = String::with_capacity(line.len());
