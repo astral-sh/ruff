@@ -1,4 +1,5 @@
 pub use await_outside_async::{await_outside_async, AwaitOutsideAsync};
+pub use consider_using_sys_exit::{consider_using_sys_exit, ConsiderUsingSysExit};
 pub use constant_comparison::{constant_comparison, ConstantComparison};
 pub use global_variable_not_assigned::GlobalVariableNotAssigned;
 pub use invalid_all_format::{invalid_all_format, InvalidAllFormat};
@@ -13,7 +14,6 @@ pub use unnecessary_direct_lambda_call::{
     unnecessary_direct_lambda_call, UnnecessaryDirectLambdaCall,
 };
 pub use use_from_import::{use_from_import, ConsiderUsingFromImport};
-pub use use_sys_exit::{use_sys_exit, UseSysExit};
 pub use used_prior_global_declaration::{
     used_prior_global_declaration, UsedPriorGlobalDeclaration,
 };
@@ -21,6 +21,7 @@ pub use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub use useless_import_alias::{useless_import_alias, UselessImportAlias};
 
 mod await_outside_async;
+mod consider_using_sys_exit;
 mod constant_comparison;
 mod global_variable_not_assigned;
 mod invalid_all_format;
@@ -33,7 +34,6 @@ mod too_many_args;
 mod too_many_statements;
 mod unnecessary_direct_lambda_call;
 mod use_from_import;
-mod use_sys_exit;
 mod used_prior_global_declaration;
 mod useless_else_on_loop;
 mod useless_import_alias;

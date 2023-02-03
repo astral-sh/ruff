@@ -9,21 +9,21 @@ use crate::{define_violation, AutofixKind};
 use ruff_macros::derive_message_formats;
 
 define_violation!(
-    pub struct UseSysExit {
+    pub struct ConsiderUsingSysExit {
         pub name: String,
     }
 );
-impl Violation for UseSysExit {
+impl Violation for ConsiderUsingSysExit {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UseSysExit { name } = self;
+        let ConsiderUsingSysExit { name } = self;
         format!("Use `sys.exit()` instead of `{name}`")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|UseSysExit { name }| format!("Replace `{name}` with `sys.exit()`"))
+        Some(|ConsiderUsingSysExit { name }| format!("Replace `{name}` with `sys.exit()`"))
     }
 }
 /// Return `true` if the `module` was imported using a star import (e.g., `from
@@ -97,7 +97,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
 }
 
 /// RUF004
-pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
+pub fn consider_using_sys_exit(checker: &mut Checker, func: &Expr) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
     };
@@ -112,7 +112,7 @@ pub fn use_sys_exit(checker: &mut Checker, func: &Expr) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(
-            UseSysExit {
+            ConsiderUsingSysExit {
                 name: name.to_string(),
             },
             Range::from_located(func),
