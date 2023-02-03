@@ -367,10 +367,10 @@ ruff_macros::define_rule_mapping!(
     DTZ011 => rules::flake8_datetimez::rules::CallDateToday,
     DTZ012 => rules::flake8_datetimez::rules::CallDateFromtimestamp,
     // pygrep-hooks
-    PGH001 => violations::NoEval,
-    PGH002 => violations::DeprecatedLogWarn,
-    PGH003 => violations::BlanketTypeIgnore,
-    PGH004 => violations::BlanketNOQA,
+    PGH001 => rules::pygrep_hooks::rules::NoEval,
+    PGH002 => rules::pygrep_hooks::rules::DeprecatedLogWarn,
+    PGH003 => rules::pygrep_hooks::rules::BlanketTypeIgnore,
+    PGH004 => rules::pygrep_hooks::rules::BlanketNOQA,
     // pandas-vet
     PD002 => rules::pandas_vet::rules::UseOfInplaceArgument,
     PD003 => rules::pandas_vet::rules::UseOfDotIsNull,
