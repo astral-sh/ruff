@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::registry::{Linter, Rule, RuleCodePrefix, RuleIter, RuleNamespace};
+use crate::codes::RuleCodePrefix;
+use crate::registry::{Linter, Rule, RuleIter, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -48,8 +49,8 @@ impl FromStr for RuleSelector {
             }
 
             Ok(Self::Prefix {
-                prefix: RuleCodePrefix::from_str(s)
-                    .map_err(|_| ParseError::Unknown(s.to_string()))?,
+                prefix: RuleCodePrefix::parse(&linter, code)
+                    .map_err(|_| ParseError::Unknown(code.to_string()))?,
                 redirected_from,
             })
         }
@@ -69,9 +70,7 @@ impl RuleSelector {
         match self {
             RuleSelector::All => ("", "ALL"),
             RuleSelector::Prefix { prefix, .. } => {
-                let prefix: &'static str = prefix.into();
-                let (linter, code) = Linter::parse_code(prefix).unwrap();
-                (linter.common_prefix(), code)
+                (prefix.linter().common_prefix(), prefix.short_code())
             }
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
         }
@@ -182,7 +181,11 @@ impl JsonSchema for RuleSelector {
             instance_type: Some(InstanceType::String.into()),
             enum_values: Some(
                 std::iter::once("ALL".to_string())
-                    .chain(RuleCodePrefix::iter().map(|s| s.as_ref().to_string()))
+                    .chain(RuleCodePrefix::iter().map(|p| {
+                        let prefix = p.linter().common_prefix();
+                        let code = p.short_code();
+                        format!("{prefix}{code}")
+                    }))
                     .map(Value::String)
                     .collect(),
             ),
@@ -196,7 +199,17 @@ impl RuleSelector {
         match self {
             RuleSelector::All => Specificity::All,
             RuleSelector::Linter(..) => Specificity::Linter,
-            RuleSelector::Prefix { prefix, .. } => prefix.specificity(),
+            RuleSelector::Prefix { prefix, .. } => {
+                let prefix: &'static str = prefix.short_code();
+                match prefix.len() {
+                    1 => Specificity::Code1Char,
+                    2 => Specificity::Code2Chars,
+                    3 => Specificity::Code3Chars,
+                    4 => Specificity::Code4Chars,
+                    5 => Specificity::Code5Chars,
+                    _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
+                }
+            }
         }
     }
 }

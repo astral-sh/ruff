@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter};
 
 use crate::ast::types::Range;
+use crate::codes::{self, RuleCodePrefix};
 use crate::fix::Fix;
 use crate::rules;
 use crate::violation::Violation;
@@ -723,14 +724,17 @@ impl Linter {
     pub const fn upstream_categories(&self) -> Option<&'static [UpstreamCategory]> {
         match self {
             Linter::Pycodestyle => Some(&[
-                UpstreamCategory(RuleCodePrefix::E, "Error"),
-                UpstreamCategory(RuleCodePrefix::W, "Warning"),
+                UpstreamCategory(RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E), "Error"),
+                UpstreamCategory(
+                    RuleCodePrefix::Pycodestyle(codes::Pycodestyle::W),
+                    "Warning",
+                ),
             ]),
             Linter::Pylint => Some(&[
-                UpstreamCategory(RuleCodePrefix::PLC, "Convention"),
-                UpstreamCategory(RuleCodePrefix::PLE, "Error"),
-                UpstreamCategory(RuleCodePrefix::PLR, "Refactor"),
-                UpstreamCategory(RuleCodePrefix::PLW, "Warning"),
+                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::C), "Convention"),
+                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::E), "Error"),
+                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::R), "Refactor"),
+                UpstreamCategory(RuleCodePrefix::Pylint(codes::Pylint::W), "Warning"),
             ]),
             _ => None,
         }

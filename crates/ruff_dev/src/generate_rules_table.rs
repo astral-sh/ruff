@@ -62,7 +62,7 @@ pub fn main(args: &Args) -> Result<()> {
                 .upstream_categories()
                 .unwrap()
                 .iter()
-                .map(|UpstreamCategory(prefix, ..)| prefix.as_ref())
+                .map(|UpstreamCategory(prefix, ..)| prefix.short_code())
                 .join(", "),
             prefix => prefix.to_string(),
         };
@@ -104,7 +104,11 @@ pub fn main(args: &Args) -> Result<()> {
 
         if let Some(categories) = linter.upstream_categories() {
             for UpstreamCategory(prefix, name) in categories {
-                table_out.push_str(&format!("#### {name} ({})", prefix.as_ref()));
+                table_out.push_str(&format!(
+                    "#### {name} ({}{})",
+                    linter.common_prefix(),
+                    prefix.short_code()
+                ));
                 table_out.push('\n');
                 table_out.push('\n');
                 generate_table(&mut table_out, prefix);
