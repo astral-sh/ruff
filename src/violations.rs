@@ -6,22 +6,6 @@ use crate::define_violation;
 
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
-// mccabe
-
-define_violation!(
-    pub struct FunctionIsTooComplex {
-        pub name: String,
-        pub complexity: usize,
-    }
-);
-impl Violation for FunctionIsTooComplex {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let FunctionIsTooComplex { name, complexity } = self;
-        format!("`{name}` is too complex ({complexity})")
-    }
-}
-
 // flake8-print
 
 define_violation!(
