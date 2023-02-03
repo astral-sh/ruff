@@ -349,11 +349,11 @@ ruff_macros::define_rule_mapping!(
     FBT002 => rules::flake8_boolean_trap::rules::BooleanDefaultValueInFunctionDefinition,
     FBT003 => rules::flake8_boolean_trap::rules::BooleanPositionalValueInFunctionCall,
     // flake8-unused-arguments
-    ARG001 => violations::UnusedFunctionArgument,
-    ARG002 => violations::UnusedMethodArgument,
-    ARG003 => violations::UnusedClassMethodArgument,
-    ARG004 => violations::UnusedStaticMethodArgument,
-    ARG005 => violations::UnusedLambdaArgument,
+    ARG001 => rules::flake8_unused_arguments::rules::UnusedFunctionArgument,
+    ARG002 => rules::flake8_unused_arguments::rules::UnusedMethodArgument,
+    ARG003 => rules::flake8_unused_arguments::rules::UnusedClassMethodArgument,
+    ARG004 => rules::flake8_unused_arguments::rules::UnusedStaticMethodArgument,
+    ARG005 => rules::flake8_unused_arguments::rules::UnusedLambdaArgument,
     // flake8-import-conventions
     ICN001 => rules::flake8_import_conventions::rules::ImportAliasIsNotConventional,
     // flake8-datetimez
