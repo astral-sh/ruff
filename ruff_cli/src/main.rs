@@ -80,7 +80,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, format } => commands::rule(rule, format)?,
+        Command::Rule { rule, format } => commands::rule(&rule, format)?,
         Command::Linter { format } => commands::linter::linter(format),
         Command::Clean => commands::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
