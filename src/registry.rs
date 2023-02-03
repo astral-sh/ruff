@@ -147,7 +147,7 @@ ruff_macros::define_rule_mapping!(
     C416 => rules::flake8_comprehensions::rules::UnnecessaryComprehension,
     C417 => rules::flake8_comprehensions::rules::UnnecessaryMap,
     // flake8-debugger
-    T100 => violations::Debugger,
+    T100 => rules::flake8_debugger::rules::Debugger,
     // mccabe
     C901 => violations::FunctionIsTooComplex,
     // flake8-tidy-imports
