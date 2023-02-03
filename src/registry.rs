@@ -645,20 +645,20 @@ pub trait RuleNamespace: Sized {
 }
 
 /// The prefix, name and selector for an upstream linter category.
-pub struct LinterCategory(pub &'static str, pub &'static str, pub RuleCodePrefix);
+pub struct UpstreamCategory(pub &'static str, pub &'static str, pub RuleCodePrefix);
 
 impl Linter {
-    pub fn categories(&self) -> Option<&'static [LinterCategory]> {
+    pub fn upstream_categories(&self) -> Option<&'static [UpstreamCategory]> {
         match self {
             Linter::Pycodestyle => Some(&[
-                LinterCategory("E", "Error", RuleCodePrefix::E),
-                LinterCategory("W", "Warning", RuleCodePrefix::W),
+                UpstreamCategory("E", "Error", RuleCodePrefix::E),
+                UpstreamCategory("W", "Warning", RuleCodePrefix::W),
             ]),
             Linter::Pylint => Some(&[
-                LinterCategory("PLC", "Convention", RuleCodePrefix::PLC),
-                LinterCategory("PLE", "Error", RuleCodePrefix::PLE),
-                LinterCategory("PLR", "Refactor", RuleCodePrefix::PLR),
-                LinterCategory("PLW", "Warning", RuleCodePrefix::PLW),
+                UpstreamCategory("PLC", "Convention", RuleCodePrefix::PLC),
+                UpstreamCategory("PLE", "Error", RuleCodePrefix::PLE),
+                UpstreamCategory("PLR", "Refactor", RuleCodePrefix::PLR),
+                UpstreamCategory("PLW", "Warning", RuleCodePrefix::PLW),
             ]),
             _ => None,
         }
