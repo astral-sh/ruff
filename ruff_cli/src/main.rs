@@ -102,6 +102,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
     }
     if cli.show_files {
         commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
+        return Ok(ExitCode::SUCCESS);
     }
 
     // Extract options that are included in `Settings`, but only apply at the top
