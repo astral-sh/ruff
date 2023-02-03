@@ -84,6 +84,7 @@ pub struct Checker<'a> {
     deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext<'a>)>,
     deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, DeferralContext<'a>)>,
+    deferred_for_loops: Vec<(&'a Stmt, DeferralContext<'a>)>,
     deferred_assignments: Vec<DeferralContext<'a>>,
     // Body iteration; used to peek at siblings.
     body: &'a [Stmt],
@@ -145,6 +146,7 @@ impl<'a> Checker<'a> {
             deferred_type_definitions: vec![],
             deferred_functions: vec![],
             deferred_lambdas: vec![],
+            deferred_for_loops: vec![],
             deferred_assignments: vec![],
             // Body iteration.
             body: &[],
@@ -1557,7 +1559,8 @@ where
                     .rules
                     .enabled(&Rule::UnusedLoopControlVariable)
                 {
-                    flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
+                    self.deferred_for_loops
+                        .push((stmt, (self.scope_stack.clone(), self.parents.clone())));
                 }
                 if self
                     .settings
@@ -4421,6 +4424,28 @@ impl<'a> Checker<'a> {
         }
     }
 
+    fn check_deferred_for_loops(&mut self) {
+        self.deferred_for_loops.reverse();
+        while let Some((stmt, (scopes, parents))) = self.deferred_for_loops.pop() {
+            self.scope_stack = scopes.clone();
+            self.parents = parents.clone();
+
+            if let StmtKind::For { target, body, .. } | StmtKind::AsyncFor { target, body, .. } =
+                &stmt.node
+            {
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnusedLoopControlVariable)
+                {
+                    flake8_bugbear::rules::unused_loop_control_variable(self, stmt, target, body);
+                }
+            } else {
+                unreachable!("Expected ExprKind::Lambda");
+            }
+        }
+    }
+
     fn check_dead_scopes(&mut self) {
         if !(self.settings.rules.enabled(&Rule::UnusedImport)
             || self.settings.rules.enabled(&Rule::ImportStarUsage)
@@ -5201,6 +5226,7 @@ pub fn check_ast(
     checker.check_deferred_type_definitions();
     let mut allocator = vec![];
     checker.check_deferred_string_type_definitions(&mut allocator);
+    checker.check_deferred_for_loops();
 
     // Check docstrings.
     checker.check_definitions();
