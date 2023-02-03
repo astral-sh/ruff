@@ -44,7 +44,6 @@ cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
         pub mod packaging;
 
-
         mod lib_native;
         pub use lib_native::check;
     } else {
