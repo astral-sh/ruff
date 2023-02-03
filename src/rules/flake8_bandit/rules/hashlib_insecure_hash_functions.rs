@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use super::super::helpers::string_literal;
@@ -5,7 +8,22 @@ use crate::ast::helpers::SimpleCallArgs;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct HashlibInsecureHashFunction {
+        pub string: String,
+    }
+);
+impl Violation for HashlibInsecureHashFunction {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let HashlibInsecureHashFunction { string } = self;
+        format!(
+            "Probable use of insecure hash functions in `hashlib`: \"{}\"",
+            string.escape_debug()
+        )
+    }
+}
 
 const WEAK_HASHES: [&str; 4] = ["md4", "md5", "sha", "sha1"];
 
@@ -56,7 +74,7 @@ pub fn hashlib_insecure_hash_functions(
                     if let Some(hash_func_name) = string_literal(name_arg) {
                         if WEAK_HASHES.contains(&hash_func_name.to_lowercase().as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::HashlibInsecureHashFunction {
+                                HashlibInsecureHashFunction {
                                     string: hash_func_name.to_string(),
                                 },
                                 Range::from_located(name_arg),
@@ -73,7 +91,7 @@ pub fn hashlib_insecure_hash_functions(
                 }
 
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::HashlibInsecureHashFunction {
+                    HashlibInsecureHashFunction {
                         string: (*func_name).to_string(),
                     },
                     Range::from_located(func),
