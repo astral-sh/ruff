@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Keyword};
 use rustpython_parser::ast::Constant;
 
@@ -5,7 +8,24 @@ use crate::ast::helpers::SimpleCallArgs;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct RequestWithoutTimeout {
+        pub timeout: Option<String>,
+    }
+);
+impl Violation for RequestWithoutTimeout {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let RequestWithoutTimeout { timeout } = self;
+        match timeout {
+            Some(value) => {
+                format!("Probable use of requests call with timeout set to `{value}`")
+            }
+            None => format!("Probable use of requests call without timeout"),
+        }
+    }
+}
 
 const HTTP_VERBS: [&str; 7] = ["get", "options", "head", "post", "put", "patch", "delete"];
 
@@ -31,7 +51,7 @@ pub fn request_without_timeout(
                 _ => None,
             } {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::RequestWithoutTimeout {
+                    RequestWithoutTimeout {
                         timeout: Some(timeout),
                     },
                     Range::from_located(timeout_arg),
@@ -39,7 +59,7 @@ pub fn request_without_timeout(
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
-                violations::RequestWithoutTimeout { timeout: None },
+                RequestWithoutTimeout { timeout: None },
                 Range::from_located(func),
             ));
         }
