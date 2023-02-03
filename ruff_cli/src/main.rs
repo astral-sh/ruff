@@ -160,9 +160,12 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
     }
 
     if cli.add_noqa {
+        if !matches!(autofix, fix::FixMode::None) {
+            warn_user_once!("--fix is incompatible with --add-noqa.");
+        }
         let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
-            println!("Added {modifications} noqa directives.");
+            eprintln!("Added {modifications} noqa directives.");
         }
         return Ok(ExitCode::SUCCESS);
     }
@@ -171,7 +174,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
 
     if cli.watch {
         if !matches!(autofix, fix::FixMode::None) {
-            warn_user_once!("--fix is not enabled in watch mode.");
+            warn_user_once!("--fix is unsupported in watch mode.");
         }
         if format != SerializationFormat::Text {
             warn_user_once!("--format 'text' is used in watch mode.");
