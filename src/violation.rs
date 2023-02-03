@@ -97,3 +97,23 @@ macro_rules! define_simple_violation {
         }
     };
 }
+
+#[macro_export]
+/// This macro exists to make it simpler to define violations that only have a
+/// simple message, and no parametrization.
+macro_rules! define_simple_autofix_violation {
+    ($name:ident, $message:expr, $autofix_title:expr) => {
+        $crate::define_violation!(
+            pub struct $name;
+        );
+        impl AlwaysAutofixableViolation for $name {
+            #[derive_message_formats]
+            fn message(&self) -> String {
+                format!($message)
+            }
+            fn autofix_title(&self) -> String {
+                $autofix_title.to_string()
+            }
+        }
+    };
+}
