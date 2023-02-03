@@ -196,7 +196,7 @@ mod tests {
     use anyhow::Result;
 
     use super::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
-    use crate::registry::RuleCodePrefix;
+    use crate::registry::{Linter, RuleCodePrefix};
     use crate::rule_selector::RuleSelector;
     use crate::settings::types::PatternPrefixPair;
 
@@ -296,23 +296,23 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "t/*".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
             PatternPrefixPair {
                 pattern: "setup.py".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
             PatternPrefixPair {
                 pattern: "examples/*".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
             PatternPrefixPair {
                 pattern: "docs/*".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
             PatternPrefixPair {
                 pattern: "extra/*".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
         ];
         assert_eq!(actual, expected);

@@ -8,17 +8,24 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::registry::{Rule, RuleCodePrefix, RuleIter};
+use crate::registry::{Linter, Rule, RuleCodePrefix, RuleIter, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
     /// All rules
     All,
+    Linter(Linter),
     Prefix {
         prefix: RuleCodePrefix,
         redirected_from: Option<&'static str>,
     },
+}
+
+impl From<Linter> for RuleSelector {
+    fn from(linter: Linter) -> Self {
+        Self::Linter(linter)
+    }
 }
 
 impl FromStr for RuleSelector {
@@ -32,6 +39,14 @@ impl FromStr for RuleSelector {
                 Some((from, target)) => (target, Some(from)),
                 None => (s, None),
             };
+
+            let (linter, code) =
+                Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+
+            if code.is_empty() {
+                return Ok(Self::Linter(linter));
+            }
+
             Ok(Self::Prefix {
                 prefix: RuleCodePrefix::from_str(s)
                     .map_err(|_| ParseError::Unknown(s.to_string()))?,
@@ -53,6 +68,7 @@ impl RuleSelector {
     pub fn short_code(&self) -> &'static str {
         match self {
             RuleSelector::All => "ALL",
+            RuleSelector::Linter(linter) => linter.common_prefix(),
             RuleSelector::Prefix { prefix, .. } => prefix.into(),
         }
     }
@@ -117,14 +133,15 @@ impl IntoIterator for &RuleSelector {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
-            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Prefix(prefix.into_iter()),
+            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.into_iter()),
+            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.into_iter()),
         }
     }
 }
 
 pub enum RuleSelectorIter {
     All(RuleIter),
-    Prefix(std::vec::IntoIter<Rule>),
+    Vec(std::vec::IntoIter<Rule>),
 }
 
 impl Iterator for RuleSelectorIter {
@@ -133,7 +150,7 @@ impl Iterator for RuleSelectorIter {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             RuleSelectorIter::All(iter) => iter.next(),
-            RuleSelectorIter::Prefix(iter) => iter.next(),
+            RuleSelectorIter::Vec(iter) => iter.next(),
         }
     }
 }
@@ -173,6 +190,7 @@ impl RuleSelector {
     pub(crate) fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
+            RuleSelector::Linter(..) => Specificity::Linter,
             RuleSelector::Prefix { prefix, .. } => prefix.specificity(),
         }
     }
