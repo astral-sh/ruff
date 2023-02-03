@@ -79,10 +79,10 @@ pub fn lint_path(
         {
             if fixed > 0 {
                 if matches!(autofix, fix::FixMode::Apply) {
-                    write(path, transformed)?;
+                    write(path, transformed.as_bytes())?;
                 } else if matches!(autofix, fix::FixMode::Diff) {
                     let mut stdout = io::stdout().lock();
-                    TextDiff::from_lines(&contents, &transformed)
+                    TextDiff::from_lines(contents.as_str(), &transformed)
                         .unified_diff()
                         .header(&fs::relativize_path(path), &fs::relativize_path(path))
                         .to_writer(&mut stdout)?;

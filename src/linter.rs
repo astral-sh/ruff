@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
@@ -314,13 +315,13 @@ pub fn lint_only(
 
 /// Generate `Diagnostic`s from source code content, iteratively autofixing
 /// until stable.
-pub fn lint_fix(
-    contents: &str,
+pub fn lint_fix<'a>(
+    contents: &'a str,
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
-) -> Result<(LinterResult<Vec<Message>>, String, usize)> {
-    let mut transformed = contents.to_string();
+) -> Result<(LinterResult<Vec<Message>>, Cow<'a, str>, usize)> {
+    let mut transformed = Cow::Borrowed(contents);
 
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;
@@ -397,7 +398,7 @@ This indicates a bug in `{}`. If you could open an issue at:
                 fixed += applied;
 
                 // Store the fixed contents.
-                transformed = fixed_contents.to_string();
+                transformed = Cow::Owned(fixed_contents);
 
                 // Increment the iteration count.
                 iterations += 1;
