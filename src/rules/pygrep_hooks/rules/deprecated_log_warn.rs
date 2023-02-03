@@ -1,9 +1,21 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Expr;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct DeprecatedLogWarn;
+);
+impl Violation for DeprecatedLogWarn {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`warn` is deprecated in favor of `warning`")
+    }
+}
 
 /// PGH002 - deprecated use of logging.warn
 pub fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
@@ -11,7 +23,7 @@ pub fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
         call_path.as_slice() == ["logging", "warn"]
     }) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::DeprecatedLogWarn,
+            DeprecatedLogWarn,
             Range::from_located(func),
         ));
     }

@@ -352,48 +352,6 @@ impl Violation for ErrorSuffixOnExceptionName {
     }
 }
 
-// pygrep-hooks
-
-define_violation!(
-    pub struct NoEval;
-);
-impl Violation for NoEval {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("No builtin `eval()` allowed")
-    }
-}
-
-define_violation!(
-    pub struct DeprecatedLogWarn;
-);
-impl Violation for DeprecatedLogWarn {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`warn` is deprecated in favor of `warning`")
-    }
-}
-
-define_violation!(
-    pub struct BlanketTypeIgnore;
-);
-impl Violation for BlanketTypeIgnore {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use specific rule codes when ignoring type issues")
-    }
-}
-
-define_violation!(
-    pub struct BlanketNOQA;
-);
-impl Violation for BlanketNOQA {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use specific rule codes when using `noqa`")
-    }
-}
-
 // flake8-errmsg
 
 define_violation!(
