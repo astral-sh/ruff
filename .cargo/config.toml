@@ -9,9 +9,9 @@ rustflags = [
   #      `https://github.com/EmbarkStudios/rust-ecosystem/issues/22#issuecomment-947011395`
   "-Dunsafe_code",
   "-Wclippy::pedantic",
-  # "-Wclippy::print_stdout",
-  # "-Wclippy::print_stderr",
-  # "-Wclippy::dbg_macro",
+  "-Wclippy::print_stdout",
+  "-Wclippy::print_stderr",
+  "-Wclippy::dbg_macro",
   "-Wclippy::char_lit_as_u8",
   "-Aclippy::collapsible_else_if",
   "-Aclippy::collapsible_if",

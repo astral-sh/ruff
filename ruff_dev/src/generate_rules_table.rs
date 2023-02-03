@@ -1,4 +1,5 @@
 //! Generate a Markdown-compatible table of supported lint rules.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use anyhow::Result;
 use itertools::Itertools;

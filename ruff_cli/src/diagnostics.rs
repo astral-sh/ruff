@@ -105,14 +105,17 @@ pub fn lint_path(
 
     if let Some(err) = parse_error {
         // Notify the user of any parse errors.
-        eprintln!(
-            "{}{} {}{}{} {err}",
-            "error".red().bold(),
-            ":".bold(),
-            "Failed to parse ".bold(),
-            fs::relativize_path(path).bold(),
-            ":".bold()
-        );
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!(
+                "{}{} {}{}{} {err}",
+                "error".red().bold(),
+                ":".bold(),
+                "Failed to parse ".bold(),
+                fs::relativize_path(path).bold(),
+                ":".bold()
+            );
+        }
 
         // Purge the cache.
         cache::del(path, package.as_ref(), settings, autofix.into());
@@ -207,12 +210,15 @@ pub fn lint_stdin(
     };
 
     if let Some(err) = parse_error {
-        eprintln!(
-            "{}{} Failed to parse {}: {err}",
-            "error".red().bold(),
-            ":".bold(),
-            path.map_or_else(|| "-".into(), fs::relativize_path).bold()
-        );
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!(
+                "{}{} Failed to parse {}: {err}",
+                "error".red().bold(),
+                ":".bold(),
+                path.map_or_else(|| "-".into(), fs::relativize_path).bold()
+            );
+        }
     }
 
     Ok(Diagnostics { messages, fixed })

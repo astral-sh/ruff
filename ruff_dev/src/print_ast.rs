@@ -1,4 +1,5 @@
 //! Print the AST for a given Python file.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::fs;
 use std::path::PathBuf;
