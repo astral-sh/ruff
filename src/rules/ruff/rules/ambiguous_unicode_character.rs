@@ -1,4 +1,7 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
 use once_cell::sync::Lazy;
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
 
 use crate::ast::types::Range;
@@ -8,7 +11,90 @@ use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::rules::ruff::rules::Context;
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
-use crate::violations;
+
+define_violation!(
+    pub struct AmbiguousUnicodeCharacterString {
+        pub confusable: char,
+        pub representant: char,
+    }
+);
+impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let AmbiguousUnicodeCharacterString {
+            confusable,
+            representant,
+        } = self;
+        format!(
+            "String contains ambiguous unicode character '{confusable}' (did you mean \
+             '{representant}'?)"
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        let AmbiguousUnicodeCharacterString {
+            confusable,
+            representant,
+        } = self;
+        format!("Replace '{confusable}' with '{representant}'")
+    }
+}
+
+define_violation!(
+    pub struct AmbiguousUnicodeCharacterDocstring {
+        pub confusable: char,
+        pub representant: char,
+    }
+);
+impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let AmbiguousUnicodeCharacterDocstring {
+            confusable,
+            representant,
+        } = self;
+        format!(
+            "Docstring contains ambiguous unicode character '{confusable}' (did you mean \
+             '{representant}'?)"
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        let AmbiguousUnicodeCharacterDocstring {
+            confusable,
+            representant,
+        } = self;
+        format!("Replace '{confusable}' with '{representant}'")
+    }
+}
+
+define_violation!(
+    pub struct AmbiguousUnicodeCharacterComment {
+        pub confusable: char,
+        pub representant: char,
+    }
+);
+impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let AmbiguousUnicodeCharacterComment {
+            confusable,
+            representant,
+        } = self;
+        format!(
+            "Comment contains ambiguous unicode character '{confusable}' (did you mean \
+             '{representant}'?)"
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        let AmbiguousUnicodeCharacterComment {
+            confusable,
+            representant,
+        } = self;
+        format!("Replace '{confusable}' with '{representant}'")
+    }
+}
 
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
 static CONFUSABLES: Lazy<FxHashMap<u32, u32>> = Lazy::new(|| {
@@ -1626,17 +1712,17 @@ pub fn ambiguous_unicode_character(
                     let end_location = Location::new(location.row(), location.column() + 1);
                     let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
                         match context {
-                            Context::String => violations::AmbiguousUnicodeCharacterString {
+                            Context::String => AmbiguousUnicodeCharacterString {
                                 confusable: current_char,
                                 representant,
                             }
                             .into(),
-                            Context::Docstring => violations::AmbiguousUnicodeCharacterDocstring {
+                            Context::Docstring => AmbiguousUnicodeCharacterDocstring {
                                 confusable: current_char,
                                 representant,
                             }
                             .into(),
-                            Context::Comment => violations::AmbiguousUnicodeCharacterComment {
+                            Context::Comment => AmbiguousUnicodeCharacterComment {
                                 confusable: current_char,
                                 representant,
                             }
