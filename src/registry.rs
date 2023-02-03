@@ -163,9 +163,9 @@ ruff_macros::define_rule_mapping!(
     RET507 => rules::flake8_return::rules::SuperfluousElseContinue,
     RET508 => rules::flake8_return::rules::SuperfluousElseBreak,
     // flake8-implicit-str-concat
-    ISC001 => violations::SingleLineImplicitStringConcatenation,
-    ISC002 => violations::MultiLineImplicitStringConcatenation,
-    ISC003 => violations::ExplicitStringConcatenation,
+    ISC001 => rules::flake8_implicit_str_concat::rules::SingleLineImplicitStringConcatenation,
+    ISC002 => rules::flake8_implicit_str_concat::rules::MultiLineImplicitStringConcatenation,
+    ISC003 => rules::flake8_implicit_str_concat::rules::ExplicitStringConcatenation,
     // flake8-print
     T201 => violations::PrintFound,
     T203 => violations::PPrintFound,

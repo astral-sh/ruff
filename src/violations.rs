@@ -22,38 +22,6 @@ impl Violation for FunctionIsTooComplex {
     }
 }
 
-// flake8-implicit-str-concat
-
-define_violation!(
-    pub struct SingleLineImplicitStringConcatenation;
-);
-impl Violation for SingleLineImplicitStringConcatenation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Implicitly concatenated string literals on one line")
-    }
-}
-
-define_violation!(
-    pub struct MultiLineImplicitStringConcatenation;
-);
-impl Violation for MultiLineImplicitStringConcatenation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Implicitly concatenated string literals over multiple lines")
-    }
-}
-
-define_violation!(
-    pub struct ExplicitStringConcatenation;
-);
-impl Violation for ExplicitStringConcatenation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Explicitly concatenated string should be implicitly concatenated")
-    }
-}
-
 // flake8-print
 
 define_violation!(
