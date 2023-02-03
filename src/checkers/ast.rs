@@ -74,7 +74,9 @@ pub struct Checker<'a> {
     pub(crate) parents: Vec<RefEquality<'a, Stmt>>,
     pub(crate) depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
     pub(crate) child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
+    // A stack of all bindings created in any scope, at any point in execution.
     pub(crate) bindings: Vec<Binding<'a>>,
+    // Map from binding index to indexes of bindings that redefine it in other scopes.
     pub(crate) redefinitions: IntMap<usize, Vec<usize>>,
     pub(crate) exprs: Vec<RefEquality<'a, Expr>>,
     pub(crate) scopes: Vec<Scope<'a>>,
@@ -212,7 +214,7 @@ impl<'a> Checker<'a> {
     /// Return the current `Binding` for a given `name`.
     pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.current_scopes()
-            .find_map(|scope| scope.values.get(member))
+            .find_map(|scope| scope.bindings.get(member))
             .map(|index| &self.bindings[*index])
     }
 
@@ -352,7 +354,7 @@ where
                             source: Some(RefEquality(stmt)),
                             context,
                         });
-                        scope.values.insert(name, index);
+                        scope.bindings.insert(name, index);
                     }
                 }
 
@@ -382,7 +384,7 @@ where
                             source: Some(RefEquality(stmt)),
                             context,
                         });
-                        scope.values.insert(name, index);
+                        scope.bindings.insert(name, index);
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
@@ -390,7 +392,7 @@ where
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let mut exists = false;
                         for index in self.scope_stack.iter().skip(1).rev().skip(1) {
-                            if let Some(index) = self.scopes[*index].values.get(&name.as_str()) {
+                            if let Some(index) = self.scopes[*index].bindings.get(&name.as_str()) {
                                 exists = true;
                                 self.bindings[*index].runtime_usage = usage;
                             }
@@ -1768,7 +1770,7 @@ where
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in operations::extract_globals(body) {
                     if self.scopes[GLOBAL_SCOPE_INDEX]
-                        .values
+                        .bindings
                         .get(name)
                         .map_or(true, |index| {
                             matches!(self.bindings[*index].kind, BindingKind::Annotation)
@@ -1784,7 +1786,7 @@ where
                             source: Some(RefEquality(stmt)),
                             context: self.execution_context(),
                         });
-                        self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
+                        self.scopes[GLOBAL_SCOPE_INDEX].bindings.insert(name, index);
                     }
                 }
 
@@ -1832,7 +1834,7 @@ where
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in &globals {
                     if self.scopes[GLOBAL_SCOPE_INDEX]
-                        .values
+                        .bindings
                         .get(name)
                         .map_or(true, |index| {
                             matches!(self.bindings[*index].kind, BindingKind::Annotation)
@@ -1848,7 +1850,7 @@ where
                             source: Some(RefEquality(stmt)),
                             context: self.execution_context(),
                         });
-                        self.scopes[GLOBAL_SCOPE_INDEX].values.insert(name, index);
+                        self.scopes[GLOBAL_SCOPE_INDEX].bindings.insert(name, index);
                     }
                 }
 
@@ -3481,7 +3483,7 @@ where
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
 
-                        if self.current_scope().values.contains_key(&name.as_str()) {
+                        if self.current_scope().bindings.contains_key(&name.as_str()) {
                             self.handle_node_store(
                                 name,
                                 &Expr::new(
@@ -3495,7 +3497,7 @@ where
                             );
                         }
 
-                        let definition = self.current_scope().values.get(&name.as_str()).copied();
+                        let definition = self.current_scope().bindings.get(&name.as_str()).copied();
                         self.handle_node_store(
                             name,
                             &Expr::new(
@@ -3513,7 +3515,7 @@ where
                         if let Some(index) = {
                             let scope = &mut self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found"))];
-                            &scope.values.remove(&name.as_str())
+                            &scope.bindings.remove(&name.as_str())
                         } {
                             if !self.bindings[*index].used() {
                                 if self.settings.rules.enabled(&Rule::UnusedVariable) {
@@ -3548,7 +3550,7 @@ where
                         if let Some(index) = definition {
                             let scope = &mut self.scopes
                                 [*(self.scope_stack.last().expect("No current scope found"))];
-                            scope.values.insert(name, index);
+                            scope.bindings.insert(name, index);
                         }
                     }
                     None => walk_excepthandler(self, excepthandler),
@@ -3743,7 +3745,7 @@ impl<'a> Checker<'a> {
                 source: None,
                 context: ExecutionContext::Runtime,
             });
-            scope.values.insert(builtin, index);
+            scope.bindings.insert(builtin, index);
         }
     }
 
@@ -3810,9 +3812,9 @@ impl<'a> Checker<'a> {
             .iter()
             .rev()
             .enumerate()
-            .find(|(_, scope_index)| self.scopes[**scope_index].values.contains_key(&name))
+            .find(|(_, scope_index)| self.scopes[**scope_index].bindings.contains_key(&name))
         {
-            let existing_binding_index = self.scopes[*scope_index].values.get(&name).unwrap();
+            let existing_binding_index = self.scopes[*scope_index].bindings.get(&name).unwrap();
             let existing = &self.bindings[*existing_binding_index];
             let in_current_scope = stack_index == 0;
             if !matches!(existing.kind, BindingKind::Builtin)
@@ -3875,7 +3877,7 @@ impl<'a> Checker<'a> {
         }
 
         let scope = self.current_scope();
-        let binding = if let Some(index) = scope.values.get(&name) {
+        let binding = if let Some(index) = scope.bindings.get(&name) {
             if matches!(self.bindings[*index].kind, BindingKind::Builtin) {
                 // Avoid overriding builtins.
                 binding
@@ -3914,8 +3916,14 @@ impl<'a> Checker<'a> {
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-        if !(matches!(binding.kind, BindingKind::Annotation) && scope.values.contains_key(name)) {
-            scope.values.insert(name, binding_index);
+        if !(matches!(binding.kind, BindingKind::Annotation) && scope.bindings.contains_key(name)) {
+            if let Some(rebound_index) = scope.bindings.insert(name, binding_index) {
+                scope
+                    .rebounds
+                    .entry(name)
+                    .or_insert_with(Vec::new)
+                    .push(rebound_index);
+            }
         }
 
         self.bindings.push(binding);
@@ -3940,7 +3948,7 @@ impl<'a> Checker<'a> {
                     }
                 }
 
-                if let Some(index) = scope.values.get(&id.as_str()) {
+                if let Some(index) = scope.bindings.get(&id.as_str()) {
                     // Mark the binding as used.
                     let context = self.execution_context();
                     self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
@@ -3970,7 +3978,7 @@ impl<'a> Checker<'a> {
                                 .unwrap_or_default();
                             if has_alias {
                                 // Mark the sub-importation as used.
-                                if let Some(index) = scope.values.get(full_name) {
+                                if let Some(index) = scope.bindings.get(full_name) {
                                     self.bindings[*index].mark_used(
                                         scope_id,
                                         Range::from_located(expr),
@@ -3987,7 +3995,7 @@ impl<'a> Checker<'a> {
                                 .unwrap_or_default();
                             if has_alias {
                                 // Mark the sub-importation as used.
-                                if let Some(index) = scope.values.get(full_name.as_str()) {
+                                if let Some(index) = scope.bindings.get(full_name.as_str()) {
                                     self.bindings[*index].mark_used(
                                         scope_id,
                                         Range::from_located(expr),
@@ -4012,7 +4020,7 @@ impl<'a> Checker<'a> {
                     let mut from_list = vec![];
                     for scope_index in self.scope_stack.iter().rev() {
                         let scope = &self.scopes[*scope_index];
-                        for binding in scope.values.values().map(|index| &self.bindings[*index]) {
+                        for binding in scope.bindings.values().map(|index| &self.bindings[*index]) {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
@@ -4090,9 +4098,14 @@ impl<'a> Checker<'a> {
         {
             if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
                 // Ignore globals.
-                if !self.current_scope().values.get(id).map_or(false, |index| {
-                    matches!(self.bindings[*index].kind, BindingKind::Global)
-                }) {
+                if !self
+                    .current_scope()
+                    .bindings
+                    .get(id)
+                    .map_or(false, |index| {
+                        matches!(self.bindings[*index].kind, BindingKind::Global)
+                    })
+                {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
             }
@@ -4261,7 +4274,7 @@ impl<'a> Checker<'a> {
 
             let scope =
                 &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-            if scope.values.remove(&id.as_str()).is_none()
+            if scope.bindings.remove(&id.as_str()).is_none()
                 && self.settings.rules.enabled(&Rule::UndefinedName)
             {
                 self.diagnostics.push(Diagnostic::new(
@@ -4500,7 +4513,7 @@ impl<'a> Checker<'a> {
                 .iter()
                 .map(|scope| {
                     scope
-                        .values
+                        .bindings
                         .values()
                         .map(|index| &self.bindings[*index])
                         .filter(|binding| {
@@ -4523,7 +4536,7 @@ impl<'a> Checker<'a> {
                 .rules
                 .enabled(&Rule::GlobalVariableNotAssigned)
             {
-                for (name, index) in &scope.values {
+                for (name, index) in &scope.bindings {
                     let binding = &self.bindings[*index];
                     if matches!(binding.kind, BindingKind::Global) {
                         if let Some(stmt) = &binding.source {
@@ -4546,7 +4559,7 @@ impl<'a> Checker<'a> {
             }
 
             let all_binding: Option<&Binding> = scope
-                .values
+                .bindings
                 .get("__all__")
                 .map(|index| &self.bindings[*index]);
             let all_names: Option<Vec<&str>> =
@@ -4560,7 +4573,7 @@ impl<'a> Checker<'a> {
                     if let Some(all_binding) = all_binding {
                         if let Some(names) = &all_names {
                             for &name in names {
-                                if !scope.values.contains_key(name) {
+                                if !scope.bindings.contains_key(name) {
                                     diagnostics.push(Diagnostic::new(
                                         pyflakes::rules::UndefinedExport {
                                             name: name.to_string(),
@@ -4578,7 +4591,7 @@ impl<'a> Checker<'a> {
             // unused. Note that we only store references in `redefinitions` if
             // the bindings are in different scopes.
             if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
-                for (name, index) in &scope.values {
+                for (name, index) in &scope.bindings {
                     let binding = &self.bindings[*index];
 
                     if matches!(
@@ -4619,7 +4632,8 @@ impl<'a> Checker<'a> {
                     if let Some(all_binding) = all_binding {
                         if let Some(names) = &all_names {
                             let mut from_list = vec![];
-                            for binding in scope.values.values().map(|index| &self.bindings[*index])
+                            for binding in
+                                scope.bindings.values().map(|index| &self.bindings[*index])
                             {
                                 if let BindingKind::StarImportation(level, module) = &binding.kind {
                                     from_list.push(helpers::format_import_from(
@@ -4631,7 +4645,7 @@ impl<'a> Checker<'a> {
                             from_list.sort();
 
                             for &name in names {
-                                if !scope.values.contains_key(name) {
+                                if !scope.bindings.contains_key(name) {
                                     diagnostics.push(Diagnostic::new(
                                         pyflakes::rules::ImportStarUsage {
                                             name: name.to_string(),
@@ -4673,7 +4687,7 @@ impl<'a> Checker<'a> {
                         .copied()
                         .collect()
                 };
-                for (.., index) in &scope.values {
+                for (.., index) in &scope.bindings {
                     let binding = &self.bindings[*index];
 
                     if let Some(diagnostic) =
@@ -4707,7 +4721,7 @@ impl<'a> Checker<'a> {
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
                     FxHashMap::default();
 
-                for (name, index) in &scope.values {
+                for (name, index) in &scope.bindings {
                     let binding = &self.bindings[*index];
 
                     let full_name = match &binding.kind {

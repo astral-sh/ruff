@@ -64,9 +64,19 @@ def f():
 
 
 def f():
-    # Fixable, but not fixed in practice, since we can't tell if `bar` is used.
+    # Fixable.
     for foo, bar, baz in (["1", "2", "3"],):
         if foo or baz:
             break
 
     bar = 1
+
+
+def f():
+    # Fixable.
+    for foo, bar, baz in (["1", "2", "3"],):
+        if foo or baz:
+            break
+
+    bar = 1
+    print(bar)

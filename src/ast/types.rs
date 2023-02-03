@@ -87,8 +87,11 @@ pub struct Scope<'a> {
     pub kind: ScopeKind<'a>,
     pub import_starred: bool,
     pub uses_locals: bool,
-    /// A map from bound name to binding index.
-    pub values: FxHashMap<&'a str, usize>,
+    /// A map from bound name to binding index, for live bindings.
+    pub bindings: FxHashMap<&'a str, usize>,
+    /// A map from bound name to binding index, for bindings that were created in the scope but
+    /// rebound (and thus overridden) later on in the same scope.
+    pub rebounds: FxHashMap<&'a str, Vec<usize>>,
 }
 
 impl<'a> Scope<'a> {
@@ -98,7 +101,8 @@ impl<'a> Scope<'a> {
             kind,
             import_starred: false,
             uses_locals: false,
-            values: FxHashMap::default(),
+            bindings: FxHashMap::default(),
+            rebounds: FxHashMap::default(),
         }
     }
 }
