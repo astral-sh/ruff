@@ -1,5 +1,5 @@
 #![allow(clippy::useless_format)]
-use itertools::Itertools;
+
 use ruff_macros::derive_message_formats;
 
 use crate::define_violation;
@@ -381,73 +381,6 @@ impl Violation for ErrorSuffixOnExceptionName {
     fn message(&self) -> String {
         let ErrorSuffixOnExceptionName { name } = self;
         format!("Exception name `{name}` should be named with an Error suffix")
-    }
-}
-
-// flake8-unused-arguments
-
-define_violation!(
-    pub struct UnusedFunctionArgument {
-        pub name: String,
-    }
-);
-impl Violation for UnusedFunctionArgument {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let UnusedFunctionArgument { name } = self;
-        format!("Unused function argument: `{name}`")
-    }
-}
-
-define_violation!(
-    pub struct UnusedMethodArgument {
-        pub name: String,
-    }
-);
-impl Violation for UnusedMethodArgument {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let UnusedMethodArgument { name } = self;
-        format!("Unused method argument: `{name}`")
-    }
-}
-
-define_violation!(
-    pub struct UnusedClassMethodArgument {
-        pub name: String,
-    }
-);
-impl Violation for UnusedClassMethodArgument {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let UnusedClassMethodArgument { name } = self;
-        format!("Unused class method argument: `{name}`")
-    }
-}
-
-define_violation!(
-    pub struct UnusedStaticMethodArgument {
-        pub name: String,
-    }
-);
-impl Violation for UnusedStaticMethodArgument {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let UnusedStaticMethodArgument { name } = self;
-        format!("Unused static method argument: `{name}`")
-    }
-}
-
-define_violation!(
-    pub struct UnusedLambdaArgument {
-        pub name: String,
-    }
-);
-impl Violation for UnusedLambdaArgument {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let UnusedLambdaArgument { name } = self;
-        format!("Unused lambda argument: `{name}`")
     }
 }
 

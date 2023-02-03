@@ -1,5 +1,5 @@
+use super::rules;
 use crate::registry::{DiagnosticKind, Rule};
-use crate::violations;
 
 /// An AST node that can contain arguments.
 pub enum Argumentable {
@@ -13,11 +13,11 @@ pub enum Argumentable {
 impl Argumentable {
     pub fn check_for(&self, name: String) -> DiagnosticKind {
         match self {
-            Argumentable::Function => violations::UnusedFunctionArgument { name }.into(),
-            Argumentable::Method => violations::UnusedMethodArgument { name }.into(),
-            Argumentable::ClassMethod => violations::UnusedClassMethodArgument { name }.into(),
-            Argumentable::StaticMethod => violations::UnusedStaticMethodArgument { name }.into(),
-            Argumentable::Lambda => violations::UnusedLambdaArgument { name }.into(),
+            Argumentable::Function => rules::UnusedFunctionArgument { name }.into(),
+            Argumentable::Method => rules::UnusedMethodArgument { name }.into(),
+            Argumentable::ClassMethod => rules::UnusedClassMethodArgument { name }.into(),
+            Argumentable::StaticMethod => rules::UnusedStaticMethodArgument { name }.into(),
+            Argumentable::Lambda => rules::UnusedLambdaArgument { name }.into(),
         }
     }
 
