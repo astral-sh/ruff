@@ -588,8 +588,8 @@ where
                     pylint::rules::property_with_parameters(self, stmt, decorator_list, args);
                 }
 
-                if self.settings.rules.enabled(&Rule::TooManyArgs) {
-                    pylint::rules::too_many_args(self, args, stmt);
+                if self.settings.rules.enabled(&Rule::TooManyArguments) {
+                    pylint::rules::too_many_arguments(self, args, stmt);
                 }
 
                 if self.settings.rules.enabled(&Rule::TooManyStatements) {
