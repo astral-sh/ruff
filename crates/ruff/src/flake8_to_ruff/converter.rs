@@ -358,13 +358,13 @@ pub fn convert(
     options.select = Some(
         select
             .into_iter()
-            .sorted_by_key(RuleSelector::short_code)
+            .sorted_by_key(RuleSelector::prefix_and_code)
             .collect(),
     );
     options.ignore = Some(
         ignore
             .into_iter()
-            .sorted_by_key(RuleSelector::short_code)
+            .sorted_by_key(RuleSelector::prefix_and_code)
             .collect(),
     );
     if flake8_annotations != flake8_annotations::settings::Options::default() {
@@ -462,7 +462,7 @@ mod tests {
                     .iter()
                     .cloned()
                     .chain(plugins)
-                    .sorted_by_key(RuleSelector::short_code)
+                    .sorted_by_key(RuleSelector::prefix_and_code)
                     .collect(),
             ),
             ..Options::default()
