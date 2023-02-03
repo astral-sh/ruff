@@ -60,16 +60,16 @@ impl fmt::Display for ViolationsCmpop {
 }
 
 define_violation!(
-    pub struct ConstantComparison {
+    pub struct ComparisonOfConstant {
         pub left_constant: String,
         pub op: ViolationsCmpop,
         pub right_constant: String,
     }
 );
-impl Violation for ConstantComparison {
+impl Violation for ComparisonOfConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConstantComparison {
+        let ComparisonOfConstant {
             left_constant,
             op,
             right_constant,
@@ -83,7 +83,7 @@ impl Violation for ConstantComparison {
 }
 
 /// PLR0133
-pub fn constant_comparison(
+pub fn comparison_of_constant(
     checker: &mut Checker,
     left: &Expr,
     ops: &[Cmpop],
@@ -106,7 +106,7 @@ pub fn constant_comparison(
         ) = (&left.node, &right.node)
         {
             let diagnostic = Diagnostic::new(
-                ConstantComparison {
+                ComparisonOfConstant {
                     left_constant: left_constant.to_string(),
                     op: op.into(),
                     right_constant: right_constant.to_string(),
