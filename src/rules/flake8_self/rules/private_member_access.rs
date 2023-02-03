@@ -26,8 +26,10 @@ const VALID_IDS: [&str; 3] = ["self", "cls", "mcs"];
 pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, attr, .. } = &expr.node {
         if !attr.ends_with("__") && (attr.starts_with('_') || attr.starts_with("__")) {
-            let ExprKind::Name { id, .. } = &value.node else {
-                return;
+            let id = match &value.node {
+                ExprKind::Name { id, .. } => id,
+                ExprKind::Attribute { attr, .. } => attr,
+                _ => return,
             };
 
             if !VALID_IDS.contains(&id.as_str()) {
