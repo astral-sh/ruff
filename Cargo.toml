@@ -48,9 +48,9 @@ path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix
 regex = { version = "1.6.0" }
 ruff_macros = { version = "0.0.240", path = "ruff_macros" }
 rustc-hash = { version = "1.1.0" }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
+rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
 schemars = { version = "0.8.11" }
 semver = { version = "1.0.16" }
 serde = { version = "1.0.147", features = ["derive"] }
