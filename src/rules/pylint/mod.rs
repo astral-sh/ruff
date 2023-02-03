@@ -37,7 +37,7 @@ mod tests {
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
-    #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR-0912")]
+    #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
