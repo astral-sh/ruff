@@ -6,8 +6,8 @@ use itertools::Itertools;
 use super::external_config::ExternalConfig;
 use super::plugin::Plugin;
 use super::{parser, plugin};
-use crate::registry::RuleCodePrefix;
-use crate::rule_selector::{prefix_to_selector, RuleSelector};
+use crate::registry::Linter;
+use crate::rule_selector::RuleSelector;
 use crate::rules::flake8_pytest_style::types::{
     ParametrizeNameType, ParametrizeValuesRowType, ParametrizeValuesType,
 };
@@ -23,9 +23,8 @@ use crate::settings::pyproject::Pyproject;
 use crate::warn_user;
 
 const DEFAULT_SELECTORS: &[RuleSelector] = &[
-    prefix_to_selector(RuleCodePrefix::F),
-    prefix_to_selector(RuleCodePrefix::E),
-    prefix_to_selector(RuleCodePrefix::W),
+    RuleSelector::Linter(Linter::Pyflakes),
+    RuleSelector::Linter(Linter::Pycodestyle),
 ];
 
 pub fn convert(
@@ -433,7 +432,7 @@ pub fn convert(
 /// plugins.
 fn resolve_select(plugins: &[Plugin]) -> HashSet<RuleSelector> {
     let mut select: HashSet<_> = DEFAULT_SELECTORS.iter().cloned().collect();
-    select.extend(plugins.iter().map(Plugin::selector));
+    select.extend(plugins.iter().map(|p| Linter::from(p).into()));
     select
 }
 
@@ -448,7 +447,7 @@ mod tests {
     use super::convert;
     use crate::flake8_to_ruff::converter::DEFAULT_SELECTORS;
     use crate::flake8_to_ruff::ExternalConfig;
-    use crate::registry::RuleCodePrefix;
+    use crate::registry::Linter;
     use crate::rule_selector::RuleSelector;
     use crate::rules::pydocstyle::settings::Convention;
     use crate::rules::{flake8_quotes, pydocstyle};
@@ -578,7 +577,7 @@ mod tests {
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
             }),
-            ..default_options([RuleCodePrefix::D.into()])
+            ..default_options([Linter::Pydocstyle.into()])
         });
         assert_eq!(actual, expected);
 
@@ -602,7 +601,7 @@ mod tests {
                 docstring_quotes: None,
                 avoid_escape: None,
             }),
-            ..default_options([RuleCodePrefix::Q.into()])
+            ..default_options([Linter::Flake8Quotes.into()])
         });
         assert_eq!(actual, expected);
 

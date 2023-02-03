@@ -562,7 +562,7 @@ ruff_macros::define_rule_mapping!(
     DJ013 => rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
 
-#[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
+#[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
 pub enum Linter {
     /// [Pyflakes](https://pypi.org/project/pyflakes/)
     #[prefix = "F"]
