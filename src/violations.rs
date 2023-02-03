@@ -5,27 +5,8 @@ use ruff_macros::derive_message_formats;
 use serde::{Deserialize, Serialize};
 
 use crate::define_violation;
-use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
 use crate::violation::{AlwaysAutofixableViolation, AutofixKind, Availability, Violation};
-
-// flake8-debugger
-
-define_violation!(
-    pub struct Debugger {
-        pub using_type: DebuggerUsingType,
-    }
-);
-impl Violation for Debugger {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let Debugger { using_type } = self;
-        match using_type {
-            DebuggerUsingType::Call(name) => format!("Trace found: `{name}` used"),
-            DebuggerUsingType::Import(name) => format!("Import for `{name}` found"),
-        }
-    }
-}
 
 // mccabe
 
