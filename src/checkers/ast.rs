@@ -2611,8 +2611,8 @@ where
                 {
                     pylint::rules::unnecessary_direct_lambda_call(self, expr, func);
                 }
-                if self.settings.rules.enabled(&Rule::UseSysExit) {
-                    pylint::rules::use_sys_exit(self, func);
+                if self.settings.rules.enabled(&Rule::ConsiderUsingSysExit) {
+                    pylint::rules::consider_using_sys_exit(self, func);
                 }
 
                 // flake8-pytest-style

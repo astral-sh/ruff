@@ -1346,7 +1346,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLR0913 | too-many-args | Too many arguments to function call ({c_args}/{max_args}) |  |
 | PLR0915 | too-many-statements | Too many statements ({statements}/{max_statements}) |  |
 | PLR1701 | consider-merging-isinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
-| PLR1722 | use-sys-exit | Use `sys.exit()` instead of `{name}` | 🛠 |
+| PLR1722 | consider-using-sys-exit | Use `sys.exit()` instead of `{name}` | 🛠 |
 | PLR2004 | magic-value-comparison | Magic value used in comparison, consider replacing {value} with a constant variable |  |
 
 #### Warning (PLW)

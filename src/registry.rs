@@ -88,7 +88,7 @@ ruff_macros::define_rule_mapping!(
     PLR0402 => rules::pylint::rules::ConsiderUsingFromImport,
     PLR0133 => rules::pylint::rules::ConstantComparison,
     PLR1701 => rules::pylint::rules::ConsiderMergingIsinstance,
-    PLR1722 => rules::pylint::rules::UseSysExit,
+    PLR1722 => rules::pylint::rules::ConsiderUsingSysExit,
     PLR2004 => rules::pylint::rules::MagicValueComparison,
     PLW0120 => rules::pylint::rules::UselessElseOnLoop,
     PLW0602 => rules::pylint::rules::GlobalVariableNotAssigned,
