@@ -13,6 +13,7 @@ define_violation!(
         pub max_branches: usize,
     }
 );
+
 impl Violation for TooManyBranches {
     #[derive_message_formats]
     fn message(&self) -> String {
