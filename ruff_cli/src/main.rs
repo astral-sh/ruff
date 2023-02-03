@@ -1,12 +1,3 @@
-#![forbid(unsafe_code)]
-#![warn(clippy::pedantic)]
-#![allow(
-    clippy::match_same_arms,
-    clippy::missing_errors_doc,
-    clippy::module_name_repetitions,
-    clippy::too_many_lines
-)]
-
 use std::io::{self};
 use std::path::PathBuf;
 use std::process::ExitCode;
