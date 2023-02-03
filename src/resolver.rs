@@ -411,6 +411,11 @@ fn is_file_excluded(
                 return true;
             }
         }
+        if path == settings.project_root {
+            // Bail out; we'd end up past the project root on the next iteration
+            // (excludes etc. are thus "rooted" to the project).
+            break;
+        }
     }
     false
 }
@@ -424,8 +429,13 @@ mod tests {
     use path_absolutize::Absolutize;
 
     use crate::fs;
-    use crate::resolver::{is_python_path, match_exclusion};
+    use crate::resolver::{
+        is_file_excluded, is_python_path, match_exclusion, resolve_settings_with_processor,
+        NoOpProcessor, PyprojectDiscovery, Relativity, Resolver,
+    };
+    use crate::settings::pyproject::find_settings_toml;
     use crate::settings::types::FilePattern;
+    use crate::test::test_resource_path;
 
     #[test]
     fn inclusions() {
@@ -565,6 +575,32 @@ mod tests {
             &make_exclusion(exclude),
         ));
 
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_exclusion() -> Result<()> {
+        let package_root = test_resource_path("package");
+        let resolver = Resolver::default();
+        let ppd = PyprojectDiscovery::Hierarchical(resolve_settings_with_processor(
+            &find_settings_toml(&package_root)?.unwrap(),
+            &Relativity::Parent,
+            &NoOpProcessor,
+        )?);
+        // src/app.py should not be excluded even if it lives in a hierarchy that should be
+        // excluded by virtue of the pyproject.toml having `resources/*` in it.
+        assert!(!is_file_excluded(
+            &package_root.join("src/app.py"),
+            &resolver,
+            &ppd,
+        ));
+        // However, resources/ignored.py should be ignored, since that `resources` is beneath
+        // the package root.
+        assert!(is_file_excluded(
+            &package_root.join("resources/ignored.py"),
+            &resolver,
+            &ppd,
+        ));
         Ok(())
     }
 }
