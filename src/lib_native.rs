@@ -61,7 +61,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
         &settings,
         autofix.into(),
         flags::Noqa::Enabled,
-    )?;
+    );
 
     Ok(diagnostics)
 }

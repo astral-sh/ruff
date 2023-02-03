@@ -68,7 +68,7 @@ pub fn lint_path(
 
     // Lint the file.
     let (messages, fixed) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
-        let (transformed, fixed, messages) = lint_fix(&contents, path, package, &settings.lib)?;
+        let (transformed, fixed, messages) = lint_fix(&contents, path, package, &settings.lib);
         if fixed > 0 {
             if matches!(autofix, fix::FixMode::Apply) {
                 write(path, transformed)?;
@@ -84,7 +84,7 @@ pub fn lint_path(
         }
         (messages, fixed)
     } else {
-        let messages = lint_only(&contents, path, package, &settings.lib, autofix.into())?;
+        let messages = lint_only(&contents, path, package, &settings.lib, autofix.into());
         let fixed = 0;
         (messages, fixed)
     };
@@ -120,7 +120,7 @@ pub fn lint_stdin(
             path.unwrap_or_else(|| Path::new("-")),
             package,
             settings,
-        )?;
+        );
 
         if matches!(autofix, fix::FixMode::Apply) {
             // Write the contents to stdout, regardless of whether any errors were fixed.
@@ -149,7 +149,7 @@ pub fn lint_stdin(
             package,
             settings,
             autofix.into(),
-        )?;
+        );
         let fixed = 0;
         (messages, fixed)
     };
