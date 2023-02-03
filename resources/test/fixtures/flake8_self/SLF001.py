@@ -1,8 +1,25 @@
+class BazMeta(type):
+    _private_count = 1
+
+    def __new__(mcs, name, bases, attrs):
+        if mcs._private_count <= 5:
+            mcs.some_method()
+
+        return super().__new__(mcs, name, bases, attrs)
+
+    def some_method():
+        pass
+
+
 class Bar:
     _private = True
 
+    @classmethod
+    def is_private(cls):
+        return cls._private
 
-class Foo:
+
+class Foo(metaclass=BazMeta):
 
     def __init__(self):
         self.public_thing = "foo"
