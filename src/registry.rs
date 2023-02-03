@@ -488,12 +488,12 @@ ruff_macros::define_rule_mapping!(
     // flake8-self
     SLF001 => rules::flake8_self::rules::PrivateMemberAccess,
     // ruff
-    RUF001 => violations::AmbiguousUnicodeCharacterString,
-    RUF002 => violations::AmbiguousUnicodeCharacterDocstring,
-    RUF003 => violations::AmbiguousUnicodeCharacterComment,
-    RUF004 => violations::KeywordArgumentBeforeStarArgument,
-    RUF005 => violations::UnpackInsteadOfConcatenatingToCollectionLiteral,
-    RUF100 => violations::UnusedNOQA,
+    RUF001 => rules::ruff::rules::AmbiguousUnicodeCharacterString,
+    RUF002 => rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,
+    RUF003 => rules::ruff::rules::AmbiguousUnicodeCharacterComment,
+    RUF004 => rules::ruff::rules::KeywordArgumentBeforeStarArgument,
+    RUF005 => rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
+    RUF100 => rules::ruff::rules::UnusedNOQA,
 );
 
 #[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
