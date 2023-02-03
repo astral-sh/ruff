@@ -18,7 +18,7 @@ define_violation!(
     }
 );
 impl Violation for ConsiderUsingFromImport {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
