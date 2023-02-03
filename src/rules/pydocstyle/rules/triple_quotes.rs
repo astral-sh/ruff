@@ -2,7 +2,20 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct UsesTripleQuotes;
+);
+impl Violation for UsesTripleQuotes {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!(r#"Use """triple double quotes""""#)
+    }
+}
 
 /// D300
 pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
@@ -29,7 +42,7 @@ pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     };
     if !starts_with_triple {
         checker.diagnostics.push(Diagnostic::new(
-            violations::UsesTripleQuotes,
+            UsesTripleQuotes,
             Range::from_located(docstring.expr),
         ));
     }
