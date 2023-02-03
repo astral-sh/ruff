@@ -1,7 +1,7 @@
 use ruff_macros::derive_message_formats;
 
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use crate::{define_simple_violation, define_violation};
+use crate::{define_simple_autofix_violation, define_simple_violation, define_violation};
 
 define_simple_violation!(
     LoggingStringFormat,
@@ -14,19 +14,11 @@ define_simple_violation!(LoggingStringConcat, "Logging statement uses `+`");
 
 define_simple_violation!(LoggingFString, "Logging statement uses f-string");
 
-define_violation!(
-    pub struct LoggingWarn;
+define_simple_autofix_violation!(
+    LoggingWarn,
+    "Logging statement uses `warn` instead of `warning`",
+    "Convert to `warn`"
 );
-impl AlwaysAutofixableViolation for LoggingWarn {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Logging statement uses `warn` instead of `warning`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Convert to `warn`".to_string()
-    }
-}
 
 define_violation!(
     pub struct LoggingExtraAttrClash(pub String);

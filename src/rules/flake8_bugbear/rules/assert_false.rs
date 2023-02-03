@@ -1,26 +1,18 @@
 use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
-define_violation!(
-    pub struct DoNotAssertFalse;
+define_simple_autofix_violation!(
+    DoNotAssertFalse,
+    "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`",
+    "Replace `assert False`"
 );
-impl AlwaysAutofixableViolation for DoNotAssertFalse {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace `assert False`".to_string()
-    }
-}
 
 fn assertion_error(msg: Option<&Expr>) -> Stmt {
     Stmt::new(

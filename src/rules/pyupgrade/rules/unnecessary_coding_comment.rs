@@ -1,5 +1,5 @@
 use crate::ast::types::Range;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
@@ -9,19 +9,11 @@ use regex::Regex;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::Location;
 
-define_violation!(
-    pub struct PEP3120UnnecessaryCodingComment;
+define_simple_autofix_violation!(
+    PEP3120UnnecessaryCodingComment,
+    "UTF-8 encoding declaration is unnecessary",
+    "Remove unnecessary coding comment"
 );
-impl AlwaysAutofixableViolation for PEP3120UnnecessaryCodingComment {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("UTF-8 encoding declaration is unnecessary")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove unnecessary coding comment".to_string()
-    }
-}
 
 // Regex from PEP263.
 static CODING_COMMENT_REGEX: Lazy<Regex> =

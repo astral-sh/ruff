@@ -8,22 +8,14 @@ use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::violation::AlwaysAutofixableViolation;
 
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct EndsInPunctuation;
+define_simple_autofix_violation!(
+    EndsInPunctuation,
+    "First line should end with a period, question mark, or exclamation point",
+    "Add closing punctuation"
 );
-impl AlwaysAutofixableViolation for EndsInPunctuation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("First line should end with a period, question mark, or exclamation point")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add closing punctuation".to_string()
-    }
-}
 
 /// D415
 pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {

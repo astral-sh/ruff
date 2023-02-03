@@ -17,7 +17,7 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use crate::{define_simple_violation, define_violation};
+use crate::{define_simple_autofix_violation, define_simple_violation, define_violation};
 
 define_violation!(
     pub struct IncorrectFixtureParenthesesStyle {
@@ -53,19 +53,11 @@ impl Violation for FixturePositionalArgs {
     }
 }
 
-define_violation!(
-    pub struct ExtraneousScopeFunction;
+define_simple_autofix_violation!(
+    ExtraneousScopeFunction,
+    "`scope='function'` is implied in `@pytest.fixture()`",
+    "Remove implied `scope` argument"
 );
-impl AlwaysAutofixableViolation for ExtraneousScopeFunction {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`scope='function'` is implied in `@pytest.fixture()`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove implied `scope` argument".to_string()
-    }
-}
 
 define_violation!(
     pub struct MissingFixtureNameUnderscore {
@@ -136,33 +128,17 @@ impl AlwaysAutofixableViolation for UselessYieldFixture {
     }
 }
 
-define_violation!(
-    pub struct ErroneousUseFixturesOnFixture;
+define_simple_autofix_violation!(
+    ErroneousUseFixturesOnFixture,
+    "`pytest.mark.usefixtures` has no effect on fixtures",
+    "Remove `pytest.mark.usefixtures`"
 );
-impl AlwaysAutofixableViolation for ErroneousUseFixturesOnFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`pytest.mark.usefixtures` has no effect on fixtures")
-    }
 
-    fn autofix_title(&self) -> String {
-        "Remove `pytest.mark.usefixtures`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct UnnecessaryAsyncioMarkOnFixture;
+define_simple_autofix_violation!(
+    UnnecessaryAsyncioMarkOnFixture,
+    "`pytest.mark.asyncio` is unnecessary for fixtures",
+    "Remove `pytest.mark.asyncio`"
 );
-impl AlwaysAutofixableViolation for UnnecessaryAsyncioMarkOnFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`pytest.mark.asyncio` is unnecessary for fixtures")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `pytest.mark.asyncio`".to_string()
-    }
-}
 
 #[derive(Default)]
 /// Visitor that skips functions

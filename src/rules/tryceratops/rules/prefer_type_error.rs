@@ -5,24 +5,16 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct PreferTypeError;
+define_simple_autofix_violation!(
+    PreferTypeError,
+    "Prefer `TypeError` exception for invalid type",
+    "Use `TypeError` exception type"
 );
-impl AlwaysAutofixableViolation for PreferTypeError {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Prefer `TypeError` exception for invalid type")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Use `TypeError` exception type".to_string()
-    }
-}
 
 #[derive(Default)]
 struct ControlFlowVisitor<'a> {

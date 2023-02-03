@@ -1,10 +1,10 @@
 use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
+use crate::{define_simple_autofix_violation, define_violation};
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Location};
 
@@ -34,19 +34,11 @@ impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
     }
 }
 
-define_violation!(
-    pub struct UseFixturesWithoutParameters;
+define_simple_autofix_violation!(
+    UseFixturesWithoutParameters,
+    "Useless `pytest.mark.usefixtures` without parameters",
+    "Remove `usefixtures` decorator or pass parameters"
 );
-impl AlwaysAutofixableViolation for UseFixturesWithoutParameters {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Useless `pytest.mark.usefixtures` without parameters")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `usefixtures` decorator or pass parameters".to_string()
-    }
-}
 
 fn pytest_mark_parentheses(
     checker: &mut Checker,

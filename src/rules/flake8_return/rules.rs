@@ -12,52 +12,26 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use crate::{define_simple_violation, define_violation};
+use crate::{define_simple_autofix_violation, define_simple_violation, define_violation};
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct UnnecessaryReturnNone;
+define_simple_autofix_violation!(
+    UnnecessaryReturnNone,
+    "Do not explicitly `return None` in function if it is the only possible return value",
+    "Remove explicit `return None`"
 );
-impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "Do not explicitly `return None` in function if it is the only possible return value"
-        )
-    }
 
-    fn autofix_title(&self) -> String {
-        "Remove explicit `return None`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct ImplicitReturnValue;
+define_simple_autofix_violation!(
+    ImplicitReturnValue,
+    "Do not implicitly `return None` in function able to return non-`None` value",
+    "Add explicit `None` return value"
 );
-impl AlwaysAutofixableViolation for ImplicitReturnValue {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Do not implicitly `return None` in function able to return non-`None` value")
-    }
 
-    fn autofix_title(&self) -> String {
-        "Add explicit `None` return value".to_string()
-    }
-}
-
-define_violation!(
-    pub struct ImplicitReturn;
+define_simple_autofix_violation!(
+    ImplicitReturn,
+    "Missing explicit `return` at the end of function able to return non-`None` value",
+    "Add explicit `return` statement"
 );
-impl AlwaysAutofixableViolation for ImplicitReturn {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Missing explicit `return` at the end of function able to return non-`None` value")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add explicit `return` statement".to_string()
-    }
-}
 
 define_simple_violation!(
     UnnecessaryAssign,

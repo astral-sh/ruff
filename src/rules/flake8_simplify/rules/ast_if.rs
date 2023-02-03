@@ -1,5 +1,5 @@
 use crate::violation::{AlwaysAutofixableViolation, Availability, Violation};
-use crate::{define_violation, AutofixKind};
+use crate::{define_simple_autofix_violation, define_violation, AutofixKind};
 use log::error;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
@@ -15,19 +15,11 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
 
-define_violation!(
-    pub struct NestedIfStatements;
+define_simple_autofix_violation!(
+    NestedIfStatements,
+    "Use a single `if` statement instead of nested `if` statements",
+    "Combine `if` statements using `and`"
 );
-impl AlwaysAutofixableViolation for NestedIfStatements {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use a single `if` statement instead of nested `if` statements")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Combine `if` statements using `and`".to_string()
-    }
-}
 
 define_violation!(
     pub struct ReturnBoolConditionDirectly {

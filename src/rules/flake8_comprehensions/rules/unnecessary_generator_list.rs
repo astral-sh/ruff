@@ -1,7 +1,7 @@
 use super::helpers;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
@@ -9,19 +9,11 @@ use log::error;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Keyword};
 
-define_violation!(
-    pub struct UnnecessaryGeneratorList;
+define_simple_autofix_violation!(
+    UnnecessaryGeneratorList,
+    "Unnecessary generator (rewrite as a `list` comprehension)",
+    "Rewrite as a `list` comprehension"
 );
-impl AlwaysAutofixableViolation for UnnecessaryGeneratorList {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary generator (rewrite as a `list` comprehension)")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Rewrite as a `list` comprehension".to_string()
-    }
-}
 
 /// C400 (`list(generator)`)
 pub fn unnecessary_generator_list(

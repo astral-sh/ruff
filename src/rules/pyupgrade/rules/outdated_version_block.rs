@@ -13,7 +13,7 @@ use crate::ast::types::{Range, RefEquality};
 use crate::ast::whitespace::indentation;
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyupgrade::fixes::adjust_indentation;
@@ -21,19 +21,11 @@ use crate::settings::types::PythonVersion;
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct OutdatedVersionBlock;
+define_simple_autofix_violation!(
+    OutdatedVersionBlock,
+    "Version block is outdated for minimum Python version",
+    "Remove outdated version block"
 );
-impl AlwaysAutofixableViolation for OutdatedVersionBlock {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Version block is outdated for minimum Python version")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove outdated version block".to_string()
-    }
-}
 
 #[derive(Debug)]
 struct BlockMetadata {

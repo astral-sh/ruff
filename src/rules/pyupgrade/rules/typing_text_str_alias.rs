@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::Expr;
@@ -8,19 +8,11 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct TypingTextStrAlias;
+define_simple_autofix_violation!(
+    TypingTextStrAlias,
+    "`typing.Text` is deprecated, use `str`",
+    "Replace with `str`"
 );
-impl AlwaysAutofixableViolation for TypingTextStrAlias {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`typing.Text` is deprecated, use `str`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace with `str`".to_string()
-    }
-}
 
 /// UP019
 pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {

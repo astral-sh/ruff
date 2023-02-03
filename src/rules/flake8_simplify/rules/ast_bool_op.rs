@@ -1,5 +1,5 @@
-use crate::define_violation;
 use crate::violation::AlwaysAutofixableViolation;
+use crate::{define_simple_autofix_violation, define_violation};
 use ruff_macros::derive_message_formats;
 
 use std::collections::BTreeMap;
@@ -84,33 +84,17 @@ impl AlwaysAutofixableViolation for AOrNotA {
     }
 }
 
-define_violation!(
-    pub struct OrTrue;
+define_simple_autofix_violation!(
+    OrTrue,
+    "Use `True` instead of `... or True`",
+    "Replace with `True`"
 );
-impl AlwaysAutofixableViolation for OrTrue {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `True` instead of `... or True`")
-    }
 
-    fn autofix_title(&self) -> String {
-        "Replace with `True`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct AndFalse;
+define_simple_autofix_violation!(
+    AndFalse,
+    "Use `False` instead of `... and False`",
+    "Replace with `False`"
 );
-impl AlwaysAutofixableViolation for AndFalse {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `False` instead of `... and False`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace with `False`".to_string()
-    }
-}
 
 /// Return `true` if two `Expr` instances are equivalent names.
 fn is_same_expr<'a>(a: &'a Expr, b: &'a Expr) -> Option<&'a str> {

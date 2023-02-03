@@ -13,21 +13,13 @@ use crate::message::Location;
 use crate::python::identifiers::is_identifier;
 use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use crate::{define_simple_violation, define_violation};
+use crate::{define_simple_autofix_violation, define_simple_violation, define_violation};
 
-define_violation!(
-    pub struct NoUnnecessaryPass;
+define_simple_autofix_violation!(
+    NoUnnecessaryPass,
+    "Unnecessary `pass` statement",
+    "Remove unnecessary `pass`"
 );
-impl AlwaysAutofixableViolation for NoUnnecessaryPass {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `pass` statement")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove unnecessary `pass`".to_string()
-    }
-}
 
 define_violation!(
     pub struct DupeClassFieldDefinitions(pub String);
@@ -62,19 +54,11 @@ define_simple_violation!(NoUnnecessarySpread, "Unnecessary spread `**`");
 
 define_simple_violation!(NoUnnecessaryDictKwargs, "Unnecessary `dict` kwargs");
 
-define_violation!(
-    pub struct PreferListBuiltin;
+define_simple_autofix_violation!(
+    PreferListBuiltin,
+    "Prefer `list` over useless lambda",
+    "Replace with `list`"
 );
-impl AlwaysAutofixableViolation for PreferListBuiltin {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Prefer `list` over useless lambda")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace with `list`".to_string()
-    }
-}
 
 /// PIE790
 pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {

@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, Stmt};
@@ -7,19 +7,11 @@ use super::super::fixes;
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
 
-define_violation!(
-    pub struct SuperCallWithParameters;
+define_simple_autofix_violation!(
+    SuperCallWithParameters,
+    "Use `super()` instead of `super(__class__, self)`",
+    "Remove `__super__` parameters"
 );
-impl AlwaysAutofixableViolation for SuperCallWithParameters {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `super()` instead of `super(__class__, self)`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `__super__` parameters".to_string()
-    }
-}
 
 /// UP008
 pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {

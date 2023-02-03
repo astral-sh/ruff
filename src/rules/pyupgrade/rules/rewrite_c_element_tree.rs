@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Located, Stmt, StmtKind};
@@ -8,19 +8,11 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct RewriteCElementTree;
+define_simple_autofix_violation!(
+    RewriteCElementTree,
+    "`cElementTree` is deprecated, use `ElementTree`",
+    "Replace with `ElementTree`"
 );
-impl AlwaysAutofixableViolation for RewriteCElementTree {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`cElementTree` is deprecated, use `ElementTree`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace with `ElementTree`".to_string()
-    }
-}
 
 fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
     let mut diagnostic = Diagnostic::new(RewriteCElementTree, Range::from_located(node));

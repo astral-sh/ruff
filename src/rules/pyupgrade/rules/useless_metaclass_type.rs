@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use log::error;
 use ruff_macros::derive_message_formats;
@@ -9,19 +9,11 @@ use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct UselessMetaclassType;
+define_simple_autofix_violation!(
+    UselessMetaclassType,
+    "`__metaclass__ = type` is implied",
+    "Remove `__metaclass__ = type`"
 );
-impl AlwaysAutofixableViolation for UselessMetaclassType {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`__metaclass__ = type` is implied")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove `__metaclass__ = type`".to_string()
-    }
-}
 
 fn rule(targets: &[Expr], value: &Expr, location: Range) -> Option<Diagnostic> {
     if targets.len() != 1 {

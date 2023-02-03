@@ -8,7 +8,7 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use crate::{define_simple_violation, define_violation};
+use crate::{define_simple_autofix_violation, define_simple_violation};
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -109,38 +109,22 @@ impl Context {
     }
 }
 
-define_violation!(
-    pub struct TrailingCommaMissing;
+define_simple_autofix_violation!(
+    TrailingCommaMissing,
+    "Trailing comma missing",
+    "Add trailing comma"
 );
-impl AlwaysAutofixableViolation for TrailingCommaMissing {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Trailing comma missing")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add trailing comma".to_string()
-    }
-}
 
 define_simple_violation!(
     TrailingCommaOnBareTupleProhibited,
     "Trailing comma on bare tuple prohibited"
 );
 
-define_violation!(
-    pub struct TrailingCommaProhibited;
+define_simple_autofix_violation!(
+    TrailingCommaProhibited,
+    "Trailing comma prohibited",
+    "Remove trailing comma"
 );
-impl AlwaysAutofixableViolation for TrailingCommaProhibited {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Trailing comma prohibited")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove trailing comma".to_string()
-    }
-}
 
 /// COM812, COM818, COM819
 pub fn trailing_commas(

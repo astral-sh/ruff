@@ -12,26 +12,18 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct UnsortedImports;
+define_simple_autofix_violation!(
+    UnsortedImports,
+    "Import block is un-sorted or un-formatted",
+    "Organize imports"
 );
-impl AlwaysAutofixableViolation for UnsortedImports {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Import block is un-sorted or un-formatted")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Organize imports".to_string()
-    }
-}
 
 fn extract_range(body: &[&Stmt]) -> Range {
     let location = body.first().unwrap().location;

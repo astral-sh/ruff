@@ -8,22 +8,14 @@ use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::leading_quote;
 use crate::violation::AlwaysAutofixableViolation;
 
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct NoSurroundingWhitespace;
+define_simple_autofix_violation!(
+    NoSurroundingWhitespace,
+    "No whitespaces allowed surrounding docstring text",
+    "Trim surrounding whitespace"
 );
-impl AlwaysAutofixableViolation for NoSurroundingWhitespace {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("No whitespaces allowed surrounding docstring text")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Trim surrounding whitespace".to_string()
-    }
-}
 
 /// D210
 pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {

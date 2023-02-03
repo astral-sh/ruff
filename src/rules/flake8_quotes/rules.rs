@@ -1,12 +1,12 @@
 use super::settings::Quote;
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
+use crate::{define_simple_autofix_violation, define_violation};
 
 use ruff_macros::derive_message_formats;
 use rustpython_ast::Location;
@@ -84,19 +84,11 @@ impl AlwaysAutofixableViolation for BadQuotesDocstring {
     }
 }
 
-define_violation!(
-    pub struct AvoidQuoteEscape;
+define_simple_autofix_violation!(
+    AvoidQuoteEscape,
+    "Change outer quotes to avoid escaping inner quotes",
+    "Change outer quotes to avoid escaping inner quotes"
 );
-impl AlwaysAutofixableViolation for AvoidQuoteEscape {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Change outer quotes to avoid escaping inner quotes")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Change outer quotes to avoid escaping inner quotes".to_string()
-    }
-}
 
 fn good_single(quote: &Quote) -> char {
     match quote {

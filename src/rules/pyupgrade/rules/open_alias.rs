@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::Expr;
@@ -8,19 +8,11 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct OpenAlias;
+define_simple_autofix_violation!(
+    OpenAlias,
+    "Use builtin `open`",
+    "Replace with builtin `open`"
 );
-impl AlwaysAutofixableViolation for OpenAlias {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use builtin `open`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace with builtin `open`".to_string()
-    }
-}
 
 /// UP020
 pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {

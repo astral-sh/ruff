@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
@@ -9,19 +9,11 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
 
-define_violation!(
-    pub struct UnnecessaryEncodeUTF8;
+define_simple_autofix_violation!(
+    UnnecessaryEncodeUTF8,
+    "Unnecessary call to `encode` as UTF-8",
+    "Remove unnecessary `encode`"
 );
-impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary call to `encode` as UTF-8")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove unnecessary `encode`".to_string()
-    }
-}
 
 const UTF8_LITERALS: &[&str] = &["utf-8", "utf8", "utf_8", "u8", "utf", "cp65001"];
 

@@ -1,7 +1,7 @@
 use super::helpers;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
@@ -9,19 +9,11 @@ use log::error;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
-define_violation!(
-    pub struct UnnecessaryListCall;
+define_simple_autofix_violation!(
+    UnnecessaryListCall,
+    "Unnecessary `list` call (remove the outer call to `list()`)",
+    "Remove outer `list` call"
 );
-impl AlwaysAutofixableViolation for UnnecessaryListCall {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `list` call (remove the outer call to `list()`)")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove outer `list` call".to_string()
-    }
-}
 
 /// C411
 pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {

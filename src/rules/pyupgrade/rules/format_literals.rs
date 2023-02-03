@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use anyhow::{anyhow, bail, Result};
 use libcst_native::{Arg, Codegen, CodegenState, Expression};
@@ -15,19 +15,11 @@ use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::source_code::{Locator, Stylist};
 
-define_violation!(
-    pub struct FormatLiterals;
+define_simple_autofix_violation!(
+    FormatLiterals,
+    "Use implicit references for positional format fields",
+    "Remove explicit positional indexes"
 );
-impl AlwaysAutofixableViolation for FormatLiterals {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use implicit references for positional format fields")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove explicit positional indexes".to_string()
-    }
-}
 
 // An opening curly brace, followed by any integer, followed by any text,
 // followed by a closing brace.

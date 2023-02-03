@@ -1,7 +1,7 @@
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::fix::Fix;
 use crate::python::identifiers::{is_identifier, is_mangled_private};
 use crate::python::keyword::KWLIST;
@@ -10,22 +10,13 @@ use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location};
 
-define_violation!(
-    pub struct GetAttrWithConstant;
+define_simple_autofix_violation!(
+    GetAttrWithConstant,
+    "Do not call `getattr` with a constant attribute value. It is not any safer than \
+             normal property access.",
+    "Replace `getattr` with attribute access"
 );
-impl AlwaysAutofixableViolation for GetAttrWithConstant {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "Do not call `getattr` with a constant attribute value. It is not any safer than \
-             normal property access."
-        )
-    }
 
-    fn autofix_title(&self) -> String {
-        "Replace `getattr` with attribute access".to_string()
-    }
-}
 fn attribute(value: &Expr, attr: &str) -> Expr {
     Expr::new(
         Location::default(),

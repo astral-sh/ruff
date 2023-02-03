@@ -4,39 +4,23 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::helpers::compare;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct NotInTest;
+define_simple_autofix_violation!(
+    NotInTest,
+    "Test for membership should be `not in`",
+    "Convert to `not in`"
 );
-impl AlwaysAutofixableViolation for NotInTest {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Test for membership should be `not in`")
-    }
 
-    fn autofix_title(&self) -> String {
-        "Convert to `not in`".to_string()
-    }
-}
-
-define_violation!(
-    pub struct NotIsTest;
+define_simple_autofix_violation!(
+    NotIsTest,
+    "Test for object identity should be `is not`",
+    "Convert to `is not`"
 );
-impl AlwaysAutofixableViolation for NotIsTest {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Test for object identity should be `is not`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Convert to `is not`".to_string()
-    }
-}
 
 /// E713, E714
 pub fn not_tests(

@@ -8,22 +8,14 @@ use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::violation::AlwaysAutofixableViolation;
 
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct EndsInPeriod;
+define_simple_autofix_violation!(
+    EndsInPeriod,
+    "First line should end with a period",
+    "Add period"
 );
-impl AlwaysAutofixableViolation for EndsInPeriod {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("First line should end with a period")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add period".to_string()
-    }
-}
 
 /// D400
 pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {

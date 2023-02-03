@@ -2,25 +2,17 @@ use ruff_macros::derive_message_formats;
 use rustpython_ast::Location;
 
 use crate::ast::types::Range;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct NoNewLineAtEndOfFile;
+define_simple_autofix_violation!(
+    NoNewLineAtEndOfFile,
+    "No newline at end of file",
+    "Add trailing newline"
 );
-impl AlwaysAutofixableViolation for NoNewLineAtEndOfFile {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("No newline at end of file")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add trailing newline".to_string()
-    }
-}
 
 /// W292
 pub fn no_newline_at_end_of_file(

@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, Keyword};
@@ -11,19 +11,11 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::{Locator, Stylist};
 
-define_violation!(
-    pub struct ReplaceStdoutStderr;
+define_simple_autofix_violation!(
+    ReplaceStdoutStderr,
+    "Sending stdout and stderr to pipe is deprecated, use `capture_output`",
+    "Replace with `capture_output` keyword argument"
 );
-impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Sending stdout and stderr to pipe is deprecated, use `capture_output`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace with `capture_output` keyword argument".to_string()
-    }
-}
 
 #[derive(Debug)]
 struct MiddleContent<'a> {

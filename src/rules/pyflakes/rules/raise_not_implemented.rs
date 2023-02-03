@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
@@ -8,19 +8,11 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct RaiseNotImplemented;
+define_simple_autofix_violation!(
+    RaiseNotImplemented,
+    "`raise NotImplemented` should be `raise NotImplementedError`",
+    "Use `raise NotImplementedError`"
 );
-impl AlwaysAutofixableViolation for RaiseNotImplemented {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`raise NotImplemented` should be `raise NotImplementedError`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Use `raise NotImplementedError`".to_string()
-    }
-}
 
 fn match_not_implemented(expr: &Expr) -> Option<&Expr> {
     match &expr.node {

@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
@@ -17,19 +17,11 @@ use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
 
-define_violation!(
-    pub struct FString;
+define_simple_autofix_violation!(
+    FString,
+    "Use f-string instead of `format` call",
+    "Convert to f-string"
 );
-impl AlwaysAutofixableViolation for FString {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use f-string instead of `format` call")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Convert to f-string".to_string()
-    }
-}
 
 /// Like [`FormatSummary`], but maps positional and keyword arguments to their
 /// values. For example, given `{a} {b}".format(a=1, b=2)`, `FormatFunction`

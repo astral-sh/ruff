@@ -7,22 +7,14 @@ use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers;
 use crate::violation::AlwaysAutofixableViolation;
 
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct FitsOnOneLine;
+define_simple_autofix_violation!(
+    FitsOnOneLine,
+    "One-line docstring should fit on one line",
+    "Reformat to one line"
 );
-impl AlwaysAutofixableViolation for FitsOnOneLine {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("One-line docstring should fit on one line")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Reformat to one line".to_string()
-    }
-}
 
 /// D200
 pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {

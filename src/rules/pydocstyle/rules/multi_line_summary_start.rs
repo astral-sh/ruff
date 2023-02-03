@@ -9,36 +9,20 @@ use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::helpers::leading_quote;
 use crate::violation::AlwaysAutofixableViolation;
 
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct MultiLineSummaryFirstLine;
+define_simple_autofix_violation!(
+    MultiLineSummaryFirstLine,
+    "Multi-line docstring summary should start at the first line",
+    "Remove whitespace after opening quotes"
 );
-impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Multi-line docstring summary should start at the first line")
-    }
 
-    fn autofix_title(&self) -> String {
-        "Remove whitespace after opening quotes".to_string()
-    }
-}
-
-define_violation!(
-    pub struct MultiLineSummarySecondLine;
+define_simple_autofix_violation!(
+    MultiLineSummarySecondLine,
+    "Multi-line docstring summary should start at the second line",
+    "Insert line break and indentation after opening quotes"
 );
-impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Multi-line docstring summary should start at the second line")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Insert line break and indentation after opening quotes".to_string()
-    }
-}
 
 /// D212, D213
 pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {

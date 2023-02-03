@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
@@ -8,19 +8,11 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct FStringMissingPlaceholders;
+define_simple_autofix_violation!(
+    FStringMissingPlaceholders,
+    "f-string without any placeholders",
+    "Remove extraneous `f` prefix"
 );
-impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("f-string without any placeholders")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove extraneous `f` prefix".to_string()
-    }
-}
 
 /// F541
 pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {

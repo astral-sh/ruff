@@ -1,7 +1,7 @@
 use super::helpers;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
@@ -9,19 +9,11 @@ use log::error;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Keyword};
 
-define_violation!(
-    pub struct UnnecessaryListComprehensionDict;
+define_simple_autofix_violation!(
+    UnnecessaryListComprehensionDict,
+    "Unnecessary `list` comprehension (rewrite as a `dict` comprehension)",
+    "Rewrite as a `dict` comprehension"
 );
-impl AlwaysAutofixableViolation for UnnecessaryListComprehensionDict {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `list` comprehension (rewrite as a `dict` comprehension)")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Rewrite as a `dict` comprehension".to_string()
-    }
-}
 
 /// C404 (`dict([...])`)
 pub fn unnecessary_list_comprehension_dict(

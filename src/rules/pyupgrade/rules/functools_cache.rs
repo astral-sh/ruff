@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, ExprKind, KeywordData};
@@ -10,19 +10,11 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct FunctoolsCache;
+define_simple_autofix_violation!(
+    FunctoolsCache,
+    "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`",
+    "Rewrite with `@functools.cache"
 );
-impl AlwaysAutofixableViolation for FunctoolsCache {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Rewrite with `@functools.cache".to_string()
-    }
-}
 
 /// UP033
 pub fn functools_cache(checker: &mut Checker, decorator_list: &[Expr]) {

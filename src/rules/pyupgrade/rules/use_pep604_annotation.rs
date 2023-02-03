@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
@@ -9,19 +9,11 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct UsePEP604Annotation;
+define_simple_autofix_violation!(
+    UsePEP604Annotation,
+    "Use `X | Y` for type annotations",
+    "Convert to `X | Y`"
 );
-impl AlwaysAutofixableViolation for UsePEP604Annotation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `X | Y` for type annotations")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Convert to `X | Y`".to_string()
-    }
-}
 
 fn optional(expr: &Expr) -> Expr {
     Expr::new(

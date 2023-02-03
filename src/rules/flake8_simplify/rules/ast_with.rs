@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use log::error;
 use ruff_macros::derive_message_formats;
@@ -10,22 +10,12 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct MultipleWithStatements;
+define_simple_autofix_violation!(
+    MultipleWithStatements,
+    "Use a single `with` statement with multiple contexts instead of nested `with` \
+             statements",
+    "Combine `with` statements"
 );
-impl AlwaysAutofixableViolation for MultipleWithStatements {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "Use a single `with` statement with multiple contexts instead of nested `with` \
-             statements"
-        )
-    }
-
-    fn autofix_title(&self) -> String {
-        "Combine `with` statements".to_string()
-    }
-}
 
 fn find_last_with(body: &[Stmt]) -> Option<(&Vec<Withitem>, &Vec<Stmt>)> {
     let [Located { node: StmtKind::With { items, body, .. }, ..}] = body else { return None };

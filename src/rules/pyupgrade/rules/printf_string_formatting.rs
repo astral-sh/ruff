@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 
@@ -22,19 +22,11 @@ use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyupgrade::helpers::curly_escape;
 
-define_violation!(
-    pub struct PrintfStringFormatting;
+define_simple_autofix_violation!(
+    PrintfStringFormatting,
+    "Use format specifiers instead of percent format",
+    "Replace with format specifiers"
 );
-impl AlwaysAutofixableViolation for PrintfStringFormatting {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use format specifiers instead of percent format")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace with format specifiers".to_string()
-    }
-}
 
 fn simplify_conversion_flag(flags: CConversionFlags) -> String {
     let mut flag_string = String::new();

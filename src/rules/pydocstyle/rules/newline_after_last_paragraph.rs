@@ -8,22 +8,14 @@ use crate::message::Location;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct NewLineAfterLastParagraph;
+define_simple_autofix_violation!(
+    NewLineAfterLastParagraph,
+    "Multi-line docstring closing quotes should be on a separate line",
+    "Move closing quotes to new line"
 );
-impl AlwaysAutofixableViolation for NewLineAfterLastParagraph {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Multi-line docstring closing quotes should be on a separate line")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Move closing quotes to new line".to_string()
-    }
-}
 
 /// D209
 pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {

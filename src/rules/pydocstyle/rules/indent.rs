@@ -8,7 +8,7 @@ use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
-use crate::{define_simple_violation, define_violation};
+use crate::{define_simple_autofix_violation, define_simple_violation};
 use ruff_macros::derive_message_formats;
 
 define_simple_violation!(
@@ -16,33 +16,17 @@ define_simple_violation!(
     "Docstring should be indented with spaces, not tabs"
 );
 
-define_violation!(
-    pub struct NoUnderIndentation;
+define_simple_autofix_violation!(
+    NoUnderIndentation,
+    "Docstring is under-indented",
+    "Increase indentation"
 );
-impl AlwaysAutofixableViolation for NoUnderIndentation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Docstring is under-indented")
-    }
 
-    fn autofix_title(&self) -> String {
-        "Increase indentation".to_string()
-    }
-}
-
-define_violation!(
-    pub struct NoOverIndentation;
+define_simple_autofix_violation!(
+    NoOverIndentation,
+    "Docstring is over-indented",
+    "Remove over-indentation"
 );
-impl AlwaysAutofixableViolation for NoOverIndentation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Docstring is over-indented")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove over-indentation".to_string()
-    }
-}
 
 /// D206, D207, D208
 pub fn indent(checker: &mut Checker, docstring: &Docstring) {

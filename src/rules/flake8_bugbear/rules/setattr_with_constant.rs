@@ -1,7 +1,7 @@
 use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_autofix_violation;
 use crate::fix::Fix;
 use crate::python::identifiers::{is_identifier, is_mangled_private};
 use crate::python::keyword::KWLIST;
@@ -11,22 +11,12 @@ use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
-define_violation!(
-    pub struct SetAttrWithConstant;
+define_simple_autofix_violation!(
+    SetAttrWithConstant,
+    "Do not call `setattr` with a constant attribute value. It is not any safer than \
+             normal property access.",
+    "Replace `setattr` with assignment"
 );
-impl AlwaysAutofixableViolation for SetAttrWithConstant {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "Do not call `setattr` with a constant attribute value. It is not any safer than \
-             normal property access."
-        )
-    }
-
-    fn autofix_title(&self) -> String {
-        "Replace `setattr` with assignment".to_string()
-    }
-}
 
 fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String {
     let stmt = Stmt::new(
