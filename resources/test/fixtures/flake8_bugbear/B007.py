@@ -44,4 +44,29 @@ for foo, bar in [(1, 2)]:
         print(FMT.format(**vars()))
 
 for foo, bar in [(1, 2)]:
-    print(FMT.format(foo=foo, bar=eval('bar')))
+    print(FMT.format(foo=foo, bar=eval("bar")))
+
+
+def f():
+    # Fixable.
+    for foo, bar, baz in (["1", "2", "3"],):
+        if foo or baz:
+            break
+
+
+def f():
+    # Unfixable due to usage of `bar` outside of loop.
+    for foo, bar, baz in (["1", "2", "3"],):
+        if foo or baz:
+            break
+
+    print(bar)
+
+
+def f():
+    # Fixable, but not fixed in practice, since we can't tell if `bar` is used.
+    for foo, bar, baz in (["1", "2", "3"],):
+        if foo or baz:
+            break
+
+    bar = 1
