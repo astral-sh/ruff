@@ -41,109 +41,109 @@ expression: diagnostics
 - kind:
     UselessImportAlias: ~
   location:
-    row: 15
+    row: 16
     column: 14
   end_location:
-    row: 15
+    row: 16
     column: 24
   fix:
     content:
       - bar
     location:
-      row: 15
+      row: 16
       column: 14
     end_location:
-      row: 15
+      row: 16
       column: 24
   parent: ~
 - kind:
     UselessImportAlias: ~
   location:
-    row: 18
+    row: 19
     column: 18
   end_location:
-    row: 18
+    row: 19
     column: 28
   fix:
     content:
       - bar
     location:
-      row: 18
+      row: 19
       column: 18
     end_location:
-      row: 18
+      row: 19
       column: 28
   parent: ~
 - kind:
     UselessImportAlias: ~
   location:
-    row: 19
+    row: 20
     column: 22
   end_location:
-    row: 19
+    row: 20
     column: 38
   fix:
     content:
       - foobar
     location:
-      row: 19
+      row: 20
       column: 22
     end_location:
-      row: 19
+      row: 20
       column: 38
   parent: ~
 - kind:
     UselessImportAlias: ~
   location:
-    row: 21
+    row: 22
     column: 14
   end_location:
-    row: 21
+    row: 22
     column: 24
   fix:
     content:
       - foo
     location:
-      row: 21
+      row: 22
       column: 14
     end_location:
-      row: 21
+      row: 22
       column: 24
   parent: ~
 - kind:
     UselessImportAlias: ~
   location:
-    row: 22
+    row: 23
     column: 26
   end_location:
-    row: 22
+    row: 23
     column: 38
   fix:
     content:
       - foo2
     location:
-      row: 22
+      row: 23
       column: 26
     end_location:
-      row: 22
+      row: 23
       column: 38
   parent: ~
 - kind:
     UselessImportAlias: ~
   location:
-    row: 24
+    row: 25
     column: 20
   end_location:
-    row: 24
+    row: 25
     column: 36
   fix:
     content:
       - foobar
     location:
-      row: 24
+      row: 25
       column: 20
     end_location:
-      row: 24
+      row: 25
       column: 36
   parent: ~
 
