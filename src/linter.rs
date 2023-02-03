@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use colored::Colorize;
 use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
@@ -320,7 +320,7 @@ pub fn lint_fix(
     package: Option<&Path>,
     settings: &Settings,
 ) -> Result<(LinterResult<Vec<Message>>, String, usize)> {
-    let mut contents = contents.to_string();
+    let mut transformed = contents.to_string();
 
     // Track the number of fixed errors across iterations.
     let mut fixed = 0;
@@ -328,16 +328,19 @@ pub fn lint_fix(
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;
 
+    // Track whether the _initial_ source code was parseable.
+    let mut parseable = false;
+
     // Continuously autofix until the source code stabilizes.
     loop {
         // Tokenize once.
-        let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+        let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&transformed);
 
         // Map row and column locations to byte slices (lazily).
-        let locator = Locator::new(&contents);
+        let locator = Locator::new(&transformed);
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_contents(&contents, &locator);
+        let stylist = Stylist::from_contents(&transformed, &locator);
 
         // Extra indices from the code.
         let indexer: Indexer = tokens.as_slice().into();
@@ -350,7 +353,7 @@ pub fn lint_fix(
         let result = check_path(
             path,
             package,
-            &contents,
+            &transformed,
             tokens,
             &locator,
             &stylist,
@@ -361,6 +364,32 @@ pub fn lint_fix(
             flags::Noqa::Enabled,
         );
 
+        if iterations == 0 {
+            parseable = result.error.is_none();
+        } else {
+            // If the source code was parseable on the first pass, but is no
+            // longer parseable on a subsequent pass, then we've introduced a
+            // syntax error. Return the original code.
+            if parseable && result.error.is_some() {
+                eprintln!(
+                    r#"
+{}: Autofix introduced a syntax error. Reverting all changes.
+
+This indicates a bug in `{}`. If you could open an issue at:
+
+    {}/issues/new?title=%5BAutofix%20error%5D
+
+...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+"#,
+                    "error".red().bold(),
+                    CARGO_PKG_NAME,
+                    CARGO_PKG_REPOSITORY,
+                    fs::relativize_path(path),
+                );
+                return Err(anyhow!("Autofix introduced a syntax error"));
+            }
+        }
+
         // Apply autofix.
         if let Some((fixed_contents, applied)) = fix_file(&result.data, &locator) {
             if iterations < MAX_ITERATIONS {
@@ -368,7 +397,7 @@ pub fn lint_fix(
                 fixed += applied;
 
                 // Store the fixed contents.
-                contents = fixed_contents.to_string();
+                transformed = fixed_contents.to_string();
 
                 // Increment the iteration count.
                 iterations += 1;
@@ -381,11 +410,11 @@ pub fn lint_fix(
                 r#"
 {}: Failed to converge after {} iterations.
 
-This likely indicates a bug in `{}`. If you could open an issue at:
+This indicates a bug in `{}`. If you could open an issue at:
 
-{}/issues/new?title=%5BInfinite%20loop%5D
+    {}/issues/new?title=%5BInfinite%20loop%5D
 
-quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
                 "error".red().bold(),
                 MAX_ITERATIONS,
@@ -411,7 +440,7 @@ quoting the contents of `{}`, along with the `pyproject.toml` settings and execu
                     })
                     .collect()
             }),
-            contents,
+            transformed,
             fixed,
         ));
     }

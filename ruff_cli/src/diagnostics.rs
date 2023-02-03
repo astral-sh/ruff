@@ -75,21 +75,28 @@ pub fn lint_path(
         },
         fixed,
     ) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
-        let (result, transformed, fixed) = lint_fix(&contents, path, package, &settings.lib)?;
-        if fixed > 0 {
-            if matches!(autofix, fix::FixMode::Apply) {
-                write(path, transformed)?;
-            } else if matches!(autofix, fix::FixMode::Diff) {
-                let mut stdout = io::stdout().lock();
-                TextDiff::from_lines(&contents, &transformed)
-                    .unified_diff()
-                    .header(&fs::relativize_path(path), &fs::relativize_path(path))
-                    .to_writer(&mut stdout)?;
-                stdout.write_all(b"\n")?;
-                stdout.flush()?;
+        if let Ok((result, transformed, fixed)) = lint_fix(&contents, path, package, &settings.lib)
+        {
+            if fixed > 0 {
+                if matches!(autofix, fix::FixMode::Apply) {
+                    write(path, transformed)?;
+                } else if matches!(autofix, fix::FixMode::Diff) {
+                    let mut stdout = io::stdout().lock();
+                    TextDiff::from_lines(&contents, &transformed)
+                        .unified_diff()
+                        .header(&fs::relativize_path(path), &fs::relativize_path(path))
+                        .to_writer(&mut stdout)?;
+                    stdout.write_all(b"\n")?;
+                    stdout.flush()?;
+                }
             }
+            (result, fixed)
+        } else {
+            // If we fail to autofix, lint the original source code.
+            let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
+            let fixed = 0;
+            (result, fixed)
         }
-        (result, fixed)
     } else {
         let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
         let fixed = 0;
@@ -143,33 +150,50 @@ pub fn lint_stdin(
         },
         fixed,
     ) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
-        let (result, transformed, fixed) = lint_fix(
+        if let Ok((result, transformed, fixed)) = lint_fix(
             contents,
             path.unwrap_or_else(|| Path::new("-")),
             package,
             settings,
-        )?;
+        ) {
+            if matches!(autofix, fix::FixMode::Apply) {
+                // Write the contents to stdout, regardless of whether any errors were fixed.
+                io::stdout().write_all(transformed.as_bytes())?;
+            } else if matches!(autofix, fix::FixMode::Diff) {
+                // But only write a diff if it's non-empty.
+                if fixed > 0 {
+                    let text_diff = TextDiff::from_lines(contents, &transformed);
+                    let mut unified_diff = text_diff.unified_diff();
+                    if let Some(path) = path {
+                        unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                    }
 
-        if matches!(autofix, fix::FixMode::Apply) {
-            // Write the contents to stdout, regardless of whether any errors were fixed.
-            io::stdout().write_all(transformed.as_bytes())?;
-        } else if matches!(autofix, fix::FixMode::Diff) {
-            // But only write a diff if it's non-empty.
-            if fixed > 0 {
-                let text_diff = TextDiff::from_lines(contents, &transformed);
-                let mut unified_diff = text_diff.unified_diff();
-                if let Some(path) = path {
-                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                    let mut stdout = io::stdout().lock();
+                    unified_diff.to_writer(&mut stdout)?;
+                    stdout.write_all(b"\n")?;
+                    stdout.flush()?;
                 }
-
-                let mut stdout = io::stdout().lock();
-                unified_diff.to_writer(&mut stdout)?;
-                stdout.write_all(b"\n")?;
-                stdout.flush()?;
             }
-        }
 
-        (result, fixed)
+            (result, fixed)
+        } else {
+            // If we fail to autofix, lint the original source code.
+            let result = lint_only(
+                contents,
+                path.unwrap_or_else(|| Path::new("-")),
+                package,
+                settings,
+                autofix.into(),
+            );
+            let fixed = 0;
+
+            // Write the contents to stdout anyway.
+            if matches!(autofix, fix::FixMode::Apply) {
+                io::stdout().write_all(contents.as_bytes())?;
+            }
+
+            (result, fixed)
+        }
     } else {
         let result = lint_only(
             contents,
