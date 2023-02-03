@@ -3858,13 +3858,21 @@ impl<'a> Checker<'a> {
                             ))
                     {
                         if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
-                            self.diagnostics.push(Diagnostic::new(
+                            let mut diagnostic = Diagnostic::new(
                                 pyflakes::rules::RedefinedWhileUnused {
                                     name: name.to_string(),
                                     line: existing.range.location.row(),
                                 },
                                 binding_range(&binding, self.locator),
-                            ));
+                            );
+                            if let Some(parent) = binding.source.as_ref() {
+                                if matches!(parent.node, StmtKind::ImportFrom { .. })
+                                    && parent.location.row() != binding.range.location.row()
+                                {
+                                    diagnostic.parent(parent.location);
+                                }
+                            }
+                            self.diagnostics.push(diagnostic);
                         }
                     }
                 } else if existing_is_import && binding.redefines(existing) {
@@ -4614,13 +4622,22 @@ impl<'a> Checker<'a> {
 
                         if let Some(indices) = self.redefinitions.get(index) {
                             for index in indices {
-                                diagnostics.push(Diagnostic::new(
+                                let rebound = &self.bindings[*index];
+                                let mut diagnostic = Diagnostic::new(
                                     pyflakes::rules::RedefinedWhileUnused {
                                         name: (*name).to_string(),
                                         line: binding.range.location.row(),
                                     },
-                                    binding_range(&self.bindings[*index], self.locator),
-                                ));
+                                    binding_range(rebound, self.locator),
+                                );
+                                if let Some(parent) = &rebound.source {
+                                    if matches!(parent.node, StmtKind::ImportFrom { .. })
+                                        && parent.location.row() != rebound.range.location.row()
+                                    {
+                                        diagnostic.parent(parent.location);
+                                    }
+                                };
+                                diagnostics.push(diagnostic);
                             }
                         }
                     }
