@@ -4,12 +4,23 @@ expression: diagnostics
 ---
 - kind:
     PrivateMemberAccess:
+      access: bar._private
+  location:
+    row: 17
+    column: 11
+  end_location:
+    row: 17
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    PrivateMemberAccess:
       access: foo._private_thing
   location:
-    row: 28
+    row: 38
     column: 6
   end_location:
-    row: 28
+    row: 38
     column: 24
   fix: ~
   parent: ~
@@ -17,10 +28,10 @@ expression: diagnostics
     PrivateMemberAccess:
       access: foo.__really_private_thing
   location:
-    row: 29
+    row: 39
     column: 6
   end_location:
-    row: 29
+    row: 39
     column: 32
   fix: ~
   parent: ~
@@ -28,10 +39,10 @@ expression: diagnostics
     PrivateMemberAccess:
       access: foo._private_func
   location:
-    row: 30
+    row: 40
     column: 6
   end_location:
-    row: 30
+    row: 40
     column: 23
   fix: ~
   parent: ~
@@ -39,11 +50,22 @@ expression: diagnostics
     PrivateMemberAccess:
       access: foo.__really_private_func
   location:
-    row: 31
+    row: 41
     column: 6
   end_location:
-    row: 31
+    row: 41
     column: 31
+  fix: ~
+  parent: ~
+- kind:
+    PrivateMemberAccess:
+      access: bar._private
+  location:
+    row: 42
+    column: 6
+  end_location:
+    row: 42
+    column: 22
   fix: ~
   parent: ~
 
