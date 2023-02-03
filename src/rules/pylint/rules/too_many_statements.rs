@@ -25,7 +25,7 @@ impl Violation for TooManyStatements {
 }
 
 fn num_statements(stmts: &[Stmt]) -> usize {
-    let mut count: usize = 0;
+    let mut count = 0;
     for stmt in stmts {
         // TODO(charlie): Account for pattern match statement.
         match &stmt.node {
