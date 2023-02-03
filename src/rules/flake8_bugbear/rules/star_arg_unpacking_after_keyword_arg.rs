@@ -9,21 +9,16 @@
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Keyword};
 
-define_violation!(
-    pub struct StarArgUnpackingAfterKeywordArg;
+define_simple_violation!(
+    StarArgUnpackingAfterKeywordArg,
+    "Star-arg unpacking after a keyword argument is strongly discouraged"
 );
-impl Violation for StarArgUnpackingAfterKeywordArg {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Star-arg unpacking after a keyword argument is strongly discouraged")
-    }
-}
 
 /// B026
 pub fn star_arg_unpacking_after_keyword_arg(

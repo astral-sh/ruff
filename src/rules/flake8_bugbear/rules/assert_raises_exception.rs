@@ -9,21 +9,16 @@
 //! `assertRaises`.
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{ExprKind, Stmt, Withitem};
 
-define_violation!(
-    pub struct NoAssertRaisesException;
+define_simple_violation!(
+    NoAssertRaisesException,
+    "`assertRaises(Exception)` should be considered evil"
 );
-impl Violation for NoAssertRaisesException {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`assertRaises(Exception)` should be considered evil")
-    }
-}
 
 /// B017
 pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[Withitem]) {

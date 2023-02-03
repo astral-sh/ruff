@@ -4,20 +4,12 @@ use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 use crate::ast::helpers::SimpleCallArgs;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct FailWithoutMessage;
-);
-impl Violation for FailWithoutMessage {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("No message passed to `pytest.fail()`")
-    }
-}
+define_simple_violation!(FailWithoutMessage, "No message passed to `pytest.fail()`");
 
 pub fn fail_call(checker: &mut Checker, call: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_fail(call, checker) {

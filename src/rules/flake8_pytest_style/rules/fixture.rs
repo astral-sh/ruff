@@ -13,11 +13,11 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::helpers::remove_argument;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::{define_simple_violation, define_violation};
 
 define_violation!(
     pub struct IncorrectFixtureParenthesesStyle {
@@ -109,25 +109,15 @@ impl Violation for FixtureParamWithoutValue {
     }
 }
 
-define_violation!(
-    pub struct DeprecatedYieldFixture;
+define_simple_violation!(
+    DeprecatedYieldFixture,
+    "`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`"
 );
-impl Violation for DeprecatedYieldFixture {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`")
-    }
-}
 
-define_violation!(
-    pub struct FixtureFinalizerCallback;
+define_simple_violation!(
+    FixtureFinalizerCallback,
+    "Use `yield` instead of `request.addfinalizer`"
 );
-impl Violation for FixtureFinalizerCallback {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `yield` instead of `request.addfinalizer`")
-    }
-}
 
 define_violation!(
     pub struct UselessYieldFixture {

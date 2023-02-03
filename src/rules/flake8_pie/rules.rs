@@ -8,12 +8,12 @@ use crate::ast::helpers::{match_trailing_comment, unparse_expr};
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::python::identifiers::is_identifier;
 use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::{define_simple_violation, define_violation};
 
 define_violation!(
     pub struct NoUnnecessaryPass;
@@ -58,25 +58,9 @@ impl Violation for PreferUniqueEnums {
     }
 }
 
-define_violation!(
-    pub struct NoUnnecessarySpread;
-);
-impl Violation for NoUnnecessarySpread {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary spread `**`")
-    }
-}
+define_simple_violation!(NoUnnecessarySpread, "Unnecessary spread `**`");
 
-define_violation!(
-    pub struct NoUnnecessaryDictKwargs;
-);
-impl Violation for NoUnnecessaryDictKwargs {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary `dict` kwargs")
-    }
-}
+define_simple_violation!(NoUnnecessaryDictKwargs, "Unnecessary `dict` kwargs");
 
 define_violation!(
     pub struct PreferListBuiltin;

@@ -5,19 +5,14 @@ use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::visibility::is_overload;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct SkipDocstring;
+define_simple_violation!(
+    SkipDocstring,
+    "Function decorated with `@overload` shouldn't contain a docstring"
 );
-impl Violation for SkipDocstring {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Function decorated with `@overload` shouldn't contain a docstring")
-    }
-}
 
 /// D418
 pub fn if_needed(checker: &mut Checker, docstring: &Docstring) {

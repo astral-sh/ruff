@@ -2,23 +2,16 @@ use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct UselessElseOnLoop;
-);
-impl Violation for UselessElseOnLoop {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "Else clause on loop without a break statement, remove the else and de-indent all the \
+define_simple_violation!(
+    UselessElseOnLoop,
+    "Else clause on loop without a break statement, remove the else and de-indent all the \
              code inside it"
-        )
-    }
-}
+);
 
 fn loop_exits_early(body: &[Stmt]) -> bool {
     body.iter().any(|stmt| match &stmt.node {

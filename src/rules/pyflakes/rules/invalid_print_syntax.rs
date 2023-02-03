@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
@@ -7,15 +7,10 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct InvalidPrintSyntax;
+define_simple_violation!(
+    InvalidPrintSyntax,
+    "Use of `>>` is invalid with `print` function"
 );
-impl Violation for InvalidPrintSyntax {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use of `>>` is invalid with `print` function")
-    }
-}
 
 /// F633
 pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {

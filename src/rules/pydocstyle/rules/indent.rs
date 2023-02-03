@@ -8,18 +8,13 @@ use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
-use crate::define_violation;
+use crate::{define_simple_violation, define_violation};
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct IndentWithSpaces;
+define_simple_violation!(
+    IndentWithSpaces,
+    "Docstring should be indented with spaces, not tabs"
 );
-impl Violation for IndentWithSpaces {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Docstring should be indented with spaces, not tabs")
-    }
-}
 
 define_violation!(
     pub struct NoUnderIndentation;

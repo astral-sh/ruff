@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 
@@ -7,15 +7,10 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct AssertTuple;
+define_simple_violation!(
+    AssertTuple,
+    "Assert test is a non-empty tuple, which is always `True`"
 );
-impl Violation for AssertTuple {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Assert test is a non-empty tuple, which is always `True`")
-    }
-}
 
 /// F631
 pub fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {

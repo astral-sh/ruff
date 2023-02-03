@@ -3,29 +3,16 @@ use crate::checkers::ast::Checker;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Alias, Stmt};
 
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct MultipleImportsOnOneLine;
-);
-impl Violation for MultipleImportsOnOneLine {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Multiple imports on one line")
-    }
-}
+define_simple_violation!(MultipleImportsOnOneLine, "Multiple imports on one line");
 
-define_violation!(
-    pub struct ModuleImportNotAtTopOfFile;
+define_simple_violation!(
+    ModuleImportNotAtTopOfFile,
+    "Module level import not at top of file"
 );
-impl Violation for ModuleImportNotAtTopOfFile {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Module level import not at top of file")
-    }
-}
 
 pub fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &[Alias]) {
     if names.len() > 1 {

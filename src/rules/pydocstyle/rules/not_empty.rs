@@ -4,18 +4,10 @@ use crate::docstrings::definition::Docstring;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 
-use crate::define_violation;
+use crate::define_simple_violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct NonEmpty;
-);
-impl Violation for NonEmpty {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Docstring is empty")
-    }
-}
+define_simple_violation!(NonEmpty, "Docstring is empty");
 
 /// D419
 pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {

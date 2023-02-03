@@ -1,22 +1,15 @@
 use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
-define_violation!(
-    pub struct CachedInstanceMethod;
+define_simple_violation!(
+    CachedInstanceMethod,
+    "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
 );
-impl Violation for CachedInstanceMethod {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-        )
-    }
-}
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
     checker.resolve_call_path(expr).map_or(false, |call_path| {

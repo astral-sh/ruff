@@ -7,89 +7,28 @@ use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::visibility::{is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility};
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct PublicModule;
-);
-impl Violation for PublicModule {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Missing docstring in public module")
-    }
-}
+define_simple_violation!(PublicModule, "Missing docstring in public module");
 
-define_violation!(
-    pub struct PublicClass;
-);
-impl Violation for PublicClass {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Missing docstring in public class")
-    }
-}
+define_simple_violation!(PublicClass, "Missing docstring in public class");
 
-define_violation!(
-    pub struct PublicMethod;
-);
-impl Violation for PublicMethod {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Missing docstring in public method")
-    }
-}
+define_simple_violation!(PublicMethod, "Missing docstring in public method");
 
-define_violation!(
-    pub struct PublicFunction;
-);
-impl Violation for PublicFunction {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Missing docstring in public function")
-    }
-}
+define_simple_violation!(PublicFunction, "Missing docstring in public function");
 
-define_violation!(
-    pub struct PublicPackage;
-);
-impl Violation for PublicPackage {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Missing docstring in public package")
-    }
-}
+define_simple_violation!(PublicPackage, "Missing docstring in public package");
 
-define_violation!(
-    pub struct MagicMethod;
-);
-impl Violation for MagicMethod {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Missing docstring in magic method")
-    }
-}
+define_simple_violation!(MagicMethod, "Missing docstring in magic method");
 
-define_violation!(
-    pub struct PublicNestedClass;
+define_simple_violation!(
+    PublicNestedClass,
+    "Missing docstring in public nested class"
 );
-impl Violation for PublicNestedClass {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Missing docstring in public nested class")
-    }
-}
 
-define_violation!(
-    pub struct PublicInit;
-);
-impl Violation for PublicInit {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Missing docstring in `__init__`")
-    }
-}
+define_simple_violation!(PublicInit, "Missing docstring in `__init__`");
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
 pub fn not_missing(

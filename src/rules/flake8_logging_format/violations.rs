@@ -1,47 +1,18 @@
 use ruff_macros::derive_message_formats;
 
-use crate::define_violation;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::{define_simple_violation, define_violation};
 
-define_violation!(
-    pub struct LoggingStringFormat;
+define_simple_violation!(
+    LoggingStringFormat,
+    "Logging statement uses `string.format()`"
 );
-impl Violation for LoggingStringFormat {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Logging statement uses `string.format()`")
-    }
-}
 
-define_violation!(
-    pub struct LoggingPercentFormat;
-);
-impl Violation for LoggingPercentFormat {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Logging statement uses `%`")
-    }
-}
+define_simple_violation!(LoggingPercentFormat, "Logging statement uses `%`");
 
-define_violation!(
-    pub struct LoggingStringConcat;
-);
-impl Violation for LoggingStringConcat {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Logging statement uses `+`")
-    }
-}
+define_simple_violation!(LoggingStringConcat, "Logging statement uses `+`");
 
-define_violation!(
-    pub struct LoggingFString;
-);
-impl Violation for LoggingFString {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Logging statement uses f-string")
-    }
-}
+define_simple_violation!(LoggingFString, "Logging statement uses f-string");
 
 define_violation!(
     pub struct LoggingWarn;
@@ -70,22 +41,12 @@ impl Violation for LoggingExtraAttrClash {
     }
 }
 
-define_violation!(
-    pub struct LoggingExcInfo;
+define_simple_violation!(
+    LoggingExcInfo,
+    "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
 );
-impl Violation for LoggingExcInfo {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`")
-    }
-}
 
-define_violation!(
-    pub struct LoggingRedundantExcInfo;
+define_simple_violation!(
+    LoggingRedundantExcInfo,
+    "Logging statement has redundant `exc_info`"
 );
-impl Violation for LoggingRedundantExcInfo {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Logging statement has redundant `exc_info`")
-    }
-}

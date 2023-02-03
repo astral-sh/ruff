@@ -3,19 +3,11 @@ use rustpython_ast::Expr;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct RaiseVanillaClass;
-);
-impl Violation for RaiseVanillaClass {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Create your own exception")
-    }
-}
+define_simple_violation!(RaiseVanillaClass, "Create your own exception");
 
 /// TRY002
 pub fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {

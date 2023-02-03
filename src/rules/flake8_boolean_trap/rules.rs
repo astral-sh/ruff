@@ -4,39 +4,24 @@ use rustpython_parser::ast::{Constant, Expr};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct BooleanPositionalArgInFunctionDefinition;
+define_simple_violation!(
+    BooleanPositionalArgInFunctionDefinition,
+    "Boolean positional arg in function definition"
 );
-impl Violation for BooleanPositionalArgInFunctionDefinition {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Boolean positional arg in function definition")
-    }
-}
 
-define_violation!(
-    pub struct BooleanDefaultValueInFunctionDefinition;
+define_simple_violation!(
+    BooleanDefaultValueInFunctionDefinition,
+    "Boolean default value in function definition"
 );
-impl Violation for BooleanDefaultValueInFunctionDefinition {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Boolean default value in function definition")
-    }
-}
 
-define_violation!(
-    pub struct BooleanPositionalValueInFunctionCall;
+define_simple_violation!(
+    BooleanPositionalValueInFunctionCall,
+    "Boolean positional value in function call"
 );
-impl Violation for BooleanPositionalValueInFunctionCall {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Boolean positional value in function call")
-    }
-}
 
 const FUNC_NAME_ALLOWLIST: &[&str] = &[
     "assertEqual",

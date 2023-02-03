@@ -1,20 +1,12 @@
 use crate::ast::types::Range;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Stmt, StmtKind};
 
-define_violation!(
-    pub struct ContinueOutsideLoop;
-);
-impl Violation for ContinueOutsideLoop {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`continue` not properly in loop")
-    }
-}
+define_simple_violation!(ContinueOutsideLoop, "`continue` not properly in loop");
 
 /// F702
 pub fn continue_outside_loop<'a>(

@@ -5,19 +5,14 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct VerboseRaise;
+define_simple_violation!(
+    VerboseRaise,
+    "Use `raise` without specifying exception name"
 );
-impl Violation for VerboseRaise {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `raise` without specifying exception name")
-    }
-}
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {

@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 
@@ -7,15 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct IfTuple;
-);
-impl Violation for IfTuple {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("If test is a tuple, which is always `True`")
-    }
-}
+define_simple_violation!(IfTuple, "If test is a tuple, which is always `True`");
 
 /// F634
 pub fn if_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {

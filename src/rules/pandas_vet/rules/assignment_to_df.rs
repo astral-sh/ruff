@@ -2,19 +2,14 @@ use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct DfIsABadVariableName;
+define_simple_violation!(
+    DfIsABadVariableName,
+    "`df` is a bad variable name. Be kinder to your future self."
 );
-impl Violation for DfIsABadVariableName {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`df` is a bad variable name. Be kinder to your future self.")
-    }
-}
 
 /// PD901
 pub fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {

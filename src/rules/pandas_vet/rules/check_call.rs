@@ -3,62 +3,35 @@ use rustpython_ast::{ExprKind, Located};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UseOfDotIsNull;
+define_simple_violation!(
+    UseOfDotIsNull,
+    "`.isna` is preferred to `.isnull`; functionality is equivalent"
 );
-impl Violation for UseOfDotIsNull {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.isna` is preferred to `.isnull`; functionality is equivalent")
-    }
-}
 
-define_violation!(
-    pub struct UseOfDotNotNull;
+define_simple_violation!(
+    UseOfDotNotNull,
+    "`.notna` is preferred to `.notnull`; functionality is equivalent"
 );
-impl Violation for UseOfDotNotNull {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.notna` is preferred to `.notnull`; functionality is equivalent")
-    }
-}
 
-define_violation!(
-    pub struct UseOfDotPivotOrUnstack;
+define_simple_violation!(
+    UseOfDotPivotOrUnstack,
+    "`.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality"
 );
-impl Violation for UseOfDotPivotOrUnstack {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "`.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality"
-        )
-    }
-}
 
-define_violation!(
-    pub struct UseOfDotReadTable;
+define_simple_violation!(
+    UseOfDotReadTable,
+    "`.read_csv` is preferred to `.read_table`; provides same functionality"
 );
-impl Violation for UseOfDotReadTable {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.read_csv` is preferred to `.read_table`; provides same functionality")
-    }
-}
 
-define_violation!(
-    pub struct UseOfDotStack;
+define_simple_violation!(
+    UseOfDotStack,
+    "`.melt` is preferred to `.stack`; provides same functionality"
 );
-impl Violation for UseOfDotStack {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.melt` is preferred to `.stack`; provides same functionality")
-    }
-}
 
 pub fn check_call(checker: &mut Checker, func: &Located<ExprKind>) {
     let rules = &checker.settings.rules;

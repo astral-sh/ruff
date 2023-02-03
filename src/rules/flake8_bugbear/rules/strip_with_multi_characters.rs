@@ -1,21 +1,16 @@
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind};
 
-define_violation!(
-    pub struct StripWithMultiCharacters;
+define_simple_violation!(
+    StripWithMultiCharacters,
+    "Using `.strip()` with multi-character strings is misleading the reader"
 );
-impl Violation for StripWithMultiCharacters {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Using `.strip()` with multi-character strings is misleading the reader")
-    }
-}
 
 /// B005
 pub fn strip_with_multi_characters(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {

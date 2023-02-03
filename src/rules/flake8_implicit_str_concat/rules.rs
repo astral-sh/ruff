@@ -5,40 +5,25 @@ use rustpython_parser::lexer::{LexResult, Tok};
 use ruff_macros::derive_message_formats;
 
 use crate::ast::types::Range;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_implicit_str_concat::settings::Settings;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct SingleLineImplicitStringConcatenation;
+define_simple_violation!(
+    SingleLineImplicitStringConcatenation,
+    "Implicitly concatenated string literals on one line"
 );
-impl Violation for SingleLineImplicitStringConcatenation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Implicitly concatenated string literals on one line")
-    }
-}
 
-define_violation!(
-    pub struct MultiLineImplicitStringConcatenation;
+define_simple_violation!(
+    MultiLineImplicitStringConcatenation,
+    "Implicitly concatenated string literals over multiple lines"
 );
-impl Violation for MultiLineImplicitStringConcatenation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Implicitly concatenated string literals over multiple lines")
-    }
-}
 
-define_violation!(
-    pub struct ExplicitStringConcatenation;
+define_simple_violation!(
+    ExplicitStringConcatenation,
+    "Explicitly concatenated string should be implicitly concatenated"
 );
-impl Violation for ExplicitStringConcatenation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Explicitly concatenated string should be implicitly concatenated")
-    }
-}
 
 /// ISC001, ISC002
 pub fn implicit(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {

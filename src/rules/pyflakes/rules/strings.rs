@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::{define_simple_violation, define_violation};
 use ruff_macros::derive_message_formats;
 use std::string::ToString;
 
@@ -30,25 +30,15 @@ impl Violation for PercentFormatInvalidFormat {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatExpectedMapping;
+define_simple_violation!(
+    PercentFormatExpectedMapping,
+    "`%`-format string expected mapping but got sequence"
 );
-impl Violation for PercentFormatExpectedMapping {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`%`-format string expected mapping but got sequence")
-    }
-}
 
-define_violation!(
-    pub struct PercentFormatExpectedSequence;
+define_simple_violation!(
+    PercentFormatExpectedSequence,
+    "`%`-format string expected sequence but got mapping"
 );
-impl Violation for PercentFormatExpectedSequence {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`%`-format string expected sequence but got mapping")
-    }
-}
 
 define_violation!(
     pub struct PercentFormatExtraNamedArguments {
@@ -84,15 +74,10 @@ impl Violation for PercentFormatMissingArgument {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatMixedPositionalAndNamed;
+define_simple_violation!(
+    PercentFormatMixedPositionalAndNamed,
+    "`%`-format string has mixed positional and named placeholders"
 );
-impl Violation for PercentFormatMixedPositionalAndNamed {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`%`-format string has mixed positional and named placeholders")
-    }
-}
 
 define_violation!(
     pub struct PercentFormatPositionalCountMismatch {
@@ -108,15 +93,10 @@ impl Violation for PercentFormatPositionalCountMismatch {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatStarRequiresSequence;
+define_simple_violation!(
+    PercentFormatStarRequiresSequence,
+    "`%`-format string `*` specifier requires sequence"
 );
-impl Violation for PercentFormatStarRequiresSequence {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`%`-format string `*` specifier requires sequence")
-    }
-}
 
 define_violation!(
     pub struct PercentFormatUnsupportedFormatCharacter {
@@ -192,15 +172,10 @@ impl Violation for StringDotFormatMissingArguments {
     }
 }
 
-define_violation!(
-    pub struct StringDotFormatMixingAutomatic;
+define_simple_violation!(
+    StringDotFormatMixingAutomatic,
+    "`.format` string mixes automatic and manual numbering"
 );
-impl Violation for StringDotFormatMixingAutomatic {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.format` string mixes automatic and manual numbering")
-    }
-}
 
 fn has_star_star_kwargs(keywords: &[Keyword]) -> bool {
     keywords.iter().any(|k| {

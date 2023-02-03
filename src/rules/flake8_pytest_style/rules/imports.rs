@@ -1,20 +1,15 @@
 use rustpython_ast::Stmt;
 
 use crate::ast::types::Range;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct IncorrectPytestImport;
+define_simple_violation!(
+    IncorrectPytestImport,
+    "Found incorrect import of pytest, use simple `import pytest` instead"
 );
-impl Violation for IncorrectPytestImport {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Found incorrect import of pytest, use simple `import pytest` instead")
-    }
-}
 
 fn is_pytest_or_subpackage(imported_name: &str) -> bool {
     imported_name == "pytest" || imported_name.starts_with("pytest.")

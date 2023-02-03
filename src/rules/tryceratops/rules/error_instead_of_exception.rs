@@ -6,19 +6,14 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct ErrorInsteadOfException;
+define_simple_violation!(
+    ErrorInsteadOfException,
+    "Use `logging.exception` instead of `logging.error`"
 );
-impl Violation for ErrorInsteadOfException {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `logging.exception` instead of `logging.error`")
-    }
-}
 
 #[derive(Default)]
 /// Collect `logging`-like calls from an AST.

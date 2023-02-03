@@ -1,23 +1,16 @@
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{ExprKind, Stmt, StmtKind};
 
-define_violation!(
-    pub struct FStringDocstring;
-);
-impl Violation for FStringDocstring {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "f-string used as docstring. This will be interpreted by python as a joined string \
+define_simple_violation!(
+    FStringDocstring,
+    "f-string used as docstring. This will be interpreted by python as a joined string \
              rather than a docstring."
-        )
-    }
-}
+);
 
 /// B021
 pub fn f_string_docstring(checker: &mut Checker, body: &[Stmt]) {

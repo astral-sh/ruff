@@ -4,19 +4,11 @@ use rustpython_ast::Constant;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct TypeComparison;
-);
-impl Violation for TypeComparison {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Do not compare types, use `isinstance()`")
-    }
-}
+define_simple_violation!(TypeComparison, "Do not compare types, use `isinstance()`");
 
 /// E721
 pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Diagnostic> {

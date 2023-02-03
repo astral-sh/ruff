@@ -3,19 +3,14 @@ use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct RaiseVanillaArgs;
+define_simple_violation!(
+    RaiseVanillaArgs,
+    "Avoid specifying long messages outside the exception class"
 );
-impl Violation for RaiseVanillaArgs {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Avoid specifying long messages outside the exception class")
-    }
-}
 
 fn collect_strings_impl<'a>(expr: &'a Expr, parts: &mut Vec<&'a str>) {
     match &expr.node {

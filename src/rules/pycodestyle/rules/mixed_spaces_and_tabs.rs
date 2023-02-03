@@ -3,19 +3,14 @@ use rustpython_ast::Location;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct MixedSpacesAndTabs;
+define_simple_violation!(
+    MixedSpacesAndTabs,
+    "Indentation contains mixed spaces and tabs"
 );
-impl Violation for MixedSpacesAndTabs {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Indentation contains mixed spaces and tabs")
-    }
-}
 
 /// E101
 pub fn mixed_spaces_and_tabs(lineno: usize, line: &str) -> Option<Diagnostic> {

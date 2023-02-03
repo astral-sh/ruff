@@ -8,20 +8,15 @@ use rustpython_ast::Location;
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ast::types::Range;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct ShebangNotExecutable;
+define_simple_violation!(
+    ShebangNotExecutable,
+    "Shebang is present but file is not executable"
 );
-impl Violation for ShebangNotExecutable {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Shebang is present but file is not executable")
-    }
-}
 
 /// EXE001
 #[cfg(not(target_family = "wasm"))]

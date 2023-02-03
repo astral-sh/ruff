@@ -4,20 +4,15 @@ use super::helpers::is_empty_or_null_string;
 use crate::ast::helpers::{format_call_path, to_call_path};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
+use crate::{define_simple_violation, define_violation};
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct RaisesWithMultipleStatements;
+define_simple_violation!(
+    RaisesWithMultipleStatements,
+    "`pytest.raises()` block should contain a single simple statement"
 );
-impl Violation for RaisesWithMultipleStatements {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`pytest.raises()` block should contain a single simple statement")
-    }
-}
 
 define_violation!(
     pub struct RaisesTooBroad {
@@ -35,15 +30,10 @@ impl Violation for RaisesTooBroad {
     }
 }
 
-define_violation!(
-    pub struct RaisesWithoutException;
+define_simple_violation!(
+    RaisesWithoutException,
+    "set the expected exception in `pytest.raises()`"
 );
-impl Violation for RaisesWithoutException {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("set the expected exception in `pytest.raises()`")
-    }
-}
 
 fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
     checker.resolve_call_path(func).map_or(false, |call_path| {

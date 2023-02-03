@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::StmtKind;
@@ -8,15 +8,10 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct NoSignature;
+define_simple_violation!(
+    NoSignature,
+    "First line should not be the function's signature"
 );
-impl Violation for NoSignature {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("First line should not be the function's signature")
-    }
-}
 
 /// D402
 pub fn no_signature(checker: &mut Checker, docstring: &Docstring) {

@@ -3,19 +3,14 @@ use rustpython_ast::{Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct TryConsiderElse;
+define_simple_violation!(
+    TryConsiderElse,
+    "Consider moving this statement to an `else` block"
 );
-impl Violation for TryConsiderElse {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Consider moving this statement to an `else` block")
-    }
-}
 
 /// TRY300
 pub fn try_consider_else(checker: &mut Checker, body: &[Stmt], orelse: &[Stmt]) {

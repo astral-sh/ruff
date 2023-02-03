@@ -4,18 +4,13 @@ use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-use crate::define_violation;
+use crate::define_simple_violation;
 use ruff_macros::derive_message_formats;
 
-define_violation!(
-    pub struct FirstLineCapitalized;
+define_simple_violation!(
+    FirstLineCapitalized,
+    "First word of the first line should be properly capitalized"
 );
-impl Violation for FirstLineCapitalized {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("First word of the first line should be properly capitalized")
-    }
-}
 
 /// D403
 pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {

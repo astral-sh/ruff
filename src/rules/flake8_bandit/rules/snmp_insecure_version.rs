@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::violation::Violation;
 use num_traits::{One, Zero};
 use ruff_macros::derive_message_formats;
@@ -10,15 +10,10 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct SnmpInsecureVersion;
+define_simple_violation!(
+    SnmpInsecureVersion,
+    "The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able."
 );
-impl Violation for SnmpInsecureVersion {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.")
-    }
-}
 
 /// S508
 pub fn snmp_insecure_version(

@@ -3,19 +3,14 @@ use rustpython_ast::{Expr, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct TryExceptPass;
+define_simple_violation!(
+    TryExceptPass,
+    "`try`-`except`-`pass` detected, consider logging the exception"
 );
-impl Violation for TryExceptPass {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`try`-`except`-`pass` detected, consider logging the exception")
-    }
-}
 
 /// S110
 pub fn try_except_pass(

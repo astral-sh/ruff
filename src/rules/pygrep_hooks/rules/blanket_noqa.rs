@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::violation::Violation;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -8,15 +8,7 @@ use rustpython_ast::Location;
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct BlanketNOQA;
-);
-impl Violation for BlanketNOQA {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use specific rule codes when using `noqa`")
-    }
-}
+define_simple_violation!(BlanketNOQA, "Use specific rule codes when using `noqa`");
 
 static BLANKET_NOQA_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)# noqa($|\s|:[^ ])").unwrap());

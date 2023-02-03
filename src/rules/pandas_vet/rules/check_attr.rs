@@ -3,50 +3,27 @@ use rustpython_ast::{ExprKind, Located};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UseOfDotIx;
+define_simple_violation!(
+    UseOfDotIx,
+    "`.ix` is deprecated; use more explicit `.loc` or `.iloc`"
 );
-impl Violation for UseOfDotIx {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("`.ix` is deprecated; use more explicit `.loc` or `.iloc`")
-    }
-}
 
-define_violation!(
-    pub struct UseOfDotAt;
+define_simple_violation!(
+    UseOfDotAt,
+    "Use `.loc` instead of `.at`.  If speed is important, use numpy."
 );
-impl Violation for UseOfDotAt {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `.loc` instead of `.at`.  If speed is important, use numpy.")
-    }
-}
 
-define_violation!(
-    pub struct UseOfDotIat;
+define_simple_violation!(
+    UseOfDotIat,
+    "Use `.iloc` instead of `.iat`.  If speed is important, use numpy."
 );
-impl Violation for UseOfDotIat {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `.iloc` instead of `.iat`.  If speed is important, use numpy.")
-    }
-}
 
-define_violation!(
-    pub struct UseOfDotValues;
-);
-impl Violation for UseOfDotValues {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use `.to_numpy()` instead of `.values`")
-    }
-}
+define_simple_violation!(UseOfDotValues, "Use `.to_numpy()` instead of `.values`");
 
 pub fn check_attr(
     checker: &mut Checker,

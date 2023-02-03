@@ -5,119 +5,60 @@ use ruff_macros::derive_message_formats;
 use crate::ast::helpers::{has_non_none_keyword, is_const_none};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct CallDatetimeWithoutTzinfo;
+define_simple_violation!(
+    CallDatetimeWithoutTzinfo,
+    "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
 );
-impl Violation for CallDatetimeWithoutTzinfo {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("The use of `datetime.datetime()` without `tzinfo` argument is not allowed")
-    }
-}
 
-define_violation!(
-    pub struct CallDatetimeToday;
-);
-impl Violation for CallDatetimeToday {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.today()` is not allowed, use \
+define_simple_violation!(
+    CallDatetimeToday,
+    "The use of `datetime.datetime.today()` is not allowed, use \
              `datetime.datetime.now(tz=)` instead"
-        )
-    }
-}
-
-define_violation!(
-    pub struct CallDatetimeUtcnow;
 );
-impl Violation for CallDatetimeUtcnow {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.utcnow()` is not allowed, use \
+
+define_simple_violation!(
+    CallDatetimeUtcnow,
+    "The use of `datetime.datetime.utcnow()` is not allowed, use \
              `datetime.datetime.now(tz=)` instead"
-        )
-    }
-}
-
-define_violation!(
-    pub struct CallDatetimeUtcfromtimestamp;
 );
-impl Violation for CallDatetimeUtcfromtimestamp {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use \
+
+define_simple_violation!(
+    CallDatetimeUtcfromtimestamp,
+    "The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use \
              `datetime.datetime.fromtimestamp(ts, tz=)` instead"
-        )
-    }
-}
-
-define_violation!(
-    pub struct CallDatetimeNowWithoutTzinfo;
 );
-impl Violation for CallDatetimeNowWithoutTzinfo {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("The use of `datetime.datetime.now()` without `tz` argument is not allowed")
-    }
-}
 
-define_violation!(
-    pub struct CallDatetimeFromtimestamp;
+define_simple_violation!(
+    CallDatetimeNowWithoutTzinfo,
+    "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
 );
-impl Violation for CallDatetimeFromtimestamp {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed"
-        )
-    }
-}
 
-define_violation!(
-    pub struct CallDatetimeStrptimeWithoutZone;
+define_simple_violation!(
+    CallDatetimeFromtimestamp,
+    "The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed"
 );
-impl Violation for CallDatetimeStrptimeWithoutZone {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "The use of `datetime.datetime.strptime()` without %z must be followed by \
+
+define_simple_violation!(
+    CallDatetimeStrptimeWithoutZone,
+    "The use of `datetime.datetime.strptime()` without %z must be followed by \
              `.replace(tzinfo=)` or `.astimezone()`"
-        )
-    }
-}
-
-define_violation!(
-    pub struct CallDateToday;
 );
-impl Violation for CallDateToday {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "The use of `datetime.date.today()` is not allowed, use \
+
+define_simple_violation!(
+    CallDateToday,
+    "The use of `datetime.date.today()` is not allowed, use \
              `datetime.datetime.now(tz=).date()` instead"
-        )
-    }
-}
-
-define_violation!(
-    pub struct CallDateFromtimestamp;
 );
-impl Violation for CallDateFromtimestamp {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!(
-            "The use of `datetime.date.fromtimestamp()` is not allowed, use \
+
+define_simple_violation!(
+    CallDateFromtimestamp,
+    "The use of `datetime.date.fromtimestamp()` is not allowed, use \
              `datetime.datetime.fromtimestamp(ts, tz=).date()` instead"
-        )
-    }
-}
+);
 
 pub fn call_datetime_without_tzinfo(
     checker: &mut Checker,

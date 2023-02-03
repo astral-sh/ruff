@@ -4,11 +4,11 @@ use rustpython_parser::lexer::{LexResult, Spanned};
 use rustpython_parser::token::Tok;
 
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::{define_simple_violation, define_violation};
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -123,15 +123,10 @@ impl AlwaysAutofixableViolation for TrailingCommaMissing {
     }
 }
 
-define_violation!(
-    pub struct TrailingCommaOnBareTupleProhibited;
+define_simple_violation!(
+    TrailingCommaOnBareTupleProhibited,
+    "Trailing comma on bare tuple prohibited"
 );
-impl Violation for TrailingCommaOnBareTupleProhibited {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Trailing comma on bare tuple prohibited")
-    }
-}
 
 define_violation!(
     pub struct TrailingCommaProhibited;

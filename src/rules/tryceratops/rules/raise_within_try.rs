@@ -4,19 +4,11 @@ use rustpython_ast::{Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::ast::visitor::{self, Visitor};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct RaiseWithinTry;
-);
-impl Violation for RaiseWithinTry {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Abstract `raise` to an inner function")
-    }
-}
+define_simple_violation!(RaiseWithinTry, "Abstract `raise` to an inner function");
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {

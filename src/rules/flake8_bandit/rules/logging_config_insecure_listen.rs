@@ -5,19 +5,14 @@ use ruff_macros::derive_message_formats;
 use crate::ast::helpers::SimpleCallArgs;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct LoggingConfigInsecureListen;
+define_simple_violation!(
+    LoggingConfigInsecureListen,
+    "Use of insecure `logging.config.listen` detected"
 );
-impl Violation for LoggingConfigInsecureListen {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use of insecure `logging.config.listen` detected")
-    }
-}
 
 /// S612
 pub fn logging_config_insecure_listen(

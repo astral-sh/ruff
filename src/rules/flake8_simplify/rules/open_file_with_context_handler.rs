@@ -1,4 +1,4 @@
-use crate::define_violation;
+use crate::define_simple_violation;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
@@ -8,15 +8,10 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 
-define_violation!(
-    pub struct OpenFileWithContextHandler;
+define_simple_violation!(
+    OpenFileWithContextHandler,
+    "Use context handler for opening files"
 );
-impl Violation for OpenFileWithContextHandler {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Use context handler for opening files")
-    }
-}
 
 /// Return `true` if the current expression is nested in an `await
 /// exit_stack.enter_async_context` call.

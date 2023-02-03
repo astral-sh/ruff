@@ -5,11 +5,11 @@ use crate::ast::function_type;
 use crate::ast::helpers::identifier_range;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::python::string::{self};
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::Violation;
+use crate::{define_simple_violation, define_violation};
 use ruff_macros::derive_message_formats;
 
 define_violation!(
@@ -51,25 +51,15 @@ impl Violation for InvalidArgumentName {
     }
 }
 
-define_violation!(
-    pub struct InvalidFirstArgumentNameForClassMethod;
+define_simple_violation!(
+    InvalidFirstArgumentNameForClassMethod,
+    "First argument of a class method should be named `cls`"
 );
-impl Violation for InvalidFirstArgumentNameForClassMethod {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("First argument of a class method should be named `cls`")
-    }
-}
 
-define_violation!(
-    pub struct InvalidFirstArgumentNameForMethod;
+define_simple_violation!(
+    InvalidFirstArgumentNameForMethod,
+    "First argument of a method should be named `self`"
 );
-impl Violation for InvalidFirstArgumentNameForMethod {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("First argument of a method should be named `self`")
-    }
-}
 
 define_violation!(
     pub struct NonLowercaseVariableInFunction {
@@ -84,15 +74,10 @@ impl Violation for NonLowercaseVariableInFunction {
     }
 }
 
-define_violation!(
-    pub struct DunderFunctionName;
+define_simple_violation!(
+    DunderFunctionName,
+    "Function name should not start and end with `__`"
 );
-impl Violation for DunderFunctionName {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Function name should not start and end with `__`")
-    }
-}
 
 define_violation!(
     pub struct ConstantImportedAsNonConstant {
