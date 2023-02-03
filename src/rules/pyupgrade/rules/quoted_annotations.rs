@@ -47,20 +47,20 @@ fn remove_quotes(checker: &mut Checker, annotation: &Box<Expr>) {
     }
 }
 
-fn process_call<'a>(node: Box<Call<'a>>) -> Vec<&'a Annotation<'a>> {
-    let to_add: Vec<&Annotation> = vec![];
+fn process_call<'a>(node: &mut Box<Call<'a>>) -> Vec<&'a mut Annotation<'a>> {
+    let to_add: Vec<&mut Annotation> = vec![];
     println!("{:?}", node);
     to_add
 }
 
 fn replace_string_literal(annotation: &mut Annotation) {
-    let mut nodes: Vec<&Annotation> = vec![annotation];
+    let mut nodes: Vec<&mut Annotation> = vec![annotation];
     while nodes.len() > 0 {
         let node = match nodes.pop() {
             Some(item) => item,
             None => continue,
         };
-        match node.annotation.get_mut() {
+        match &mut node.annotation {
             Expression::Call(item) => nodes.extend(process_call(item)),
             _ => continue,
         }

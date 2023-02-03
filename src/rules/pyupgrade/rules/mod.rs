@@ -19,6 +19,7 @@ pub(crate) use open_alias::{open_alias, OpenAlias};
 pub(crate) use os_error_alias::{os_error_alias, OSErrorAlias};
 pub(crate) use outdated_version_block::{outdated_version_block, OutdatedVersionBlock};
 pub(crate) use printf_string_formatting::{printf_string_formatting, PrintfStringFormatting};
+pub(crate) use quoted_annotations::{quoted_annotations, QuotedAnnotations};
 pub(crate) use redundant_open_modes::{redundant_open_modes, RedundantOpenModes};
 pub(crate) use replace_stdout_stderr::{replace_stdout_stderr, ReplaceStdoutStderr};
 pub(crate) use replace_universal_newlines::{replace_universal_newlines, ReplaceUniversalNewlines};
@@ -43,7 +44,6 @@ pub(crate) use use_pep585_annotation::{use_pep585_annotation, UsePEP585Annotatio
 pub(crate) use use_pep604_annotation::{use_pep604_annotation, UsePEP604Annotation};
 pub(crate) use useless_metaclass_type::{useless_metaclass_type, UselessMetaclassType};
 pub(crate) use useless_object_inheritance::{useless_object_inheritance, UselessObjectInheritance};
-pub(crate) use quoted_annotations::{quoted_annotations, QuotedAnnotations};
 
 mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
