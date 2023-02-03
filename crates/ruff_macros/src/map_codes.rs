@@ -179,6 +179,7 @@ pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
     #[allow(clippy::type_complexity)]
     let mut rule_to_codes: HashMap<&Path, Vec<(&Ident, &String, &Vec<Attribute>)>> = HashMap::new();
+    let mut linter_code_for_rule_match_arms = quote!();
 
     for (linter, map) in &linters {
         for (code, (rule, attrs)) in map {
@@ -186,6 +187,9 @@ pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 .entry(rule)
                 .or_default()
                 .push((linter, code, attrs));
+            linter_code_for_rule_match_arms.extend(quote! {
+                #(#attrs)* (Self::#linter, #rule) => Some(#code),
+            });
         }
     }
 
@@ -212,6 +216,15 @@ pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                     #rule_noqa_code_match_arms
                     // TODO: support rules without codes
                     // rule => rule.as_ref()
+                }
+            }
+        }
+
+        impl crate::registry::Linter {
+            pub fn code_for_rule(&self, rule: &Rule) -> Option<&'static str> {
+                match (self, rule) {
+                    #linter_code_for_rule_match_arms
+                    _ => None,
                 }
             }
         }
