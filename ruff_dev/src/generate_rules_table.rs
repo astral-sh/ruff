@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use itertools::Itertools;
-use ruff::registry::{Linter, LinterCategory, Rule, RuleNamespace};
+use ruff::registry::{Linter, Rule, RuleNamespace, UpstreamCategory};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -50,10 +50,10 @@ pub fn main(args: &Args) -> Result<()> {
     for linter in Linter::iter() {
         let codes_csv: String = match linter.common_prefix() {
             "" => linter
-                .categories()
+                .upstream_categories()
                 .unwrap()
                 .iter()
-                .map(|LinterCategory(prefix, ..)| prefix)
+                .map(|UpstreamCategory(prefix, ..)| prefix)
                 .join(", "),
             prefix => prefix.to_string(),
         };
@@ -93,8 +93,8 @@ pub fn main(args: &Args) -> Result<()> {
             table_out.push('\n');
         }
 
-        if let Some(categories) = linter.categories() {
-            for LinterCategory(prefix, name, selector) in categories {
+        if let Some(categories) = linter.upstream_categories() {
+            for UpstreamCategory(prefix, name, selector) in categories {
                 table_out.push_str(&format!("#### {name} ({prefix})"));
                 table_out.push('\n');
                 table_out.push('\n');
