@@ -33,6 +33,11 @@ repos:
         types_or: [python, pyi]
         require_serial: true
         exclude: ^resources
+      - id: pylint-link-in-readme
+        name: pylint-link-in-readme
+        entry: python scripts/upgrade_readme_with_pylint_doc_links.py
+        language: python
+        files: README.md
       - id: dev-generate-all
         name: dev-generate-all
         entry: cargo dev generate-all

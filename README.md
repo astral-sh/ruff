@@ -1323,38 +1323,38 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLC0414 | useless-import-alias | Import alias does not rename original package | 🛠 |
-| PLC3002 | unnecessary-direct-lambda-call | Lambda expression called directly. Execute the expression inline instead. |  |
+| PLC0414 | [useless-import-alias](https://pylint.readthedocs.io/en/latest/user_guide/messages/convention/useless-import-alias.html) | Import alias does not rename original package | 🛠 |
+| PLC3002 | [unnecessary-direct-lambda-call](https://pylint.readthedocs.io/en/latest/user_guide/messages/convention/unnecessary-direct-lambda-call.html) | Lambda expression called directly. Execute the expression inline instead. |  |
 
 #### Error (PLE)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLE0117 | nonlocal-without-binding | Nonlocal name `{name}` found without binding |  |
-| PLE0118 | used-prior-global-declaration | Name `{name}` is used prior to global declaration on line {line} |  |
-| PLE0604 | invalid-all-object | Invalid object in `__all__`, must contain only strings |  |
-| PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
-| PLE1142 | await-outside-async | `await` should be used within an async function |  |
+| PLE0117 | [nonlocal-without-binding](https://pylint.readthedocs.io/en/latest/user_guide/messages/error/nonlocal-without-binding.html) | Nonlocal name `{name}` found without binding |  |
+| PLE0118 | [used-prior-global-declaration](https://pylint.readthedocs.io/en/latest/user_guide/messages/error/used-prior-global-declaration.html) | Name `{name}` is used prior to global declaration on line {line} |  |
+| PLE0604 | [invalid-all-object](https://pylint.readthedocs.io/en/latest/user_guide/messages/error/invalid-all-object.html) | Invalid object in `__all__`, must contain only strings |  |
+| PLE0605 | [invalid-all-format](https://pylint.readthedocs.io/en/latest/user_guide/messages/error/invalid-all-format.html) | Invalid format for `__all__`, must be `tuple` or `list` |  |
+| PLE1142 | [await-outside-async](https://pylint.readthedocs.io/en/latest/user_guide/messages/error/await-outside-async.html) | `await` should be used within an async function |  |
 
 #### Refactor (PLR)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLR0133 | comparison-of-constant | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
-| PLR0206 | property-with-parameters | Cannot have defined parameters for properties |  |
-| PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias | 🛠 |
-| PLR0913 | too-many-arguments | Too many arguments to function call ({c_args}/{max_args}) |  |
-| PLR0915 | too-many-statements | Too many statements ({statements}/{max_statements}) |  |
-| PLR1701 | consider-merging-isinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
-| PLR1722 | consider-using-sys-exit | Use `sys.exit()` instead of `{name}` | 🛠 |
-| PLR2004 | magic-value-comparison | Magic value used in comparison, consider replacing {value} with a constant variable |  |
+| PLR0133 | [constant-comparison](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/constant-comparison.html) | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
+| PLR0206 | [property-with-parameters](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/property-with-parameters.html) | Cannot have defined parameters for properties |  |
+| PLR0402 | [consider-using-from-import](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/consider-using-from-import.html) | Use `from {module} import {name}` in lieu of alias | 🛠 |
+| PLR0913 | [too-many-args](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/too-many-args.html) | Too many arguments to function call ({c_args}/{max_args}) |  |
+| PLR0915 | [too-many-statements](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/too-many-statements.html) | Too many statements ({statements}/{max_statements}) |  |
+| PLR1701 | [consider-merging-isinstance](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/consider-merging-isinstance.html) | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
+| PLR1722 | [consider-using-sys-exit](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/consider-using-sys-exit.html) | Use `sys.exit()` instead of `{name}` | 🛠 |
+| PLR2004 | [magic-value-comparison](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/magic-value-comparison.html) | Magic value used in comparison, consider replacing {value} with a constant variable |  |
 
 #### Warning (PLW)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLW0120 | useless-else-on-loop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
-| PLW0602 | global-variable-not-assigned | Using global for `{name}` but no assignment is done |  |
+| PLW0120 | [useless-else-on-loop](https://pylint.readthedocs.io/en/latest/user_guide/messages/warning/useless-else-on-loop.html) | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
+| PLW0602 | [global-variable-not-assigned](https://pylint.readthedocs.io/en/latest/user_guide/messages/warning/global-variable-not-assigned.html) | Using global for `{name}` but no assignment is done |  |
 
 ### tryceratops (TRY)
 
