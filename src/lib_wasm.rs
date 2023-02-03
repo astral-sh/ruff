@@ -6,7 +6,7 @@ use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::directives;
-use crate::linter::check_path;
+use crate::linter::{check_path, LinterResult};
 use crate::registry::Rule;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
@@ -187,7 +187,9 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let directives = directives::extract_directives(&tokens, directives::Flags::empty());
 
     // Generate checks.
-    let diagnostics = check_path(
+    let LinterResult {
+        data: diagnostics, ..
+    } = check_path(
         Path::new("<filename>"),
         None,
         contents,

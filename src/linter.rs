@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use colored::Colorize;
+use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
 
 use crate::autofix::fix_file;
@@ -24,6 +25,23 @@ use crate::{directives, fs, rustpython_helpers};
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
+/// A [`Result`]-like type that returns both data and an error. Used to return diagnostics even in
+/// the face of parse errors, since many diagnostics can be generated without a full AST.
+pub struct LinterResult<T> {
+    pub data: T,
+    pub error: Option<ParseError>,
+}
+
+impl<T> LinterResult<T> {
+    fn new(data: T, error: Option<ParseError>) -> Self {
+        LinterResult { data, error }
+    }
+
+    fn map<U, F: FnOnce(T) -> U>(self, f: F) -> LinterResult<U> {
+        LinterResult::new(f(self.data), self.error)
+    }
+}
+
 /// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
 #[allow(clippy::too_many_arguments)]
@@ -39,9 +57,10 @@ pub fn check_path(
     settings: &Settings,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
-) -> Vec<Diagnostic> {
+) -> LinterResult<Vec<Diagnostic>> {
     // Aggregate all diagnostics.
-    let mut diagnostics: Vec<Diagnostic> = vec![];
+    let mut diagnostics = vec![];
+    let mut error = None;
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
@@ -80,7 +99,7 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
     if use_ast || use_imports || use_doc_lines {
-        match rustpython_helpers::parse_program_tokens(tokens, "<filename>") {
+        match rustpython_helpers::parse_program_tokens(tokens, &path.to_string_lossy()) {
             Ok(python_ast) => {
                 if use_ast {
                     diagnostics.extend(check_ast(
@@ -117,6 +136,7 @@ pub fn check_path(
                 if settings.rules.enabled(&Rule::SyntaxError) {
                     pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
                 }
+                error = Some(parse_error);
             }
         }
     }
@@ -169,7 +189,7 @@ pub fn check_path(
         );
     }
 
-    diagnostics
+    LinterResult::new(diagnostics, error)
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -196,7 +216,10 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
-    let diagnostics = check_path(
+    let LinterResult {
+        data: diagnostics,
+        error,
+    } = check_path(
         path,
         None,
         &contents,
@@ -210,6 +233,19 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         flags::Noqa::Disabled,
     );
 
+    // Log any parse errors.
+    if let Some(err) = error {
+        eprintln!(
+            "{}{} {}{}{} {err:?}",
+            "error".red().bold(),
+            ":".bold(),
+            "Failed to parse ".bold(),
+            fs::relativize_path(path).bold(),
+            ":".bold()
+        );
+    }
+
+    // Add any missing `# noqa` pragmas.
     add_noqa(
         path,
         &diagnostics,
@@ -220,15 +256,14 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     )
 }
 
-/// Generate `Diagnostic`s (optionally including any autofix
-/// patches) from source code content.
+/// Generate a [`Message`] for each [`Diagnostic`] triggered by the given source code.
 pub fn lint_only(
     contents: &str,
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
     autofix: flags::Autofix,
-) -> Vec<Message> {
+) -> LinterResult<Vec<Message>> {
     // Tokenize once.
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
 
@@ -246,7 +281,7 @@ pub fn lint_only(
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
 
     // Generate diagnostics.
-    let diagnostics = check_path(
+    let result = check_path(
         path,
         package,
         contents,
@@ -262,17 +297,19 @@ pub fn lint_only(
 
     // Convert from diagnostics to messages.
     let path_lossy = path.to_string_lossy();
-    diagnostics
-        .into_iter()
-        .map(|diagnostic| {
-            let source = if settings.show_source {
-                Some(Source::from_diagnostic(&diagnostic, &locator))
-            } else {
-                None
-            };
-            Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
-        })
-        .collect()
+    result.map(|diagnostics| {
+        diagnostics
+            .into_iter()
+            .map(|diagnostic| {
+                let source = if settings.show_source {
+                    Some(Source::from_diagnostic(&diagnostic, &locator))
+                } else {
+                    None
+                };
+                Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
+            })
+            .collect()
+    })
 }
 
 /// Generate `Diagnostic`s from source code content, iteratively autofixing
@@ -282,7 +319,7 @@ pub fn lint_fix(
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
-) -> (String, usize, Vec<Message>) {
+) -> Result<(LinterResult<Vec<Message>>, String, usize)> {
     let mut contents = contents.to_string();
 
     // Track the number of fixed errors across iterations.
@@ -310,7 +347,7 @@ pub fn lint_fix(
             directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
 
         // Generate diagnostics.
-        let diagnostics = check_path(
+        let result = check_path(
             path,
             package,
             &contents,
@@ -325,7 +362,7 @@ pub fn lint_fix(
         );
 
         // Apply autofix.
-        if let Some((fixed_contents, applied)) = fix_file(&diagnostics, &locator) {
+        if let Some((fixed_contents, applied)) = fix_file(&result.data, &locator) {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 fixed += applied;
@@ -350,7 +387,7 @@ This likely indicates a bug in `{}`. If you could open an issue at:
 
 quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
-                "warning".yellow().bold(),
+                "error".red().bold(),
                 MAX_ITERATIONS,
                 CARGO_PKG_NAME,
                 CARGO_PKG_REPOSITORY,
@@ -360,17 +397,22 @@ quoting the contents of `{}`, along with the `pyproject.toml` settings and execu
 
         // Convert to messages.
         let path_lossy = path.to_string_lossy();
-        let messages = diagnostics
-            .into_iter()
-            .map(|diagnostic| {
-                let source = if settings.show_source {
-                    Some(Source::from_diagnostic(&diagnostic, &locator))
-                } else {
-                    None
-                };
-                Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
-            })
-            .collect();
-        return (contents, fixed, messages);
+        return Ok((
+            result.map(|diagnostics| {
+                diagnostics
+                    .into_iter()
+                    .map(|diagnostic| {
+                        let source = if settings.show_source {
+                            Some(Source::from_diagnostic(&diagnostic, &locator))
+                        } else {
+                            None
+                        };
+                        Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
+                    })
+                    .collect()
+            }),
+            contents,
+            fixed,
+        ));
     }
 }

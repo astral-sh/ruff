@@ -4,6 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 use rustpython_parser::lexer::LexResult;
 
+use crate::linter::LinterResult;
 use crate::{
     autofix::fix_file,
     directives, fs,
@@ -15,8 +16,8 @@ use crate::{
     source_code::{Indexer, Locator, Stylist},
 };
 
-pub fn test_resource_path(path: impl AsRef<std::path::Path>) -> std::path::PathBuf {
-    std::path::Path::new("./resources/test/").join(path)
+pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
+    Path::new("./resources/test/").join(path)
 }
 
 /// A convenient wrapper around [`check_path`], that additionally
@@ -30,7 +31,10 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let indexer: Indexer = tokens.as_slice().into();
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
-    let mut diagnostics = check_path(
+    let LinterResult {
+        data: mut diagnostics,
+        ..
+    } = check_path(
         &path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
@@ -62,7 +66,9 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
             let indexer: Indexer = tokens.as_slice().into();
             let directives =
                 directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
-            let diagnostics = check_path(
+            let LinterResult {
+                data: diagnostics, ..
+            } = check_path(
                 &path,
                 None,
                 &contents,
