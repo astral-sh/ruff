@@ -65,11 +65,15 @@ pub enum ParseError {
 }
 
 impl RuleSelector {
-    pub fn short_code(&self) -> &'static str {
+    pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
-            RuleSelector::All => "ALL",
-            RuleSelector::Linter(linter) => linter.common_prefix(),
-            RuleSelector::Prefix { prefix, .. } => prefix.into(),
+            RuleSelector::All => ("", "ALL"),
+            RuleSelector::Prefix { prefix, .. } => {
+                let prefix: &'static str = prefix.into();
+                let (linter, code) = Linter::parse_code(prefix).unwrap();
+                (linter.common_prefix(), code)
+            }
+            RuleSelector::Linter(l) => (l.common_prefix(), ""),
         }
     }
 }
@@ -79,7 +83,8 @@ impl Serialize for RuleSelector {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.short_code())
+        let (prefix, code) = self.prefix_and_code();
+        serializer.serialize_str(&format!("{prefix}{code}"))
     }
 }
 
