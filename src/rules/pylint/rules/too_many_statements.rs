@@ -185,7 +185,7 @@ def f():
         print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(num_statements(&stmts), 9); // counter-intuitive, but elif counts as 2 statements according to pylint itself
+        assert_eq!(num_statements(&stmts), 9);
         Ok(())
     }
 
