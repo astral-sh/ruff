@@ -80,3 +80,20 @@ macro_rules! define_violation {
         $($struct)*
     };
 }
+
+#[macro_export]
+/// This macro exists to make it simpler to define violations that only have a
+/// simple message, and no parametrization.
+macro_rules! define_simple_violation {
+    ($name:ident, $message:expr) => {
+        $crate::define_violation!(
+            pub struct $name;
+        );
+        impl Violation for $name {
+            #[derive_message_formats]
+            fn message(&self) -> String {
+                format!($message)
+            }
+        }
+    };
+}
