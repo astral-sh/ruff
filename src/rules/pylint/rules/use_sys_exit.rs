@@ -30,7 +30,7 @@ impl Violation for UseSysExit {
 /// sys import *`).
 fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
     checker.current_scopes().any(|scope| {
-        scope.values.values().any(|index| {
+        scope.bindings.values().any(|index| {
             if let BindingKind::StarImportation(_, name) = &checker.bindings[*index].kind {
                 name.as_ref().map(|name| name == module).unwrap_or_default()
             } else {
@@ -45,7 +45,7 @@ fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
 fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -> Option<String> {
     checker.current_scopes().find_map(|scope| {
         scope
-            .values
+            .bindings
             .values()
             .find_map(|index| match &checker.bindings[*index].kind {
                 // e.g. module=sys object=exit

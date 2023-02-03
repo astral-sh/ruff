@@ -135,7 +135,7 @@ pub fn unused_arguments(
                         function(
                             &Argumentable::Function,
                             args,
-                            &scope.values,
+                            &scope.bindings,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -164,7 +164,7 @@ pub fn unused_arguments(
                         method(
                             &Argumentable::Method,
                             args,
-                            &scope.values,
+                            &scope.bindings,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -193,7 +193,7 @@ pub fn unused_arguments(
                         method(
                             &Argumentable::ClassMethod,
                             args,
-                            &scope.values,
+                            &scope.bindings,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -222,7 +222,7 @@ pub fn unused_arguments(
                         function(
                             &Argumentable::StaticMethod,
                             args,
-                            &scope.values,
+                            &scope.bindings,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -245,7 +245,7 @@ pub fn unused_arguments(
                 function(
                     &Argumentable::Lambda,
                     args,
-                    &scope.values,
+                    &scope.bindings,
                     bindings,
                     &checker.settings.dummy_variable_rgx,
                     checker

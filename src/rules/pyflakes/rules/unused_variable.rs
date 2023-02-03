@@ -182,7 +182,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
     }
 
     for (name, binding) in scope
-        .values
+        .bindings
         .iter()
         .map(|(name, index)| (name, &checker.bindings[*index]))
     {

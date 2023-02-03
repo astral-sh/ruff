@@ -23,7 +23,7 @@ impl Violation for UnusedAnnotation {
 pub fn unused_annotation(checker: &mut Checker, scope: usize) {
     let scope = &checker.scopes[scope];
     for (name, binding) in scope
-        .values
+        .bindings
         .iter()
         .map(|(name, index)| (name, &checker.bindings[*index]))
     {

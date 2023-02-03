@@ -21,6 +21,7 @@
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
+use std::iter;
 
 use ruff_macros::derive_message_formats;
 
@@ -145,22 +146,37 @@ pub fn unused_loop_control_variable(
             Range::from_located(expr),
         );
         if matches!(certainty, Certainty::Certain) && checker.patch(diagnostic.kind.rule()) {
-            // Guard against cases in which the loop variable is used later on in the scope.
-            // TODO(charlie): This avoids fixing cases in which the loop variable is overridden (but
-            // unused) later on in the scope.
-            if let Some(binding) = checker.find_binding(name) {
+            // Find the `BindingKind::LoopVar` corresponding to the name.
+            let scope = checker.current_scope();
+            if let Some(binding) = iter::once(scope.bindings.get(name))
+                .flatten()
+                .chain(
+                    iter::once(scope.rebounds.get(name))
+                        .flatten()
+                        .into_iter()
+                        .flatten(),
+                )
+                .find_map(|index| {
+                    let binding = &checker.bindings[*index];
+                    if let Some(source) = &binding.source {
+                        if source == &RefEquality(stmt) {
+                            Some(binding)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            {
                 if matches!(binding.kind, BindingKind::LoopVar) {
                     if !binding.used() {
-                        if let Some(source) = &binding.source {
-                            if source == &RefEquality(stmt) {
-                                // Prefix the variable name with an underscore.
-                                diagnostic.amend(Fix::replacement(
-                                    format!("_{name}"),
-                                    expr.location,
-                                    expr.end_location.unwrap(),
-                                ));
-                            }
-                        }
+                        // Prefix the variable name with an underscore.
+                        diagnostic.amend(Fix::replacement(
+                            format!("_{name}"),
+                            expr.location,
+                            expr.end_location.unwrap(),
+                        ));
                     }
                 }
             }

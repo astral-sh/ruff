@@ -24,7 +24,15 @@ expression: diagnostics
   end_location:
     row: 18
     column: 13
-  fix: ~
+  fix:
+    content:
+      - _k
+    location:
+      row: 18
+      column: 12
+    end_location:
+      row: 18
+      column: 13
   parent: ~
 - kind:
     UnusedLoopControlVariable:
@@ -148,6 +156,34 @@ expression: diagnostics
   end_location:
     row: 68
     column: 16
-  fix: ~
+  fix:
+    content:
+      - _bar
+    location:
+      row: 68
+      column: 13
+    end_location:
+      row: 68
+      column: 16
+  parent: ~
+- kind:
+    UnusedLoopControlVariable:
+      name: bar
+      certainty: Certain
+  location:
+    row: 77
+    column: 13
+  end_location:
+    row: 77
+    column: 16
+  fix:
+    content:
+      - _bar
+    location:
+      row: 77
+      column: 13
+    end_location:
+      row: 77
+      column: 16
   parent: ~
 
