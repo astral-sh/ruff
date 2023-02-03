@@ -389,7 +389,7 @@ def f():  # 11
     #[test]
     fn yield_() -> Result<()> {
         let source: &str = r#"
-def f():
+def f():  # 2
     for i in range(10):
         yield i
 "#;
