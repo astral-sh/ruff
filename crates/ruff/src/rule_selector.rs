@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use itertools::Itertools;
 use schemars::_serde_json::Value;
 use schemars::schema::{InstanceType, Schema, SchemaObject};
 use schemars::JsonSchema;
@@ -181,11 +182,19 @@ impl JsonSchema for RuleSelector {
             instance_type: Some(InstanceType::String.into()),
             enum_values: Some(
                 std::iter::once("ALL".to_string())
-                    .chain(RuleCodePrefix::iter().map(|p| {
-                        let prefix = p.linter().common_prefix();
-                        let code = p.short_code();
-                        format!("{prefix}{code}")
-                    }))
+                    .chain(
+                        RuleCodePrefix::iter()
+                            .map(|p| {
+                                let prefix = p.linter().common_prefix();
+                                let code = p.short_code();
+                                format!("{prefix}{code}")
+                            })
+                            .chain(Linter::iter().filter_map(|l| {
+                                let prefix = l.common_prefix();
+                                (!prefix.is_empty()).then(|| prefix.to_string())
+                            }))
+                            .sorted(),
+                    )
                     .map(Value::String)
                     .collect(),
             ),
