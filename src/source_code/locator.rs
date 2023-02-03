@@ -93,8 +93,8 @@ fn truncate(location: Location, index: &Index, contents: &str) -> usize {
 }
 
 impl<'a> Locator<'a> {
-    pub fn new(contents: &'a str) -> Self {
-        Locator {
+    pub const fn new(contents: &'a str) -> Self {
+        Self {
             contents,
             index: OnceCell::new(),
         }
@@ -140,11 +140,11 @@ impl<'a> Locator<'a> {
         )
     }
 
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.contents.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.contents.is_empty()
     }
 }

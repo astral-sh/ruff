@@ -2,7 +2,7 @@ use rustpython_ast::{Expr, ExprKind};
 
 /// Return `true` if an `Expr` _could_ be a `DataFrame`. This rules out
 /// obviously-wrong cases, like constants and literals.
-pub fn is_dataframe_candidate(expr: &Expr) -> bool {
+pub const fn is_dataframe_candidate(expr: &Expr) -> bool {
     !matches!(
         expr.node,
         ExprKind::Constant { .. }

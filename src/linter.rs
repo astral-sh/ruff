@@ -34,8 +34,8 @@ pub struct LinterResult<T> {
 }
 
 impl<T> LinterResult<T> {
-    fn new(data: T, error: Option<ParseError>) -> Self {
-        LinterResult { data, error }
+    const fn new(data: T, error: Option<ParseError>) -> Self {
+        Self { data, error }
     }
 
     fn map<U, F: FnOnce(T) -> U>(self, f: F) -> LinterResult<U> {

@@ -648,7 +648,7 @@ pub trait RuleNamespace: Sized {
 pub struct UpstreamCategory(pub RuleCodePrefix, pub &'static str);
 
 impl Linter {
-    pub fn upstream_categories(&self) -> Option<&'static [UpstreamCategory]> {
+    pub const fn upstream_categories(&self) -> Option<&'static [UpstreamCategory]> {
         match self {
             Linter::Pycodestyle => Some(&[
                 UpstreamCategory(RuleCodePrefix::E, "Error"),
@@ -678,7 +678,7 @@ pub enum LintSource {
 impl Rule {
     /// The source for the diagnostic (either the AST, the filesystem, or the
     /// physical lines).
-    pub fn lint_source(&self) -> &'static LintSource {
+    pub const fn lint_source(&self) -> &'static LintSource {
         match self {
             Rule::UnusedNOQA => &LintSource::NoQa,
             Rule::BlanketNOQA

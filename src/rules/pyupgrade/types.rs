@@ -12,26 +12,26 @@ pub enum Primitive {
 }
 
 impl Primitive {
-    pub fn from_constant(constant: &Constant) -> Option<Self> {
+    pub const fn from_constant(constant: &Constant) -> Option<Self> {
         match constant {
-            Constant::Bool(_) => Some(Primitive::Bool),
-            Constant::Str(_) => Some(Primitive::Str),
-            Constant::Bytes(_) => Some(Primitive::Bytes),
-            Constant::Int(_) => Some(Primitive::Int),
-            Constant::Float(_) => Some(Primitive::Float),
-            Constant::Complex { .. } => Some(Primitive::Complex),
+            Constant::Bool(_) => Some(Self::Bool),
+            Constant::Str(_) => Some(Self::Str),
+            Constant::Bytes(_) => Some(Self::Bytes),
+            Constant::Int(_) => Some(Self::Int),
+            Constant::Float(_) => Some(Self::Float),
+            Constant::Complex { .. } => Some(Self::Complex),
             _ => None,
         }
     }
 
     pub fn builtin(self) -> String {
         match self {
-            Primitive::Bool => "bool".to_string(),
-            Primitive::Str => "str".to_string(),
-            Primitive::Bytes => "bytes".to_string(),
-            Primitive::Int => "int".to_string(),
-            Primitive::Float => "float".to_string(),
-            Primitive::Complex => "complex".to_string(),
+            Self::Bool => "bool".to_string(),
+            Self::Str => "str".to_string(),
+            Self::Bytes => "bytes".to_string(),
+            Self::Int => "int".to_string(),
+            Self::Float => "float".to_string(),
+            Self::Complex => "complex".to_string(),
         }
     }
 }

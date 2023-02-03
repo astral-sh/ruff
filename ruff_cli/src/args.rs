@@ -313,13 +313,13 @@ pub struct LogLevelArgs {
 impl From<&LogLevelArgs> for LogLevel {
     fn from(args: &LogLevelArgs) -> Self {
         if args.silent {
-            LogLevel::Silent
+            Self::Silent
         } else if args.quiet {
-            LogLevel::Quiet
+            Self::Quiet
         } else if args.verbose {
-            LogLevel::Verbose
+            Self::Verbose
         } else {
-            LogLevel::Default
+            Self::Default
         }
     }
 }

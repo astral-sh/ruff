@@ -3785,11 +3785,11 @@ impl<'a> Checker<'a> {
             .map(|index| &self.scopes[*index])
     }
 
-    pub fn in_exception_handler(&self) -> bool {
+    pub const fn in_exception_handler(&self) -> bool {
         self.in_exception_handler
     }
 
-    pub fn execution_context(&self) -> ExecutionContext {
+    pub const fn execution_context(&self) -> ExecutionContext {
         if self.in_type_checking_block
             || self.in_annotation
             || self.in_deferred_string_type_definition

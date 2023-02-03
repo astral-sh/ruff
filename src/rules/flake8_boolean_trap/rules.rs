@@ -69,7 +69,7 @@ fn allow_boolean_trap(func: &Expr) -> bool {
     false
 }
 
-fn is_boolean_arg(arg: &Expr) -> bool {
+const fn is_boolean_arg(arg: &Expr) -> bool {
     matches!(
         &arg.node,
         ExprKind::Constant {

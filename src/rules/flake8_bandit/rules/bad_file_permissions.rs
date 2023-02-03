@@ -76,11 +76,7 @@ fn get_int_value(expr: &Expr) -> Option<u16> {
             ..
         } => value.to_u16(),
         ExprKind::Attribute { .. } => {
-            if let Some(path) = compose_call_path(expr) {
-                PYSTAT_MAPPING.get(path.as_str()).copied()
-            } else {
-                None
-            }
+            compose_call_path(expr).and_then(|path| PYSTAT_MAPPING.get(path.as_str()).copied())
         }
         ExprKind::BinOp { left, op, right } => {
             if let (Some(left_value), Some(right_value)) =

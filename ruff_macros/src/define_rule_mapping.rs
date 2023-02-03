@@ -148,6 +148,6 @@ impl Parse for Mapping {
             let _: Token![,] = input.parse()?;
             entries.push((code, path, name));
         }
-        Ok(Mapping { entries })
+        Ok(Self { entries })
     }
 }

@@ -9,9 +9,7 @@ rustflags = [
   #      `https://github.com/EmbarkStudios/rust-ecosystem/issues/22#issuecomment-947011395`
   "-Dunsafe_code",
   "-Wclippy::pedantic",
-  "-Wclippy::print_stdout",
-  "-Wclippy::print_stderr",
-  "-Wclippy::dbg_macro",
+  # Allowed pedantic lints
   "-Wclippy::char_lit_as_u8",
   "-Aclippy::collapsible_else_if",
   "-Aclippy::collapsible_if",
@@ -22,5 +20,9 @@ rustflags = [
   "-Aclippy::module_name_repetitions",
   "-Aclippy::must_use_candidate",
   "-Aclippy::similar_names",
-  "-Aclippy::too_many_lines"
+  "-Aclippy::too_many_lines",
+  # Disallowed restriction lints
+  "-Wclippy::print_stdout",
+  "-Wclippy::print_stderr",
+  "-Wclippy::dbg_macro",
 ]
