@@ -86,7 +86,7 @@ ruff_macros::define_rule_mapping!(
     PLE1142 => rules::pylint::rules::AwaitOutsideAsync,
     PLR0206 => rules::pylint::rules::PropertyWithParameters,
     PLR0402 => rules::pylint::rules::ConsiderUsingFromImport,
-    PLR0133 => rules::pylint::rules::ConstantComparison,
+    PLR0133 => rules::pylint::rules::ComparisonOfConstant,
     PLR1701 => rules::pylint::rules::ConsiderMergingIsinstance,
     PLR1722 => rules::pylint::rules::ConsiderUsingSysExit,
     PLR2004 => rules::pylint::rules::MagicValueComparison,

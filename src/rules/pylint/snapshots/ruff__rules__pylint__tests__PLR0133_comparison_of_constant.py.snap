@@ -3,7 +3,7 @@ source: src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "100"
       op: Eq
       right_constant: "100"
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "1"
       op: Eq
       right_constant: "3"
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "1"
       op: NotEq
       right_constant: "3"
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "4"
       op: Eq
       right_constant: "3"
@@ -55,7 +55,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "1"
       op: Gt
       right_constant: "0"
@@ -68,7 +68,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "1"
       op: GtE
       right_constant: "0"
@@ -81,7 +81,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "1"
       op: Lt
       right_constant: "0"
@@ -94,7 +94,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "1"
       op: LtE
       right_constant: "0"
@@ -107,7 +107,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "'hello'"
       op: Eq
       right_constant: "''"
@@ -120,7 +120,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConstantComparison:
+    ComparisonOfConstant:
       left_constant: "True"
       op: Eq
       right_constant: "False"

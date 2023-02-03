@@ -3020,8 +3020,8 @@ where
                     );
                 }
 
-                if self.settings.rules.enabled(&Rule::ConstantComparison) {
-                    pylint::rules::constant_comparison(self, left, ops, comparators);
+                if self.settings.rules.enabled(&Rule::ComparisonOfConstant) {
+                    pylint::rules::comparison_of_constant(self, left, ops, comparators);
                 }
 
                 if self.settings.rules.enabled(&Rule::MagicValueComparison) {
