@@ -47,7 +47,6 @@ pub mod settings;
 pub mod source_code;
 mod vendor;
 mod violation;
-mod violations;
 mod visibility;
 
 use cfg_if::cfg_if;

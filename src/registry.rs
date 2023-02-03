@@ -7,8 +7,8 @@ use strum_macros::{AsRefStr, EnumIter};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
+use crate::rules;
 use crate::violation::Violation;
-use crate::{rules, violations};
 
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
@@ -385,9 +385,9 @@ ruff_macros::define_rule_mapping!(
     PD015 => rules::pandas_vet::rules::UseOfPdMerge,
     PD901 => rules::pandas_vet::rules::DfIsABadVariableName,
     // flake8-errmsg
-    EM101 => violations::RawStringInException,
-    EM102 => violations::FStringInException,
-    EM103 => violations::DotFormatInException,
+    EM101 => rules::flake8_errmsg::rules::RawStringInException,
+    EM102 => rules::flake8_errmsg::rules::FStringInException,
+    EM103 => rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pytest-style
     PT001 => rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     PT002 => rules::flake8_pytest_style::rules::FixturePositionalArgs,
