@@ -1,5 +1,5 @@
 #![allow(clippy::useless_format)]
-use itertools::Itertools;
+
 use ruff_macros::derive_message_formats;
 
 use crate::define_violation;
@@ -19,38 +19,6 @@ impl Violation for FunctionIsTooComplex {
     fn message(&self) -> String {
         let FunctionIsTooComplex { name, complexity } = self;
         format!("`{name}` is too complex ({complexity})")
-    }
-}
-
-// flake8-implicit-str-concat
-
-define_violation!(
-    pub struct SingleLineImplicitStringConcatenation;
-);
-impl Violation for SingleLineImplicitStringConcatenation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Implicitly concatenated string literals on one line")
-    }
-}
-
-define_violation!(
-    pub struct MultiLineImplicitStringConcatenation;
-);
-impl Violation for MultiLineImplicitStringConcatenation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Implicitly concatenated string literals over multiple lines")
-    }
-}
-
-define_violation!(
-    pub struct ExplicitStringConcatenation;
-);
-impl Violation for ExplicitStringConcatenation {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Explicitly concatenated string should be implicitly concatenated")
     }
 }
 
