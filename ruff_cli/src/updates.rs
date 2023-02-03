@@ -68,7 +68,10 @@ pub fn check_for_updates() -> Result<()> {
             pkg_name = CARGO_PKG_NAME.green()
         );
 
-        println!("\n{msg}\n{cmd}");
+        #[allow(clippy::print_stdout)]
+        {
+            println!("\n{msg}\n{cmd}");
+        }
     }
 
     Ok(())

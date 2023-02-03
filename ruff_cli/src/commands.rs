@@ -1,5 +1,6 @@
 use std::fs::remove_dir_all;
-use std::io::{self, Read};
+use std::io::Write;
+use std::io::{self, BufWriter, Read};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -11,6 +12,9 @@ use log::{debug, error};
 use path_absolutize::path_dedot;
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use serde::Serialize;
+use walkdir::WalkDir;
+
 use ruff::cache::CACHE_DIR_NAME;
 use ruff::linter::add_noqa_to_path;
 use ruff::logging::LogLevel;
@@ -19,8 +23,6 @@ use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
-use serde::Serialize;
-use walkdir::WalkDir;
 
 use crate::args::{HelpFormat, Overrides};
 use crate::cache;
@@ -230,8 +232,10 @@ pub fn show_settings(
     };
     let path = entry.path();
     let settings = resolver.resolve(path, pyproject_strategy);
-    println!("Resolved settings for: {path:?}");
-    println!("{settings:#?}");
+
+    let mut stdout = BufWriter::new(io::stdout().lock());
+    write!(stdout, "Resolved settings for: {path:?}")?;
+    write!(stdout, "{settings:#?}")?;
 
     Ok(())
 }
@@ -251,12 +255,13 @@ pub fn show_files(
     }
 
     // Print the list of files.
+    let mut stdout = BufWriter::new(io::stdout().lock());
     for entry in paths
         .iter()
         .flatten()
         .sorted_by(|a, b| a.path().cmp(b.path()))
     {
-        println!("{}", entry.path().to_string_lossy());
+        writeln!(stdout, "{}", entry.path().to_string_lossy())?;
     }
 
     Ok(())
@@ -272,34 +277,39 @@ struct Explanation<'a> {
 /// Explain a `Rule` to the user.
 pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let (linter, _) = Linter::parse_code(rule.code()).unwrap();
+    let mut stdout = BufWriter::new(io::stdout().lock());
     match format {
         HelpFormat::Text => {
-            println!("{}\n", rule.as_ref());
-            println!("Code: {} ({})\n", rule.code(), linter.name());
+            writeln!(stdout, "{}\n", rule.as_ref())?;
+            writeln!(stdout, "Code: {} ({})\n", rule.code(), linter.name())?;
 
             if let Some(autofix) = rule.autofixable() {
-                println!(
+                writeln!(
+                    stdout,
                     "{}",
                     match autofix.available {
                         AutofixAvailability::Sometimes => "Autofix is sometimes available.\n",
                         AutofixAvailability::Always => "Autofix is always available.\n",
                     }
-                );
+                )?;
             }
-            println!("Message formats:\n");
+
+            writeln!(stdout, "Message formats:\n")?;
+
             for format in rule.message_formats() {
-                println!("* {format}");
+                writeln!(stdout, "* {format}")?;
             }
         }
         HelpFormat::Json => {
-            println!(
+            writeln!(
+                stdout,
                 "{}",
                 serde_json::to_string_pretty(&Explanation {
                     code: rule.code(),
                     linter: linter.name(),
                     summary: rule.message_formats()[0],
                 })?
-            );
+            )?;
         }
     };
     Ok(())
@@ -307,6 +317,7 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
 
 /// Clear any caches in the current directory or any subdirectories.
 pub fn clean(level: LogLevel) -> Result<()> {
+    let mut stderr = BufWriter::new(io::stderr().lock());
     for entry in WalkDir::new(&*path_dedot::CWD)
         .into_iter()
         .filter_map(Result::ok)
@@ -315,7 +326,11 @@ pub fn clean(level: LogLevel) -> Result<()> {
         let cache = entry.path().join(CACHE_DIR_NAME);
         if cache.is_dir() {
             if level >= LogLevel::Default {
-                eprintln!("Removing cache at: {}", fs::relativize_path(&cache).bold());
+                writeln!(
+                    stderr,
+                    "Removing cache at: {}",
+                    fs::relativize_path(&cache).bold()
+                )?;
             }
             remove_dir_all(&cache)?;
         }

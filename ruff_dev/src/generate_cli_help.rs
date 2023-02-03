@@ -1,4 +1,5 @@
 //! Generate CLI help.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use crate::utils::replace_readme_section;
 use anyhow::Result;

@@ -236,14 +236,17 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
 
     // Log any parse errors.
     if let Some(err) = error {
-        eprintln!(
-            "{}{} {}{}{} {err:?}",
-            "error".red().bold(),
-            ":".bold(),
-            "Failed to parse ".bold(),
-            fs::relativize_path(path).bold(),
-            ":".bold()
-        );
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!(
+                "{}{} {}{}{} {err:?}",
+                "error".red().bold(),
+                ":".bold(),
+                "Failed to parse ".bold(),
+                fs::relativize_path(path).bold(),
+                ":".bold()
+            );
+        }
     }
 
     // Add any missing `# noqa` pragmas.
@@ -372,8 +375,10 @@ pub fn lint_fix<'a>(
             // longer parseable on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
             if parseable && result.error.is_some() {
-                eprintln!(
-                    r#"
+                #[allow(clippy::print_stderr)]
+                {
+                    eprintln!(
+                        r#"
 {}: Autofix introduced a syntax error. Reverting all changes.
 
 This indicates a bug in `{}`. If you could open an issue at:
@@ -382,11 +387,12 @@ This indicates a bug in `{}`. If you could open an issue at:
 
 ...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
-                    "error".red().bold(),
-                    CARGO_PKG_NAME,
-                    CARGO_PKG_REPOSITORY,
-                    fs::relativize_path(path),
-                );
+                        "error".red().bold(),
+                        CARGO_PKG_NAME,
+                        CARGO_PKG_REPOSITORY,
+                        fs::relativize_path(path),
+                    );
+                }
                 return Err(anyhow!("Autofix introduced a syntax error"));
             }
         }
@@ -407,8 +413,10 @@ This indicates a bug in `{}`. If you could open an issue at:
                 continue;
             }
 
-            eprintln!(
-                r#"
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!(
+                    r#"
 {}: Failed to converge after {} iterations.
 
 This indicates a bug in `{}`. If you could open an issue at:
@@ -417,12 +425,13 @@ This indicates a bug in `{}`. If you could open an issue at:
 
 ...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
-                "error".red().bold(),
-                MAX_ITERATIONS,
-                CARGO_PKG_NAME,
-                CARGO_PKG_REPOSITORY,
-                fs::relativize_path(path),
-            );
+                    "error".red().bold(),
+                    MAX_ITERATIONS,
+                    CARGO_PKG_NAME,
+                    CARGO_PKG_REPOSITORY,
+                    fs::relativize_path(path),
+                );
+            }
         }
 
         // Convert to messages.
