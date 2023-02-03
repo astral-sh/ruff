@@ -137,7 +137,7 @@ pub fn check_noqa(
                             valid_codes.push(code);
                         } else {
                             if let Ok(rule) = Rule::from_code(code) {
-                                if settings.rules.enabled(rule) {
+                                if settings.rules.enabled(&rule) {
                                     unmatched_codes.push(code);
                                 } else {
                                     disabled_codes.push(code);

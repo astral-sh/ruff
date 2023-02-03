@@ -36,7 +36,7 @@ pub enum Command {
     #[clap(alias = "--explain")]
     Rule {
         #[arg(value_parser=Rule::from_code)]
-        rule: &'static Rule,
+        rule: Rule,
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
