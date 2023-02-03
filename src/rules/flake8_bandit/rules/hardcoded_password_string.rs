@@ -1,9 +1,24 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use super::super::helpers::{matches_password_name, string_literal};
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct HardcodedPasswordString {
+        pub string: String,
+    }
+);
+impl Violation for HardcodedPasswordString {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let HardcodedPasswordString { string } = self;
+        format!("Possible hardcoded password: \"{}\"", string.escape_debug())
+    }
+}
 
 fn is_password_target(target: &Expr) -> bool {
     let target_name = match &target.node {
@@ -35,7 +50,7 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
                 return None;
             }
             Some(Diagnostic::new(
-                violations::HardcodedPasswordString {
+                HardcodedPasswordString {
                     string: string.to_string(),
                 },
                 Range::from_located(comp),
@@ -50,7 +65,7 @@ pub fn assign_hardcoded_password_string(value: &Expr, targets: &[Expr]) -> Optio
         for target in targets {
             if is_password_target(target) {
                 return Some(Diagnostic::new(
-                    violations::HardcodedPasswordString {
+                    HardcodedPasswordString {
                         string: string.to_string(),
                     },
                     Range::from_located(value),

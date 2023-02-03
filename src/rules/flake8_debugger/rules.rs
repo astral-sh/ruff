@@ -4,8 +4,29 @@ use super::types::DebuggerUsingType;
 use crate::ast::helpers::format_call_path;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+
+use ruff_macros::derive_message_formats;
+
+// flake8-debugger
+
+define_violation!(
+    pub struct Debugger {
+        pub using_type: DebuggerUsingType,
+    }
+);
+impl Violation for Debugger {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let Debugger { using_type } = self;
+        match using_type {
+            DebuggerUsingType::Call(name) => format!("Trace found: `{name}` used"),
+            DebuggerUsingType::Import(name) => format!("Import for `{name}` found"),
+        }
+    }
+}
 
 const DEBUGGERS: &[&[&str]] = &[
     &["pdb", "set_trace"],
@@ -33,7 +54,7 @@ pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
             .find(|target| call_path.as_slice() == **target)
     }) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::Debugger {
+            Debugger {
                 using_type: DebuggerUsingType::Call(format_call_path(target)),
             },
             Range::from_located(expr),
@@ -54,7 +75,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
         call_path.push(name);
         if DEBUGGERS.iter().any(|target| call_path == **target) {
             return Some(Diagnostic::new(
-                violations::Debugger {
+                Debugger {
                     using_type: DebuggerUsingType::Import(format_call_path(&call_path)),
                 },
                 Range::from_located(stmt),
@@ -67,7 +88,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
             .any(|call_path| call_path[..call_path.len() - 1] == parts)
         {
             return Some(Diagnostic::new(
-                violations::Debugger {
+                Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
                 },
                 Range::from_located(stmt),

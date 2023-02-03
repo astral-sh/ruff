@@ -25,7 +25,7 @@ impl Violation for TooManyStatements {
 }
 
 fn num_statements(stmts: &[Stmt]) -> usize {
-    let mut count: usize = 0;
+    let mut count = 0;
     for stmt in stmts {
         // TODO(charlie): Account for pattern match statement.
         match &stmt.node {
@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn pass() -> Result<()> {
         let source: &str = r#"
-def f():
+def f():  # 2
     pass
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
@@ -160,7 +160,7 @@ def f():
     #[test]
     fn if_elif() -> Result<()> {
         let source: &str = r#"
-def f():
+def f():  # 5
     if a:
         print()
     elif a:
@@ -174,7 +174,7 @@ def f():
     #[test]
     fn if_elif_else() -> Result<()> {
         let source: &str = r#"
-def f():
+def f():  # 9
     if a:
         print()
     elif a == 2:
@@ -185,14 +185,14 @@ def f():
         print()
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(num_statements(&stmts), 9); // counter-intuitive, but elif counts as 2 statements according to pylint itself
+        assert_eq!(num_statements(&stmts), 9);
         Ok(())
     }
 
     #[test]
     fn many_statements() -> Result<()> {
         let source: &str = r#"
-async def f():
+async def f():  # 19
     a = 1
     b = 2
     c = 3
@@ -247,7 +247,7 @@ def f():  # 3
     #[test]
     fn nested_def() -> Result<()> {
         let source: &str = r#"
-def f():
+def f():  # 5
     def g():
         print()
         print()
@@ -262,7 +262,7 @@ def f():
     #[test]
     fn nested_class() -> Result<()> {
         let source: &str = r#"
-def f():
+def f():  # 3
     class A:
         def __init__(self):
             pass
@@ -389,7 +389,7 @@ def f():  # 11
     #[test]
     fn yield_() -> Result<()> {
         let source: &str = r#"
-def f():
+def f():  # 2
     for i in range(10):
         yield i
 "#;

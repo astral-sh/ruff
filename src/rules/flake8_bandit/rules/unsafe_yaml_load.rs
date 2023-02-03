@@ -1,10 +1,37 @@
 use rustpython_ast::{Expr, ExprKind, Keyword};
 
+use ruff_macros::derive_message_formats;
+
 use crate::ast::helpers::SimpleCallArgs;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+
+define_violation!(
+    pub struct UnsafeYAMLLoad {
+        pub loader: Option<String>,
+    }
+);
+impl Violation for UnsafeYAMLLoad {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnsafeYAMLLoad { loader } = self;
+        match loader {
+            Some(name) => {
+                format!(
+                    "Probable use of unsafe loader `{name}` with `yaml.load`. Allows \
+                     instantiation of arbitrary objects. Consider `yaml.safe_load`."
+                )
+            }
+            None => format!(
+                "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. \
+                 Consider `yaml.safe_load`."
+            ),
+        }
+    }
+}
 
 /// S506
 pub fn unsafe_yaml_load(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
@@ -27,13 +54,13 @@ pub fn unsafe_yaml_load(checker: &mut Checker, func: &Expr, args: &[Expr], keywo
                     _ => None,
                 };
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::UnsafeYAMLLoad { loader },
+                    UnsafeYAMLLoad { loader },
                     Range::from_located(loader_arg),
                 ));
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
-                violations::UnsafeYAMLLoad { loader: None },
+                UnsafeYAMLLoad { loader: None },
                 Range::from_located(func),
             ));
         }

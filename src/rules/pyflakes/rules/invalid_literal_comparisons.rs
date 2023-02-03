@@ -1,3 +1,11 @@
+use itertools::izip;
+use log::error;
+use once_cell::unsync::Lazy;
+use rustpython_ast::{Cmpop, Expr};
+use serde::{Deserialize, Serialize};
+
+use ruff_macros::derive_message_formats;
+
 use crate::ast::helpers;
 use crate::ast::operations::locate_cmpops;
 use crate::ast::types::Range;
@@ -6,11 +14,6 @@ use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
-use itertools::izip;
-use once_cell::unsync::Lazy;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Cmpop, Expr};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IsCmpop {
@@ -75,7 +78,7 @@ pub fn invalid_literal_comparison(
                         Cmpop::Is => Some("==".to_string()),
                         Cmpop::IsNot => Some("!=".to_string()),
                         node => {
-                            eprintln!("Failed to fix invalid comparison: {node:?}");
+                            error!("Failed to fix invalid comparison: {node:?}");
                             None
                         }
                     } {
@@ -89,7 +92,7 @@ pub fn invalid_literal_comparison(
                         ));
                     }
                 } else {
-                    eprintln!("Failed to fix invalid comparison due to missing op");
+                    error!("Failed to fix invalid comparison due to missing op");
                 }
             }
             checker.diagnostics.push(diagnostic);

@@ -5,7 +5,44 @@ use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::rules::regexes::{COMMENT_REGEX, INNER_FUNCTION_OR_CLASS_REGEX};
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct NoBlankLineBeforeFunction {
+        pub num_lines: usize,
+    }
+);
+impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NoBlankLineBeforeFunction { num_lines } = self;
+        format!("No blank lines allowed before function docstring (found {num_lines})")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove blank line(s) before function docstring".to_string()
+    }
+}
+
+define_violation!(
+    pub struct NoBlankLineAfterFunction {
+        pub num_lines: usize,
+    }
+);
+impl AlwaysAutofixableViolation for NoBlankLineAfterFunction {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NoBlankLineAfterFunction { num_lines } = self;
+        format!("No blank lines allowed after function docstring (found {num_lines})")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove blank line(s) after function docstring".to_string()
+    }
+}
 
 /// D201, D202
 pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring) {
@@ -35,7 +72,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             .count();
         if blank_lines_before != 0 {
             let mut diagnostic = Diagnostic::new(
-                violations::NoBlankLineBeforeFunction {
+                NoBlankLineBeforeFunction {
                     num_lines: blank_lines_before,
                 },
                 Range::from_located(docstring.expr),
@@ -82,7 +119,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
 
         if blank_lines_after != 0 {
             let mut diagnostic = Diagnostic::new(
-                violations::NoBlankLineAfterFunction {
+                NoBlankLineAfterFunction {
                     num_lines: blank_lines_after,
                 },
                 Range::from_located(docstring.expr),

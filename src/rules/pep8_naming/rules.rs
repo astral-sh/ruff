@@ -5,17 +5,210 @@ use crate::ast::function_type;
 use crate::ast::helpers::identifier_range;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::python::string::{self};
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct InvalidClassName {
+        pub name: String,
+    }
+);
+impl Violation for InvalidClassName {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let InvalidClassName { name } = self;
+        format!("Class name `{name}` should use CapWords convention ")
+    }
+}
+
+define_violation!(
+    pub struct InvalidFunctionName {
+        pub name: String,
+    }
+);
+impl Violation for InvalidFunctionName {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let InvalidFunctionName { name } = self;
+        format!("Function name `{name}` should be lowercase")
+    }
+}
+
+define_violation!(
+    pub struct InvalidArgumentName {
+        pub name: String,
+    }
+);
+impl Violation for InvalidArgumentName {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let InvalidArgumentName { name } = self;
+        format!("Argument name `{name}` should be lowercase")
+    }
+}
+
+define_violation!(
+    pub struct InvalidFirstArgumentNameForClassMethod;
+);
+impl Violation for InvalidFirstArgumentNameForClassMethod {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("First argument of a class method should be named `cls`")
+    }
+}
+
+define_violation!(
+    pub struct InvalidFirstArgumentNameForMethod;
+);
+impl Violation for InvalidFirstArgumentNameForMethod {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("First argument of a method should be named `self`")
+    }
+}
+
+define_violation!(
+    pub struct NonLowercaseVariableInFunction {
+        pub name: String,
+    }
+);
+impl Violation for NonLowercaseVariableInFunction {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NonLowercaseVariableInFunction { name } = self;
+        format!("Variable `{name}` in function should be lowercase")
+    }
+}
+
+define_violation!(
+    pub struct DunderFunctionName;
+);
+impl Violation for DunderFunctionName {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Function name should not start and end with `__`")
+    }
+}
+
+define_violation!(
+    pub struct ConstantImportedAsNonConstant {
+        pub name: String,
+        pub asname: String,
+    }
+);
+impl Violation for ConstantImportedAsNonConstant {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ConstantImportedAsNonConstant { name, asname } = self;
+        format!("Constant `{name}` imported as non-constant `{asname}`")
+    }
+}
+
+define_violation!(
+    pub struct LowercaseImportedAsNonLowercase {
+        pub name: String,
+        pub asname: String,
+    }
+);
+impl Violation for LowercaseImportedAsNonLowercase {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let LowercaseImportedAsNonLowercase { name, asname } = self;
+        format!("Lowercase `{name}` imported as non-lowercase `{asname}`")
+    }
+}
+
+define_violation!(
+    pub struct CamelcaseImportedAsLowercase {
+        pub name: String,
+        pub asname: String,
+    }
+);
+impl Violation for CamelcaseImportedAsLowercase {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let CamelcaseImportedAsLowercase { name, asname } = self;
+        format!("Camelcase `{name}` imported as lowercase `{asname}`")
+    }
+}
+
+define_violation!(
+    pub struct CamelcaseImportedAsConstant {
+        pub name: String,
+        pub asname: String,
+    }
+);
+impl Violation for CamelcaseImportedAsConstant {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let CamelcaseImportedAsConstant { name, asname } = self;
+        format!("Camelcase `{name}` imported as constant `{asname}`")
+    }
+}
+
+define_violation!(
+    pub struct MixedCaseVariableInClassScope {
+        pub name: String,
+    }
+);
+impl Violation for MixedCaseVariableInClassScope {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MixedCaseVariableInClassScope { name } = self;
+        format!("Variable `{name}` in class scope should not be mixedCase")
+    }
+}
+
+define_violation!(
+    pub struct MixedCaseVariableInGlobalScope {
+        pub name: String,
+    }
+);
+impl Violation for MixedCaseVariableInGlobalScope {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MixedCaseVariableInGlobalScope { name } = self;
+        format!("Variable `{name}` in global scope should not be mixedCase")
+    }
+}
+
+define_violation!(
+    pub struct CamelcaseImportedAsAcronym {
+        pub name: String,
+        pub asname: String,
+    }
+);
+impl Violation for CamelcaseImportedAsAcronym {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let CamelcaseImportedAsAcronym { name, asname } = self;
+        format!("Camelcase `{name}` imported as acronym `{asname}`")
+    }
+}
+
+define_violation!(
+    pub struct ErrorSuffixOnExceptionName {
+        pub name: String,
+    }
+);
+impl Violation for ErrorSuffixOnExceptionName {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let ErrorSuffixOnExceptionName { name } = self;
+        format!("Exception name `{name}` should be named with an Error suffix")
+    }
+}
 
 /// N801
 pub fn invalid_class_name(class_def: &Stmt, name: &str, locator: &Locator) -> Option<Diagnostic> {
     let stripped = name.strip_prefix('_').unwrap_or(name);
     if !stripped.chars().next().map_or(false, char::is_uppercase) || stripped.contains('_') {
         return Some(Diagnostic::new(
-            violations::InvalidClassName {
+            InvalidClassName {
                 name: name.to_string(),
             },
             identifier_range(class_def, locator),
@@ -33,7 +226,7 @@ pub fn invalid_function_name(
 ) -> Option<Diagnostic> {
     if name.to_lowercase() != name && !ignore_names.iter().any(|ignore_name| ignore_name == name) {
         return Some(Diagnostic::new(
-            violations::InvalidFunctionName {
+            InvalidFunctionName {
                 name: name.to_string(),
             },
             identifier_range(func_def, locator),
@@ -46,7 +239,7 @@ pub fn invalid_function_name(
 pub fn invalid_argument_name(name: &str, arg: &Arg) -> Option<Diagnostic> {
     if name.to_lowercase() != name {
         return Some(Diagnostic::new(
-            violations::InvalidArgumentName {
+            InvalidArgumentName {
                 name: name.to_string(),
             },
             Range::from_located(arg),
@@ -79,14 +272,14 @@ pub fn invalid_first_argument_name_for_class_method(
     if let Some(arg) = args.posonlyargs.first() {
         if arg.node.arg != "cls" {
             return Some(Diagnostic::new(
-                violations::InvalidFirstArgumentNameForClassMethod,
+                InvalidFirstArgumentNameForClassMethod,
                 Range::from_located(arg),
             ));
         }
     } else if let Some(arg) = args.args.first() {
         if arg.node.arg != "cls" {
             return Some(Diagnostic::new(
-                violations::InvalidFirstArgumentNameForClassMethod,
+                InvalidFirstArgumentNameForClassMethod,
                 Range::from_located(arg),
             ));
         }
@@ -120,7 +313,7 @@ pub fn invalid_first_argument_name_for_method(
         return None;
     }
     Some(Diagnostic::new(
-        violations::InvalidFirstArgumentNameForMethod,
+        InvalidFirstArgumentNameForMethod,
         Range::from_located(arg),
     ))
 }
@@ -137,7 +330,7 @@ pub fn non_lowercase_variable_in_function(
         && !helpers::is_type_var_assignment(checker, stmt)
     {
         checker.diagnostics.push(Diagnostic::new(
-            violations::NonLowercaseVariableInFunction {
+            NonLowercaseVariableInFunction {
                 name: name.to_string(),
             },
             Range::from_located(expr),
@@ -164,7 +357,7 @@ pub fn dunder_function_name(
     }
 
     Some(Diagnostic::new(
-        violations::DunderFunctionName,
+        DunderFunctionName,
         identifier_range(stmt, locator),
     ))
 }
@@ -178,7 +371,7 @@ pub fn constant_imported_as_non_constant(
 ) -> Option<Diagnostic> {
     if string::is_upper(name) && !string::is_upper(asname) {
         return Some(Diagnostic::new(
-            violations::ConstantImportedAsNonConstant {
+            ConstantImportedAsNonConstant {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },
@@ -197,7 +390,7 @@ pub fn lowercase_imported_as_non_lowercase(
 ) -> Option<Diagnostic> {
     if !string::is_upper(name) && string::is_lower(name) && asname.to_lowercase() != asname {
         return Some(Diagnostic::new(
-            violations::LowercaseImportedAsNonLowercase {
+            LowercaseImportedAsNonLowercase {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },
@@ -216,7 +409,7 @@ pub fn camelcase_imported_as_lowercase(
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name) && string::is_lower(asname) {
         return Some(Diagnostic::new(
-            violations::CamelcaseImportedAsLowercase {
+            CamelcaseImportedAsLowercase {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },
@@ -239,7 +432,7 @@ pub fn camelcase_imported_as_constant(
         && !helpers::is_acronym(name, asname)
     {
         return Some(Diagnostic::new(
-            violations::CamelcaseImportedAsConstant {
+            CamelcaseImportedAsConstant {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },
@@ -258,7 +451,7 @@ pub fn mixed_case_variable_in_class_scope(
 ) {
     if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::MixedCaseVariableInClassScope {
+            MixedCaseVariableInClassScope {
                 name: name.to_string(),
             },
             Range::from_located(expr),
@@ -275,7 +468,7 @@ pub fn mixed_case_variable_in_global_scope(
 ) {
     if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::MixedCaseVariableInGlobalScope {
+            MixedCaseVariableInGlobalScope {
                 name: name.to_string(),
             },
             Range::from_located(expr),
@@ -296,7 +489,7 @@ pub fn camelcase_imported_as_acronym(
         && helpers::is_acronym(name, asname)
     {
         return Some(Diagnostic::new(
-            violations::CamelcaseImportedAsAcronym {
+            CamelcaseImportedAsAcronym {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },
@@ -327,7 +520,7 @@ pub fn error_suffix_on_exception_name(
         return None;
     }
     Some(Diagnostic::new(
-        violations::ErrorSuffixOnExceptionName {
+        ErrorSuffixOnExceptionName {
             name: name.to_string(),
         },
         identifier_range(class_def, locator),

@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprContext, ExprKind, Operator};
 
 use crate::ast::helpers::{create_expr, has_comments, unparse_expr};
@@ -5,7 +8,19 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct UnpackInsteadOfConcatenatingToCollectionLiteral {
+        pub expr: String,
+    }
+);
+impl Violation for UnpackInsteadOfConcatenatingToCollectionLiteral {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnpackInsteadOfConcatenatingToCollectionLiteral { expr } = self;
+        format!("Consider `{expr}` instead of concatenation")
+    }
+}
 
 fn make_splat_elts(
     splat_element: &Expr,
@@ -81,7 +96,7 @@ pub fn unpack_instead_of_concatenating_to_collection_literal(checker: &mut Check
     };
 
     let mut diagnostic = Diagnostic::new(
-        violations::UnpackInsteadOfConcatenatingToCollectionLiteral {
+        UnpackInsteadOfConcatenatingToCollectionLiteral {
             expr: new_expr_string.clone(),
         },
         Range::from_located(expr),

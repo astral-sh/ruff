@@ -19,7 +19,11 @@ pub fn linter(format: HelpFormat) {
                         .join("/"),
                     prefix => prefix.to_string(),
                 };
-                println!("{:>4} {}", prefix, linter.name());
+
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("{:>4} {}", prefix, linter.name());
+                }
             }
         }
 
@@ -39,7 +43,10 @@ pub fn linter(format: HelpFormat) {
                 })
                 .collect();
 
-            println!("{}", serde_json::to_string_pretty(&linters).unwrap());
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{}", serde_json::to_string_pretty(&linters).unwrap());
+            }
         }
     }
 }

@@ -1,12 +1,3 @@
-#![forbid(unsafe_code)]
-#![warn(clippy::pedantic)]
-#![allow(
-    clippy::match_same_arms,
-    clippy::missing_errors_doc,
-    clippy::module_name_repetitions,
-    clippy::too_many_lines
-)]
-
 use std::io::{self};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -60,16 +51,19 @@ fn inner_main() -> Result<ExitCode> {
     {
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            eprintln!(
-                r#"
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!(
+                    r#"
 {}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
 
 https://github.com/charliermarsh/ruff/issues/new?title=%5BPanic%5D
 
 quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
 "#,
-                "error".red().bold(),
-            );
+                    "error".red().bold(),
+                );
+            }
             default_panic_hook(info);
         }));
     }
@@ -109,6 +103,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
     }
     if cli.show_files {
         commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
+        return Ok(ExitCode::SUCCESS);
     }
 
     // Extract options that are included in `Settings`, but only apply at the top
@@ -163,7 +158,10 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
         }
         let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
-            eprintln!("Added {modifications} noqa directives.");
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Added {modifications} noqa directives.");
+            }
         }
         return Ok(ExitCode::SUCCESS);
     }
@@ -289,7 +287,10 @@ pub fn main() -> ExitCode {
     match inner_main() {
         Ok(code) => code,
         Err(err) => {
-            eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
+            }
             ExitCode::FAILURE
         }
     }

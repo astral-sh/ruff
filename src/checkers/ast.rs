@@ -5088,7 +5088,7 @@ impl<'a> Checker<'a> {
                     pydocstyle::rules::ends_with_period(self, &docstring);
                 }
                 if self.settings.rules.enabled(&Rule::NonImperativeMood) {
-                    pydocstyle::rules::non_imperative_mood::non_imperative_mood(self, &docstring);
+                    pydocstyle::rules::non_imperative_mood(self, &docstring);
                 }
                 if self.settings.rules.enabled(&Rule::NoSignature) {
                     pydocstyle::rules::no_signature(self, &docstring);

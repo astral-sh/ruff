@@ -65,11 +65,17 @@ pub fn convert(
     let plugins = plugins.unwrap_or_else(|| {
         let from_options = plugin::infer_plugins_from_options(flake8);
         if !from_options.is_empty() {
-            eprintln!("Inferred plugins from settings: {from_options:#?}");
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Inferred plugins from settings: {from_options:#?}");
+            }
         }
         let from_codes = plugin::infer_plugins_from_codes(&referenced_codes);
         if !from_codes.is_empty() {
-            eprintln!("Inferred plugins from referenced codes: {from_codes:#?}");
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Inferred plugins from referenced codes: {from_codes:#?}");
+            }
         }
         from_options.into_iter().chain(from_codes).collect()
     });
