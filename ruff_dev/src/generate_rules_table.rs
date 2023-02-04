@@ -1,8 +1,9 @@
 //! Generate a Markdown-compatible table of supported lint rules.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use anyhow::Result;
 use itertools::Itertools;
-use ruff::registry::{Linter, LinterCategory, Rule, RuleNamespace};
+use ruff::registry::{Linter, Rule, RuleNamespace, UpstreamCategory};
 use strum::IntoEnumIterator;
 
 use crate::utils::replace_readme_section;
@@ -50,10 +51,10 @@ pub fn main(args: &Args) -> Result<()> {
     for linter in Linter::iter() {
         let codes_csv: String = match linter.common_prefix() {
             "" => linter
-                .categories()
+                .upstream_categories()
                 .unwrap()
                 .iter()
-                .map(|LinterCategory(prefix, ..)| prefix)
+                .map(|UpstreamCategory(prefix, ..)| prefix.as_ref())
                 .join(", "),
             prefix => prefix.to_string(),
         };
@@ -93,12 +94,12 @@ pub fn main(args: &Args) -> Result<()> {
             table_out.push('\n');
         }
 
-        if let Some(categories) = linter.categories() {
-            for LinterCategory(prefix, name, selector) in categories {
-                table_out.push_str(&format!("#### {name} ({prefix})"));
+        if let Some(categories) = linter.upstream_categories() {
+            for UpstreamCategory(prefix, name) in categories {
+                table_out.push_str(&format!("#### {name} ({})", prefix.as_ref()));
                 table_out.push('\n');
                 table_out.push('\n');
-                generate_table(&mut table_out, selector);
+                generate_table(&mut table_out, prefix);
             }
         } else {
             generate_table(&mut table_out, &linter);

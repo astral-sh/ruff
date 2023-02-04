@@ -98,35 +98,35 @@ impl AlwaysAutofixableViolation for AvoidQuoteEscape {
     }
 }
 
-fn good_single(quote: &Quote) -> char {
+const fn good_single(quote: &Quote) -> char {
     match quote {
         Quote::Single => '\'',
         Quote::Double => '"',
     }
 }
 
-fn bad_single(quote: &Quote) -> char {
+const fn bad_single(quote: &Quote) -> char {
     match quote {
         Quote::Double => '\'',
         Quote::Single => '"',
     }
 }
 
-fn good_multiline(quote: &Quote) -> &str {
+const fn good_multiline(quote: &Quote) -> &str {
     match quote {
         Quote::Single => "'''",
         Quote::Double => "\"\"\"",
     }
 }
 
-fn good_multiline_ending(quote: &Quote) -> &str {
+const fn good_multiline_ending(quote: &Quote) -> &str {
     match quote {
         Quote::Single => "'\"\"\"",
         Quote::Double => "\"'''",
     }
 }
 
-fn good_docstring(quote: &Quote) -> &str {
+const fn good_docstring(quote: &Quote) -> &str {
     match quote {
         Quote::Single => "'",
         Quote::Double => "\"",

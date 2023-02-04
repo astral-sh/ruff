@@ -85,6 +85,10 @@ fn read_sync(cache_dir: &Path, key: u64) -> Result<Vec<u8>, std::io::Error> {
     fs::read(cache_dir.join(content_dir()).join(format!("{key:x}")))
 }
 
+fn del_sync(cache_dir: &Path, key: u64) -> Result<(), std::io::Error> {
+    fs::remove_file(cache_dir.join(content_dir()).join(format!("{key:x}")))
+}
+
 /// Get a value from the cache.
 pub fn get<P: AsRef<Path>>(
     path: P,
@@ -136,4 +140,17 @@ pub fn set<P: AsRef<Path>>(
     ) {
         error!("Failed to write to cache: {e:?}");
     }
+}
+
+/// Delete a value from the cache.
+pub fn del<P: AsRef<Path>>(
+    path: P,
+    package: Option<&P>,
+    settings: &AllSettings,
+    autofix: flags::Autofix,
+) {
+    drop(del_sync(
+        &settings.cli.cache_dir,
+        cache_key(path, package, &settings.lib, autofix),
+    ));
 }

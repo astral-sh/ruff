@@ -12,14 +12,14 @@ mod tests {
     use test_case::test_case;
     use textwrap::dedent;
 
-    use crate::linter::check_path;
+    use crate::linter::{check_path, LinterResult};
     use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
     use crate::test::test_path;
     use crate::{assert_yaml_snapshot, directives, rustpython_helpers, settings};
 
-    fn rule_code(contents: &str, expected: &[Rule]) -> Result<()> {
+    fn rule_code(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(&RuleCodePrefix::PD);
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
@@ -28,7 +28,9 @@ mod tests {
         let indexer: Indexer = tokens.as_slice().into();
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
-        let diagnostics = check_path(
+        let LinterResult {
+            data: diagnostics, ..
+        } = check_path(
             Path::new("<filename>"),
             None,
             &contents,
@@ -40,13 +42,12 @@ mod tests {
             &settings,
             flags::Autofix::Enabled,
             flags::Noqa::Enabled,
-        )?;
+        );
         let actual = diagnostics
             .iter()
             .map(|diagnostic| diagnostic.kind.rule().clone())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
-        Ok(())
     }
 
     #[test_case(r#"
@@ -244,9 +245,8 @@ mod tests {
         import pandas as pd
         df = pd.DataFrame()
     "#, &[Rule::DfIsABadVariableName]; "PD901_fail_df_var")]
-    fn test_pandas_vet(code: &str, expected: &[Rule]) -> Result<()> {
-        rule_code(code, expected)?;
-        Ok(())
+    fn test_pandas_vet(code: &str, expected: &[Rule]) {
+        rule_code(code, expected);
     }
 
     #[test_case(Rule::UseOfInplaceArgument, Path::new("PD002.py"); "PD002")]

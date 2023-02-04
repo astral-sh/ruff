@@ -29,7 +29,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             .extend(quote! {Self::#name => <#path as Violation>::message_formats(),});
         rule_autofixable_match_arms.extend(quote! {Self::#name => <#path as Violation>::AUTOFIX,});
         rule_code_match_arms.extend(quote! {Self::#name => #code_str,});
-        rule_from_code_match_arms.extend(quote! {#code_str => Ok(&Rule::#name), });
+        rule_from_code_match_arms.extend(quote! {#code_str => Ok(Rule::#name), });
         diagkind_code_match_arms.extend(quote! {Self::#name(..) => &Rule::#name, });
         diagkind_body_match_arms.extend(quote! {Self::#name(x) => Violation::message(x), });
         diagkind_fixable_match_arms
@@ -96,7 +96,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
                 match self { #rule_code_match_arms }
             }
 
-            pub fn from_code(code: &str) -> Result<&'static Self, FromCodeError> {
+            pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
                 match code {
                     #rule_from_code_match_arms
                     _ => Err(FromCodeError::Unknown),
@@ -148,6 +148,6 @@ impl Parse for Mapping {
             let _: Token![,] = input.parse()?;
             entries.push((code, path, name));
         }
-        Ok(Mapping { entries })
+        Ok(Self { entries })
     }
 }

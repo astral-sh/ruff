@@ -46,7 +46,7 @@ struct BlockMetadata {
 }
 
 impl BlockMetadata {
-    fn new(starter: Tok, elif: Option<Location>, else_: Option<Location>) -> Self {
+    const fn new(starter: Tok, elif: Option<Location>, else_: Option<Location>) -> Self {
         Self {
             starter,
             elif,

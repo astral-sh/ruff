@@ -3,7 +3,7 @@ source: src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UseSysExit:
+    ConsiderUsingSysExit:
       name: exit
   location:
     row: 1
@@ -14,7 +14,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseSysExit:
+    ConsiderUsingSysExit:
       name: quit
   location:
     row: 2

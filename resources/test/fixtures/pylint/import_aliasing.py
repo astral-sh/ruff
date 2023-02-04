@@ -9,6 +9,7 @@ from collections import OrderedDict as o_dict
 import os.path as path  # [consider-using-from-import]
 import os.path as p
 import foo.bar.foobar as foobar  # [consider-using-from-import]
+import foo.bar.foobar as foobar, sys  # [consider-using-from-import]
 import os
 import os as OS
 from sys import version

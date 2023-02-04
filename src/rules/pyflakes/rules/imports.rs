@@ -24,7 +24,7 @@ fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
     }
 }
 impl Violation for UnusedImport {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {

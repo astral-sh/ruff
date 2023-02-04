@@ -4,7 +4,116 @@ use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Located};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, Rule};
-use crate::violations;
+use crate::violation::Violation;
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct SysVersionSlice3Referenced;
+);
+impl Violation for SysVersionSlice3Referenced {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`sys.version[:3]` referenced (python3.10), use `sys.version_info`")
+    }
+}
+
+define_violation!(
+    pub struct SysVersion2Referenced;
+);
+impl Violation for SysVersion2Referenced {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`sys.version[2]` referenced (python3.10), use `sys.version_info`")
+    }
+}
+
+define_violation!(
+    pub struct SysVersionCmpStr3;
+);
+impl Violation for SysVersionCmpStr3 {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`sys.version` compared to string (python3.10), use `sys.version_info`")
+    }
+}
+
+define_violation!(
+    pub struct SysVersionInfo0Eq3Referenced;
+);
+impl Violation for SysVersionInfo0Eq3Referenced {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`sys.version_info[0] == 3` referenced (python4), use `>=`")
+    }
+}
+
+define_violation!(
+    pub struct SixPY3Referenced;
+);
+impl Violation for SixPY3Referenced {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`six.PY3` referenced (python4), use `not six.PY2`")
+    }
+}
+
+define_violation!(
+    pub struct SysVersionInfo1CmpInt;
+);
+impl Violation for SysVersionInfo1CmpInt {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!(
+            "`sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to \
+             tuple"
+        )
+    }
+}
+
+define_violation!(
+    pub struct SysVersionInfoMinorCmpInt;
+);
+impl Violation for SysVersionInfoMinorCmpInt {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!(
+            "`sys.version_info.minor` compared to integer (python4), compare `sys.version_info` \
+             to tuple"
+        )
+    }
+}
+
+define_violation!(
+    pub struct SysVersion0Referenced;
+);
+impl Violation for SysVersion0Referenced {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`sys.version[0]` referenced (python10), use `sys.version_info`")
+    }
+}
+
+define_violation!(
+    pub struct SysVersionCmpStr10;
+);
+impl Violation for SysVersionCmpStr10 {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`sys.version` compared to string (python10), use `sys.version_info`")
+    }
+}
+
+define_violation!(
+    pub struct SysVersionSlice1Referenced;
+);
+impl Violation for SysVersionSlice1Referenced {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`sys.version[:1]` referenced (python10), use `sys.version_info`")
+    }
+}
 
 fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
     checker
@@ -34,7 +143,7 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                             .enabled(&Rule::SysVersionSlice1Referenced)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::SysVersionSlice1Referenced,
+                            SysVersionSlice1Referenced,
                             Range::from_located(value),
                         ));
                     } else if *i == BigInt::from(3)
@@ -44,7 +153,7 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                             .enabled(&Rule::SysVersionSlice3Referenced)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::SysVersionSlice3Referenced,
+                            SysVersionSlice3Referenced,
                             Range::from_located(value),
                         ));
                     }
@@ -59,14 +168,14 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                     && checker.settings.rules.enabled(&Rule::SysVersion2Referenced)
                 {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::SysVersion2Referenced,
+                        SysVersion2Referenced,
                         Range::from_located(value),
                     ));
                 } else if *i == BigInt::from(0)
                     && checker.settings.rules.enabled(&Rule::SysVersion0Referenced)
                 {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::SysVersion0Referenced,
+                        SysVersion0Referenced,
                         Range::from_located(value),
                     ));
                 }
@@ -106,7 +215,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                                 .enabled(&Rule::SysVersionInfo0Eq3Referenced)
                         {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::SysVersionInfo0Eq3Referenced,
+                                SysVersionInfo0Eq3Referenced,
                                 Range::from_located(left),
                             ));
                         }
@@ -126,7 +235,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     {
                         if checker.settings.rules.enabled(&Rule::SysVersionInfo1CmpInt) {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::SysVersionInfo1CmpInt,
+                                SysVersionInfo1CmpInt,
                                 Range::from_located(left),
                             ));
                         }
@@ -156,7 +265,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     .enabled(&Rule::SysVersionInfoMinorCmpInt)
                 {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::SysVersionInfoMinorCmpInt,
+                        SysVersionInfoMinorCmpInt,
                         Range::from_located(left),
                     ));
                 }
@@ -182,13 +291,13 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
             if s.len() == 1 {
                 if checker.settings.rules.enabled(&Rule::SysVersionCmpStr10) {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::SysVersionCmpStr10,
+                        SysVersionCmpStr10,
                         Range::from_located(left),
                     ));
                 }
             } else if checker.settings.rules.enabled(&Rule::SysVersionCmpStr3) {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::SysVersionCmpStr3,
+                    SysVersionCmpStr3,
                     Range::from_located(left),
                 ));
             }
@@ -202,9 +311,8 @@ pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
         .resolve_call_path(expr)
         .map_or(false, |call_path| call_path.as_slice() == ["six", "PY3"])
     {
-        checker.diagnostics.push(Diagnostic::new(
-            violations::SixPY3Referenced,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(SixPY3Referenced, Range::from_located(expr)));
     }
 }

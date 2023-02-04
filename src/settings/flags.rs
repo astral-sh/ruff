@@ -9,9 +9,9 @@ pub enum Autofix {
 impl From<bool> for Autofix {
     fn from(value: bool) -> Self {
         if value {
-            Autofix::Enabled
+            Self::Enabled
         } else {
-            Autofix::Disabled
+            Self::Disabled
         }
     }
 }
@@ -19,8 +19,8 @@ impl From<bool> for Autofix {
 impl From<fix::FixMode> for Autofix {
     fn from(value: fix::FixMode) -> Self {
         match value {
-            fix::FixMode::Generate | fix::FixMode::Diff | fix::FixMode::Apply => Autofix::Enabled,
-            fix::FixMode::None => Autofix::Disabled,
+            fix::FixMode::Generate | fix::FixMode::Diff | fix::FixMode::Apply => Self::Enabled,
+            fix::FixMode::None => Self::Disabled,
         }
     }
 }
@@ -34,9 +34,9 @@ pub enum Noqa {
 impl From<bool> for Noqa {
     fn from(value: bool) -> Self {
         if value {
-            Noqa::Enabled
+            Self::Enabled
         } else {
-            Noqa::Disabled
+            Self::Disabled
         }
     }
 }
@@ -50,9 +50,9 @@ pub enum Cache {
 impl From<bool> for Cache {
     fn from(value: bool) -> Self {
         if value {
-            Cache::Enabled
+            Self::Enabled
         } else {
-            Cache::Disabled
+            Self::Disabled
         }
     }
 }

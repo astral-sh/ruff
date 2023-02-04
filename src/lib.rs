@@ -4,20 +4,6 @@
 //! and subject to change drastically.
 //!
 //! [Ruff]: https://github.com/charliermarsh/ruff
-#![forbid(unsafe_code)]
-#![warn(clippy::pedantic)]
-#![allow(
-    clippy::collapsible_else_if,
-    clippy::collapsible_if,
-    clippy::implicit_hasher,
-    clippy::match_same_arms,
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
-    clippy::module_name_repetitions,
-    clippy::must_use_candidate,
-    clippy::similar_names,
-    clippy::too_many_lines
-)]
 
 mod assert_yaml_snapshot;
 mod ast;
@@ -47,7 +33,6 @@ pub mod settings;
 pub mod source_code;
 mod vendor;
 mod violation;
-mod violations;
 mod visibility;
 
 use cfg_if::cfg_if;
@@ -58,7 +43,6 @@ pub use violation::{AutofixKind, Availability as AutofixAvailability};
 cfg_if! {
     if #[cfg(not(target_family = "wasm"))] {
         pub mod packaging;
-
 
         mod lib_native;
         pub use lib_native::check;

@@ -12,9 +12,9 @@ pub enum FixMode {
 impl From<bool> for FixMode {
     fn from(value: bool) -> Self {
         if value {
-            FixMode::Apply
+            Self::Apply
         } else {
-            FixMode::None
+            Self::None
         }
     }
 }
@@ -27,7 +27,7 @@ pub struct Fix {
 }
 
 impl Fix {
-    pub fn deletion(start: Location, end: Location) -> Self {
+    pub const fn deletion(start: Location, end: Location) -> Self {
         Self {
             content: String::new(),
             location: start,

@@ -176,7 +176,7 @@ impl Parse for FieldAttributes {
             input.parse::<Comma>()?;
         }
 
-        Ok(FieldAttributes {
+        Ok(Self {
             default,
             value_type,
             example: textwrap::dedent(&example).trim_matches('\n').to_string(),

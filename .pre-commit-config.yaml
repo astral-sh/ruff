@@ -23,7 +23,7 @@ repos:
         types: [rust]
       - id: clippy
         name: clippy
-        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings -W clippy::pedantic
+        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
         language: rust
         pass_filenames: false
       - id: ruff

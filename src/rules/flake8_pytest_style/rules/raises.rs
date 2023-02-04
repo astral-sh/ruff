@@ -51,7 +51,7 @@ fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
     })
 }
 
-fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
+const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
     if body.len() > 1 {
         true
     } else if let Some(first_body_stmt) = body.first() {

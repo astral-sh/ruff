@@ -35,7 +35,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
         }
         if !matches!(
             scope
-                .values
+                .bindings
                 .get(&id.as_str())
                 .map(|index| &bindings[*index]),
             None | Some(Binding {

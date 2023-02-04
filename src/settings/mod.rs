@@ -90,6 +90,7 @@ pub struct Settings {
     pub extend_exclude: HashableGlobSet,
     pub force_exclude: bool,
     pub respect_gitignore: bool,
+    pub project_root: PathBuf,
 
     // Rule-specific settings
     pub allowed_confusables: HashableHashSet<char>,
@@ -167,6 +168,7 @@ impl Settings {
             src: config
                 .src
                 .unwrap_or_else(|| vec![project_root.to_path_buf()]),
+            project_root: project_root.to_path_buf(),
             target_version: config.target_version.unwrap_or(defaults::TARGET_VERSION),
             task_tags: config.task_tags.unwrap_or_else(|| {
                 defaults::TASK_TAGS
@@ -223,7 +225,7 @@ impl Settings {
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: [rule_code].into(),
-            ..Settings::default()
+            ..Self::default()
         }
     }
 
@@ -231,7 +233,7 @@ impl Settings {
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: rules.into(),
-            ..Settings::default()
+            ..Self::default()
         }
     }
 }
@@ -359,7 +361,7 @@ impl From<&Configuration> for RuleTable {
             crate::warn_user!("`{from}` has been remapped to `{}`.", target.as_ref());
         }
 
-        let mut rules = RuleTable::empty();
+        let mut rules = Self::empty();
 
         for rule in select_set {
             let fix = fixable_set.contains(&rule);

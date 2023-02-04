@@ -2,10 +2,43 @@ use itertools::Itertools;
 use rustpython_ast::{Constant, Expr, ExprKind, Operator};
 use rustpython_parser::lexer::{LexResult, Tok};
 
+use ruff_macros::derive_message_formats;
+
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_implicit_str_concat::settings::Settings;
-use crate::violations;
+use crate::violation::Violation;
+
+define_violation!(
+    pub struct SingleLineImplicitStringConcatenation;
+);
+impl Violation for SingleLineImplicitStringConcatenation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Implicitly concatenated string literals on one line")
+    }
+}
+
+define_violation!(
+    pub struct MultiLineImplicitStringConcatenation;
+);
+impl Violation for MultiLineImplicitStringConcatenation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Implicitly concatenated string literals over multiple lines")
+    }
+}
+
+define_violation!(
+    pub struct ExplicitStringConcatenation;
+);
+impl Violation for ExplicitStringConcatenation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Explicitly concatenated string should be implicitly concatenated")
+    }
+}
 
 /// ISC001, ISC002
 pub fn implicit(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
@@ -22,7 +55,7 @@ pub fn implicit(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
         if matches!(a_tok, Tok::String { .. }) && matches!(b_tok, Tok::String { .. }) {
             if a_end.row() == b_start.row() {
                 diagnostics.push(Diagnostic::new(
-                    violations::SingleLineImplicitStringConcatenation,
+                    SingleLineImplicitStringConcatenation,
                     Range {
                         location: *a_start,
                         end_location: *b_end,
@@ -30,7 +63,7 @@ pub fn implicit(tokens: &[LexResult], settings: &Settings) -> Vec<Diagnostic> {
                 ));
             } else {
                 diagnostics.push(Diagnostic::new(
-                    violations::MultiLineImplicitStringConcatenation,
+                    MultiLineImplicitStringConcatenation,
                     Range {
                         location: *a_start,
                         end_location: *b_end,
@@ -62,7 +95,7 @@ pub fn explicit(expr: &Expr) -> Option<Diagnostic> {
                     }
             ) {
                 return Some(Diagnostic::new(
-                    violations::ExplicitStringConcatenation,
+                    ExplicitStringConcatenation,
                     Range::from_located(expr),
                 ));
             }

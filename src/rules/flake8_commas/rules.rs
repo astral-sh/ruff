@@ -37,14 +37,14 @@ struct Token<'tok> {
 }
 
 impl<'tok> Token<'tok> {
-    fn irrelevant() -> Token<'static> {
+    const fn irrelevant() -> Token<'static> {
         Token {
             type_: TokenType::Irrelevant,
             spanned: None,
         }
     }
 
-    fn from_spanned(spanned: &'tok Spanned) -> Token<'tok> {
+    const fn from_spanned(spanned: &'tok Spanned) -> Token<'tok> {
         let type_ = match &spanned.1 {
             Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
             Tok::Newline => TokenType::Newline,
@@ -97,8 +97,8 @@ struct Context {
 }
 
 impl Context {
-    fn new(type_: ContextType) -> Self {
-        Context {
+    const fn new(type_: ContextType) -> Self {
+        Self {
             type_,
             num_commas: 0,
         }

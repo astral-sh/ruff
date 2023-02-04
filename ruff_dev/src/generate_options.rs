@@ -1,4 +1,5 @@
 //! Generate a Markdown-compatible listing of configuration options.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use anyhow::Result;
 use itertools::Itertools;

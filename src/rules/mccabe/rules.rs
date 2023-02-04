@@ -1,9 +1,25 @@
 use rustpython_ast::{ExcepthandlerKind, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers::identifier_range;
+use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct FunctionIsTooComplex {
+        pub name: String,
+        pub complexity: usize,
+    }
+);
+impl Violation for FunctionIsTooComplex {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let FunctionIsTooComplex { name, complexity } = self;
+        format!("`{name}` is too complex ({complexity})")
+    }
+}
 
 fn get_complexity_number(stmts: &[Stmt]) -> usize {
     let mut complexity = 0;
@@ -66,7 +82,7 @@ pub fn function_is_too_complex(
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
         Some(Diagnostic::new(
-            violations::FunctionIsTooComplex {
+            FunctionIsTooComplex {
                 name: name.to_string(),
                 complexity,
             },

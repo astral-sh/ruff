@@ -5,12 +5,12 @@ use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
+use crate::noqa;
 use crate::noqa::{is_file_exempt, Directive};
 use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rule_redirects::get_redirect_target;
+use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::{flags, Settings};
-use crate::violations::UnusedCodes;
-use crate::{noqa, violations};
 
 pub fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
@@ -106,7 +106,7 @@ pub fn check_noqa(
                         let end = start + lines[row][start_byte..end_byte].chars().count();
 
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedNOQA { codes: None },
+                            UnusedNOQA { codes: None },
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if matches!(autofix, flags::Autofix::Enabled)
@@ -137,7 +137,7 @@ pub fn check_noqa(
                             valid_codes.push(code);
                         } else {
                             if let Ok(rule) = Rule::from_code(code) {
-                                if settings.rules.enabled(rule) {
+                                if settings.rules.enabled(&rule) {
                                     unmatched_codes.push(code);
                                 } else {
                                     disabled_codes.push(code);
@@ -160,7 +160,7 @@ pub fn check_noqa(
                         let end = start + lines[row][start_byte..end_byte].chars().count();
 
                         let mut diagnostic = Diagnostic::new(
-                            violations::UnusedNOQA {
+                            UnusedNOQA {
                                 codes: Some(UnusedCodes {
                                     disabled: disabled_codes
                                         .iter()

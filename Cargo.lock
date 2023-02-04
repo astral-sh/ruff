@@ -609,15 +609,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "directories"
-version = "4.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f51c5d4ddabd36886dd3e1438cb358cdcb0d7c499cb99cb4ac2e38e18b5cb210"
-dependencies = [
- "dirs-sys",
-]
-
-[[package]]
 name = "dirs"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -750,7 +741,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.240"
+version = "0.0.241"
 dependencies = [
  "anyhow",
  "clap 4.1.4",
@@ -945,7 +936,7 @@ version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f92123bf2fe0d9f1b5df1964727b970ca3b2d0203d47cf97fb1f36d856b6398"
 dependencies = [
- "phf 0.11.1",
+ "phf",
  "rust-stemmers",
 ]
 
@@ -1573,15 +1564,6 @@ dependencies = [
 
 [[package]]
 name = "phf"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabbf1ead8a5bcbc20f5f8b939ee3f5b0f6f281b6ad3468b84656b658b455259"
-dependencies = [
- "phf_shared 0.10.0",
-]
-
-[[package]]
-name = "phf"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "928c6535de93548188ef63bb7c4036bd415cd8f36ad25af44b9789b2ee72a48c"
@@ -1591,32 +1573,12 @@ dependencies = [
 
 [[package]]
 name = "phf_codegen"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb1c3a8bc4dd4e5cfce29b44ffc14bedd2ee294559a294e2a4d4c9e9a6a13cd"
-dependencies = [
- "phf_generator 0.10.0",
- "phf_shared 0.10.0",
-]
-
-[[package]]
-name = "phf_codegen"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a56ac890c5e3ca598bbdeaa99964edb5b0258a583a9eb6ef4e89fc85d9224770"
 dependencies = [
- "phf_generator 0.11.1",
+ "phf_generator",
  "phf_shared 0.11.1",
-]
-
-[[package]]
-name = "phf_generator"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d5285893bb5eb82e6aaf5d59ee909a06a16737a8970984dd7746ba9283498d6"
-dependencies = [
- "phf_shared 0.10.0",
- "rand",
 ]
 
 [[package]]
@@ -1922,7 +1884,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.240"
+version = "0.0.241"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -1977,7 +1939,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.240"
+version = "0.0.241"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2007,14 +1969,13 @@ dependencies = [
  "similar",
  "strum",
  "textwrap",
- "update-informer",
  "ureq",
  "walkdir",
 ]
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.240"
+version = "0.0.241"
 dependencies = [
  "anyhow",
  "clap 4.1.4",
@@ -2035,7 +1996,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.240"
+version = "0.0.241"
 dependencies = [
  "once_cell",
  "proc-macro2",
@@ -2089,7 +2050,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
+source = "git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc#adc23253e4b58980b407ba2760dbe61681d752fc"
 dependencies = [
  "num-bigint",
  "rustpython-common",
@@ -2099,7 +2060,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
+source = "git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc#adc23253e4b58980b407ba2760dbe61681d752fc"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2124,7 +2085,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
+source = "git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc#adc23253e4b58980b407ba2760dbe61681d752fc"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2141,7 +2102,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
+source = "git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc#adc23253e4b58980b407ba2760dbe61681d752fc"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2151,8 +2112,8 @@ dependencies = [
  "log",
  "num-bigint",
  "num-traits",
- "phf 0.10.1",
- "phf_codegen 0.10.0",
+ "phf",
+ "phf_codegen",
  "rustc-hash",
  "rustpython-ast",
  "rustpython-compiler-core",
@@ -2455,8 +2416,8 @@ dependencies = [
  "dirs",
  "fnv",
  "nom",
- "phf 0.11.1",
- "phf_codegen 0.11.1",
+ "phf",
+ "phf_codegen",
 ]
 
 [[package]]
@@ -2759,19 +2720,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
-name = "update-informer"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "152ff185ca29f7f487c51ca785b0f1d85970c4581f4cdd12ed499227890200f5"
-dependencies = [
- "directories",
- "semver",
- "serde",
- "serde_json",
- "ureq",
-]
-
-[[package]]
 name = "ureq"
 version = "2.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2782,8 +2730,6 @@ dependencies = [
  "log",
  "once_cell",
  "rustls",
- "serde",
- "serde_json",
  "url",
  "webpki",
  "webpki-roots",

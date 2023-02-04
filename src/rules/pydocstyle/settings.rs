@@ -18,7 +18,7 @@ pub enum Convention {
 }
 
 impl Convention {
-    pub fn rules_to_be_ignored(self) -> &'static [Rule] {
+    pub const fn rules_to_be_ignored(self) -> &'static [Rule] {
         match self {
             Convention::Google => &[
                 Rule::OneBlankLineBeforeClass,

@@ -23,7 +23,7 @@ pub struct Range {
 }
 
 impl Range {
-    pub fn new(location: Location, end_location: Location) -> Self {
+    pub const fn new(location: Location, end_location: Location) -> Self {
         Self {
             location,
             end_location,
@@ -87,8 +87,11 @@ pub struct Scope<'a> {
     pub kind: ScopeKind<'a>,
     pub import_starred: bool,
     pub uses_locals: bool,
-    /// A map from bound name to binding index.
-    pub values: FxHashMap<&'a str, usize>,
+    /// A map from bound name to binding index, for live bindings.
+    pub bindings: FxHashMap<&'a str, usize>,
+    /// A map from bound name to binding index, for bindings that were created in the scope but
+    /// rebound (and thus overridden) later on in the same scope.
+    pub rebounds: FxHashMap<&'a str, Vec<usize>>,
 }
 
 impl<'a> Scope<'a> {
@@ -98,7 +101,8 @@ impl<'a> Scope<'a> {
             kind,
             import_starred: false,
             uses_locals: false,
-            values: FxHashMap::default(),
+            bindings: FxHashMap::default(),
+            rebounds: FxHashMap::default(),
         }
     }
 }
@@ -175,13 +179,13 @@ impl<'a> Binding<'a> {
         }
     }
 
-    pub fn used(&self) -> bool {
+    pub const fn used(&self) -> bool {
         self.runtime_usage.is_some()
             || self.synthetic_usage.is_some()
             || self.typing_usage.is_some()
     }
 
-    pub fn is_definition(&self) -> bool {
+    pub const fn is_definition(&self) -> bool {
         matches!(
             self.kind,
             BindingKind::ClassDefinition

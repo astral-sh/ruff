@@ -1,28 +1,20 @@
-#![forbid(unsafe_code)]
-#![warn(clippy::pedantic)]
-#![allow(
-    clippy::match_same_arms,
-    clippy::missing_errors_doc,
-    clippy::module_name_repetitions,
-    clippy::too_many_lines
-)]
-
 use std::io::{self};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use ::ruff::logging::{set_up_logging, LogLevel};
-use ::ruff::resolver::PyprojectDiscovery;
-use ::ruff::settings::types::SerializationFormat;
-use ::ruff::{fix, fs, warn_user_once};
 use anyhow::Result;
-use args::{Args, CheckArgs, Command};
 use clap::{CommandFactory, Parser, Subcommand};
 use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
+
+use ::ruff::logging::{set_up_logging, LogLevel};
+use ::ruff::resolver::PyprojectDiscovery;
+use ::ruff::settings::types::SerializationFormat;
+use ::ruff::settings::CliSettings;
+use ::ruff::{fix, fs, warn_user_once};
+use args::{Args, CheckArgs, Command};
 use printer::{Printer, Violations};
-use ruff::settings::CliSettings;
 
 pub(crate) mod args;
 mod cache;
@@ -31,8 +23,6 @@ mod diagnostics;
 mod iterators;
 mod printer;
 mod resolve;
-#[cfg(all(feature = "update-informer"))]
-pub mod updates;
 
 fn inner_main() -> Result<ExitCode> {
     let mut args: Vec<_> = std::env::args_os().collect();
@@ -62,16 +52,19 @@ fn inner_main() -> Result<ExitCode> {
     {
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            eprintln!(
-                r#"
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!(
+                    r#"
 {}: `ruff` crashed. This indicates a bug in `ruff`. If you could open an issue at:
 
 https://github.com/charliermarsh/ruff/issues/new?title=%5BPanic%5D
 
 quoting the executed command, along with the relevant file contents and `pyproject.toml` settings, we'd be very appreciative!
 "#,
-                "error".red().bold(),
-            );
+                    "error".red().bold(),
+                );
+            }
             default_panic_hook(info);
         }));
     }
@@ -80,7 +73,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, format } => commands::rule(rule, format)?,
+        Command::Rule { rule, format } => commands::rule(&rule, format)?,
         Command::Linter { format } => commands::linter::linter(format),
         Command::Clean => commands::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
@@ -111,6 +104,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
     }
     if cli.show_files {
         commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
+        return Ok(ExitCode::SUCCESS);
     }
 
     // Extract options that are included in `Settings`, but only apply at the top
@@ -160,9 +154,15 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
     }
 
     if cli.add_noqa {
+        if !matches!(autofix, fix::FixMode::None) {
+            warn_user_once!("--fix is incompatible with --add-noqa.");
+        }
         let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
-            println!("Added {modifications} noqa directives.");
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Added {modifications} noqa directives.");
+            }
         }
         return Ok(ExitCode::SUCCESS);
     }
@@ -171,7 +171,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
 
     if cli.watch {
         if !matches!(autofix, fix::FixMode::None) {
-            warn_user_once!("--fix is not enabled in watch mode.");
+            warn_user_once!("--fix is unsupported in watch mode.");
         }
         if format != SerializationFormat::Text {
             warn_user_once!("--format 'text' is used in watch mode.");
@@ -255,14 +255,10 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
             }
         }
 
-        // Check for updates if we're in a non-silent log level.
-        #[cfg(feature = "update-informer")]
-        if update_check
-            && !is_stdin
-            && log_level >= LogLevel::Default
-            && atty::is(atty::Stream::Stdout)
-        {
-            drop(updates::check_for_updates());
+        if update_check {
+            warn_user_once!(
+                "update-check has been removed; setting it will cause an error in a future version."
+            );
         }
 
         if !cli.exit_zero {
@@ -292,7 +288,10 @@ pub fn main() -> ExitCode {
     match inner_main() {
         Ok(code) => code,
         Err(err) => {
-            eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
+            }
             ExitCode::FAILURE
         }
     }

@@ -19,7 +19,7 @@ pub struct Pyproject {
 }
 
 impl Pyproject {
-    pub fn new(options: Options) -> Self {
+    pub const fn new(options: Options) -> Self {
         Self {
             tool: Some(Tools {
                 ruff: Some(options),

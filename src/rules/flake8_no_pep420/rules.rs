@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use ruff_macros::derive_message_formats;
 
@@ -19,8 +19,19 @@ impl Violation for ImplicitNamespacePackage {
 }
 
 /// INP001
-pub fn implicit_namespace_package(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
-    if package.is_none() && path.extension().map_or(true, |ext| ext != "pyi") {
+pub fn implicit_namespace_package(
+    path: &Path,
+    package: Option<&Path>,
+    src: &[PathBuf],
+) -> Option<Diagnostic> {
+    if package.is_none()
+        // Ignore `.pyi` files, which don't require an `__init__.py`.
+        && path.extension().map_or(true, |ext| ext != "pyi")
+        // Ignore any files that are direct children of a source directory (e.g., `src/manage.py`).
+        && !path
+            .parent()
+            .map_or(false, |parent| src.iter().any(|src| src == parent))
+    {
         #[cfg(all(test, windows))]
         let path = path
             .to_string_lossy()

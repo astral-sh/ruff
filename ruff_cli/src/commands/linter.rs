@@ -2,7 +2,7 @@ use itertools::Itertools;
 use serde::Serialize;
 use strum::IntoEnumIterator;
 
-use ruff::registry::{Linter, LinterCategory, RuleNamespace};
+use ruff::registry::{Linter, RuleNamespace, UpstreamCategory};
 
 use crate::args::HelpFormat;
 
@@ -12,14 +12,18 @@ pub fn linter(format: HelpFormat) {
             for linter in Linter::iter() {
                 let prefix = match linter.common_prefix() {
                     "" => linter
-                        .categories()
+                        .upstream_categories()
                         .unwrap()
                         .iter()
-                        .map(|LinterCategory(prefix, ..)| prefix)
+                        .map(|UpstreamCategory(prefix, ..)| prefix.as_ref())
                         .join("/"),
                     prefix => prefix.to_string(),
                 };
-                println!("{:>4} {}", prefix, linter.name());
+
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("{:>4} {}", prefix, linter.name());
+                }
             }
         }
 
@@ -28,10 +32,10 @@ pub fn linter(format: HelpFormat) {
                 .map(|linter_info| LinterInfo {
                     prefix: linter_info.common_prefix(),
                     name: linter_info.name(),
-                    categories: linter_info.categories().map(|cats| {
+                    categories: linter_info.upstream_categories().map(|cats| {
                         cats.iter()
-                            .map(|LinterCategory(prefix, name, ..)| LinterCategoryInfo {
-                                prefix,
+                            .map(|UpstreamCategory(prefix, name, ..)| LinterCategoryInfo {
+                                prefix: prefix.as_ref(),
                                 name,
                             })
                             .collect()
@@ -39,7 +43,10 @@ pub fn linter(format: HelpFormat) {
                 })
                 .collect();
 
-            println!("{}", serde_json::to_string_pretty(&linters).unwrap());
+            #[allow(clippy::print_stdout)]
+            {
+                println!("{}", serde_json::to_string_pretty(&linters).unwrap());
+            }
         }
     }
 }

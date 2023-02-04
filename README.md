@@ -7,6 +7,7 @@
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
+[![image](https://img.shields.io/date/1676394000?label=Jetbrains%20Ruff%20Webinar&logo=jetbrains)](https://info.jetbrains.com/PyCharm-Webinar-February14-2023.html)
 
 [**Discord**](https://discord.gg/Z8KbeK24) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
 
@@ -164,7 +165,6 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
 1. [FAQ](#faq)
 1. [Contributing](#contributing)
 1. [Support](#support)
-1. [Benchmarks](#benchmarks)
 1. [Reference](#reference)
 1. [License](#license)
 
@@ -230,7 +230,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.240'
+  rev: 'v0.0.241'
   hooks:
     - id: ruff
 ```
@@ -475,8 +475,6 @@ Miscellaneous:
           The name of the file when passing it through stdin
   -e, --exit-zero
           Exit with status code "0", even upon detecting lint violations
-      --update-check
-          Enable or disable automatic update checks
 
 Log levels:
   -v, --verbose  Enable verbose logging
@@ -1343,13 +1341,13 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLR0133 | constant-comparison | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
+| PLR0133 | comparison-of-constant | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
 | PLR0206 | property-with-parameters | Cannot have defined parameters for properties |  |
-| PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias |  |
-| PLR0913 | too-many-args | Too many arguments to function call ({c_args}/{max_args}) |  |
+| PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias | 🛠 |
+| PLR0913 | too-many-arguments | Too many arguments to function call ({c_args}/{max_args}) |  |
 | PLR0915 | too-many-statements | Too many statements ({statements}/{max_statements}) |  |
 | PLR1701 | consider-merging-isinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
-| PLR1722 | use-sys-exit | Use `sys.exit()` instead of `{name}` | 🛠 |
+| PLR1722 | consider-using-sys-exit | Use `sys.exit()` instead of `{name}` | 🛠 |
 | PLR2004 | magic-value-comparison | Magic value used in comparison, consider replacing {value} with a constant variable |  |
 
 #### Warning (PLW)
@@ -1965,129 +1963,6 @@ Having trouble? Check out the existing issues on [**GitHub**](https://github.com
 or feel free to [**open a new one**](https://github.com/charliermarsh/ruff/issues/new).
 
 You can also ask for help on [**Discord**](https://discord.gg/Z8KbeK24).
-
-## Benchmarks
-
-First, clone [CPython](https://github.com/python/cpython). It's a large and diverse Python codebase,
-which makes it a good target for benchmarking.
-
-```shell
-git clone --branch 3.10 https://github.com/python/cpython.git resources/test/cpython
-```
-
-To benchmark the release build:
-
-```shell
-cargo build --release && hyperfine --ignore-failure --warmup 10 \
-  "./target/release/ruff ./resources/test/cpython/ --no-cache" \
-  "./target/release/ruff ./resources/test/cpython/"
-
-Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
-  Time (mean ± σ):     293.8 ms ±   3.2 ms    [User: 2384.6 ms, System: 90.3 ms]
-  Range (min … max):   289.9 ms … 301.6 ms    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 2: ./target/release/ruff ./resources/test/cpython/
-  Time (mean ± σ):      48.0 ms ±   3.1 ms    [User: 65.2 ms, System: 124.7 ms]
-  Range (min … max):    45.0 ms …  66.7 ms    62 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Summary
-  './target/release/ruff ./resources/test/cpython/' ran
-    6.12 ± 0.41 times faster than './target/release/ruff ./resources/test/cpython/ --no-cache'
-```
-
-To benchmark against the ecosystem's existing tools:
-
-```shell
-hyperfine --ignore-failure --warmup 5 \
-  "./target/release/ruff ./resources/test/cpython/ --no-cache" \
-  "pyflakes resources/test/cpython" \
-  "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
-  "pycodestyle resources/test/cpython" \
-  "flake8 resources/test/cpython"
-
-Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
-  Time (mean ± σ):     294.3 ms ±   3.3 ms    [User: 2467.5 ms, System: 89.6 ms]
-  Range (min … max):   291.1 ms … 302.8 ms    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 2: pyflakes resources/test/cpython
-  Time (mean ± σ):     15.786 s ±  0.143 s    [User: 15.560 s, System: 0.214 s]
-  Range (min … max):   15.640 s … 16.157 s    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 3: autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython
-  Time (mean ± σ):      6.175 s ±  0.169 s    [User: 54.102 s, System: 1.057 s]
-  Range (min … max):    5.950 s …  6.391 s    10 runs
-
-Benchmark 4: pycodestyle resources/test/cpython
-  Time (mean ± σ):     46.921 s ±  0.508 s    [User: 46.699 s, System: 0.202 s]
-  Range (min … max):   46.171 s … 47.863 s    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Benchmark 5: flake8 resources/test/cpython
-  Time (mean ± σ):     12.260 s ±  0.321 s    [User: 102.934 s, System: 1.230 s]
-  Range (min … max):   11.848 s … 12.933 s    10 runs
-
-  Warning: Ignoring non-zero exit code.
-
-Summary
-  './target/release/ruff ./resources/test/cpython/ --no-cache' ran
-   20.98 ± 0.62 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
-   41.66 ± 1.18 times faster than 'flake8 resources/test/cpython'
-   53.64 ± 0.77 times faster than 'pyflakes resources/test/cpython'
-  159.43 ± 2.48 times faster than 'pycodestyle resources/test/cpython'
-```
-
-You can run `poetry install` from `./scripts` to create a working environment for the above. All
-reported benchmarks were computed using the versions specified by `./scripts/pyproject.toml`
-on Python 3.11.
-
-To benchmark Pylint, remove the following files from the CPython repository:
-
-```shell
-rm Lib/test/bad_coding.py \
-  Lib/test/bad_coding2.py \
-  Lib/test/bad_getattr.py \
-  Lib/test/bad_getattr2.py \
-  Lib/test/bad_getattr3.py \
-  Lib/test/badcert.pem \
-  Lib/test/badkey.pem \
-  Lib/test/badsyntax_3131.py \
-  Lib/test/badsyntax_future10.py \
-  Lib/test/badsyntax_future3.py \
-  Lib/test/badsyntax_future4.py \
-  Lib/test/badsyntax_future5.py \
-  Lib/test/badsyntax_future6.py \
-  Lib/test/badsyntax_future7.py \
-  Lib/test/badsyntax_future8.py \
-  Lib/test/badsyntax_future9.py \
-  Lib/test/badsyntax_pep3120.py \
-  Lib/test/test_asyncio/test_runners.py \
-  Lib/test/test_copy.py \
-  Lib/test/test_inspect.py \
-  Lib/test/test_typing.py
-```
-
-Then, from `resources/test/cpython`, run: `time pylint -j 0 -E $(git ls-files '*.py')`. This
-will execute Pylint with maximum parallelism and only report errors.
-
-To benchmark Pyupgrade, run the following from `resources/test/cpython`:
-
-```shell
-hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
-  "find . -type f -name \"*.py\" | xargs -P 0 pyupgrade --py311-plus"
-
-Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
-  Time (mean ± σ):     30.119 s ±  0.195 s    [User: 28.638 s, System: 0.390 s]
-  Range (min … max):   29.813 s … 30.356 s    10 runs
-```
 
 ## Reference
 

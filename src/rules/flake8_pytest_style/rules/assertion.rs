@@ -77,7 +77,7 @@ struct ExceptionHandlerVisitor<'a> {
 }
 
 impl<'a> ExceptionHandlerVisitor<'a> {
-    fn new(exception_name: &'a str) -> Self {
+    const fn new(exception_name: &'a str) -> Self {
         Self {
             exception_name,
             current_assert: None,
@@ -123,7 +123,7 @@ where
 /// Check if the test expression is a composite condition.
 /// For example, `a and b` or `not (a or b)`. The latter is equivalent
 /// to `not a and not b` by De Morgan's laws.
-fn is_composite_condition(test: &Expr) -> bool {
+const fn is_composite_condition(test: &Expr) -> bool {
     match &test.node {
         ExprKind::BoolOp {
             op: Boolop::And, ..
