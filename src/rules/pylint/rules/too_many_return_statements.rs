@@ -1,11 +1,13 @@
 use crate::ast::helpers::identifier_range;
+use crate::ast::visitor::Visitor;
 use crate::define_violation;
 use crate::registry::Diagnostic;
+use crate::rules::flake8_annotations::rules::ReturnStatementVisitor;
 use crate::source_code::Locator;
 use crate::violation::Violation;
 
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
+use rustpython_ast::Stmt;
 
 define_violation!(
     pub struct TooManyReturnStatements {
@@ -25,61 +27,11 @@ impl Violation for TooManyReturnStatements {
 }
 
 fn num_returns(stmts: &[Stmt]) -> usize {
-    stmts
-        .iter()
-        .map(|stmt| match &stmt.node {
-            StmtKind::If { body, orelse, .. }
-            | StmtKind::For { body, orelse, .. }
-            | StmtKind::AsyncFor { body, orelse, .. }
-            | StmtKind::While { body, orelse, .. } => num_returns(body) + num_returns(orelse),
-            StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => num_returns(body),
-            StmtKind::Try {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-            } => {
-                num_returns(body)
-                    + num_returns(orelse)
-                    + num_returns(finalbody)
-                    + handlers
-                        .iter()
-                        .map(|handler| {
-                            let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
-                            num_returns(body)
-                        })
-                        .sum::<usize>()
-            }
-            StmtKind::Match { .. } => {
-                // TODO: Uncomment when pattern matching is available, is in rustpython so have to match
-                // Add the 'cases' field when it is
-                /*
-                cases.iter().map(|case|
-                    num_returns(&case.body)
-                ).sum::<usize>()
-                */
-                unimplemented!("Match case is unimplemented")
-            }
-            StmtKind::Return { .. } => 1,
-            StmtKind::ImportFrom { .. }
-            | StmtKind::Import { .. }
-            | StmtKind::Global { .. }
-            | StmtKind::Nonlocal { .. }
-            | StmtKind::FunctionDef { .. }
-            | StmtKind::AsyncFunctionDef { .. }
-            | StmtKind::ClassDef { .. }
-            | StmtKind::Assert { .. }
-            | StmtKind::Raise { .. }
-            | StmtKind::Assign { .. }
-            | StmtKind::AugAssign { .. }
-            | StmtKind::AnnAssign { .. }
-            | StmtKind::Delete { .. }
-            | StmtKind::Expr { .. }
-            | StmtKind::Break
-            | StmtKind::Continue
-            | StmtKind::Pass => 0,
-        })
-        .sum()
+    let mut visitor = ReturnStatementVisitor::default();
+    for stmt in stmts {
+        visitor.visit_stmt(stmt);
+    }
+    visitor.num_returns()
 }
 
 /// PLR0911
@@ -137,7 +89,7 @@ if x == 7:
 if x == 8:
     return
 if x == 9:
-    return            
+    return
 "#;
 
         test_helper(source, 9)?;

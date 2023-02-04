@@ -163,8 +163,14 @@ impl Violation for DynamicallyTypedExpression {
 }
 
 #[derive(Default)]
-struct ReturnStatementVisitor<'a> {
+pub struct ReturnStatementVisitor<'a> {
     returns: Vec<Option<&'a Expr>>,
+}
+
+impl<'a> ReturnStatementVisitor<'a> {
+    pub fn num_returns(&self) -> usize {
+        self.returns.len()
+    }
 }
 
 impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
