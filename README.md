@@ -3742,6 +3742,23 @@ allow-magic-value-types = ["int"]
 
 ---
 
+#### [`max-args`](#max-args)
+
+Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).
+
+**Default value**: `5`
+
+**Type**: `int`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pylint]
+max-args = 5
+```
+
+---
+
 #### [`max-branches`](#max-branches)
 
 Maximum number of branches allowed for a function or method body (see: `PLR0912`).
@@ -3763,7 +3780,7 @@ max-branches = 12
 
 Maximum number of return statements allowed for a function or method body (see `PLR0911`)
 
-**Default value**: `5`
+**Default value**: `6`
 
 **Type**: `int`
 
@@ -3771,7 +3788,7 @@ Maximum number of return statements allowed for a function or method body (see `
 
 ```toml
 [tool.ruff.pylint]
-max-args = 5
+max-returns = 6
 ```
 
 ---
