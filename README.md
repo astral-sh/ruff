@@ -1344,6 +1344,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLR0206 | property-with-parameters | Cannot have defined parameters for properties |  |
 | PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias | 🛠 |
 | PLR0913 | too-many-arguments | Too many arguments to function call ({c_args}/{max_args}) |  |
+| PLR0912 | too-many-branches | Too many branches ({branches}/{max_branches}) |  |
 | PLR0915 | too-many-statements | Too many statements ({statements}/{max_statements}) |  |
 | PLR1701 | consider-merging-isinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
 | PLR1722 | consider-using-sys-exit | Use `sys.exit()` instead of `{name}` | 🛠 |
@@ -3753,6 +3754,23 @@ Maximum number of arguments allowed for a function definition (see: `PLR0913`).
 ```toml
 [tool.ruff.pylint]
 max-args = 5
+```
+
+---
+
+#### [`max-branches`](#max-branches)
+
+Maximum number of branches allowed for a method or (see: `PLR0912)
+
+**Default value**: `12`
+
+**Type**: `int`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pylint]
+max-branches = 12
 ```
 
 ---

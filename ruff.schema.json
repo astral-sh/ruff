@@ -1190,6 +1190,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-branches": {
+          "description": "Maximum number of branches allowed for a method or (see: `PLR0912)",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-statements": {
           "description": "Maximum number of statements allowed for a method or a statement (see: `PLR0915`).",
           "type": [
@@ -1669,6 +1678,7 @@
         "PLR0402",
         "PLR09",
         "PLR091",
+        "PLR0912",
         "PLR0913",
         "PLR0915",
         "PLR1",

@@ -37,6 +37,7 @@ mod tests {
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
+    #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR-0912")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
@@ -87,6 +88,22 @@ mod tests {
             &Settings {
                 dummy_variable_rgx: Regex::new(r"skip_.*").unwrap().into(),
                 ..Settings::for_rules(vec![Rule::TooManyArguments])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn max_branches() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_branches_params.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    max_branches: 1,
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyBranches])
             },
         )?;
         assert_yaml_snapshot!(diagnostics);

@@ -93,6 +93,7 @@ ruff_macros::define_rule_mapping!(
     PLW0120 => rules::pylint::rules::UselessElseOnLoop,
     PLW0602 => rules::pylint::rules::GlobalVariableNotAssigned,
     PLR0913 => rules::pylint::rules::TooManyArguments,
+    PLR0912 => rules::pylint::rules::TooManyBranches,
     PLR0915 => rules::pylint::rules::TooManyStatements,
     // flake8-builtins
     A001 => rules::flake8_builtins::rules::BuiltinVariableShadowing,
