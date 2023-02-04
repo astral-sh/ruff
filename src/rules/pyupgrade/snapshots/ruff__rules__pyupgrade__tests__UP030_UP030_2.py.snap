@@ -81,105 +81,133 @@ expression: diagnostics
     column: 0
   end_location:
     row: 14
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    FormatLiterals: ~
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 26
+  fix:
+    content:
+      - "\"{}_{}\".format(*args, 1)"
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 16
+      column: 26
+  parent: ~
+- kind:
+    FormatLiterals: ~
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
     column: 29
   fix:
     content:
       - "\"{}_{}\".format(1, 2, *args)"
     location:
-      row: 14
+      row: 18
       column: 0
     end_location:
-      row: 14
+      row: 18
       column: 29
   parent: ~
 - kind:
     FormatLiterals: ~
   location:
-    row: 16
+    row: 20
     column: 0
   end_location:
-    row: 16
+    row: 20
     column: 29
   fix:
     content:
       - "\"{}_{}\".format(*args, 1, 2)"
     location:
-      row: 16
+      row: 20
       column: 0
     end_location:
-      row: 16
+      row: 20
       column: 29
   parent: ~
 - kind:
     FormatLiterals: ~
   location:
-    row: 18
+    row: 22
     column: 0
   end_location:
-    row: 18
+    row: 22
     column: 33
   fix:
     content:
       - "\"{}_{}_{}\".format(1, **kwargs)"
     location:
-      row: 18
+      row: 22
       column: 0
     end_location:
-      row: 18
+      row: 22
       column: 33
   parent: ~
 - kind:
     FormatLiterals: ~
   location:
-    row: 20
+    row: 24
     column: 0
   end_location:
-    row: 20
+    row: 24
     column: 36
   fix:
     content:
       - "\"{}_{}_{}\".format(1, 2, **kwargs)"
     location:
-      row: 20
+      row: 24
       column: 0
     end_location:
-      row: 20
+      row: 24
       column: 36
   parent: ~
 - kind:
     FormatLiterals: ~
   location:
-    row: 22
+    row: 26
     column: 0
   end_location:
-    row: 22
+    row: 26
     column: 39
   fix:
     content:
       - "\"{}_{}_{}\".format(1, 2, 3, **kwargs)"
     location:
-      row: 22
+      row: 26
       column: 0
     end_location:
-      row: 22
+      row: 26
       column: 39
   parent: ~
 - kind:
     FormatLiterals: ~
   location:
-    row: 24
+    row: 28
     column: 0
   end_location:
-    row: 24
+    row: 28
     column: 46
   fix:
     content:
       - "\"{}_{}_{}\".format(1, 2, 3, *args, **kwargs)"
     location:
-      row: 24
+      row: 28
       column: 0
     end_location:
-      row: 24
+      row: 28
       column: 46
   parent: ~
 

@@ -1,19 +1,20 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use anyhow::{anyhow, bail, Result};
 use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rustpython_ast::Expr;
+
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, KeywordData, Located};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call, match_expression};
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::source_code::{Locator, Stylist};
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct FormatLiterals;
@@ -70,50 +71,10 @@ fn generate_arguments<'a>(
     Ok(new_args)
 }
 
-/// Returns None if there are no *args present, and returns Some, and the number of arguments that are
-/// not *args, if *args is present
-fn check_args(args: &[Expr]) -> Option<usize> {
-    let mut non_args = 0;
-    let mut has_args = false;
-    for arg in args {
-        if let ExprKind::Starred { .. } = &arg.node {
-            has_args = true;
-        } else {
-            non_args += 1;
-        }
-    }
-    if has_args {
-        Some(non_args)
-    } else {
-        None
-    }
-}
-
-/// Returns None if there are no *kwargs present, and returns Some, and the number of arguments that are
-/// not *kwargs, if *kwargs is present
-fn check_kwargs(kwargs: &[Located<KeywordData>]) -> Option<usize> {
-    if kwargs.is_empty() {
-        return None;
-    }
-    let mut non_kwargs = 0;
-    let mut has_kwargs = false;
-    for kwarg in kwargs {
-        if kwarg.node.arg.is_none() {
-            has_kwargs = true;
-        } else {
-            non_kwargs += 1;
-        }
-    }
-    if has_kwargs {
-        Some(non_kwargs)
-    } else {
-        None
-    }
-}
-
-fn is_sequential(items: &[usize]) -> bool {
-    for (idx, item) in items.iter().enumerate() {
-        if item != &idx {
+/// Returns true if the indices are sequential.
+fn is_sequential(indices: &[usize]) -> bool {
+    for (expected, actual) in indices.iter().enumerate() {
+        if expected != *actual {
             return false;
         }
     }
@@ -127,26 +88,12 @@ fn generate_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    // If there is valid *args or *kwargs in the function, we do not need to reformat the call
-    let mut skip_arguments = false;
-    if let ExprKind::Call { args, keywords, .. } = &expr.node {
-        let has_args = check_args(args);
-        let has_kwargs = check_kwargs(keywords);
-        if has_args.is_some() || has_kwargs.is_some() {
-            if has_args.unwrap_or_default() + has_kwargs.unwrap_or_default() <= correct_order.len()
-            {
-                if is_sequential(correct_order) {
-                    skip_arguments = true;
-                }
-            }
-        }
-    }
-
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
     let mut expression = match_expression(module_text)?;
     let mut call = match_call(&mut expression)?;
+
     // Fix the call arguments.
-    if !skip_arguments {
+    if !is_sequential(correct_order) {
         call.args = generate_arguments(&call.args, correct_order)?;
     }
 
@@ -193,7 +140,6 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
     if !(0..summary.indexes.len()).all(|index| summary.indexes.contains(&index)) {
         return;
     }
-    // Check edge case where there are more arguments and args/kwargs then items
 
     let mut diagnostic = Diagnostic::new(FormatLiterals, Range::from_located(expr));
     if checker.patch(diagnostic.kind.rule()) {

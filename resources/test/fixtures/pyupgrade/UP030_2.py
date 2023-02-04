@@ -11,6 +11,10 @@ kwargs = {x: x for x in range(10)}
 
 "{0}_{1}".format(1, *args)
 
+"{1}_{0}".format(*args)
+
+"{1}_{0}".format(1, *args)
+
 "{0}_{1}".format(1, 2, *args)
 
 "{0}_{1}".format(*args, 1, 2)
