@@ -49,11 +49,9 @@ x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 
 x: NamedTuple(typename="X", fields=[("foo", "int")])
 
-
 # These should NOT change
 class D(TypedDict):
     E: TypedDict("E")
-
 
 x: Annotated[()]
 
