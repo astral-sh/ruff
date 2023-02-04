@@ -596,7 +596,17 @@ where
                     if let Some(diagnostic) = pylint::rules::too_many_return_statements(
                         stmt,
                         body,
-                        self.settings.pylint.max_returns,
+                        self.settings.pylint.max_returns, self.locator,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+
+                if self.settings.rules.enabled(&Rule::TooManyBranches) {
+                    if let Some(diagnostic) = pylint::rules::too_many_branches(
+                        stmt,
+                        body,
+                        self.settings.pylint.max_branches,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
