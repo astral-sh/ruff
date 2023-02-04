@@ -488,10 +488,15 @@ ruff_macros::define_rule_mapping!(
     RUF004 => violations::KeywordArgumentBeforeStarArgument,
     RUF005 => violations::UnpackInsteadOfConcatenatingToCollectionLiteral,
     RUF100 => violations::UnusedNOQA,
+
+    DJ08 => rules::flake8_django::rules::ModelDunderStr,
 );
 
 #[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
 pub enum Linter {
+    /// [flake8-django](https://pypi.org/project/flake8-django/)
+    #[prefix = "DJ"]
+    Flake8Django,
     /// [Pyflakes](https://pypi.org/project/pyflakes/)
     #[prefix = "F"]
     Pyflakes,
