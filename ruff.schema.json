@@ -1190,6 +1190,15 @@
           "format": "uint",
           "minimum": 0.0
         },
+        "max-returns": {
+          "description": "Maximum number of return statements allowed for a function or method (see `PLR0911`)",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
         "max-statements": {
           "description": "Maximum number of statements allowed for a method or a statement (see: `PLR0915`).",
           "type": [
@@ -1669,6 +1678,7 @@
         "PLR0402",
         "PLR09",
         "PLR091",
+        "PLR0911",
         "PLR0913",
         "PLR0915",
         "PLR1",
