@@ -5,7 +5,7 @@ use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind};
+use rustpython_ast::{Expr, ExprKind, KeywordData, Located};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -70,14 +70,54 @@ fn generate_arguments<'a>(
     Ok(new_args)
 }
 
-/// Returns true if *args is in the arguments.
-fn check_for_starred(args: &[Expr]) -> bool {
+/// Returns None if there are no *args present, and returns Some, and the number of arguments that are
+/// not *args, if *args is present
+fn check_args(args: &[Expr]) -> Option<usize> {
+    let mut non_args = 0;
+    let mut has_args = false;
     for arg in args {
         if let ExprKind::Starred { .. } = &arg.node {
-            return true;
+            has_args = true;
+        } else {
+            non_args += 1;
         }
     }
-    false
+    if has_args {
+        Some(non_args)
+    } else {
+        None
+    }
+}
+
+/// Returns None if there are no *kwargs present, and returns Some, and the number of arguments that are
+/// not *kwargs, if *kwargs is present
+fn check_kwargs(kwargs: &[Located<KeywordData>]) -> Option<usize> {
+    if kwargs.is_empty() {
+        return None;
+    }
+    let mut non_kwargs = 0;
+    let mut has_kwargs = false;
+    for kwarg in kwargs {
+        if kwarg.node.arg.is_none() {
+            has_kwargs = true;
+        } else {
+            non_kwargs += 1;
+        }
+    }
+    if has_kwargs {
+        Some(non_kwargs)
+    } else {
+        None
+    }
+}
+
+fn is_sequential(items: &[usize]) -> bool {
+    for (idx, item) in items.iter().enumerate() {
+        if item != &idx {
+            return false;
+        }
+    }
+    true
 }
 
 /// Returns the corrected function call.
@@ -87,23 +127,28 @@ fn generate_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    println!("CHECKPOINT: 0");
-    if let ExprKind::Call {
-        func,
-        args,
-        keywords,
-    } = &expr.node
-    {
-        let is_starred = check_for_starred(&args);
-        println!("{:?}", is_starred);
+    // If there is valid *args or *kwargs in the function, we do not need to reformat the call
+    let mut skip_arguments = false;
+    if let ExprKind::Call { args, keywords, .. } = &expr.node {
+        let has_args = check_args(args);
+        let has_kwargs = check_kwargs(keywords);
+        if has_args.is_some() || has_kwargs.is_some() {
+            if has_args.unwrap_or_default() + has_kwargs.unwrap_or_default() <= correct_order.len()
+            {
+                if is_sequential(correct_order) {
+                    skip_arguments = true;
+                }
+            }
+        }
     }
 
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
     let mut expression = match_expression(module_text)?;
     let mut call = match_call(&mut expression)?;
     // Fix the call arguments.
-    call.args = generate_arguments(&call.args, correct_order)?;
-    println!("CHECKPOINT: 1");
+    if !skip_arguments {
+        call.args = generate_arguments(&call.args, correct_order)?;
+    }
 
     // Fix the string itself.
     let Expression::Attribute(item) = &*call.func else {
@@ -148,13 +193,12 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
     if !(0..summary.indexes.len()).all(|index| summary.indexes.contains(&index)) {
         return;
     }
-    println!("CHECKPOINT: -1");
+    // Check edge case where there are more arguments and args/kwargs then items
 
     let mut diagnostic = Diagnostic::new(FormatLiterals, Range::from_located(expr));
     if checker.patch(diagnostic.kind.rule()) {
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846
-        println!("CHECKPOINT: -0.5");
         if let Ok(contents) =
             generate_call(expr, &summary.indexes, checker.locator, checker.stylist)
         {
