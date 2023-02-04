@@ -55,16 +55,12 @@ fn get_name(expr: &Expr) -> Result<String, ()> {
     }
 }
 
-fn remove_quotes(checker: &mut Checker, annotation: &Expr) {
-    if let ExprKind::Constant {
-        value: Constant::Str(type_str),
-        ..
-    } = &annotation.node
-    {
+pub fn remove_quotes(checker: &mut Checker, annotation: &Expr) {
+    if let ExprKind::Name{ id, .. } = &annotation.node {
         let mut diagnostic = Diagnostic::new(QuotedAnnotations, Range::from_located(annotation));
         if checker.patch(&Rule::PrintfStringFormatting) {
             diagnostic.amend(Fix::replacement(
-                type_str.to_string(),
+                id.to_string(),
                 annotation.location,
                 annotation.end_location.unwrap(),
             ));
@@ -358,6 +354,7 @@ fn handle_functiondef(args: &Arguments, returns: &Option<Box<Expr>>, checker: &m
 
 /// UP037
 pub fn quoted_annotations(checker: &mut Checker, stmt: &Stmt) {
+    return
     match &stmt.node {
         StmtKind::FunctionDef { args, returns, .. }
         | StmtKind::AsyncFunctionDef { args, returns, .. } => {

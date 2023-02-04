@@ -19,7 +19,7 @@ pub(crate) use open_alias::{open_alias, OpenAlias};
 pub(crate) use os_error_alias::{os_error_alias, OSErrorAlias};
 pub(crate) use outdated_version_block::{outdated_version_block, OutdatedVersionBlock};
 pub(crate) use printf_string_formatting::{printf_string_formatting, PrintfStringFormatting};
-pub(crate) use quoted_annotations::{quoted_annotations, QuotedAnnotations};
+pub(crate) use quoted_annotations::{quoted_annotations, QuotedAnnotations, remove_quotes};
 pub(crate) use redundant_open_modes::{redundant_open_modes, RedundantOpenModes};
 pub(crate) use replace_stdout_stderr::{replace_stdout_stderr, ReplaceStdoutStderr};
 pub(crate) use replace_universal_newlines::{replace_universal_newlines, ReplaceUniversalNewlines};
