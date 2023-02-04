@@ -1,9 +1,7 @@
 # These SHOULD change
 
 args = list(range(10))
-print(args)
 kwargs = {x:x for x in range(10)}
-print(kwargs)
 
 "{0}".format(*args)
 
@@ -24,7 +22,6 @@ print(kwargs)
 "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
 
 "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
-
 
 # These should NOT change
 "{0}".format()
