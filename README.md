@@ -3743,7 +3743,7 @@ allow-magic-value-types = ["int"]
 
 #### [`max-args`](#max-args)
 
-Maximum number of arguments allowed for a function definition (see: `PLR0913`).
+Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).
 
 **Default value**: `5`
 
@@ -3760,7 +3760,7 @@ max-args = 5
 
 #### [`max-branches`](#max-branches)
 
-Maximum number of branches allowed for a method or (see: `PLR0912)
+Maximum number of branches allowed for a function or method body (see: `PLR0912`).
 
 **Default value**: `12`
 
@@ -3777,7 +3777,7 @@ max-branches = 12
 
 #### [`max-statements`](#max-statements)
 
-Maximum number of statements allowed for a method or a statement (see: `PLR0915`).
+Maximum number of statements allowed for a function or method body (see: `PLR0915`).
 
 **Default value**: `50`
 

@@ -54,13 +54,13 @@ pub struct Options {
     /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
     #[option(default = r"12", value_type = "int", example = r"max-branches = 12")]
-    /// Maximum number of branches allowed for a method or (see: `PLR0912)
+    /// Maximum number of branches allowed for a function or method body (see: `PLR0912`).
     pub max_branches: Option<usize>,
     #[option(default = r"5", value_type = "int", example = r"max-args = 5")]
-    /// Maximum number of arguments allowed for a function definition (see: `PLR0913`).
+    /// Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).
     pub max_args: Option<usize>,
     #[option(default = r"50", value_type = "int", example = r"max-statements = 50")]
-    /// Maximum number of statements allowed for a method or a statement (see: `PLR0915`).
+    /// Maximum number of statements allowed for a function or method body (see: `PLR0915`).
     pub max_statements: Option<usize>,
 }
 

@@ -1182,7 +1182,7 @@
           }
         },
         "max-args": {
-          "description": "Maximum number of arguments allowed for a function definition (see: `PLR0913`).",
+          "description": "Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).",
           "type": [
             "integer",
             "null"
@@ -1191,7 +1191,7 @@
           "minimum": 0.0
         },
         "max-branches": {
-          "description": "Maximum number of branches allowed for a method or (see: `PLR0912)",
+          "description": "Maximum number of branches allowed for a function or method body (see: `PLR0912`).",
           "type": [
             "integer",
             "null"
@@ -1200,7 +1200,7 @@
           "minimum": 0.0
         },
         "max-statements": {
-          "description": "Maximum number of statements allowed for a method or a statement (see: `PLR0915`).",
+          "description": "Maximum number of statements allowed for a function or method body (see: `PLR0915`).",
           "type": [
             "integer",
             "null"
