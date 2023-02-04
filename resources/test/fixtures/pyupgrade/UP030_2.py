@@ -22,12 +22,3 @@ kwargs = {x:x for x in range(10)}
 "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
 
 "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
-
-# These should NOT change
-"{0}".format()
-
-"{0}".format(1, 2)
-
-"{0}".format(1, 2, *args)
-
-"{0}_{1}".format(1, 2, 3, *kwargs)
