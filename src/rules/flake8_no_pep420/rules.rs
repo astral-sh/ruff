@@ -22,11 +22,16 @@ impl Violation for ImplicitNamespacePackage {
 pub fn implicit_namespace_package(
     path: &Path,
     package: Option<&Path>,
+    project_root: &Path,
     src: &[PathBuf],
 ) -> Option<Diagnostic> {
     if package.is_none()
         // Ignore `.pyi` files, which don't require an `__init__.py`.
         && path.extension().map_or(true, |ext| ext != "pyi")
+        // Ignore any files that are direct children of the project root.
+        && !path
+            .parent()
+            .map_or(false, |parent| parent == project_root)
         // Ignore any files that are direct children of a source directory (e.g., `src/manage.py`).
         && !path
             .parent()
