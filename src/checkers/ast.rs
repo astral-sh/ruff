@@ -2908,6 +2908,9 @@ where
                     if self.settings.rules.enabled(&Rule::PrintfStringFormatting) {
                         pyupgrade::rules::printf_string_formatting(self, expr, left, right);
                     }
+                    if self.settings.rules.enabled(&Rule::BadStringFormatType) {
+                        pylint::rules::bad_string_format_type(self, expr, left, right);
+                    }
                 }
             }
             ExprKind::BinOp {
