@@ -4,9 +4,9 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::Constant::Bool;
-use rustpython_ast::ExprKind::{Attribute, Constant, Name};
+use rustpython_ast::ExprKind::{Attribute, Call, Constant, Name};
 use rustpython_ast::StmtKind::{Assign, ClassDef, FunctionDef};
-use rustpython_ast::{Expr, Stmt};
+use rustpython_ast::{Expr, Located, Stmt};
 
 define_violation!(
     pub struct ModelDunderStr;
@@ -105,5 +105,33 @@ impl ModelDunderStr {
             }
             _ => false,
         }
+    }
+}
+
+define_violation!(
+    pub struct ReceiverDecoratorChecker;
+);
+impl Violation for ReceiverDecoratorChecker {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("@receiver decorator must be on top of all the other decorators")
+    }
+}
+
+impl ReceiverDecoratorChecker {
+    pub fn check_decorator(decorator_list: &[Expr]) -> Option<Diagnostic> {
+        let Some(Located {node: Call{ func, ..}, ..}) = decorator_list.first() else {
+            return None;
+        };
+        let Name {id, ..} = &func.node else {
+            return None;
+        };
+        if id == "receiver" {
+            return Some(Diagnostic::new(
+                ReceiverDecoratorChecker,
+                Range::from_located(func),
+            ));
+        }
+        None
     }
 }

@@ -457,6 +457,15 @@ where
                 body,
                 ..
             } => {
+                if self.settings.rules.enabled(&Rule::ReceiverDecoratorChecker) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::ReceiverDecoratorChecker::check_decorator(
+                            decorator_list,
+                        )
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.rules.enabled(&Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {

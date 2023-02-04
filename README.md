@@ -644,6 +644,7 @@ For more, see [flake8-django](https://pypi.org/project/flake8-django/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | DJ08 | model-dunder-str | Model does not define __str__ method |  |
+| DJ13 | receiver-decorator-checker | @receiver decorator must be on top of all the other decorators |  |
 
 ### Pyflakes (F)
 

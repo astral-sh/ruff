@@ -24,4 +24,17 @@ mod tests {
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(Rule::ReceiverDecoratorChecker, Path::new("DJ13.py"); "DJ13")]
+    fn receiver_decorator_checker(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/flake8_django")
+                .join(path)
+                .as_path(),
+            &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
 }

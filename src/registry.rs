@@ -490,6 +490,7 @@ ruff_macros::define_rule_mapping!(
     RUF100 => violations::UnusedNOQA,
 
     DJ08 => rules::flake8_django::rules::ModelDunderStr,
+    DJ13=> rules::flake8_django::rules::ReceiverDecoratorChecker,
 );
 
 #[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
