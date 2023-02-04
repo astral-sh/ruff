@@ -47,7 +47,7 @@ fn argument_list(args: &Arguments) -> Vec<Arg> {
     final_result
 }
 
-fn get_name(expr: &Box<Expr>) -> Result<String, ()> {
+fn get_name(expr: &Expr) -> Result<String, ()> {
     match &expr.node {
         ExprKind::Name { id, .. } => Ok(id.to_string()),
         ExprKind::Attribute { value, .. } => get_name(value),
@@ -87,7 +87,7 @@ fn get_keyword_value<'a>(keywords: &'a Vec<Keyword>, name: &str) -> Option<&'a E
 }
 
 fn process_call<'a>(
-    func: &Box<Expr>,
+    func: &Expr,
     args: &'a Vec<Expr>,
     keywords: &'a Vec<Keyword>,
 ) -> Result<Vec<&'a Expr>, ()> {
@@ -132,14 +132,14 @@ fn process_call<'a>(
             }
         }
     } else if FUNC_NAMES.contains(&&name[..]) {
-        if !args.is_empty() {
-            to_add.push(args.get(0).unwrap());
-        } else {
+        if args.is_empty() {
             let keyword_value = match get_keyword_value(keywords, "type") {
                 Some(item) => item,
                 None => return Err(()),
             };
             to_add.push(keyword_value);
+        } else {
+            to_add.push(args.get(0).unwrap());
         }
     }
     Ok(to_add)
