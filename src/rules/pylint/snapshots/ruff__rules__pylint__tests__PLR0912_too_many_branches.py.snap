@@ -1,0 +1,17 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    TooManyBranches:
+      branches: 13
+      max_branches: 12
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 9
+  fix: ~
+  parent: ~
+
