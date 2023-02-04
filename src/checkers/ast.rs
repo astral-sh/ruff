@@ -596,7 +596,8 @@ where
                     if let Some(diagnostic) = pylint::rules::too_many_return_statements(
                         stmt,
                         body,
-                        self.settings.pylint.max_returns, self.locator,
+                        self.settings.pylint.max_returns,
+                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }

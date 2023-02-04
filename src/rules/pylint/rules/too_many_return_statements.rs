@@ -1,8 +1,7 @@
-use crate::ast::helpers::identifier_range;
+use crate::ast::helpers::{identifier_range, ReturnStatementVisitor};
 use crate::ast::visitor::Visitor;
 use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::rules::flake8_annotations::rules::ReturnStatementVisitor;
 use crate::source_code::Locator;
 use crate::violation::Violation;
 
@@ -26,12 +25,11 @@ impl Violation for TooManyReturnStatements {
     }
 }
 
-fn num_returns(stmts: &[Stmt]) -> usize {
+/// Count the number of return statements in a function or method body.
+fn num_returns(body: &[Stmt]) -> usize {
     let mut visitor = ReturnStatementVisitor::default();
-    for stmt in stmts {
-        visitor.visit_stmt(stmt);
-    }
-    visitor.num_returns()
+    visitor.visit_body(body);
+    visitor.returns.len()
 }
 
 /// PLR0911
