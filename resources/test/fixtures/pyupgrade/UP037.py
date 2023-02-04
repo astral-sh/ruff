@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-def foo(var: "MyClass") -> MyClass:
+def foo(var: "MyClass") -> "MyClass":
     x: "MyClass"
 
 def foo (*, inplace: "bool"):

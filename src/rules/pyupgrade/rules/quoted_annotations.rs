@@ -44,25 +44,26 @@ fn argument_list(args: &Arguments) -> Vec<Arg> {
 fn get_name(expr: &Box<Expr>) -> Result<String, ()> {
     match &expr.node {
         ExprKind::Name { id, .. } => Ok(id.to_string()),
-        ExprKind::Attribute { value, .. } => get_name(&value),
+        ExprKind::Attribute { value, .. } => get_name(value),
         _ => Err(()),
     }
 }
 
 fn remove_quotes(checker: &mut Checker, annotation: &Expr) {
-    if let ExprKind::Constant { value, .. } = &annotation.node {
-        if let Constant::Str(type_str) = value {
-            let mut diagnostic =
-                Diagnostic::new(QuotedAnnotations, Range::from_located(&annotation));
-            if checker.patch(&Rule::PrintfStringFormatting) {
-                diagnostic.amend(Fix::replacement(
-                    type_str.to_string(),
-                    annotation.location,
-                    annotation.end_location.unwrap(),
-                ));
-            }
-            checker.diagnostics.push(diagnostic);
+    if let ExprKind::Constant {
+        value: Constant::Str(type_str),
+        ..
+    } = &annotation.node
+    {
+        let mut diagnostic = Diagnostic::new(QuotedAnnotations, Range::from_located(annotation));
+        if checker.patch(&Rule::PrintfStringFormatting) {
+            diagnostic.amend(Fix::replacement(
+                type_str.to_string(),
+                annotation.location,
+                annotation.end_location.unwrap(),
+            ));
         }
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -95,7 +96,7 @@ fn process_call<'a>(
             // Garbage
         } else if let ExprKind::Dict { values, .. } = &args.get(1).unwrap().node {
             for value in values {
-                to_add.push(&value);
+                to_add.push(value);
             }
         } else {
             return Err(());
@@ -143,7 +144,7 @@ fn get_comprehension(comp: &Comprehension) -> Vec<&Expr> {
     to_add.push(&comp.target);
     to_add.push(&comp.iter);
     for if_state in &comp.ifs {
-        to_add.push(&if_state);
+        to_add.push(if_state);
     }
     to_add
 }
@@ -153,46 +154,42 @@ fn get_any(node: &Expr) -> Vec<&Expr> {
     match &node.node {
         ExprKind::BoolOp { values, .. } => {
             for value in values {
-                to_add.push(&value);
+                to_add.push(value);
             }
         }
         ExprKind::NamedExpr { target, value } => {
-            to_add.push(&target);
-            to_add.push(&value);
+            to_add.push(target);
+            to_add.push(value);
         }
         ExprKind::BinOp { left, right, .. } => {
-            to_add.push(&left);
-            to_add.push(&right);
+            to_add.push(left);
+            to_add.push(right);
         }
         ExprKind::UnaryOp { operand, .. } => {
-            to_add.push(&operand);
+            to_add.push(operand);
         }
         ExprKind::IfExp { test, body, orelse } => {
-            to_add.push(&test);
-            to_add.push(&body);
-            to_add.push(&orelse);
+            to_add.push(test);
+            to_add.push(body);
+            to_add.push(orelse);
         }
         ExprKind::Dict { keys, values } => {
-            for key in keys {
-                if let Some(item) = key {
-                    to_add.push(&item);
-                }
-            }
+            to_add.extend(keys.iter().flatten());
             for value in values {
-                to_add.push(&value);
+                to_add.push(value);
             }
         }
         ExprKind::Set { elts } => {
             for elt in elts {
-                to_add.push(&elt);
+                to_add.push(elt);
             }
         }
         ExprKind::ListComp { elt, generators }
         | ExprKind::SetComp { elt, generators }
         | ExprKind::GeneratorExp { elt, generators } => {
-            to_add.push(&elt);
+            to_add.push(elt);
             for generator in generators {
-                to_add.extend(get_comprehension(&generator));
+                to_add.extend(get_comprehension(generator));
             }
         }
         ExprKind::DictComp {
@@ -200,26 +197,24 @@ fn get_any(node: &Expr) -> Vec<&Expr> {
             value,
             generators,
         } => {
-            to_add.push(&key);
-            to_add.push(&value);
+            to_add.push(key);
+            to_add.push(value);
             for generator in generators {
-                to_add.extend(get_comprehension(&generator));
+                to_add.extend(get_comprehension(generator));
             }
         }
         ExprKind::Await { value } | ExprKind::YieldFrom { value } => {
-            to_add.push(&value);
+            to_add.push(value);
         }
-        ExprKind::Yield { value } => {
-            if let Some(item) = value {
-                to_add.push(&item);
-            }
+        ExprKind::Yield { value: Some(item) } => {
+            to_add.push(item);
         }
         ExprKind::Compare {
             left, comparators, ..
         } => {
-            to_add.push(&left);
+            to_add.push(left);
             for comparator in comparators {
-                to_add.push(&comparator);
+                to_add.push(comparator);
             }
         }
         ExprKind::Call {
@@ -227,9 +222,9 @@ fn get_any(node: &Expr) -> Vec<&Expr> {
             args,
             keywords,
         } => {
-            to_add.push(&func);
+            to_add.push(func);
             for arg in args {
-                to_add.push(&arg);
+                to_add.push(arg);
             }
             for keyword in keywords {
                 to_add.push(&keyword.node.value);
@@ -238,40 +233,38 @@ fn get_any(node: &Expr) -> Vec<&Expr> {
         ExprKind::FormattedValue {
             value, format_spec, ..
         } => {
-            to_add.push(&value);
+            to_add.push(value);
             if let Some(item) = format_spec {
-                to_add.push(&item);
+                to_add.push(item);
             }
         }
         ExprKind::JoinedStr { values } => {
             for value in values {
-                to_add.push(&value);
+                to_add.push(value);
             }
         }
         ExprKind::Attribute { value, .. } => {
-            to_add.push(&value);
+            to_add.push(value);
         }
         ExprKind::Subscript { value, slice, .. } => {
-            to_add.push(&value);
-            to_add.push(&slice);
+            to_add.push(value);
+            to_add.push(slice);
         }
-        ExprKind::Starred { value, .. } => {
-            to_add.push(&value);
-        }
+        ExprKind::Starred { value, .. } => to_add.push(value),
         ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } => {
             for elt in elts {
-                to_add.push(&elt);
+                to_add.push(elt);
             }
         }
         ExprKind::Slice { lower, upper, step } => {
             if let Some(item) = lower {
-                to_add.push(&item);
+                to_add.push(item);
             }
             if let Some(item) = upper {
-                to_add.push(&item);
+                to_add.push(item);
             }
             if let Some(item) = step {
-                to_add.push(&item);
+                to_add.push(item);
             }
         }
         _ => (),
@@ -282,22 +275,20 @@ fn get_any(node: &Expr) -> Vec<&Expr> {
 fn process_subscript<'a>(
     value: &Expr,
     slice: &'a Expr,
-    py_version: &PythonVersion,
+    py_version: PythonVersion,
 ) -> Result<Vec<&'a Expr>, ()> {
     let mut to_add: Vec<&Expr> = vec![];
     let name = get_name(&Box::new(value.clone()))?;
     if name == "Annotated" {
-        let node_slice: &Expr;
-        if py_version >= &PythonVersion::Py39 {
-            node_slice = slice;
+        let node_slice: &Expr = if py_version >= PythonVersion::Py39 {
+            slice
         // FOR REVIEWER: There is a potential issue here, pyupgrade has a special case if there is
         // an Index token here. Index tokens were removed in python 3.9. rustpython only covers
         // python >= 3.10, so it does not have access to the index token. How should we proceed?
-        } else if false {
-            node_slice = slice
+        // Pyupgrade had an elif with the Index token
         } else {
-            node_slice = slice;
-        }
+            slice
+        };
 
         if let ExprKind::Tuple { elts, .. } = &node_slice.node {
             to_add.push(elts.get(0).unwrap());
@@ -305,12 +296,12 @@ fn process_subscript<'a>(
     } else if name != "Literal" {
         to_add.push(slice);
     }
-    return Ok(to_add);
+    Ok(to_add)
 }
 
-fn replace_string_literal(annotation: Box<Expr>, checker: &mut Checker) {
-    let mut nodes: Vec<&Expr> = vec![annotation.as_ref()];
-    while nodes.len() > 0 {
+fn replace_string_literal(annotation: &Expr, checker: &mut Checker) {
+    let mut nodes: Vec<&Expr> = vec![annotation];
+    while !nodes.is_empty() {
         let node = match nodes.pop() {
             Some(item) => item,
             None => continue,
@@ -329,7 +320,7 @@ fn replace_string_literal(annotation: Box<Expr>, checker: &mut Checker) {
             }
             ExprKind::Subscript { value, slice, .. } => {
                 let new_nodes =
-                    match process_subscript(value, slice, &checker.settings.target_version) {
+                    match process_subscript(value, slice, checker.settings.target_version) {
                         Ok(item) => item,
                         Err(_) => continue,
                     };
@@ -337,7 +328,7 @@ fn replace_string_literal(annotation: Box<Expr>, checker: &mut Checker) {
             }
             ExprKind::Constant { value, .. } => {
                 if let Constant::Str(_) = value {
-                    remove_quotes(checker, node)
+                    remove_quotes(checker, node);
                 }
             }
             _ => nodes.extend(get_any(node)),
@@ -345,14 +336,14 @@ fn replace_string_literal(annotation: Box<Expr>, checker: &mut Checker) {
     }
 }
 
-fn handle_functiondef(args: &Box<Arguments>, returns: &Option<Box<Expr>>, checker: &mut Checker) {
+fn handle_functiondef(args: &Arguments, returns: &Option<Box<Expr>>, checker: &mut Checker) {
     if let Some(return_item) = returns {
-        replace_string_literal(return_item.clone(), checker);
+        replace_string_literal(return_item, checker);
     }
-    let arg_list = argument_list(&args);
+    let arg_list = argument_list(args);
     for arg in arg_list {
         if let Some(annotation) = arg.node.annotation {
-            replace_string_literal(annotation, checker);
+            replace_string_literal(&annotation, checker);
         }
     }
 }
@@ -362,11 +353,11 @@ pub fn quoted_annotations(checker: &mut Checker, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::FunctionDef { args, returns, .. }
         | StmtKind::AsyncFunctionDef { args, returns, .. } => {
-            handle_functiondef(args, returns, checker)
+            handle_functiondef(args, returns, checker);
         }
         StmtKind::AnnAssign { annotation, .. } => {
-            replace_string_literal(annotation.clone(), checker)
+            replace_string_literal(annotation, checker);
         }
-        _ => return,
+        _ => (),
     }
 }

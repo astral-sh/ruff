@@ -1707,7 +1707,6 @@ where
             }
             StmtKind::AnnAssign {
                 target,
-                annotation,
                 value,
                 ..
             } => {

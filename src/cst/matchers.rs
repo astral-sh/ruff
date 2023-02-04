@@ -1,7 +1,6 @@
 use anyhow::{bail, Result};
 use libcst_native::{
-    AnnAssign, Call, Comparison, CompoundStatement, Expr, Expression, FunctionDef, Import,
-    ImportFrom, Module, SmallStatement, Statement,
+    Call, Comparison, Expr, Expression, Import, ImportFrom, Module, SmallStatement, Statement,
 };
 
 pub fn match_module(module_text: &str) -> Result<Module> {
@@ -69,29 +68,5 @@ pub fn match_comparison<'a, 'b>(
         Ok(comparison)
     } else {
         bail!("Expected Expression::Comparison")
-    }
-}
-
-pub fn match_functiondef<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut FunctionDef<'b>> {
-    if let Some(Statement::Compound(compound)) = module.body.first_mut() {
-        if let CompoundStatement::FunctionDef(funcdef) = compound {
-            return Ok(funcdef);
-        } else {
-            bail!("Expected CompoundStatement::FunctionDef")
-        }
-    } else {
-        bail!("Expected Statement::Compound")
-    }
-}
-
-pub fn match_annassign<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut AnnAssign<'b>> {
-    if let Some(Statement::Simple(simple)) = module.body.first_mut() {
-        if let Some(SmallStatement::AnnAssign(ann_assign)) = simple.body.first_mut() {
-            return Ok(ann_assign);
-        } else {
-            bail!("Expected CompoundStatement::FunctionDef")
-        }
-    } else {
-        bail!("Expected Statement::Simple")
     }
 }
