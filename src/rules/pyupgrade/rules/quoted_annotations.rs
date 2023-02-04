@@ -37,7 +37,13 @@ fn argument_list(args: &Arguments) -> Vec<Arg> {
     let mut final_result: Vec<Arg> = vec![];
     final_result.extend(args.posonlyargs.clone());
     final_result.extend(args.args.clone());
+    if let Some(item) = &args.vararg {
+        final_result.push(*item.clone());
+    }
     final_result.extend(args.kwonlyargs.clone());
+    if let Some(item) = &args.kwarg {
+        final_result.push(*item.clone());
+    }
     final_result
 }
 
