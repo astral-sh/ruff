@@ -297,7 +297,9 @@ fn process_subscript<'a>(
         };
 
         if let ExprKind::Tuple { elts, .. } = &node_slice.node {
-            to_add.push(elts.get(0).unwrap());
+            if let Some(item) = elts.get(0) {
+                to_add.push(item);
+            }
         }
     } else if name != "Literal" {
         to_add.push(slice);
