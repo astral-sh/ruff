@@ -1,7 +1,7 @@
 # These SHOULD change
 
 args = list(range(10))
-kwargs = {x:x for x in range(10)}
+kwargs = {x: x for x in range(10)}
 
 "{0}".format(*args)
 
