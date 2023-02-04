@@ -22,7 +22,12 @@ class D(TypedDict):
 class D(typing.TypedDict):
     E: TypedDict("E", {"foo": "int"})
 
+class D(TypedDict):
+    E: TypedDict("E", {"foo": "int"})
+
 x: Annotated["str", "metadata"]
+
+x: typing.Annotated["str", "metadata"]
 
 x: Arg("str", "name")
 
