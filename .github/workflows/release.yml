@@ -1,0 +1,137 @@
+# CI that:
+#
+# * checks for a Git Tag that looks like a release ("v1.2.0")
+# * creates a Github Release™️
+# * builds binaries/packages with cargo-dist
+# * uploads those packages to the Github Release™️
+#
+# Note that the Github Release™️ will be created before the packages,
+# so there will be a few minutes where the release has no packages
+# and then they will slowly trickle in, possibly failing. To make
+# this more pleasant we mark the release as a "draft" until all
+# artifacts have been successfully uploaded. This allows you to
+# choose what to do with partial successes and avoids spamming
+# anyone with notifications before the release is actually ready.
+name: Release
+
+permissions:
+  contents: write
+
+# This task will run whenever you push a git tag that looks like
+# a version number. We just look for `v` followed by at least one number
+# and then whatever. so `v1`, `v1.0.0`, and `v1.0.0-prerelease` all work.
+#
+# If there's a prerelease-style suffix to the version then the Github Release™️
+# will be marked as a prerelease (handled by taiki-e/create-gh-release-action).
+#
+# Note that when generating links to uploaded artifacts, cargo-dist will currently
+# assume that your git tag is always v{VERSION} where VERSION is the version in
+# the published package's Cargo.toml (this is the default behaviour of cargo-release).
+# In the future this may be made more robust/configurable.
+on:
+
+  push:
+    tags:
+      - v[0-9]+.*
+
+env:
+  ALL_CARGO_DIST_TARGET_ARGS: --target=x86_64-unknown-linux-gnu --target=x86_64-apple-darwin --target=x86_64-pc-windows-msvc
+  ALL_CARGO_DIST_INSTALLER_ARGS:
+
+jobs:
+  # Create the Github Release™️ so the packages have something to be uploaded to
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.create-gh-release.outputs.computed-prefix }}${{ steps.create-gh-release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v3
+      - id: create-gh-release
+        uses: taiki-e/create-gh-release-action@v1
+        with:
+          draft: true
+          # (required) GitHub token for creating GitHub Releases.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+
+  # Build and packages all the things
+  upload-artifacts:
+    needs: create-release
+    strategy:
+      matrix:
+        # For these target platforms
+        include:
+        - target: x86_64-unknown-linux-gnu
+          os: ubuntu-20.04
+          install-dist: curl --proto '=https' --tlsv1.2 -L -sSf https://github.com/axodotdev/cargo-dist/releases/download/v0.0.2/installer.sh | sh
+        - target: x86_64-apple-darwin
+          os: macos-11
+          install-dist: curl --proto '=https' --tlsv1.2 -L -sSf https://github.com/axodotdev/cargo-dist/releases/download/v0.0.2/installer.sh | sh
+        - target: x86_64-pc-windows-msvc
+          os: windows-2019
+          install-dist: irm 'https://github.com/axodotdev/cargo-dist/releases/download/v0.0.2/installer.ps1' | iex
+    runs-on: ${{ matrix.os }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        run: rustup update stable && rustup default stable
+      - name: Install cargo-dist
+        run: ${{ matrix.install-dist }}
+      - name: Run cargo-dist
+        # This logic is a bit janky because it's trying to be a polyglot between
+        # powershell and bash since this will run on windows, macos, and linux!
+        # The two platforms don't agree on how to talk about env vars but they
+        # do agree on 'cat' and '$()' so we use that to marshal values between commmands.
+        run: |
+          # Actually do builds and make zips and whatnot
+          cargo dist --target=${{ matrix.target }} --output-format=json > dist-manifest.json
+          echo "dist ran successfully"
+          cat dist-manifest.json
+          # Parse out what we just built and upload it to the Github Release™️
+          cat dist-manifest.json | jq --raw-output ".releases[].artifacts[].path" > uploads.txt
+          echo "uploading..."
+          cat uploads.txt
+          gh release upload ${{ needs.create-release.outputs.tag }} $(cat uploads.txt)
+          echo "uploaded!"
+
+  # Compute and upload the manifest for everything
+  upload-manifest:
+    needs: create-release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust
+        run: rustup update stable && rustup default stable
+      - name: Install cargo-dist
+        run: curl --proto '=https' --tlsv1.2 -L -sSf https://github.com/axodotdev/cargo-dist/releases/download/v0.0.2/installer.sh | sh
+      - name: Run cargo-dist manifest
+        run: |
+          # Generate a manifest describing everything
+          cargo dist manifest --no-local-paths --output-format=json $ALL_CARGO_DIST_TARGET_ARGS $ALL_CARGO_DIST_INSTALLER_ARGS > dist-manifest.json
+          echo "dist manifest ran successfully"
+          cat dist-manifest.json
+          # Upload the manifest to the Github Release™️
+          gh release upload ${{ needs.create-release.outputs.tag }} dist-manifest.json
+          echo "uploaded manifest!"
+          # Edit the Github Release™️ title/body to match what cargo-dist thinks it should be
+          CHANGELOG_TITLE=$(cat dist-manifest.json | jq --raw-output ".releases[].changelog_title")
+          cat dist-manifest.json | jq --raw-output ".releases[].changelog_body" > new_dist_changelog.md
+          gh release edit ${{ needs.create-release.outputs.tag }} --title="$CHANGELOG_TITLE" --notes-file=new_dist_changelog.md
+          echo "updated release notes!"
+
+  # Mark the Github Release™️ as a non-draft now that everything has succeeded!
+  publish-release:
+    needs: [create-release, upload-artifacts, upload-manifest]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: mark release as non-draft
+        run: |
+          gh release edit ${{ needs.create-release.outputs.tag }} --draft=false
+
