@@ -5,7 +5,7 @@ use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::Expr;
+use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -70,6 +70,16 @@ fn generate_arguments<'a>(
     Ok(new_args)
 }
 
+/// Returns true if *args is in the arguments.
+fn check_for_starred(args: &[Expr]) -> bool {
+    for arg in args {
+        if let ExprKind::Starred { .. } = &arg.node {
+            return true;
+        }
+    }
+    false
+}
+
 /// Returns the corrected function call.
 fn generate_call(
     expr: &Expr,
@@ -77,12 +87,23 @@ fn generate_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
+    println!("CHECKPOINT: 0");
+    if let ExprKind::Call {
+        func,
+        args,
+        keywords,
+    } = &expr.node
+    {
+        let is_starred = check_for_starred(&args);
+        println!("{:?}", is_starred);
+    }
+
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
     let mut expression = match_expression(module_text)?;
     let mut call = match_call(&mut expression)?;
-
     // Fix the call arguments.
     call.args = generate_arguments(&call.args, correct_order)?;
+    println!("CHECKPOINT: 1");
 
     // Fix the string itself.
     let Expression::Attribute(item) = &*call.func else {
@@ -127,11 +148,13 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
     if !(0..summary.indexes.len()).all(|index| summary.indexes.contains(&index)) {
         return;
     }
+    println!("CHECKPOINT: -1");
 
     let mut diagnostic = Diagnostic::new(FormatLiterals, Range::from_located(expr));
     if checker.patch(diagnostic.kind.rule()) {
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846
+        println!("CHECKPOINT: -0.5");
         if let Ok(contents) =
             generate_call(expr, &summary.indexes, checker.locator, checker.stylist)
         {
