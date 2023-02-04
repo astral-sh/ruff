@@ -4374,7 +4374,7 @@ impl<'a> Checker<'a> {
         }
         for (expr, (in_annotation, (scopes, parents))) in allocator.iter().zip(stacks) {
             if self.settings.rules.enabled(&Rule::QuotedAnnotations)
-                // && self.annotations_future_enabled
+            // && self.annotations_future_enabled
             {
                 pyupgrade::rules::remove_quotes(self, expr);
             }
