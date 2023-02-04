@@ -36,7 +36,9 @@ mod tests {
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
+    #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
+    #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
@@ -94,6 +96,22 @@ mod tests {
     }
 
     #[test]
+    fn max_branches() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_branches_params.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    max_branches: 1,
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyBranches])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn max_statements() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pylint/too_many_statements_params.py"),
@@ -103,6 +121,22 @@ mod tests {
                     ..pylint::settings::Settings::default()
                 },
                 ..Settings::for_rules(vec![Rule::TooManyStatements])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn max_return_statements() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/too_many_return_statements_params.py"),
+            &Settings {
+                pylint: pylint::settings::Settings {
+                    max_returns: 1,
+                    ..pylint::settings::Settings::default()
+                },
+                ..Settings::for_rules(vec![Rule::TooManyReturnStatements])
             },
         )?;
         assert_yaml_snapshot!(diagnostics);
