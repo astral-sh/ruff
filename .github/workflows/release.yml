@@ -29,34 +29,34 @@ permissions:
 # the published package's Cargo.toml (this is the default behaviour of cargo-release).
 # In the future this may be made more robust/configurable.
 on:
-
-  push:
-    tags:
-      - v[0-9]+.*
+  pull_request:
+#  push:
+#    tags:
+#      - v[0-9]+.*
 
 env:
   ALL_CARGO_DIST_TARGET_ARGS: --target=x86_64-unknown-linux-gnu --target=x86_64-apple-darwin --target=x86_64-pc-windows-msvc
   ALL_CARGO_DIST_INSTALLER_ARGS:
 
 jobs:
-  # Create the Github Release™️ so the packages have something to be uploaded to
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.create-gh-release.outputs.computed-prefix }}${{ steps.create-gh-release.outputs.version }}
-    steps:
-      - uses: actions/checkout@v3
-      - id: create-gh-release
-        uses: taiki-e/create-gh-release-action@v1
-        with:
-          draft: true
-          # (required) GitHub token for creating GitHub Releases.
-          token: ${{ secrets.GITHUB_TOKEN }}
+#  # Create the Github Release™️ so the packages have something to be uploaded to
+#  create-release:
+#    runs-on: ubuntu-latest
+#    outputs:
+#      tag: ${{ steps.create-gh-release.outputs.computed-prefix }}${{ steps.create-gh-release.outputs.version }}
+#    steps:
+#      - uses: actions/checkout@v3
+#      - id: create-gh-release
+#        uses: taiki-e/create-gh-release-action@v1
+#        with:
+#          draft: true
+#          # (required) GitHub token for creating GitHub Releases.
+#          token: ${{ secrets.GITHUB_TOKEN }}
 
 
   # Build and packages all the things
   upload-artifacts:
-    needs: create-release
+#    needs: create-release
     strategy:
       matrix:
         # For these target platforms
@@ -93,12 +93,12 @@ jobs:
           cat dist-manifest.json | jq --raw-output ".releases[].artifacts[].path" > uploads.txt
           echo "uploading..."
           cat uploads.txt
-          gh release upload ${{ needs.create-release.outputs.tag }} $(cat uploads.txt)
-          echo "uploaded!"
+#          gh release upload ${{ needs.create-release.outputs.tag }} $(cat uploads.txt)
+#          echo "uploaded!"
 
   # Compute and upload the manifest for everything
   upload-manifest:
-    needs: create-release
+#    needs: create-release
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -114,24 +114,24 @@ jobs:
           cargo dist manifest --no-local-paths --output-format=json $ALL_CARGO_DIST_TARGET_ARGS $ALL_CARGO_DIST_INSTALLER_ARGS > dist-manifest.json
           echo "dist manifest ran successfully"
           cat dist-manifest.json
-          # Upload the manifest to the Github Release™️
-          gh release upload ${{ needs.create-release.outputs.tag }} dist-manifest.json
-          echo "uploaded manifest!"
-          # Edit the Github Release™️ title/body to match what cargo-dist thinks it should be
-          CHANGELOG_TITLE=$(cat dist-manifest.json | jq --raw-output ".releases[].changelog_title")
-          cat dist-manifest.json | jq --raw-output ".releases[].changelog_body" > new_dist_changelog.md
-          gh release edit ${{ needs.create-release.outputs.tag }} --title="$CHANGELOG_TITLE" --notes-file=new_dist_changelog.md
-          echo "updated release notes!"
+#          # Upload the manifest to the Github Release™️
+#          gh release upload ${{ needs.create-release.outputs.tag }} dist-manifest.json
+#          echo "uploaded manifest!"
+#          # Edit the Github Release™️ title/body to match what cargo-dist thinks it should be
+#          CHANGELOG_TITLE=$(cat dist-manifest.json | jq --raw-output ".releases[].changelog_title")
+#          cat dist-manifest.json | jq --raw-output ".releases[].changelog_body" > new_dist_changelog.md
+#          gh release edit ${{ needs.create-release.outputs.tag }} --title="$CHANGELOG_TITLE" --notes-file=new_dist_changelog.md
+#          echo "updated release notes!"
 
-  # Mark the Github Release™️ as a non-draft now that everything has succeeded!
-  publish-release:
-    needs: [create-release, upload-artifacts, upload-manifest]
-    runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: mark release as non-draft
-        run: |
-          gh release edit ${{ needs.create-release.outputs.tag }} --draft=false
-
+#  # Mark the Github Release™️ as a non-draft now that everything has succeeded!
+#  publish-release:
+#    needs: [create-release, upload-artifacts, upload-manifest]
+#    runs-on: ubuntu-latest
+#    env:
+#      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#    steps:
+#      - uses: actions/checkout@v3
+#      - name: mark release as non-draft
+#        run: |
+#          gh release edit ${{ needs.create-release.outputs.tag }} --draft=false
+#
