@@ -13,6 +13,8 @@ use rustpython_parser::token::StringKind;
 use smallvec::smallvec;
 
 use crate::ast::types::{Binding, BindingKind, CallPath, Range};
+use crate::ast::visitor;
+use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 
@@ -661,6 +663,27 @@ pub fn to_call_path(target: &str) -> CallPath {
         target.split('.').collect()
     } else {
         smallvec!["", target]
+    }
+}
+
+/// A [`Visitor`] that collects all return statements in a function or method.
+#[derive(Default)]
+pub struct ReturnStatementVisitor<'a> {
+    pub returns: Vec<Option<&'a Expr>>,
+}
+
+impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
+where
+    'b: 'a,
+{
+    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        match &stmt.node {
+            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
+                // Don't recurse.
+            }
+            StmtKind::Return { value } => self.returns.push(value.as_ref().map(|expr| &**expr)),
+            _ => visitor::walk_stmt(self, stmt),
+        }
     }
 }
 

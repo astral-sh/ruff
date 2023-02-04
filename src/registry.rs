@@ -92,6 +92,7 @@ ruff_macros::define_rule_mapping!(
     PLR2004 => rules::pylint::rules::MagicValueComparison,
     PLW0120 => rules::pylint::rules::UselessElseOnLoop,
     PLW0602 => rules::pylint::rules::GlobalVariableNotAssigned,
+    PLR0911 => rules::pylint::rules::TooManyReturnStatements,
     PLR0913 => rules::pylint::rules::TooManyArguments,
     PLR0912 => rules::pylint::rules::TooManyBranches,
     PLR0915 => rules::pylint::rules::TooManyStatements,
