@@ -1705,11 +1705,7 @@ where
                     }
                 }
             }
-            StmtKind::AnnAssign {
-                target,
-                value,
-                ..
-            } => {
+            StmtKind::AnnAssign { target, value, .. } => {
                 if self.settings.rules.enabled(&Rule::DoNotAssignLambda) {
                     if let Some(value) = value {
                         pycodestyle::rules::do_not_assign_lambda(self, target, value, stmt);

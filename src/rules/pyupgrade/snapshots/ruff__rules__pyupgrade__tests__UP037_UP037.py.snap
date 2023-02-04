@@ -1,0 +1,275 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 3
+    column: 13
+  end_location:
+    row: 3
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 3
+    column: 27
+  end_location:
+    row: 3
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 4
+    column: 7
+  end_location:
+    row: 4
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 6
+    column: 21
+  end_location:
+    row: 6
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 9
+    column: 15
+  end_location:
+    row: 9
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 9
+    column: 32
+  end_location:
+    row: 9
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 12
+    column: 9
+  end_location:
+    row: 12
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 14
+    column: 13
+  end_location:
+    row: 14
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 17
+    column: 7
+  end_location:
+    row: 17
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 20
+    column: 26
+  end_location:
+    row: 20
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 23
+    column: 30
+  end_location:
+    row: 23
+    column: 35
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 26
+    column: 30
+  end_location:
+    row: 26
+    column: 35
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 28
+    column: 13
+  end_location:
+    row: 28
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 30
+    column: 20
+  end_location:
+    row: 30
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 30
+    column: 27
+  end_location:
+    row: 30
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 32
+    column: 7
+  end_location:
+    row: 32
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 34
+    column: 14
+  end_location:
+    row: 34
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 36
+    column: 12
+  end_location:
+    row: 36
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 38
+    column: 19
+  end_location:
+    row: 38
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 40
+    column: 19
+  end_location:
+    row: 40
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 42
+    column: 10
+  end_location:
+    row: 42
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 44
+    column: 18
+  end_location:
+    row: 44
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 46
+    column: 28
+  end_location:
+    row: 46
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 46
+    column: 44
+  end_location:
+    row: 46
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 48
+    column: 35
+  end_location:
+    row: 48
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 48
+    column: 51
+  end_location:
+    row: 48
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    QuotedAnnotations: ~
+  location:
+    row: 50
+    column: 44
+  end_location:
+    row: 50
+    column: 49
+  fix: ~
+  parent: ~
+
