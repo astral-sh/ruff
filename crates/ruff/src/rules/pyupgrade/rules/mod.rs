@@ -29,7 +29,6 @@ pub(crate) use rewrite_mock_import::{
 };
 pub(crate) use rewrite_unicode_literal::{rewrite_unicode_literal, RewriteUnicodeLiteral};
 pub(crate) use rewrite_yield_from::{rewrite_yield_from, RewriteYieldFrom};
-pub(crate) use super_args::super_args;
 pub(crate) use super_call_with_parameters::{super_call_with_parameters, SuperCallWithParameters};
 pub(crate) use type_of_primitive::{type_of_primitive, TypeOfPrimitive};
 pub(crate) use typing_text_str_alias::{typing_text_str_alias, TypingTextStrAlias};
@@ -68,7 +67,6 @@ mod rewrite_c_element_tree;
 mod rewrite_mock_import;
 mod rewrite_unicode_literal;
 mod rewrite_yield_from;
-mod super_args;
 mod super_call_with_parameters;
 mod type_of_primitive;
 mod typing_text_str_alias;
