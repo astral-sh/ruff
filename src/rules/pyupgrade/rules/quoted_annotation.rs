@@ -13,7 +13,7 @@ define_violation!(
 impl AlwaysAutofixableViolation for QuotedAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Remove unnecessary quotes from type annotations")
+        format!("Remove quotes from type annotation")
     }
 
     fn autofix_title(&self) -> String {
