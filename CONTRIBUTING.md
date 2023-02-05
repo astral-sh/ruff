@@ -20,8 +20,7 @@ existing Python plugins, which can be used as a reference implementation.
 
 As a concrete example: consider taking on one of the rules from the [`tryceratops`](https://github.com/charliermarsh/ruff/issues/2056)
 plugin, and looking to the originating [Python source](https://github.com/guilatrova/tryceratops)
-for guidance. [`flake8-simplify`](https://github.com/charliermarsh/ruff/issues/998) has a few rules
-left too.
+for guidance.
 
 ### Prerequisites
 
@@ -39,16 +38,16 @@ cargo install cargo-insta
 After cloning the repository, run Ruff locally with:
 
 ```shell
-cargo run crates/ruff/resources/test/fixtures --no-cache
+cargo run /path/to/file.py --no-cache
 ```
 
 Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
 ```shell
-cargo fmt --all     # Auto-formatting...
+cargo fmt --all  # Auto-formatting...
 cargo clippy --fix --workspace --all-targets --all-features  # Linting...
-cargo test --all    # Testing...
+cargo test --all  # Testing...
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
@@ -70,6 +69,22 @@ pre-commit run --all-files
 
 Your Pull Request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
+
+### Project structure
+
+Ruff is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
+such that all crates are contained in a flat `crates` directory.
+
+The vast majority of the code, including all lint rules, lives in the `ruff` crate (located at
+`crates/ruff`). As a contributor, that's the crate that'll be most relevant to you.
+
+At time of writing, the repository includes the following crates:
+
+- `crates/ruff`: library crate containing all lint rules and the core logic for running them.
+- `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
+- `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g., `cargo dev generate-all`).
+- `crates/ruff_macros`: library crate containing macros used by Ruff.
+- `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
 
 ### Example: Adding a new lint rule
 
