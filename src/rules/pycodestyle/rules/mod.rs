@@ -13,6 +13,11 @@ pub use imports::{
     module_import_not_at_top_of_file, multiple_imports_on_one_line, ModuleImportNotAtTopOfFile,
     MultipleImportsOnOneLine,
 };
+pub use indentation::{
+    indentation, IndentationWithInvalidMultiple, IndentationWithInvalidMultipleComment,
+    NoIndentedBlock, NoIndentedBlockComment, OverIndented, UnexpectedIndentation,
+    UnexpectedIndentationComment,
+};
 pub use invalid_escape_sequence::{invalid_escape_sequence, InvalidEscapeSequence};
 pub use line_too_long::{line_too_long, LineTooLong};
 pub use literal_comparisons::{literal_comparisons, NoneComparison, TrueFalseComparison};
@@ -34,6 +39,7 @@ mod doc_line_too_long;
 mod errors;
 mod extraneous_whitespace;
 mod imports;
+mod indentation;
 mod invalid_escape_sequence;
 mod line_too_long;
 mod literal_comparisons;

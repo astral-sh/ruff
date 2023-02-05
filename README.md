@@ -701,6 +701,13 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | E101 | mixed-spaces-and-tabs | Indentation contains mixed spaces and tabs |  |
+| E111 | indentation-with-invalid-multiple | Indentation is not a multiple of {indent_size} |  |
+| E112 | no-indented-block | Expected an indented block |  |
+| E113 | unexpected-indentation | Unexpected indentation |  |
+| E114 | indentation-with-invalid-multiple-comment | Indentation is not a multiple of {indent_size} (comment) |  |
+| E115 | no-indented-block-comment | Expected an indented block (comment) |  |
+| E116 | unexpected-indentation-comment | Unexpected indentation (comment) |  |
+| E117 | over-indented | Over-indented |  |
 | E201 | whitespace-after-open-bracket | Whitespace after '(' |  |
 | E202 | whitespace-before-close-bracket | Whitespace before ')' |  |
 | E203 | whitespace-before-punctuation | Whitespace before ',', ';', or ':' |  |

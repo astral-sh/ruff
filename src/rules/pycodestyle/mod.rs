@@ -2,7 +2,8 @@
 pub(crate) mod rules;
 pub mod settings;
 
-pub mod helpers;
+pub(crate) mod helpers;
+pub(crate) mod logical_lines;
 
 #[cfg(test)]
 mod tests {
@@ -16,6 +17,13 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
+    #[test_case(Rule::IndentationWithInvalidMultiple, Path::new("E11.py"))]
+    #[test_case(Rule::IndentationWithInvalidMultipleComment, Path::new("E11.py"))]
+    #[test_case(Rule::NoIndentedBlock, Path::new("E11.py"))]
+    #[test_case(Rule::NoIndentedBlockComment, Path::new("E11.py"))]
+    #[test_case(Rule::UnexpectedIndentation, Path::new("E11.py"))]
+    #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]
+    #[test_case(Rule::OverIndented, Path::new("E11.py"))]
     #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]

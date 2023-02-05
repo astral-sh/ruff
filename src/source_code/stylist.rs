@@ -112,6 +112,10 @@ impl Indentation {
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
+
+    pub fn as_char(&self) -> char {
+        self.0.chars().next().unwrap()
+    }
 }
 
 impl Deref for Indentation {

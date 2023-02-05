@@ -96,7 +96,7 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| matches!(rule_code.lint_source(), LintSource::LogicalLines))
     {
-        diagnostics.extend(check_logical_lines(&tokens, locator, settings));
+        diagnostics.extend(check_logical_lines(&tokens, locator, stylist, settings));
     }
 
     // Run the AST-based rules.

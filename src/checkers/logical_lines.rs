@@ -1,164 +1,62 @@
 use bisection::bisect_left;
 use itertools::Itertools;
 use rustpython_ast::Location;
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
-use crate::rules::pycodestyle::rules::{extraneous_whitespace, space_around_operator};
+use crate::rules::pycodestyle::logical_lines::iter_logical_lines;
+use crate::rules::pycodestyle::rules::{extraneous_whitespace, indentation, space_around_operator};
 use crate::settings::Settings;
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 
-#[derive(Debug)]
-struct LogicalLine {
-    text: String,
-    mapping: Vec<(usize, Location)>,
-    /// Whether the logical line contains an operator.
-    operator: bool,
-    /// Whether the logical line contains a comment.
-    bracket: bool,
-    /// Whether the logical line contains a punctuation mark.
-    punctuation: bool,
-}
-
-fn build_line(tokens: &[(Location, &Tok, Location)], locator: &Locator) -> LogicalLine {
-    let mut logical = String::with_capacity(88);
-    let mut operator = false;
-    let mut bracket = false;
-    let mut punctuation = false;
-    let mut mapping = Vec::new();
-    let mut prev: Option<&Location> = None;
-    let mut length = 0;
-    for (start, tok, end) in tokens {
-        if matches!(
-            tok,
-            Tok::Newline | Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent | Tok::Comment { .. }
-        ) {
-            continue;
-        }
-        if mapping.is_empty() {
-            mapping.push((0, *start));
-        }
-
-        if !operator {
-            operator |= matches!(
-                tok,
-                Tok::Amper
-                    | Tok::AmperEqual
-                    | Tok::CircumFlex
-                    | Tok::CircumflexEqual
-                    | Tok::Colon
-                    | Tok::ColonEqual
-                    | Tok::DoubleSlash
-                    | Tok::DoubleSlashEqual
-                    | Tok::DoubleStar
-                    | Tok::Equal
-                    | Tok::Greater
-                    | Tok::GreaterEqual
-                    | Tok::Less
-                    | Tok::LessEqual
-                    | Tok::Minus
-                    | Tok::MinusEqual
-                    | Tok::NotEqual
-                    | Tok::Percent
-                    | Tok::PercentEqual
-                    | Tok::Plus
-                    | Tok::PlusEqual
-                    | Tok::Slash
-                    | Tok::SlashEqual
-                    | Tok::Star
-                    | Tok::StarEqual
-                    | Tok::Vbar
-                    | Tok::VbarEqual
-            );
-        }
-
-        if !bracket {
-            bracket |= matches!(
-                tok,
-                Tok::Lpar | Tok::Lsqb | Tok::Lbrace | Tok::Rpar | Tok::Rsqb | Tok::Rbrace
-            );
-        }
-
-        if !punctuation {
-            punctuation |= matches!(tok, Tok::Comma | Tok::Semi | Tok::Colon);
-        }
-
-        // TODO(charlie): "Mute" strings.
-        let text = if let Tok::String { .. } = tok {
-            "\"xxx\""
+/// Return the amount of indentation, expanding tabs to the next multiple of 8.
+fn expand_indent(mut line: &str) -> usize {
+    while line.ends_with("\n\r") {
+        line = &line[..line.len() - 2];
+    }
+    if !line.contains('\t') {
+        return line.len() - line.trim_start().len();
+    }
+    let mut indent = 0;
+    for c in line.chars() {
+        if c == '\t' {
+            indent = (indent / 8) * 8 + 8;
+        } else if c == ' ' {
+            indent += 1;
         } else {
-            locator.slice_source_code_range(&Range {
-                location: *start,
-                end_location: *end,
-            })
-        };
-
-        if let Some(prev) = prev {
-            if prev.row() != start.row() {
-                let prev_text = locator.slice_source_code_range(&Range {
-                    location: Location::new(prev.row(), prev.column() - 1),
-                    end_location: Location::new(prev.row(), prev.column()),
-                });
-                if prev_text == ","
-                    || ((prev_text != "{" && prev_text != "[" && prev_text != "(")
-                        && (text != "}" && text != "]" && text != ")"))
-                {
-                    logical.push(' ');
-                    length += 1;
-                }
-            } else if prev.column() != start.column() {
-                let prev_text = locator.slice_source_code_range(&Range {
-                    location: *prev,
-                    end_location: *start,
-                });
-                logical.push_str(prev_text);
-                length += prev_text.len();
-            }
-        }
-        logical.push_str(text);
-        length += text.len();
-        mapping.push((length, *end));
-        prev = Some(end);
-    }
-
-    LogicalLine {
-        text: logical,
-        operator,
-        bracket,
-        punctuation,
-        mapping,
-    }
-}
-
-fn iter_logical_lines(tokens: &[LexResult], locator: &Locator) -> Vec<LogicalLine> {
-    let mut parens = 0;
-    let mut accumulator = Vec::with_capacity(32);
-    let mut lines = Vec::with_capacity(128);
-    for &(start, ref tok, end) in tokens.iter().flatten() {
-        accumulator.push((start, tok, end));
-        if matches!(tok, Tok::Lbrace | Tok::Lpar | Tok::Lsqb) {
-            parens += 1;
-        } else if matches!(tok, Tok::Rbrace | Tok::Rpar | Tok::Rsqb) {
-            parens -= 1;
-        } else if parens == 0 {
-            if matches!(tok, Tok::Newline) {
-                lines.push(build_line(&accumulator, locator));
-                accumulator.drain(..);
-            }
+            break;
         }
     }
-    lines
+    indent
 }
 
 pub fn check_logical_lines(
     tokens: &[LexResult],
     locator: &Locator,
+    stylist: &Stylist,
     settings: &Settings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
+
+    let indent_char = stylist.indentation().as_char();
+    let mut prev_line = None;
+    let mut prev_indent_level = None;
     for line in iter_logical_lines(tokens, locator) {
+        if line.mapping.is_empty() {
+            continue;
+        }
+
+        // Extract the indentation level.
+        let start_loc = line.mapping[0].1;
+        let start_line = locator
+            .slice_source_code_range(&Range::new(Location::new(start_loc.row(), 0), start_loc));
+        let indent_level = expand_indent(start_line);
+        let indent_size = 4;
+
+        // Generate mapping from logical to physical offsets.
         let mapping_offsets = line.mapping.iter().map(|(offset, _)| *offset).collect_vec();
+
         if line.operator {
             for (index, kind) in space_around_operator(&line.text) {
                 let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
@@ -188,6 +86,32 @@ pub fn check_logical_lines(
                     });
                 }
             }
+        }
+
+        for (index, kind) in indentation(
+            &line,
+            prev_line.as_ref(),
+            indent_char,
+            indent_level,
+            prev_indent_level,
+            indent_size,
+        ) {
+            let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
+            let location = Location::new(pos.row(), pos.column() + index - token_offset);
+            if settings.rules.enabled(kind.rule()) {
+                diagnostics.push(Diagnostic {
+                    kind,
+                    location,
+                    end_location: location,
+                    fix: None,
+                    parent: None,
+                });
+            }
+        }
+
+        if !line.is_comment() {
+            prev_line = Some(line);
+            prev_indent_level = Some(indent_level);
         }
     }
     diagnostics
@@ -276,7 +200,7 @@ f()"#;
             .into_iter()
             .map(|line| line.text)
             .collect();
-        let expected = vec!["def f():", "\"xxx\"", "x = 1", "f()"];
+        let expected = vec!["def f():", "\"xxx\"", "", "x = 1", "f()"];
         assert_eq!(actual, expected);
     }
 }

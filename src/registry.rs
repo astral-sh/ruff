@@ -13,6 +13,13 @@ use crate::violation::Violation;
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
     E101 => rules::pycodestyle::rules::MixedSpacesAndTabs,
+    E111 => rules::pycodestyle::rules::IndentationWithInvalidMultiple,
+    E112 => rules::pycodestyle::rules::NoIndentedBlock,
+    E113 => rules::pycodestyle::rules::UnexpectedIndentation,
+        E114 => rules::pycodestyle::rules::IndentationWithInvalidMultipleComment,
+    E115 => rules::pycodestyle::rules::NoIndentedBlockComment,
+    E116 => rules::pycodestyle::rules::UnexpectedIndentationComment,
+    E117 => rules::pycodestyle::rules::OverIndented,
     E201 => rules::pycodestyle::rules::WhitespaceAfterOpenBracket,
     E202 => rules::pycodestyle::rules::WhitespaceBeforeCloseBracket,
     E203 => rules::pycodestyle::rules::WhitespaceBeforePunctuation,
@@ -692,10 +699,17 @@ impl Rule {
     pub const fn lint_source(&self) -> &'static LintSource {
         match self {
             Rule::UnusedNOQA => &LintSource::NoQa,
-            Rule::TabBeforeOperator
+            Rule::IndentationWithInvalidMultiple
+            | Rule::IndentationWithInvalidMultipleComment
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeOperator
+            | Rule::NoIndentedBlock
+            | Rule::NoIndentedBlockComment
+            | Rule::OverIndented
             | Rule::TabAfterOperator
+            | Rule::TabBeforeOperator
+            | Rule::UnexpectedIndentation
+            | Rule::UnexpectedIndentationComment
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
