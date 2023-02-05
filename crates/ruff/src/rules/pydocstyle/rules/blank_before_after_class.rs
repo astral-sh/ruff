@@ -1,14 +1,13 @@
+use ruff_macros::derive_message_formats;
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
-use crate::rules::pydocstyle::rules::regexes::COMMENT_REGEX;
 use crate::violation::AlwaysAutofixableViolation;
-
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct OneBlankLineBeforeClass {
@@ -144,7 +143,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         let all_blank_after = after
             .lines()
             .skip(1)
-            .all(|line| line.trim().is_empty() || COMMENT_REGEX.is_match(line));
+            .all(|line| line.trim().is_empty() || line.trim_start().starts_with('#'));
         if all_blank_after {
             return;
         }
