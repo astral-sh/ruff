@@ -40,6 +40,7 @@ mod tests {
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
+    #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"); "PLE1307")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

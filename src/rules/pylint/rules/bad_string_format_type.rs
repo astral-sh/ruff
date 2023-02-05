@@ -26,6 +26,7 @@ impl Violation for BadStringFormatType {
     }
 }
 
+#[derive(Debug)]
 enum DataType {
     String,
     Integer,
@@ -53,8 +54,11 @@ impl PartialEq for DataType {
 fn char_to_data(format: char) -> DataType {
     match format {
         's' => DataType::String,
-        'n' => DataType::Number,
-        'b' | 'c' | 'd' | 'o' | 'x' | 'X' => DataType::Integer,
+        // The python documentation says "d" only works for integers, but it works for floats as
+        // well: https://docs.python.org/3/library/string.html#formatstrings
+        // I checked the rest of the integer codes, and none of them work with floats
+        'n' | 'd' => DataType::Number,
+        'b' | 'c' | 'o' | 'x' | 'X' => DataType::Integer,
         'e' | 'E' | 'f' | 'F' | 'g' | 'G' | '%' => DataType::Float,
         _ => DataType::Other,
     }
@@ -63,7 +67,8 @@ fn char_to_data(format: char) -> DataType {
 fn constant_to_data(value: &Constant) -> DataType {
     match value {
         Constant::Str(_) => DataType::String,
-        Constant::Int(_) => DataType::Integer,
+        // All float codes also work for integers
+        Constant::Int(_) => DataType::Number,
         Constant::Float(_) => DataType::Float,
         _ => DataType::Other,
     }
