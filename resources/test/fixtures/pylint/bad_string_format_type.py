@@ -48,3 +48,5 @@ print("%d %d"
 "%(key)s" % {"key": None}
 print("%s" % ("%s" % ("nested",),))
 print("%s" % ("%d" % (5,),))
+"%d %d" % "1"
+"%d" "%d" % "1"
