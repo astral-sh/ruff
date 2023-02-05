@@ -1175,7 +1175,7 @@ For more, see [flake8-return](https://pypi.org/project/flake8-return/) on PyPI.
 | RET501 | unnecessary-return-none | Do not explicitly `return None` in function if it is the only possible return value | 🛠 |
 | RET502 | implicit-return-value | Do not implicitly `return None` in function able to return non-`None` value | 🛠 |
 | RET503 | implicit-return | Missing explicit `return` at the end of function able to return non-`None` value | 🛠 |
-| RET504 | unnecessary-assign | Unnecessary variable assignment before `return` statement |  |
+| RET504 | unnecessary-assign | Unnecessary variable assignment before `return` statement | 🛠 |
 | RET505 | superfluous-else-return | Unnecessary `{branch}` after `return` statement |  |
 | RET506 | superfluous-else-raise | Unnecessary `{branch}` after `raise` statement |  |
 | RET507 | superfluous-else-continue | Unnecessary `{branch}` after `continue` statement |  |

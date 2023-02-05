@@ -15,6 +15,7 @@ pub struct Stack<'a> {
     pub assigns: FxHashMap<&'a str, Vec<Location>>,
     pub loops: Vec<(Location, Location)>,
     pub tries: Vec<(Location, Location)>,
+    pub assign_values: FxHashMap<&'a str, rustpython_ast::Located<ExprKind>>,
 }
 
 #[derive(Default)]
@@ -84,6 +85,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 visitor::walk_stmt(self, stmt);
             }
             StmtKind::Assign { targets, value, .. } => {
+
                 if let ExprKind::Name { id, .. } = &value.node {
                     self.stack
                         .refs
@@ -100,6 +102,12 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                         && !matches!(value.node, ExprKind::Tuple { .. })
                     {
                         return;
+                    }
+
+                    // TODO: Make this only run if the autofix is enabled, as this incurs a
+                    // slight performance overhead by using `.clone` 
+                    if let ExprKind::Name { id, .. } = &target.node {
+                        self.stack.assign_values.insert(id, *value.clone());
                     }
 
                     self.visit_assign_target(target);

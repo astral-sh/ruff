@@ -4,7 +4,7 @@ use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 use super::branch::Branch;
 use super::helpers::result_exists;
 use super::visitor::{ReturnVisitor, Stack};
-use crate::ast::helpers::elif_else_range;
+use crate::ast::helpers::{elif_else_range, unparse_expr};
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::whitespace::indentation;
@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::violation::{AlwaysAutofixableViolation, AutofixKind, Availability, Violation};
 use ruff_macros::derive_message_formats;
 
 define_violation!(
@@ -63,9 +63,14 @@ define_violation!(
     pub struct UnnecessaryAssign;
 );
 impl Violation for UnnecessaryAssign {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind {available: Availability::Sometimes} );
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary variable assignment before `return` statement")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|_| "Remove variable definition and place the constant in the `return` statement".to_string())
     }
 }
 
@@ -302,6 +307,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         }
 
         if !stack.refs.contains_key(id.as_str()) {
+            // No autofix, these cases are complicated enough to require human refactoring.
             checker.diagnostics.push(Diagnostic::new(
                 UnnecessaryAssign,
                 Range::from_located(expr),
@@ -319,10 +325,17 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             UnnecessaryAssign,
             Range::from_located(expr),
-        ));
+        );
+
+        if checker.patch(diagnostic.kind.rule()){
+            if let Some(assign_expr) = stack.assign_values.get(id.as_str()) {
+                diagnostic.amend(Fix::replacement(unparse_expr(assign_expr, checker.stylist), expr.location, expr.end_location.expect("Expression has no end location")));
+            }
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }
 
