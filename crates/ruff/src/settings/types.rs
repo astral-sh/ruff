@@ -10,10 +10,11 @@ use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use super::hashable::HashableHashSet;
 use crate::registry::Rule;
 use crate::rule_selector::RuleSelector;
 use crate::{fs, warn_user_once};
+
+use super::hashable::HashableHashSet;
 
 #[derive(
     Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,

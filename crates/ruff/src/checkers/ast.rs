@@ -16,6 +16,9 @@ use rustpython_parser::ast::{
 use rustpython_parser::parser;
 use smallvec::smallvec;
 
+use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python::typing::TYPING_EXTENSIONS;
+
 use crate::ast::helpers::{binding_range, collect_call_path, extract_handler_names};
 use crate::ast::operations::{extract_all_names, AllNamesFlags};
 use crate::ast::relocate::relocate_expr;
@@ -23,13 +26,11 @@ use crate::ast::types::{
     Binding, BindingKind, CallPath, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
     RefEquality, Scope, ScopeKind,
 };
+use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use crate::ast::visitor::{walk_excepthandler, Visitor};
-use crate::ast::{branch_detection, cast, helpers, operations, visitor};
+use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::noqa::Directive;
-use crate::python::builtins::{BUILTINS, MAGIC_GLOBALS};
-use crate::python::typing;
-use crate::python::typing::{Callable, SubscriptKind};
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
@@ -194,7 +195,7 @@ impl<'a> Checker<'a> {
             return true;
         }
 
-        if typing::TYPING_EXTENSIONS.contains(target) {
+        if TYPING_EXTENSIONS.contains(target) {
             if call_path.as_slice() == ["typing_extensions", target] {
                 return true;
             }
@@ -2086,7 +2087,7 @@ where
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.annotations_future_enabled
                                     && self.in_annotation))
-                            && typing::is_pep585_builtin(self, expr)
+                            && typing::is_pep585_builtin(expr, |expr| self.resolve_call_path(expr))
                         {
                             pyupgrade::rules::use_pep585_annotation(self, expr);
                         }
@@ -2131,7 +2132,7 @@ where
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.annotations_future_enabled
                             && self.in_annotation))
-                    && typing::is_pep585_builtin(self, expr)
+                    && typing::is_pep585_builtin(expr, |expr| self.resolve_call_path(expr))
                 {
                     pyupgrade::rules::use_pep585_annotation(self, expr);
                 }
@@ -3399,7 +3400,11 @@ where
                     self.in_subscript = true;
                     visitor::walk_expr(self, expr);
                 } else {
-                    match typing::match_annotated_subscript(self, value) {
+                    match match_annotated_subscript(
+                        value,
+                        |expr| self.resolve_call_path(expr),
+                        self.settings.typing_modules.iter().map(String::as_str),
+                    ) {
                         Some(subscript) => {
                             match subscript {
                                 // Ex) Optional[int]

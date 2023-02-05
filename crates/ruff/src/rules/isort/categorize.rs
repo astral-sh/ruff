@@ -6,9 +6,11 @@ use log::debug;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::types::{ImportBlock, Importable};
-use crate::python::sys::KNOWN_STANDARD_LIBRARY;
+use ruff_python::sys::KNOWN_STANDARD_LIBRARY;
+
 use crate::settings::types::PythonVersion;
+
+use super::types::{ImportBlock, Importable};
 
 #[derive(
     Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash,
@@ -58,7 +60,7 @@ pub fn categorize(
         } else if module_base == "__future__" {
             (ImportType::Future, Reason::Future)
         } else if KNOWN_STANDARD_LIBRARY
-            .get(&target_version)
+            .get(&target_version.as_tuple())
             .unwrap()
             .contains(module_base)
         {

@@ -84,6 +84,7 @@ At time of writing, the repository includes the following crates:
 - `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
 - `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g., `cargo dev generate-all`).
 - `crates/ruff_macros`: library crate containing macros used by Ruff.
+- `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of standard library modules by versionb).
 - `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
 
 ### Example: Adding a new lint rule

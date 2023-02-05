@@ -11,9 +11,9 @@ use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::python::identifiers::is_identifier;
 use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
+use ruff_python::identifiers::is_identifier;
 
 define_violation!(
     pub struct NoUnnecessaryPass;

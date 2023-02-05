@@ -1,8 +1,5 @@
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Expr, ExprKind};
-
-use crate::checkers::ast::Checker;
 
 // See: https://pypi.org/project/typing-extensions/
 pub static TYPING_EXTENSIONS: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
@@ -62,7 +59,7 @@ pub static TYPING_EXTENSIONS: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
 });
 
 // See: https://docs.python.org/3/library/typing.html
-const SUBSCRIPTS: &[&[&str]] = &[
+pub const SUBSCRIPTS: &[&[&str]] = &[
     // builtins
     &["", "dict"],
     &["", "frozenset"],
@@ -183,56 +180,15 @@ const SUBSCRIPTS: &[&[&str]] = &[
 ];
 
 // See: https://docs.python.org/3/library/typing.html
-const PEP_593_SUBSCRIPTS: &[&[&str]] = &[
+pub const PEP_593_SUBSCRIPTS: &[&[&str]] = &[
     // `typing`
     &["typing", "Annotated"],
     // `typing_extensions`
     &["typing_extensions", "Annotated"],
 ];
 
-pub enum SubscriptKind {
-    AnnotatedSubscript,
-    PEP593AnnotatedSubscript,
-}
-
-pub fn match_annotated_subscript(checker: &Checker, expr: &Expr) -> Option<SubscriptKind> {
-    if !matches!(
-        expr.node,
-        ExprKind::Name { .. } | ExprKind::Attribute { .. }
-    ) {
-        return None;
-    }
-
-    checker.resolve_call_path(expr).and_then(|call_path| {
-        if SUBSCRIPTS.contains(&call_path.as_slice()) {
-            return Some(SubscriptKind::AnnotatedSubscript);
-        }
-        if PEP_593_SUBSCRIPTS.contains(&call_path.as_slice()) {
-            return Some(SubscriptKind::PEP593AnnotatedSubscript);
-        }
-
-        for module in &checker.settings.typing_modules {
-            let module_call_path = module.split('.').collect::<Vec<_>>();
-            if call_path.starts_with(&module_call_path) {
-                for subscript in SUBSCRIPTS.iter() {
-                    if call_path.last() == subscript.last() {
-                        return Some(SubscriptKind::AnnotatedSubscript);
-                    }
-                }
-                for subscript in PEP_593_SUBSCRIPTS.iter() {
-                    if call_path.last() == subscript.last() {
-                        return Some(SubscriptKind::PEP593AnnotatedSubscript);
-                    }
-                }
-            }
-        }
-
-        None
-    })
-}
-
 // See: https://peps.python.org/pep-0585/
-const PEP_585_BUILTINS_ELIGIBLE: &[&[&str]] = &[
+pub const PEP_585_BUILTINS_ELIGIBLE: &[&[&str]] = &[
     &["typing", "Dict"],
     &["typing", "FrozenSet"],
     &["typing", "List"],
@@ -241,21 +197,3 @@ const PEP_585_BUILTINS_ELIGIBLE: &[&[&str]] = &[
     &["typing", "Type"],
     &["typing_extensions", "Type"],
 ];
-
-/// Returns `true` if `Expr` represents a reference to a typing object with a
-/// PEP 585 built-in.
-pub fn is_pep585_builtin(checker: &Checker, expr: &Expr) -> bool {
-    checker.resolve_call_path(expr).map_or(false, |call_path| {
-        PEP_585_BUILTINS_ELIGIBLE.contains(&call_path.as_slice())
-    })
-}
-
-pub enum Callable {
-    ForwardRef,
-    Cast,
-    NewType,
-    TypeVar,
-    NamedTuple,
-    TypedDict,
-    MypyExtension,
-}

@@ -7,8 +7,8 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::cst::matchers::{match_expr, match_module};
 use crate::fix::Fix;
-use crate::python::string::strip_quotes_and_prefixes;
 use crate::source_code::{Locator, Stylist};
+use ruff_python::string::strip_quotes_and_prefixes;
 
 /// Generate a [`Fix`] to remove unused keys from format dict.
 pub fn remove_unused_format_arguments_from_dict(
