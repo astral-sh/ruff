@@ -64,6 +64,10 @@ thiserror = { version = "1.0" }
 titlecase = { version = "2.2.1" }
 toml = { version = "0.6.0" }
 
+[features]
+default = []
+logical_lines = []
+
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 # For (future) wasm-pack support
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]

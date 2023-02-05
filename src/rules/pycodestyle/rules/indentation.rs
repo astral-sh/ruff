@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::define_violation;
 use crate::registry::DiagnosticKind;
 use crate::rules::pycodestyle::logical_lines::LogicalLine;
@@ -81,6 +83,7 @@ impl Violation for OverIndented {
 }
 
 /// E111
+#[cfg(feature = "logical_lines")]
 pub fn indentation(
     logical_line: &LogicalLine,
     prev_logical_line: Option<&LogicalLine>,
@@ -132,4 +135,16 @@ pub fn indentation(
         }
     }
     diagnostics
+}
+
+#[cfg(not(feature = "logical_lines"))]
+pub fn indentation(
+    _logical_line: &LogicalLine,
+    _prev_logical_line: Option<&LogicalLine>,
+    _indent_char: char,
+    _indent_level: usize,
+    _prev_indent_level: Option<usize>,
+    _indent_size: usize,
+) -> Vec<(usize, DiagnosticKind)> {
+    vec![]
 }

@@ -17,20 +17,6 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
-    #[test_case(Rule::IndentationWithInvalidMultiple, Path::new("E11.py"))]
-    #[test_case(Rule::IndentationWithInvalidMultipleComment, Path::new("E11.py"))]
-    #[test_case(Rule::NoIndentedBlock, Path::new("E11.py"))]
-    #[test_case(Rule::NoIndentedBlockComment, Path::new("E11.py"))]
-    #[test_case(Rule::UnexpectedIndentation, Path::new("E11.py"))]
-    #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]
-    #[test_case(Rule::OverIndented, Path::new("E11.py"))]
-    #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
-    #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
-    #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
-    #[test_case(Rule::TabBeforeOperator, Path::new("E22.py"))]
-    #[test_case(Rule::MultipleSpacesBeforeOperator, Path::new("E22.py"))]
-    #[test_case(Rule::TabAfterOperator, Path::new("E22.py"))]
-    #[test_case(Rule::MultipleSpacesAfterOperator, Path::new("E22.py"))]
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E40.py"))]
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.py"))]
@@ -55,6 +41,31 @@ mod tests {
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_1.py"))]
     #[test_case(Rule::MixedSpacesAndTabs, Path::new("E101.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join(path).as_path(),
+            &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[cfg(feature = "logical_lines")]
+    #[test_case(Rule::IndentationWithInvalidMultiple, Path::new("E11.py"))]
+    #[test_case(Rule::IndentationWithInvalidMultipleComment, Path::new("E11.py"))]
+    #[test_case(Rule::MultipleSpacesAfterOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MultipleSpacesBeforeOperator, Path::new("E22.py"))]
+    #[test_case(Rule::NoIndentedBlock, Path::new("E11.py"))]
+    #[test_case(Rule::NoIndentedBlockComment, Path::new("E11.py"))]
+    #[test_case(Rule::OverIndented, Path::new("E11.py"))]
+    #[test_case(Rule::TabAfterOperator, Path::new("E22.py"))]
+    #[test_case(Rule::TabBeforeOperator, Path::new("E22.py"))]
+    #[test_case(Rule::UnexpectedIndentation, Path::new("E11.py"))]
+    #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]
+    #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
+    #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
+    #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
+    fn logical(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),

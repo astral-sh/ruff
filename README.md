@@ -701,20 +701,6 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | E101 | mixed-spaces-and-tabs | Indentation contains mixed spaces and tabs |  |
-| E111 | indentation-with-invalid-multiple | Indentation is not a multiple of {indent_size} |  |
-| E112 | no-indented-block | Expected an indented block |  |
-| E113 | unexpected-indentation | Unexpected indentation |  |
-| E114 | indentation-with-invalid-multiple-comment | Indentation is not a multiple of {indent_size} (comment) |  |
-| E115 | no-indented-block-comment | Expected an indented block (comment) |  |
-| E116 | unexpected-indentation-comment | Unexpected indentation (comment) |  |
-| E117 | over-indented | Over-indented |  |
-| E201 | whitespace-after-open-bracket | Whitespace after '(' |  |
-| E202 | whitespace-before-close-bracket | Whitespace before ')' |  |
-| E203 | whitespace-before-punctuation | Whitespace before ',', ';', or ':' |  |
-| E221 | multiple-spaces-before-operator | Multiple spaces before operator |  |
-| E222 | multiple-spaces-after-operator | Multiple spaces after operator |  |
-| E223 | tab-before-operator | Tab before operator |  |
-| E224 | tab-after-operator | Tab after operator |  |
 | E401 | multiple-imports-on-one-line | Multiple imports on one line |  |
 | E402 | module-import-not-at-top-of-file | Module level import not at top of file |  |
 | E501 | line-too-long | Line too long ({length} > {limit} characters) |  |
