@@ -1,19 +1,20 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use anyhow::{anyhow, bail, Result};
 use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::derive_message_formats;
 use rustpython_ast::Expr;
+
+use ruff_macros::derive_message_formats;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call, match_expression};
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::source_code::{Locator, Stylist};
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct FormatLiterals;
@@ -70,6 +71,16 @@ fn generate_arguments<'a>(
     Ok(new_args)
 }
 
+/// Returns true if the indices are sequential.
+fn is_sequential(indices: &[usize]) -> bool {
+    for (expected, actual) in indices.iter().enumerate() {
+        if expected != *actual {
+            return false;
+        }
+    }
+    true
+}
+
 /// Returns the corrected function call.
 fn generate_call(
     expr: &Expr,
@@ -82,7 +93,9 @@ fn generate_call(
     let mut call = match_call(&mut expression)?;
 
     // Fix the call arguments.
-    call.args = generate_arguments(&call.args, correct_order)?;
+    if !is_sequential(correct_order) {
+        call.args = generate_arguments(&call.args, correct_order)?;
+    }
 
     // Fix the string itself.
     let Expression::Attribute(item) = &*call.func else {

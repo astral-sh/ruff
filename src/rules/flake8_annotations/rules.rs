@@ -1,11 +1,12 @@
 use log::error;
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprKind, Stmt};
 
-use super::fixes;
-use super::helpers::match_function_def;
+use ruff_macros::derive_message_formats;
+
+use crate::ast::helpers::ReturnStatementVisitor;
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
-use crate::ast::{cast, helpers, visitor};
+use crate::ast::{cast, helpers};
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::docstrings::definition::{Definition, DefinitionKind};
@@ -13,7 +14,9 @@ use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 use crate::visibility;
 use crate::visibility::Visibility;
-use ruff_macros::derive_message_formats;
+
+use super::fixes;
+use super::helpers::match_function_def;
 
 define_violation!(
     pub struct MissingTypeFunctionArgument {
@@ -159,26 +162,6 @@ impl Violation for DynamicallyTypedExpression {
     fn message(&self) -> String {
         let DynamicallyTypedExpression { name } = self;
         format!("Dynamically typed expressions (typing.Any) are disallowed in `{name}`")
-    }
-}
-
-#[derive(Default)]
-struct ReturnStatementVisitor<'a> {
-    returns: Vec<Option<&'a Expr>>,
-}
-
-impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt.node {
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                // Don't recurse.
-            }
-            StmtKind::Return { value } => self.returns.push(value.as_ref().map(|expr| &**expr)),
-            _ => visitor::walk_stmt(self, stmt),
-        }
     }
 }
 

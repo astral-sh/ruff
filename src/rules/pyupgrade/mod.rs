@@ -52,6 +52,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"); "UP029")]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_0.py"); "UP030_0")]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_1.py"); "UP030_1")]
+    #[test_case(Rule::FormatLiterals, Path::new("UP030_2.py"); "UP030_2")]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"); "UP031_0")]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"); "UP031_1")]
     #[test_case(Rule::FString, Path::new("UP032.py"); "UP032")]
