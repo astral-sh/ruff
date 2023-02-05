@@ -85,7 +85,6 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 visitor::walk_stmt(self, stmt);
             }
             StmtKind::Assign { targets, value, .. } => {
-
                 if let ExprKind::Name { id, .. } = &value.node {
                     self.stack
                         .refs
@@ -105,7 +104,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     }
 
                     // TODO: Make this only run if the autofix is enabled, as this incurs a
-                    // slight performance overhead by using `.clone` 
+                    // slight performance overhead by using `.clone`
                     if let ExprKind::Name { id, .. } = &target.node {
                         self.stack.assign_values.insert(id, *value.clone());
                     }
