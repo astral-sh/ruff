@@ -135,7 +135,7 @@ Note that plugin-specific configuration options are defined in their own modules
 
 You may also want to add the new configuration option to the `flake8-to-ruff` tool, which is
 responsible for converting `flake8` configuration files to Ruff's TOML format. This logic
-lives in `flake8_to_ruff/crates/ruff/src/converter.rs`.
+lives in `crates/ruff/src/flake8_to_ruff/converter.rs`.
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
