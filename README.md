@@ -857,6 +857,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
 | UP035 | import-replacements | Import from `{module}` instead: {names} | 🛠 |
 | UP036 | outdated-version-block | Version block is outdated for minimum Python version | 🛠 |
+| UP037 | quoted-annotation | Remove quotes from type annotation | 🛠 |
 
 ### flake8-2020 (YTT)
 

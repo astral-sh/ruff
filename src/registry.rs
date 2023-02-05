@@ -260,6 +260,7 @@ ruff_macros::define_rule_mapping!(
     UP034 => rules::pyupgrade::rules::ExtraneousParentheses,
     UP035 => rules::pyupgrade::rules::ImportReplacements,
     UP036 => rules::pyupgrade::rules::OutdatedVersionBlock,
+    UP037 => rules::pyupgrade::rules::QuotedAnnotation,
     // pydocstyle
     D100 => rules::pydocstyle::rules::PublicModule,
     D101 => rules::pydocstyle::rules::PublicClass,
