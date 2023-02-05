@@ -5,6 +5,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: i
+      rename: _i
       certainty: Certain
   location:
     row: 6
@@ -17,6 +18,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: k
+      rename: _k
       certainty: Certain
   location:
     row: 18
@@ -37,6 +39,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: i
+      rename: _i
       certainty: Certain
   location:
     row: 30
@@ -49,6 +52,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: k
+      rename: _k
       certainty: Certain
   location:
     row: 30
@@ -69,6 +73,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: bar
+      rename: _bar
       certainty: Uncertain
   location:
     row: 34
@@ -81,6 +86,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: bar
+      rename: _bar
       certainty: Uncertain
   location:
     row: 38
@@ -93,6 +99,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: bar
+      rename: _bar
       certainty: Uncertain
   location:
     row: 42
@@ -105,6 +112,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: bar
+      rename: _bar
       certainty: Uncertain
   location:
     row: 46
@@ -117,6 +125,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: bar
+      rename: _bar
       certainty: Certain
   location:
     row: 52
@@ -137,6 +146,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: bar
+      rename: _bar
       certainty: Certain
   location:
     row: 59
@@ -149,6 +159,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: bar
+      rename: _bar
       certainty: Certain
   location:
     row: 68
@@ -169,6 +180,7 @@ expression: diagnostics
 - kind:
     UnusedLoopControlVariable:
       name: bar
+      rename: _bar
       certainty: Certain
   location:
     row: 77
@@ -185,5 +197,18 @@ expression: diagnostics
     end_location:
       row: 77
       column: 16
+  parent: ~
+- kind:
+    UnusedLoopControlVariable:
+      name: line_
+      rename: ~
+      certainty: Certain
+  location:
+    row: 87
+    column: 4
+  end_location:
+    row: 87
+    column: 9
+  fix: ~
   parent: ~
 
