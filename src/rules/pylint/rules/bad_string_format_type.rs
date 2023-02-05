@@ -21,7 +21,7 @@ define_violation!(
 impl Violation for BadStringFormatType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("String format type does not match argument type")
+        format!("Format type does not match argument type")
     }
 }
 
@@ -82,10 +82,10 @@ fn get_all_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 }
 
 /// Returns true if the format string is not equivalent to the constant type
-fn not_equivalent(format: &CFormatSpec, value: &Constant) -> bool {
+fn equivalent(format: &CFormatSpec, value: &Constant) -> bool {
     let clean_constant = constant_to_data(value);
     let clean_format = char_to_data(format.format_char);
-    clean_constant != clean_format
+    clean_constant == clean_format
 }
 
 /// Checks if the format string matches the constant type formatting it
@@ -95,7 +95,7 @@ fn check_constant(formats: &[CFormatStrOrBytes<String>], value: &Constant) -> bo
         return false;
     }
     let format = formats.get(0).unwrap();
-    not_equivalent(format, value)
+    equivalent(format, value)
 }
 
 /// PLE1307
@@ -146,10 +146,16 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, left: &Expr, r
     }
 
     // Parse the parameters.
-    match &right.node {
+    let valid = match &right.node {
         ExprKind::Tuple { elts, .. } => true,
         ExprKind::Dict { keys, values } => true,
         ExprKind::Constant { value, .. } => check_constant(&format_strings, value),
         _ => return,
     };
+    if !valid {
+        checker.diagnostics.push(Diagnostic::new(
+            BadStringFormatType,
+            Range::from_located(expr),
+        ));
+    }
 }
