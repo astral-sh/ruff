@@ -3349,20 +3349,36 @@ where
                     Some(Callable::MypyExtension) => {
                         self.visit_expr(func);
 
-                        // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
-                        let mut arguments = args.iter().chain(keywords.iter().map(|keyword| {
-                            let KeywordData { value, .. } = &keyword.node;
-                            value
-                        }));
-                        if let Some(expr) = arguments.next() {
-                            self.in_type_definition = true;
-                            self.visit_expr(expr);
-                            self.in_type_definition = prev_in_type_definition;
-                        }
-                        for expr in arguments {
-                            self.in_type_definition = false;
-                            self.visit_expr(expr);
-                            self.in_type_definition = prev_in_type_definition;
+                        if args.is_empty() {
+                            // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
+                            for keyword in keywords {
+                                let KeywordData { value, arg, .. } = &keyword.node;
+                                if arg.as_ref().map_or(false, |arg| arg == "type") {
+                                    self.in_type_definition = true;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
+                                } else {
+                                    self.in_type_definition = false;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
+                                }
+                            }
+                        } else {
+                            // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
+                            let mut arguments = args.iter().chain(keywords.iter().map(|keyword| {
+                                let KeywordData { value, .. } = &keyword.node;
+                                value
+                            }));
+                            if let Some(expr) = arguments.next() {
+                                self.in_type_definition = true;
+                                self.visit_expr(expr);
+                                self.in_type_definition = prev_in_type_definition;
+                            }
+                            for expr in arguments {
+                                self.in_type_definition = false;
+                                self.visit_expr(expr);
+                                self.in_type_definition = prev_in_type_definition;
+                            }
                         }
                     }
                     None => {
@@ -4367,8 +4383,8 @@ impl<'a> Checker<'a> {
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 if self.annotations_future_enabled {
-                    if self.settings.rules.enabled(&Rule::QuotedAnnotations) {
-                        pyupgrade::rules::quoted_annotations(self, expression, range);
+                    if self.settings.rules.enabled(&Rule::QuotedAnnotation) {
+                        pyupgrade::rules::quoted_annotation(self, expression, range);
                     }
                 }
                 relocate_expr(&mut expr, range);

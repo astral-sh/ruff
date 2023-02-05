@@ -3,7 +3,7 @@ source: src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 18
     column: 13
@@ -21,7 +21,7 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 18
     column: 27
@@ -39,7 +39,7 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 19
     column: 7
@@ -57,7 +57,7 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 22
     column: 20
@@ -75,7 +75,7 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 26
     column: 15
@@ -93,7 +93,7 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 26
     column: 32
@@ -111,7 +111,7 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 30
     column: 9
@@ -129,7 +129,7 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 32
     column: 13
@@ -147,7 +147,7 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 36
     column: 7
@@ -165,7 +165,7 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 40
     column: 26
@@ -183,7 +183,7 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 44
     column: 30
@@ -201,7 +201,7 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 47
     column: 13
@@ -219,7 +219,7 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 49
     column: 7
@@ -237,7 +237,7 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 51
     column: 14
@@ -255,7 +255,7 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 53
     column: 12
@@ -273,7 +273,7 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 55
     column: 19
@@ -291,7 +291,7 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 57
     column: 19
@@ -309,7 +309,7 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 59
     column: 10
@@ -327,7 +327,7 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 61
     column: 18
@@ -345,7 +345,7 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 63
     column: 28
@@ -363,7 +363,7 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 63
     column: 44
@@ -381,7 +381,7 @@ expression: diagnostics
       column: 49
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 65
     column: 28
@@ -399,7 +399,7 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 65
     column: 35
@@ -417,7 +417,7 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 65
     column: 44
@@ -435,7 +435,7 @@ expression: diagnostics
       column: 49
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 65
     column: 51
@@ -453,7 +453,7 @@ expression: diagnostics
       column: 56
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 67
     column: 23
@@ -471,7 +471,7 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 67
     column: 37
@@ -489,7 +489,7 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 67
     column: 44
@@ -507,43 +507,7 @@ expression: diagnostics
       column: 49
   parent: ~
 - kind:
-    QuotedAnnotations: ~
-  location:
-    row: 77
-    column: 24
-  end_location:
-    row: 77
-    column: 30
-  fix:
-    content:
-      - name
-    location:
-      row: 77
-      column: 24
-    end_location:
-      row: 77
-      column: 30
-  parent: ~
-- kind:
-    QuotedAnnotations: ~
-  location:
-    row: 79
-    column: 24
-  end_location:
-    row: 79
-    column: 30
-  fix:
-    content:
-      - name
-    location:
-      row: 79
-      column: 24
-    end_location:
-      row: 79
-      column: 30
-  parent: ~
-- kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 89
     column: 17
@@ -561,7 +525,7 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 93
     column: 9
@@ -579,7 +543,7 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    QuotedAnnotations: ~
+    QuotedAnnotation: ~
   location:
     row: 95
     column: 14

@@ -8,23 +8,23 @@ use crate::registry::{Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    pub struct QuotedAnnotations;
+    pub struct QuotedAnnotation;
 );
-impl AlwaysAutofixableViolation for QuotedAnnotations {
+impl AlwaysAutofixableViolation for QuotedAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Removed quotes from the type annotations")
+        format!("Remove unnecessary quotes from type annotations")
     }
 
     fn autofix_title(&self) -> String {
-        "Removed the quotes".to_string()
+        "Remove quotes".to_string()
     }
 }
 
 /// UP037
-pub fn quoted_annotations(checker: &mut Checker, annotation: &str, range: Range) {
-    let mut diagnostic = Diagnostic::new(QuotedAnnotations, range);
-    if checker.patch(&Rule::QuotedAnnotations) {
+pub fn quoted_annotation(checker: &mut Checker, annotation: &str, range: Range) {
+    let mut diagnostic = Diagnostic::new(QuotedAnnotation, range);
+    if checker.patch(&Rule::QuotedAnnotation) {
         diagnostic.amend(Fix::replacement(
             annotation.to_string(),
             range.location,
