@@ -1,9 +1,21 @@
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+
+define_violation!(
+    pub struct InvalidPrintSyntax;
+);
+impl Violation for InvalidPrintSyntax {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use of `>>` is invalid with `print` function")
+    }
+}
 
 /// F633
 pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
@@ -17,7 +29,7 @@ pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
         return;
     };
     checker.diagnostics.push(Diagnostic::new(
-        violations::InvalidPrintSyntax,
+        InvalidPrintSyntax,
         Range::from_located(left),
     ));
 }

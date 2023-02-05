@@ -203,4 +203,42 @@ expression: diagnostics
     column: 1
   fix: ~
   parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[*foo]"
+  location:
+    row: 41
+    column: 0
+  end_location:
+    row: 41
+    column: 8
+  fix:
+    content:
+      - "[*foo]"
+    location:
+      row: 41
+      column: 0
+    end_location:
+      row: 41
+      column: 8
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[*foo]"
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 8
+  fix:
+    content:
+      - "[*foo]"
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 44
+      column: 8
+  parent: ~
 

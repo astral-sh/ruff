@@ -154,7 +154,7 @@ impl fmt::Display for Repr<'_> {
 
 /// Returns the outer quotes to use and the number of quotes that need to be
 /// escaped.
-pub(crate) fn choose_quotes_for_repr(
+pub(crate) const fn choose_quotes_for_repr(
     num_squotes: usize,
     num_dquotes: usize,
     quote: Quote,

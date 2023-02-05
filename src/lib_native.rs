@@ -49,7 +49,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
         directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
 
     // Generate diagnostics.
-    let diagnostics = check_path(
+    let result = check_path(
         path,
         packaging::detect_package_root(path, &settings.namespace_packages),
         contents,
@@ -61,7 +61,7 @@ pub fn check(path: &Path, contents: &str, autofix: bool) -> Result<Vec<Diagnosti
         &settings,
         autofix.into(),
         flags::Noqa::Enabled,
-    )?;
+    );
 
-    Ok(diagnostics)
+    Ok(result.data)
 }

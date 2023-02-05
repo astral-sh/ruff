@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
@@ -5,7 +8,25 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct UseCapitalEnvironmentVariables {
+        pub expected: String,
+        pub original: String,
+    }
+);
+impl AlwaysAutofixableViolation for UseCapitalEnvironmentVariables {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UseCapitalEnvironmentVariables { expected, original } = self;
+        format!("Use capitalized environment variable `{expected}` instead of `{original}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let UseCapitalEnvironmentVariables { expected, original } = self;
+        format!("Replace `{original}` with `{expected}`")
+    }
+}
 
 /// SIM112
 pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
@@ -37,7 +58,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::UseCapitalEnvironmentVariables {
+        UseCapitalEnvironmentVariables {
             expected: capital_env_var.clone(),
             original: env_var.clone(),
         },
@@ -79,7 +100,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::UseCapitalEnvironmentVariables {
+        UseCapitalEnvironmentVariables {
             expected: capital_env_var.clone(),
             original: env_var.clone(),
         },

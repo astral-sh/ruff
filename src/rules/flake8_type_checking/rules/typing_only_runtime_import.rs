@@ -166,6 +166,7 @@ pub fn typing_only_runtime_import(
             &settings.isort.known_first_party,
             &settings.isort.known_third_party,
             &settings.isort.extra_standard_library,
+            settings.target_version,
         ) {
             ImportType::LocalFolder | ImportType::FirstParty => Some(Diagnostic::new(
                 TypingOnlyFirstPartyImport {

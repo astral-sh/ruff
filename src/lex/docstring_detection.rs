@@ -35,7 +35,7 @@ impl Default for StateMachine {
 }
 
 impl StateMachine {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             state: State::ExpectModuleDocstring,
             bracket_count: 0,

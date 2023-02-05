@@ -13,7 +13,7 @@ expression: diagnostics
     column: 23
   fix:
     content:
-      - assert expr is True
+      - assert expr
     location:
       row: 11
       column: 8
@@ -32,7 +32,7 @@ expression: diagnostics
     column: 23
   fix:
     content:
-      - assert expr is True
+      - assert expr
     location:
       row: 12
       column: 8
@@ -51,7 +51,7 @@ expression: diagnostics
     column: 23
   fix:
     content:
-      - assert expr is True
+      - assert expr
     location:
       row: 13
       column: 8
@@ -70,7 +70,7 @@ expression: diagnostics
     column: 23
   fix:
     content:
-      - "assert expr is True, msg"
+      - "assert expr, msg"
     location:
       row: 14
       column: 8
@@ -89,7 +89,7 @@ expression: diagnostics
     column: 23
   fix:
     content:
-      - "assert expr is True, msg"
+      - "assert expr, msg"
     location:
       row: 15
       column: 8
@@ -152,7 +152,7 @@ expression: diagnostics
     column: 24
   fix:
     content:
-      - assert True is False
+      - assert not True
     location:
       row: 22
       column: 8

@@ -1,0 +1,31 @@
+---
+source: src/rules/isort/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnsortedImports: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 10
+    column: 0
+  fix:
+    content:
+      - from __future__ import annotations
+      - ""
+      - from typing import Any
+      - ""
+      - from my_first_party import my_first_party_object
+      - from requests import Session
+      - ""
+      - from . import my_local_folder_object
+      - ""
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 10
+      column: 0
+  parent: ~
+

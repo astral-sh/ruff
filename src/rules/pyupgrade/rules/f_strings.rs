@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Constant, Expr, ExprKind, KeywordData};
 use rustpython_common::format::{
@@ -13,7 +16,20 @@ use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
-use crate::violations;
+
+define_violation!(
+    pub struct FString;
+);
+impl AlwaysAutofixableViolation for FString {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use f-string instead of `format` call")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Convert to f-string".to_string()
+    }
+}
 
 /// Like [`FormatSummary`], but maps positional and keyword arguments to their
 /// values. For example, given `{a} {b}".format(a=1, b=2)`, `FormatFunction`
@@ -257,7 +273,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(violations::FString, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(FString, Range::from_located(expr));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,

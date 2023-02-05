@@ -1,7 +1,6 @@
 use itertools::Itertools;
-use rustpython_ast::{Alias, AliasData, Stmt};
-
 use ruff_macros::derive_message_formats;
+use rustpython_ast::{Alias, AliasData, Stmt};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
@@ -22,7 +21,7 @@ define_violation!(
     }
 );
 impl Violation for ImportReplacements {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -226,7 +225,7 @@ struct ImportReplacer<'a> {
 }
 
 impl<'a> ImportReplacer<'a> {
-    fn new(
+    const fn new(
         stmt: &'a Stmt,
         module: &'a str,
         members: &'a [AliasData],

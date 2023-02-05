@@ -30,11 +30,11 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
 }
 
 impl<'a> HashableExpr<'a> {
-    pub(crate) fn from_expr(expr: &'a Expr) -> Self {
+    pub(crate) const fn from_expr(expr: &'a Expr) -> Self {
         Self(expr)
     }
 
-    pub(crate) fn as_expr(&self) -> &'a Expr {
+    pub(crate) const fn as_expr(&self) -> &'a Expr {
         self.0
     }
 }

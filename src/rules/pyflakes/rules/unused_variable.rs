@@ -1,5 +1,7 @@
+use crate::define_violation;
 use itertools::Itertools;
 use log::error;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{ExprKind, Location, Stmt, StmtKind};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -11,7 +13,25 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct UnusedVariable {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for UnusedVariable {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnusedVariable { name } = self;
+        format!("Local variable `{name}` is assigned to but never used")
+    }
+
+    fn autofix_title(&self) -> String {
+        let UnusedVariable { name } = self;
+        format!("Remove assignment to unused variable `{name}`")
+    }
+}
 
 fn match_token_after<F>(stmt: &Stmt, locator: &Locator, f: F) -> Location
 where
@@ -162,7 +182,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
     }
 
     for (name, binding) in scope
-        .values
+        .bindings
         .iter()
         .map(|(name, index)| (name, &checker.bindings[*index]))
     {
@@ -174,7 +194,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
             && name != &"__traceback_supplement__"
         {
             let mut diagnostic = Diagnostic::new(
-                violations::UnusedVariable {
+                UnusedVariable {
                     name: (*name).to_string(),
                 },
                 binding.range,

@@ -1,12 +1,26 @@
-use rustc_hash::FxHashMap;
-use rustpython_ast::{Expr, ExprKind};
-
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustc_hash::FxHashMap;
+use rustpython_ast::{Expr, ExprKind};
+
+define_violation!(
+    pub struct LoopVariableOverridesIterator {
+        pub name: String,
+    }
+);
+impl Violation for LoopVariableOverridesIterator {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let LoopVariableOverridesIterator { name } = self;
+        format!("Loop control variable `{name}` overrides iterable it iterates")
+    }
+}
 
 #[derive(Default)]
 struct NameFinder<'a> {
@@ -57,7 +71,7 @@ pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, it
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
             checker.diagnostics.push(Diagnostic::new(
-                violations::LoopVariableOverridesIterator {
+                LoopVariableOverridesIterator {
                     name: name.to_string(),
                 },
                 Range::from_located(expr),

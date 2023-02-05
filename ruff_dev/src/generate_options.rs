@@ -1,4 +1,5 @@
 //! Generate a Markdown-compatible listing of configuration options.
+#![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use anyhow::Result;
 use itertools::Itertools;
@@ -7,7 +8,7 @@ use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionFiel
 
 use crate::utils::replace_readme_section;
 
-const BEGIN_PRAGMA: &str = "<!-- Begin auto-generated options sections. -->";
+const BEGIN_PRAGMA: &str = "<!-- Begin auto-generated options sections. -->\n";
 const END_PRAGMA: &str = "<!-- End auto-generated options sections. -->";
 
 #[derive(clap::Args)]

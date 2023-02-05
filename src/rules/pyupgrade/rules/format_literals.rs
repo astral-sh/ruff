@@ -4,14 +4,31 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_ast::Expr;
 
+use ruff_macros::derive_message_formats;
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call, match_expression};
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::source_code::{Locator, Stylist};
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+define_violation!(
+    pub struct FormatLiterals;
+);
+impl AlwaysAutofixableViolation for FormatLiterals {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use implicit references for positional format fields")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove explicit positional indexes".to_string()
+    }
+}
 
 // An opening curly brace, followed by any integer, followed by any text,
 // followed by a closing brace.
@@ -54,6 +71,16 @@ fn generate_arguments<'a>(
     Ok(new_args)
 }
 
+/// Returns true if the indices are sequential.
+fn is_sequential(indices: &[usize]) -> bool {
+    for (expected, actual) in indices.iter().enumerate() {
+        if expected != *actual {
+            return false;
+        }
+    }
+    true
+}
+
 /// Returns the corrected function call.
 fn generate_call(
     expr: &Expr,
@@ -66,7 +93,9 @@ fn generate_call(
     let mut call = match_call(&mut expression)?;
 
     // Fix the call arguments.
-    call.args = generate_arguments(&call.args, correct_order)?;
+    if !is_sequential(correct_order) {
+        call.args = generate_arguments(&call.args, correct_order)?;
+    }
 
     // Fix the string itself.
     let Expression::Attribute(item) = &*call.func else {
@@ -112,7 +141,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(violations::FormatLiterals, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(FormatLiterals, Range::from_located(expr));
     if checker.patch(diagnostic.kind.rule()) {
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846

@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, Keyword, Location};
 
 use crate::ast::helpers::find_keyword;
@@ -5,7 +8,20 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct ReplaceUniversalNewlines;
+);
+impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`universal_newlines` is deprecated, use `text`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `text` keyword argument".to_string()
+    }
+}
 
 /// UP021
 pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
@@ -20,7 +36,7 @@ pub fn replace_universal_newlines(checker: &mut Checker, expr: &Expr, kwargs: &[
                 kwarg.location.column() + "universal_newlines".len(),
             ),
         );
-        let mut diagnostic = Diagnostic::new(violations::ReplaceUniversalNewlines, range);
+        let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "text".to_string(),

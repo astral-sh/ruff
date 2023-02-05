@@ -1,14 +1,50 @@
-use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
-
 use crate::ast::helpers;
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::{CallPath, Range};
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::violations;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
+use itertools::Itertools;
+use ruff_macros::derive_message_formats;
+use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
+
+define_violation!(
+    pub struct DuplicateTryBlockException {
+        pub name: String,
+    }
+);
+impl Violation for DuplicateTryBlockException {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DuplicateTryBlockException { name } = self;
+        format!("try-except block with duplicate exception `{name}`")
+    }
+}
+define_violation!(
+    pub struct DuplicateHandlerException {
+        pub names: Vec<String>,
+    }
+);
+impl AlwaysAutofixableViolation for DuplicateHandlerException {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DuplicateHandlerException { names } = self;
+        if names.len() == 1 {
+            let name = &names[0];
+            format!("Exception handler with duplicate exception: `{name}`")
+        } else {
+            let names = names.iter().map(|name| format!("`{name}`")).join(", ");
+            format!("Exception handler with duplicate exceptions: {names}")
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        "De-duplicate exceptions".to_string()
+    }
+}
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
     Expr::new(
@@ -49,7 +85,7 @@ fn duplicate_handler_exceptions<'a>(
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
             let mut diagnostic = Diagnostic::new(
-                violations::DuplicateHandlerException {
+                DuplicateHandlerException {
                     names: duplicates
                         .into_iter()
                         .map(|call_path| call_path.join("."))
@@ -115,7 +151,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
         for (name, exprs) in duplicates {
             for expr in exprs {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::DuplicateTryBlockException {
+                    DuplicateTryBlockException {
                         name: name.join("."),
                     },
                     Range::from_located(expr),

@@ -1,6 +1,9 @@
+use crate::define_violation;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashSet;
 use rustpython_ast::StmtKind;
 
@@ -15,8 +18,255 @@ use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::settings::Convention;
-use crate::violations;
+
 use crate::visibility::is_staticmethod;
+
+define_violation!(
+    pub struct SectionNotOverIndented {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for SectionNotOverIndented {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let SectionNotOverIndented { name } = self;
+        format!("Section is over-indented (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let SectionNotOverIndented { name } = self;
+        format!("Remove over-indentation from \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct SectionUnderlineNotOverIndented {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let SectionUnderlineNotOverIndented { name } = self;
+        format!("Section underline is over-indented (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let SectionUnderlineNotOverIndented { name } = self;
+        format!("Remove over-indentation from \"{name}\" underline")
+    }
+}
+
+define_violation!(
+    pub struct CapitalizeSectionName {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for CapitalizeSectionName {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let CapitalizeSectionName { name } = self;
+        format!("Section name should be properly capitalized (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let CapitalizeSectionName { name } = self;
+        format!("Capitalize \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct NewLineAfterSectionName {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for NewLineAfterSectionName {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NewLineAfterSectionName { name } = self;
+        format!("Section name should end with a newline (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let NewLineAfterSectionName { name } = self;
+        format!("Add newline after \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct DashedUnderlineAfterSection {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DashedUnderlineAfterSection { name } = self;
+        format!("Missing dashed underline after section (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DashedUnderlineAfterSection { name } = self;
+        format!("Add dashed line under \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct SectionUnderlineAfterName {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let SectionUnderlineAfterName { name } = self;
+        format!("Section underline should be in the line following the section's name (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let SectionUnderlineAfterName { name } = self;
+        format!("Add underline to \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct SectionUnderlineMatchesSectionLength {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let SectionUnderlineMatchesSectionLength { name } = self;
+        format!("Section underline should match the length of its name (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let SectionUnderlineMatchesSectionLength { name } = self;
+        format!("Adjust underline length to match \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct BlankLineAfterSection {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for BlankLineAfterSection {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BlankLineAfterSection { name } = self;
+        format!("Missing blank line after section (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let BlankLineAfterSection { name } = self;
+        format!("Add blank line after \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct BlankLineBeforeSection {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for BlankLineBeforeSection {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BlankLineBeforeSection { name } = self;
+        format!("Missing blank line before section (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let BlankLineBeforeSection { name } = self;
+        format!("Add blank line before \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct BlankLineAfterLastSection {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BlankLineAfterLastSection { name } = self;
+        format!("Missing blank line after last section (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let BlankLineAfterLastSection { name } = self;
+        format!("Add blank line after \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct NonEmptySection {
+        pub name: String,
+    }
+);
+impl Violation for NonEmptySection {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NonEmptySection { name } = self;
+        format!("Section has no content (\"{name}\")")
+    }
+}
+
+define_violation!(
+    pub struct SectionNameEndsInColon {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for SectionNameEndsInColon {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let SectionNameEndsInColon { name } = self;
+        format!("Section name should end with a colon (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        let SectionNameEndsInColon { name } = self;
+        format!("Add colon to \"{name}\"")
+    }
+}
+
+define_violation!(
+    pub struct DocumentAllArguments {
+        pub names: Vec<String>,
+    }
+);
+impl Violation for DocumentAllArguments {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DocumentAllArguments { names } = self;
+        if names.len() == 1 {
+            let name = &names[0];
+            format!("Missing argument description in the docstring: `{name}`")
+        } else {
+            let names = names.iter().map(|name| format!("`{name}`")).join(", ");
+            format!("Missing argument descriptions in the docstring: {names}")
+        }
+    }
+}
+
+define_violation!(
+    pub struct NoBlankLinesBetweenHeaderAndContent {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for NoBlankLinesBetweenHeaderAndContent {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NoBlankLinesBetweenHeaderAndContent { name } = self;
+        format!("No blank lines allowed between a section header and its content (\"{name}\")")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove blank line(s)".to_string()
+    }
+}
 
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
 /// D414, D416, D417
@@ -78,7 +328,7 @@ fn blanks_and_section_underline(
             .enabled(&Rule::DashedUnderlineAfterSection)
         {
             let mut diagnostic = Diagnostic::new(
-                violations::DashedUnderlineAfterSection {
+                DashedUnderlineAfterSection {
                     name: context.section_name.to_string(),
                 },
                 Range::from_located(docstring.expr),
@@ -103,7 +353,7 @@ fn blanks_and_section_underline(
         }
         if checker.settings.rules.enabled(&Rule::NonEmptySection) {
             checker.diagnostics.push(Diagnostic::new(
-                violations::NonEmptySection {
+                NonEmptySection {
                     name: context.section_name.to_string(),
                 },
                 Range::from_located(docstring.expr),
@@ -125,7 +375,7 @@ fn blanks_and_section_underline(
                 .enabled(&Rule::SectionUnderlineAfterName)
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::SectionUnderlineAfterName {
+                    SectionUnderlineAfterName {
                         name: context.section_name.to_string(),
                     },
                     Range::from_located(docstring.expr),
@@ -163,7 +413,7 @@ fn blanks_and_section_underline(
                 .enabled(&Rule::SectionUnderlineMatchesSectionLength)
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::SectionUnderlineMatchesSectionLength {
+                    SectionUnderlineMatchesSectionLength {
                         name: context.section_name.to_string(),
                     },
                     Range::from_located(docstring.expr),
@@ -207,7 +457,7 @@ fn blanks_and_section_underline(
             let leading_space = whitespace::leading_space(non_empty_line);
             if leading_space.len() > docstring.indentation.len() {
                 let mut diagnostic = Diagnostic::new(
-                    violations::SectionUnderlineNotOverIndented {
+                    SectionUnderlineNotOverIndented {
                         name: context.section_name.to_string(),
                     },
                     Range::from_located(docstring.expr),
@@ -249,7 +499,7 @@ fn blanks_and_section_underline(
                 if blank_lines_after_dashes == rest_of_lines.len() {
                     if checker.settings.rules.enabled(&Rule::NonEmptySection) {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::NonEmptySection {
+                            NonEmptySection {
                                 name: context.section_name.to_string(),
                             },
                             Range::from_located(docstring.expr),
@@ -262,7 +512,7 @@ fn blanks_and_section_underline(
                         .enabled(&Rule::NoBlankLinesBetweenHeaderAndContent)
                     {
                         let mut diagnostic = Diagnostic::new(
-                            violations::NoBlankLinesBetweenHeaderAndContent {
+                            NoBlankLinesBetweenHeaderAndContent {
                                 name: context.section_name.to_string(),
                             },
                             Range::from_located(docstring.expr),
@@ -294,7 +544,7 @@ fn blanks_and_section_underline(
         } else {
             if checker.settings.rules.enabled(&Rule::NonEmptySection) {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::NonEmptySection {
+                    NonEmptySection {
                         name: context.section_name.to_string(),
                     },
                     Range::from_located(docstring.expr),
@@ -308,7 +558,7 @@ fn blanks_and_section_underline(
             .enabled(&Rule::DashedUnderlineAfterSection)
         {
             let mut diagnostic = Diagnostic::new(
-                violations::DashedUnderlineAfterSection {
+                DashedUnderlineAfterSection {
                     name: context.section_name.to_string(),
                 },
                 Range::from_located(docstring.expr),
@@ -338,7 +588,7 @@ fn blanks_and_section_underline(
                 .enabled(&Rule::NoBlankLinesBetweenHeaderAndContent)
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::NoBlankLinesBetweenHeaderAndContent {
+                    NoBlankLinesBetweenHeaderAndContent {
                         name: context.section_name.to_string(),
                     },
                     Range::from_located(docstring.expr),
@@ -379,7 +629,7 @@ fn common_section(
                 .contains(capitalized_section_name.as_str())
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::CapitalizeSectionName {
+                    CapitalizeSectionName {
                         name: context.section_name.to_string(),
                     },
                     Range::from_located(docstring.expr),
@@ -417,7 +667,7 @@ fn common_section(
         let leading_space = whitespace::leading_space(context.line);
         if leading_space.len() > docstring.indentation.len() {
             let mut diagnostic = Diagnostic::new(
-                violations::SectionNotOverIndented {
+                SectionNotOverIndented {
                     name: context.section_name.to_string(),
                 },
                 Range::from_located(docstring.expr),
@@ -450,7 +700,7 @@ fn common_section(
                 .enabled(&Rule::BlankLineAfterLastSection)
             {
                 let mut diagnostic = Diagnostic::new(
-                    violations::BlankLineAfterLastSection {
+                    BlankLineAfterLastSection {
                         name: context.section_name.to_string(),
                     },
                     Range::from_located(docstring.expr),
@@ -473,7 +723,7 @@ fn common_section(
         } else {
             if checker.settings.rules.enabled(&Rule::BlankLineAfterSection) {
                 let mut diagnostic = Diagnostic::new(
-                    violations::BlankLineAfterSection {
+                    BlankLineAfterSection {
                         name: context.section_name.to_string(),
                     },
                     Range::from_located(docstring.expr),
@@ -503,7 +753,7 @@ fn common_section(
     {
         if !context.previous_line.is_empty() {
             let mut diagnostic = Diagnostic::new(
-                violations::BlankLineBeforeSection {
+                BlankLineBeforeSection {
                     name: context.section_name.to_string(),
                 },
                 Range::from_located(docstring.expr),
@@ -588,7 +838,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     if !missing_arg_names.is_empty() {
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
-            violations::DocumentAllArguments { names },
+            DocumentAllArguments { names },
             Range::from_located(parent),
         ));
     }
@@ -698,7 +948,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
             .unwrap();
         if !suffix.is_empty() {
             let mut diagnostic = Diagnostic::new(
-                violations::NewLineAfterSectionName {
+                NewLineAfterSectionName {
                     name: context.section_name.to_string(),
                 },
                 Range::from_located(docstring.expr),
@@ -750,7 +1000,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
             .unwrap();
         if suffix != ":" {
             let mut diagnostic = Diagnostic::new(
-                violations::SectionNameEndsInColon {
+                SectionNameEndsInColon {
                     name: context.section_name.to_string(),
                 },
                 Range::from_located(docstring.expr),

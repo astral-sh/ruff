@@ -6,7 +6,24 @@ use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct NewLineAfterLastParagraph;
+);
+impl AlwaysAutofixableViolation for NewLineAfterLastParagraph {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Multi-line docstring closing quotes should be on a separate line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Move closing quotes to new line".to_string()
+    }
+}
 
 /// D209
 pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring) {
@@ -22,7 +39,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
             if let Some(last_line) = contents.lines().last().map(str::trim) {
                 if last_line != "\"\"\"" && last_line != "'''" {
                     let mut diagnostic = Diagnostic::new(
-                        violations::NewLineAfterLastParagraph,
+                        NewLineAfterLastParagraph,
                         Range::from_located(docstring.expr),
                     );
                     if checker.patch(diagnostic.kind.rule()) {

@@ -1,14 +1,59 @@
 use itertools::izip;
+use log::error;
 use once_cell::unsync::Lazy;
 use rustpython_ast::{Cmpop, Expr};
+use serde::{Deserialize, Serialize};
+
+use ruff_macros::derive_message_formats;
 
 use crate::ast::helpers;
 use crate::ast::operations::locate_cmpops;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IsCmpop {
+    Is,
+    IsNot,
+}
+
+impl From<&Cmpop> for IsCmpop {
+    fn from(cmpop: &Cmpop) -> Self {
+        match cmpop {
+            Cmpop::Is => IsCmpop::Is,
+            Cmpop::IsNot => IsCmpop::IsNot,
+            _ => unreachable!("Expected Cmpop::Is | Cmpop::IsNot"),
+        }
+    }
+}
+
+define_violation!(
+    pub struct IsLiteral {
+        pub cmpop: IsCmpop,
+    }
+);
+impl AlwaysAutofixableViolation for IsLiteral {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let IsLiteral { cmpop } = self;
+        match cmpop {
+            IsCmpop::Is => format!("Use `==` to compare constant literals"),
+            IsCmpop::IsNot => format!("Use `!=` to compare constant literals"),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        let IsLiteral { cmpop } = self;
+        match cmpop {
+            IsCmpop::Is => "Replace `is` with `==`".to_string(),
+            IsCmpop::IsNot => "Replace `is not` with `!=`".to_string(),
+        }
+    }
+}
 
 /// F632
 pub fn invalid_literal_comparison(
@@ -25,8 +70,7 @@ pub fn invalid_literal_comparison(
             && (helpers::is_constant_non_singleton(left)
                 || helpers::is_constant_non_singleton(right))
         {
-            let mut diagnostic =
-                Diagnostic::new(violations::IsLiteral { cmpop: op.into() }, location);
+            let mut diagnostic = Diagnostic::new(IsLiteral { cmpop: op.into() }, location);
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(&located_op.node, op);
@@ -34,7 +78,7 @@ pub fn invalid_literal_comparison(
                         Cmpop::Is => Some("==".to_string()),
                         Cmpop::IsNot => Some("!=".to_string()),
                         node => {
-                            eprintln!("Failed to fix invalid comparison: {node:?}");
+                            error!("Failed to fix invalid comparison: {node:?}");
                             None
                         }
                     } {
@@ -48,7 +92,7 @@ pub fn invalid_literal_comparison(
                         ));
                     }
                 } else {
-                    eprintln!("Failed to fix invalid comparison due to missing op");
+                    error!("Failed to fix invalid comparison due to missing op");
                 }
             }
             checker.diagnostics.push(diagnostic);

@@ -32,11 +32,7 @@ pub fn compose_module_path(module: &NameOrAttribute) -> String {
         NameOrAttribute::A(attr) => {
             let name = attr.attr.value;
             let prefix = compose_call_path(&attr.value);
-            if let Some(prefix) = prefix {
-                format!("{prefix}.{name}")
-            } else {
-                name.to_string()
-            }
+            prefix.map_or_else(|| name.to_string(), |prefix| format!("{prefix}.{name}"))
         }
     }
 }

@@ -1,10 +1,31 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct KeyInDict {
+        pub key: String,
+        pub dict: String,
+    }
+);
+impl AlwaysAutofixableViolation for KeyInDict {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let KeyInDict { key, dict } = self;
+        format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let KeyInDict { key, dict } = self;
+        format!("Convert to `{key} in {dict}`")
+    }
+}
 
 /// SIM118
 fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
@@ -35,7 +56,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
         .slice_source_code_range(&Range::from_located(value));
 
     let mut diagnostic = Diagnostic::new(
-        violations::KeyInDict {
+        KeyInDict {
             key: left_content.to_string(),
             dict: value_content.to_string(),
         },

@@ -1,5 +1,8 @@
+use crate::define_violation;
+use crate::violation::Violation;
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Operator};
 
@@ -7,7 +10,19 @@ use crate::ast::helpers::{compose_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct BadFilePermissions {
+        pub mask: u16,
+    }
+);
+impl Violation for BadFilePermissions {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BadFilePermissions { mask } = self;
+        format!("`os.chmod` setting a permissive mask `{mask:#o}` on file or directory",)
+    }
+}
 
 const WRITE_WORLD: u16 = 0o2;
 const EXECUTE_GROUP: u16 = 0o10;
@@ -61,11 +76,7 @@ fn get_int_value(expr: &Expr) -> Option<u16> {
             ..
         } => value.to_u16(),
         ExprKind::Attribute { .. } => {
-            if let Some(path) = compose_call_path(expr) {
-                PYSTAT_MAPPING.get(path.as_str()).copied()
-            } else {
-                None
-            }
+            compose_call_path(expr).and_then(|path| PYSTAT_MAPPING.get(path.as_str()).copied())
         }
         ExprKind::BinOp { left, op, right } => {
             if let (Some(left_value), Some(right_value)) =
@@ -101,7 +112,7 @@ pub fn bad_file_permissions(
             if let Some(int_value) = get_int_value(mode_arg) {
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(
-                        violations::BadFilePermissions { mask: int_value },
+                        BadFilePermissions { mask: int_value },
                         Range::from_located(mode_arg),
                     ));
                 }

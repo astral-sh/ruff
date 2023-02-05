@@ -6,7 +6,24 @@ use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, logical_line};
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct EndsInPeriod;
+);
+impl AlwaysAutofixableViolation for EndsInPeriod {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("First line should end with a period")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add period".to_string()
+    }
+}
 
 /// D400
 pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
@@ -43,10 +60,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
         let trimmed = line.trim_end();
 
         if !trimmed.ends_with('.') {
-            let mut diagnostic = Diagnostic::new(
-                violations::EndsInPeriod,
-                Range::from_located(docstring.expr),
-            );
+            let mut diagnostic = Diagnostic::new(EndsInPeriod, Range::from_located(docstring.expr));
             // Best-effort autofix: avoid adding a period after other punctuation marks.
             if checker.patch(diagnostic.kind.rule())
                 && !trimmed.ends_with(':')

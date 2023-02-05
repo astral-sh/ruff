@@ -71,6 +71,7 @@ impl Default for Settings {
             respect_gitignore: true,
             show_source: false,
             src: vec![path_dedot::CWD.clone()],
+            project_root: path_dedot::CWD.clone(),
             target_version: TARGET_VERSION,
             task_tags: TASK_TAGS.iter().map(ToString::to_string).collect(),
             typing_modules: vec![],

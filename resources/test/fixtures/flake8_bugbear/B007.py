@@ -44,4 +44,45 @@ for foo, bar in [(1, 2)]:
         print(FMT.format(**vars()))
 
 for foo, bar in [(1, 2)]:
-    print(FMT.format(foo=foo, bar=eval('bar')))
+    print(FMT.format(foo=foo, bar=eval("bar")))
+
+
+def f():
+    # Fixable.
+    for foo, bar, baz in (["1", "2", "3"],):
+        if foo or baz:
+            break
+
+
+def f():
+    # Unfixable due to usage of `bar` outside of loop.
+    for foo, bar, baz in (["1", "2", "3"],):
+        if foo or baz:
+            break
+
+    print(bar)
+
+
+def f():
+    # Fixable.
+    for foo, bar, baz in (["1", "2", "3"],):
+        if foo or baz:
+            break
+
+    bar = 1
+
+
+def f():
+    # Fixable.
+    for foo, bar, baz in (["1", "2", "3"],):
+        if foo or baz:
+            break
+
+    bar = 1
+    print(bar)
+
+
+# Unfixable due to trailing underscore (`_line_` wouldn't be considered an ignorable
+# variable name).
+for line_ in range(self.header_lines):
+     fp.readline()

@@ -6,9 +6,8 @@ on:
       - README.md
       - mkdocs.template.yml
       - .github/workflows/docs.yaml
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
-
 
 jobs:
   mkdocs:

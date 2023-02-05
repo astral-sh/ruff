@@ -1,18 +1,33 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{ArgData, Arguments, Expr, Located};
 
 use super::super::helpers::{matches_password_name, string_literal};
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct HardcodedPasswordDefault {
+        pub string: String,
+    }
+);
+impl Violation for HardcodedPasswordDefault {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let HardcodedPasswordDefault { string } = self;
+        format!("Possible hardcoded password: \"{}\"", string.escape_debug())
+    }
+}
 
 fn check_password_kwarg(arg: &Located<ArgData>, default: &Expr) -> Option<Diagnostic> {
-    let string = string_literal(default)?;
+    let string = string_literal(default).filter(|string| !string.is_empty())?;
     let kwarg_name = &arg.node.arg;
     if !matches_password_name(kwarg_name) {
         return None;
     }
     Some(Diagnostic::new(
-        violations::HardcodedPasswordDefault {
+        HardcodedPasswordDefault {
             string: string.to_string(),
         },
         Range::from_located(default),

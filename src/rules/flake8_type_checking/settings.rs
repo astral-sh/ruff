@@ -22,7 +22,7 @@ pub struct Options {
     )]
     /// Enforce TC001, TC002, and TC003 rules even when valid runtime imports
     /// are present for the same module.
-    /// See: https://github.com/snok/flake8-type-checking#strict.
+    /// See flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.
     pub strict: Option<bool>,
     #[option(
         default = "[\"typing\"]",

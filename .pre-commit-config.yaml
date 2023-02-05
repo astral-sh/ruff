@@ -1,15 +1,18 @@
 repos:
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.0.238
-    hooks:
-      - id: ruff
-        args: [--fix]
-        exclude: ^resources
-
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.10.1
     hooks:
       - id: validate-pyproject
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.33.0
+    hooks:
+      - id: markdownlint-fix
+        args:
+          - --disable
+          - MD013 # line-length
+          - MD033 # no-inline-html
+          - --
 
   - repo: local
     hooks:
@@ -20,12 +23,22 @@ repos:
         types: [rust]
       - id: clippy
         name: clippy
-        entry: cargo clippy --workspace --all-targets --all-features
+        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
         language: rust
         pass_filenames: false
+      - id: ruff
+        name: ruff
+        entry: cargo run -- --no-cache --fix
+        language: rust
+        types_or: [python, pyi]
+        require_serial: true
+        exclude: ^resources
       - id: dev-generate-all
         name: dev-generate-all
         entry: cargo dev generate-all
         language: rust
         pass_filenames: false
         exclude: target
+
+ci:
+  skip: [cargo-fmt, clippy, dev-generate-all]

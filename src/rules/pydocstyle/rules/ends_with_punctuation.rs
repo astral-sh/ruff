@@ -6,7 +6,24 @@ use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, logical_line};
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct EndsInPunctuation;
+);
+impl AlwaysAutofixableViolation for EndsInPunctuation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("First line should end with a period, question mark, or exclamation point")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add closing punctuation".to_string()
+    }
+}
 
 /// D415
 pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
@@ -42,10 +59,8 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
         let line = body.lines().nth(index).unwrap();
         let trimmed = line.trim_end();
         if !(trimmed.ends_with('.') || trimmed.ends_with('!') || trimmed.ends_with('?')) {
-            let mut diagnostic = Diagnostic::new(
-                violations::EndsInPunctuation,
-                Range::from_located(docstring.expr),
-            );
+            let mut diagnostic =
+                Diagnostic::new(EndsInPunctuation, Range::from_located(docstring.expr));
             // Best-effort autofix: avoid adding a period after other punctuation marks.
             if checker.patch(diagnostic.kind.rule())
                 && !trimmed.ends_with(':')

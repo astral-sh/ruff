@@ -23,6 +23,7 @@ theme:
       toggle:
         icon: material/weather-night
         name: Switch to light mode
+  custom_dir: .overrides
 repo_url: https://github.com/charliermarsh/ruff
 repo_name: ruff
 site_author: charliermarsh

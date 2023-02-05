@@ -3,6 +3,7 @@
 resources/test/cpython
 docs/
 mkdocs.yml
+.overrides
 
 ###
 # Rust.gitignore

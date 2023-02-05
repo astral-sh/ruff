@@ -1,13 +1,49 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
+use serde::{Deserialize, Serialize};
+use std::fmt;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
-use crate::violations::LiteralType;
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LiteralType {
+    Str,
+    Bytes,
+}
+
+impl fmt::Display for LiteralType {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LiteralType::Str => fmt.write_str("str"),
+            LiteralType::Bytes => fmt.write_str("bytes"),
+        }
+    }
+}
+
+define_violation!(
+    pub struct NativeLiterals {
+        pub literal_type: LiteralType,
+    }
+);
+impl AlwaysAutofixableViolation for NativeLiterals {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NativeLiterals { literal_type } = self;
+        format!("Unnecessary call to `{literal_type}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let NativeLiterals { literal_type } = self;
+        format!("Replace with `{literal_type}`")
+    }
+}
 
 /// UP018
 pub fn native_literals(
@@ -25,7 +61,7 @@ pub fn native_literals(
 
     if (id == "str" || id == "bytes") && checker.is_builtin(id) {
         let Some(arg) = args.get(0) else {
-            let mut diagnostic = Diagnostic::new(violations::NativeLiterals{literal_type:if id == "str" {
+            let mut diagnostic = Diagnostic::new(NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
@@ -94,7 +130,7 @@ pub fn native_literals(
         }
 
         let mut diagnostic = Diagnostic::new(
-            violations::NativeLiterals {
+            NativeLiterals {
                 literal_type: if id == "str" {
                     LiteralType::Str
                 } else {

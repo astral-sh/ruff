@@ -7,7 +7,38 @@ use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::helpers::leading_quote;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+
+use crate::define_violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct MultiLineSummaryFirstLine;
+);
+impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Multi-line docstring summary should start at the first line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove whitespace after opening quotes".to_string()
+    }
+}
+
+define_violation!(
+    pub struct MultiLineSummarySecondLine;
+);
+impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Multi-line docstring summary should start at the second line")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Insert line break and indentation after opening quotes".to_string()
+    }
+}
 
 /// D212, D213
 pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
@@ -31,7 +62,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
             .enabled(&Rule::MultiLineSummaryFirstLine)
         {
             let mut diagnostic = Diagnostic::new(
-                violations::MultiLineSummaryFirstLine,
+                MultiLineSummaryFirstLine,
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
@@ -58,7 +89,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
             .enabled(&Rule::MultiLineSummarySecondLine)
         {
             let mut diagnostic = Diagnostic::new(
-                violations::MultiLineSummarySecondLine,
+                MultiLineSummarySecondLine,
                 Range::from_located(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {

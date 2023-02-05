@@ -1,9 +1,13 @@
+#![allow(clippy::print_stdout, clippy::print_stderr)]
+
 use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
 use ruff::settings::options::Options;
 use schemars::schema_for;
+
+use crate::ROOT_DIR;
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -19,10 +23,7 @@ pub fn main(args: &Args) -> Result<()> {
     if args.dry_run {
         println!("{schema_string}");
     } else {
-        let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("Failed to find root directory")
-            .join("ruff.schema.json");
+        let file = PathBuf::from(ROOT_DIR).join("ruff.schema.json");
         fs::write(file, schema_string.as_bytes())?;
     }
     Ok(())

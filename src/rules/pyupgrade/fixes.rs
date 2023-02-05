@@ -1,5 +1,7 @@
+use anyhow::{bail, Result};
 use libcst_native::{
-    Codegen, CodegenState, Expression, ParenthesizableWhitespace, SmallStatement, Statement,
+    Codegen, CodegenState, CompoundStatement, Expression, ParenthesizableWhitespace,
+    SmallStatement, Statement, Suite,
 };
 use rustpython_ast::{Expr, Keyword, Location};
 use rustpython_parser::lexer;
@@ -7,8 +9,46 @@ use rustpython_parser::lexer::Tok;
 
 use crate::ast::types::Range;
 use crate::autofix::helpers::remove_argument;
+use crate::cst::matchers::match_module;
 use crate::fix::Fix;
 use crate::source_code::{Locator, Stylist};
+
+/// Safely adjust the indentation of the indented block at [`Range`].
+pub fn adjust_indentation(
+    range: Range,
+    indentation: &str,
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Result<String> {
+    let contents = locator.slice_source_code_range(&range);
+
+    let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+
+    let mut tree = match_module(&module_text)?;
+
+    let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
+        bail!("Expected statement to be embedded in a function definition")
+    };
+
+    let Suite::IndentedBlock(indented_block) = &mut embedding.body else {
+        bail!("Expected indented block")
+    };
+    indented_block.indent = Some(indentation);
+
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..Default::default()
+    };
+    indented_block.codegen(&mut state);
+
+    let module_text = state.to_string();
+    let module_text = module_text
+        .strip_prefix(stylist.line_ending().as_str())
+        .unwrap()
+        .to_string();
+    Ok(module_text)
+}
 
 /// Generate a fix to remove a base from a `ClassDef` statement.
 pub fn remove_class_def_base(

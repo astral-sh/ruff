@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Keyword};
 use rustpython_parser::ast::Constant;
 
@@ -5,7 +8,21 @@ use crate::ast::helpers::SimpleCallArgs;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct RequestWithNoCertValidation {
+        pub string: String,
+    }
+);
+impl Violation for RequestWithNoCertValidation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let RequestWithNoCertValidation { string } = self;
+        format!(
+            "Probable use of `{string}` call with `verify=False` disabling SSL certificate checks"
+        )
+    }
+}
 
 const REQUESTS_HTTP_VERBS: [&str; 7] = ["get", "options", "head", "post", "put", "patch", "delete"];
 const HTTPX_METHODS: [&str; 11] = [
@@ -48,7 +65,7 @@ pub fn request_with_no_cert_validation(
             } = &verify_arg.node
             {
                 checker.diagnostics.push(Diagnostic::new(
-                    violations::RequestWithNoCertValidation {
+                    RequestWithNoCertValidation {
                         string: target.to_string(),
                     },
                     Range::from_located(verify_arg),

@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
@@ -5,7 +8,60 @@ use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct NegateEqualOp {
+        pub left: String,
+        pub right: String,
+    }
+);
+impl AlwaysAutofixableViolation for NegateEqualOp {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NegateEqualOp { left, right } = self;
+        format!("Use `{left} != {right}` instead of `not {left} == {right}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `!=` operator".to_string()
+    }
+}
+
+define_violation!(
+    pub struct NegateNotEqualOp {
+        pub left: String,
+        pub right: String,
+    }
+);
+impl AlwaysAutofixableViolation for NegateNotEqualOp {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let NegateNotEqualOp { left, right } = self;
+        format!("Use `{left} == {right}` instead of `not {left} != {right}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace with `==` operator".to_string()
+    }
+}
+
+define_violation!(
+    pub struct DoubleNegation {
+        pub expr: String,
+    }
+);
+impl AlwaysAutofixableViolation for DoubleNegation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DoubleNegation { expr } = self;
+        format!("Use `{expr}` instead of `not (not {expr})`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DoubleNegation { expr } = self;
+        format!("Replace with `{expr}`")
+    }
+}
 
 const DUNDER_METHODS: &[&str] = &["__eq__", "__ne__", "__lt__", "__le__", "__gt__", "__ge__"];
 
@@ -45,7 +101,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::NegateEqualOp {
+        NegateEqualOp {
             left: unparse_expr(left, checker.stylist),
             right: unparse_expr(&comparators[0], checker.stylist),
         },
@@ -96,7 +152,7 @@ pub fn negation_with_not_equal_op(
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::NegateNotEqualOp {
+        NegateNotEqualOp {
             left: unparse_expr(left, checker.stylist),
             right: unparse_expr(&comparators[0], checker.stylist),
         },
@@ -132,7 +188,7 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
     }
 
     let mut diagnostic = Diagnostic::new(
-        violations::DoubleNegation {
+        DoubleNegation {
             expr: operand.to_string(),
         },
         Range::from_located(expr),

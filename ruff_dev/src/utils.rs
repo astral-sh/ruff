@@ -5,12 +5,11 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
+use crate::ROOT_DIR;
+
 pub fn replace_readme_section(content: &str, begin_pragma: &str, end_pragma: &str) -> Result<()> {
     // Read the existing file.
-    let file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("Failed to find root directory")
-        .join("README.md");
+    let file = PathBuf::from(ROOT_DIR).join("README.md");
     let existing = fs::read_to_string(&file)?;
 
     // Extract the prefix.

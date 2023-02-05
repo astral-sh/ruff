@@ -11,8 +11,8 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::linter::test_path;
     use crate::registry::Rule;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::UnusedFunctionArgument, Path::new("ARG.py"); "ARG001")]
@@ -23,9 +23,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_unused_arguments")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_unused_arguments").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -35,7 +33,7 @@ mod tests {
     #[test]
     fn ignore_variadic_names() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py"),
+            Path::new("flake8_unused_arguments/ignore_variadic_names.py"),
             &settings::Settings {
                 flake8_unused_arguments: super::settings::Settings {
                     ignore_variadic_names: true,
@@ -56,7 +54,7 @@ mod tests {
     #[test]
     fn enforce_variadic_names() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py"),
+            Path::new("flake8_unused_arguments/ignore_variadic_names.py"),
             &settings::Settings {
                 flake8_unused_arguments: super::settings::Settings {
                     ignore_variadic_names: false,

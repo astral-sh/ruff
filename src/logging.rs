@@ -48,20 +48,20 @@ macro_rules! notify_user {
 
 #[derive(Debug, Default, PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 pub enum LogLevel {
-    // No output (+ `log::LevelFilter::Off`).
+    /// No output ([`log::LevelFilter::Off`]).
     Silent,
-    // Only show lint violations, with no decorative output (+ `log::LevelFilter::Off`).
+    /// Only show lint violations, with no decorative output ([`log::LevelFilter::Off`]).
     Quiet,
-    // All user-facing output (+ `log::LevelFilter::Info`).
+    /// All user-facing output ([`log::LevelFilter::Info`]).
     #[default]
     Default,
-    // All user-facing output (+ `log::LevelFilter::Debug`).
+    /// All user-facing output ([`log::LevelFilter::Debug`]).
     Verbose,
 }
 
 impl LogLevel {
     #[allow(clippy::trivially_copy_pass_by_ref)]
-    fn level_filter(&self) -> log::LevelFilter {
+    const fn level_filter(&self) -> log::LevelFilter {
         match self {
             LogLevel::Default => log::LevelFilter::Info,
             LogLevel::Verbose => log::LevelFilter::Debug,
@@ -83,6 +83,7 @@ pub fn set_up_logging(level: &LogLevel) -> Result<()> {
             ));
         })
         .level(level.level_filter())
+        .level_for("globset", log::LevelFilter::Warn)
         .chain(std::io::stderr())
         .apply()?;
     Ok(())

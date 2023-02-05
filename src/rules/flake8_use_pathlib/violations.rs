@@ -263,7 +263,7 @@ define_violation!(
 impl Violation for PathlibOpen {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`open(\"foo\")` should be replaced by`Path(\"foo\").open()`")
+        format!("`open(\"foo\")` should be replaced by `Path(\"foo\").open()`")
     }
 }
 

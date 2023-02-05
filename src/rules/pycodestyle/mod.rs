@@ -12,8 +12,8 @@ mod tests {
     use test_case::test_case;
 
     use super::settings::Settings;
-    use crate::linter::test_path;
     use crate::registry::Rule;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
@@ -42,9 +42,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pycodestyle")
-                .join(path)
-                .as_path(),
+            Path::new("pycodestyle").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -54,7 +52,7 @@ mod tests {
     #[test]
     fn constant_literals() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pycodestyle/constant_literals.py"),
+            Path::new("pycodestyle/constant_literals.py"),
             &settings::Settings::for_rules(vec![
                 Rule::NoneComparison,
                 Rule::TrueFalseComparison,
@@ -70,7 +68,7 @@ mod tests {
     fn task_tags(ignore_overlong_task_comments: bool) -> Result<()> {
         let snapshot = format!("task_tags_{ignore_overlong_task_comments}");
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pycodestyle/E501_1.py"),
+            Path::new("pycodestyle/E501_1.py"),
             &settings::Settings {
                 pycodestyle: Settings {
                     ignore_overlong_task_comments,
@@ -86,7 +84,7 @@ mod tests {
     #[test]
     fn max_doc_length() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/pycodestyle/W505.py"),
+            Path::new("pycodestyle/W505.py"),
             &settings::Settings {
                 pycodestyle: Settings {
                     max_doc_length: Some(50),

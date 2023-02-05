@@ -48,77 +48,73 @@ pub fn check_tokens(
         || settings.rules.enabled(&Rule::TrailingCommaProhibited);
     let enforce_extraneous_parenthesis = settings.rules.enabled(&Rule::ExtraneousParentheses);
 
-    let mut state_machine = StateMachine::default();
-    for &(start, ref tok, end) in tokens.iter().flatten() {
-        let is_docstring = if enforce_ambiguous_unicode_character || enforce_quotes {
-            state_machine.consume(tok)
-        } else {
-            false
-        };
+    if enforce_ambiguous_unicode_character
+        || enforce_commented_out_code
+        || enforce_invalid_escape_sequence
+    {
+        let mut state_machine = StateMachine::default();
+        for &(start, ref tok, end) in tokens.iter().flatten() {
+            let is_docstring = if enforce_ambiguous_unicode_character {
+                state_machine.consume(tok)
+            } else {
+                false
+            };
 
-        // RUF001, RUF002, RUF003
-        if enforce_ambiguous_unicode_character {
-            if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
-                diagnostics.extend(ruff::rules::ambiguous_unicode_character(
-                    locator,
-                    start,
-                    end,
-                    if matches!(tok, Tok::String { .. }) {
-                        if is_docstring {
-                            Context::Docstring
+            // RUF001, RUF002, RUF003
+            if enforce_ambiguous_unicode_character {
+                if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
+                    diagnostics.extend(ruff::rules::ambiguous_unicode_character(
+                        locator,
+                        start,
+                        end,
+                        if matches!(tok, Tok::String { .. }) {
+                            if is_docstring {
+                                Context::Docstring
+                            } else {
+                                Context::String
+                            }
                         } else {
-                            Context::String
-                        }
-                    } else {
-                        Context::Comment
-                    },
-                    settings,
-                    autofix,
-                ));
+                            Context::Comment
+                        },
+                        settings,
+                        autofix,
+                    ));
+                }
             }
-        }
 
-        // flake8-quotes
-        if enforce_quotes {
-            if matches!(tok, Tok::String { .. }) {
-                if let Some(diagnostic) = flake8_quotes::rules::quotes(
-                    locator,
-                    start,
-                    end,
-                    is_docstring,
-                    settings,
-                    autofix,
-                ) {
-                    if settings.rules.enabled(diagnostic.kind.rule()) {
+            // eradicate
+            if enforce_commented_out_code {
+                if matches!(tok, Tok::Comment(_)) {
+                    if let Some(diagnostic) =
+                        eradicate::rules::commented_out_code(locator, start, end, settings, autofix)
+                    {
                         diagnostics.push(diagnostic);
                     }
                 }
             }
-        }
 
-        // eradicate
-        if enforce_commented_out_code {
-            if matches!(tok, Tok::Comment(_)) {
-                if let Some(diagnostic) =
-                    eradicate::rules::commented_out_code(locator, start, end, settings, autofix)
-                {
-                    diagnostics.push(diagnostic);
+            // W605
+            if enforce_invalid_escape_sequence {
+                if matches!(tok, Tok::String { .. }) {
+                    diagnostics.extend(pycodestyle::rules::invalid_escape_sequence(
+                        locator,
+                        start,
+                        end,
+                        matches!(autofix, flags::Autofix::Enabled)
+                            && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
+                    ));
                 }
             }
         }
+    }
 
-        // W605
-        if enforce_invalid_escape_sequence {
-            if matches!(tok, Tok::String { .. }) {
-                diagnostics.extend(pycodestyle::rules::invalid_escape_sequence(
-                    locator,
-                    start,
-                    end,
-                    matches!(autofix, flags::Autofix::Enabled)
-                        && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
-                ));
-            }
-        }
+    // Q001, Q002, Q003
+    if enforce_quotes {
+        diagnostics.extend(
+            flake8_quotes::rules::from_tokens(tokens, locator, settings, autofix)
+                .into_iter()
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        );
     }
 
     // ISC001, ISC002

@@ -1,11 +1,25 @@
-use rustpython_ast::{ExprKind, Stmt, StmtKind};
-
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::python::string::is_lower;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{ExprKind, Stmt, StmtKind};
+
+define_violation!(
+    pub struct RaiseWithoutFromInsideExcept;
+);
+impl Violation for RaiseWithoutFromInsideExcept {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!(
+            "Within an except clause, raise exceptions with `raise ... from err` or `raise ... \
+             from None` to distinguish them from errors in exception handling"
+        )
+    }
+}
 
 struct RaiseVisitor {
     diagnostics: Vec<Diagnostic>,
@@ -21,7 +35,7 @@ impl<'a> Visitor<'a> for RaiseVisitor {
                 ExprKind::Name { id, .. } if is_lower(id) => {}
                 _ => {
                     self.diagnostics.push(Diagnostic::new(
-                        violations::RaiseWithoutFromInsideExcept,
+                        RaiseWithoutFromInsideExcept,
                         Range::from_located(stmt),
                     ));
                 }

@@ -6,8 +6,9 @@ use std::ops::AddAssign;
 use std::path::Path;
 
 use anyhow::Result;
+use colored::Colorize;
 use log::debug;
-use ruff::linter::{lint_fix, lint_only};
+use ruff::linter::{lint_fix, lint_only, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff::{fix, fs};
@@ -67,38 +68,69 @@ pub fn lint_path(
     let contents = fs::read_file(path)?;
 
     // Lint the file.
-    let (messages, fixed) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
-        let (transformed, fixed, messages) = lint_fix(&contents, path, package, &settings.lib)?;
-        if fixed > 0 {
-            if matches!(autofix, fix::FixMode::Apply) {
-                write(path, transformed)?;
-            } else if matches!(autofix, fix::FixMode::Diff) {
-                let mut stdout = io::stdout().lock();
-                TextDiff::from_lines(&contents, &transformed)
-                    .unified_diff()
-                    .header(&fs::relativize_path(path), &fs::relativize_path(path))
-                    .to_writer(&mut stdout)?;
-                stdout.write_all(b"\n")?;
-                stdout.flush()?;
+    let (
+        LinterResult {
+            data: messages,
+            error: parse_error,
+        },
+        fixed,
+    ) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
+        if let Ok((result, transformed, fixed)) = lint_fix(&contents, path, package, &settings.lib)
+        {
+            if fixed > 0 {
+                if matches!(autofix, fix::FixMode::Apply) {
+                    write(path, transformed.as_bytes())?;
+                } else if matches!(autofix, fix::FixMode::Diff) {
+                    let mut stdout = io::stdout().lock();
+                    TextDiff::from_lines(contents.as_str(), &transformed)
+                        .unified_diff()
+                        .header(&fs::relativize_path(path), &fs::relativize_path(path))
+                        .to_writer(&mut stdout)?;
+                    stdout.write_all(b"\n")?;
+                    stdout.flush()?;
+                }
             }
+            (result, fixed)
+        } else {
+            // If we fail to autofix, lint the original source code.
+            let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
+            let fixed = 0;
+            (result, fixed)
         }
-        (messages, fixed)
     } else {
-        let messages = lint_only(&contents, path, package, &settings.lib, autofix.into())?;
+        let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
         let fixed = 0;
-        (messages, fixed)
+        (result, fixed)
     };
 
-    // Re-populate the cache.
-    if let Some(metadata) = metadata {
-        cache::set(
-            path,
-            package.as_ref(),
-            &metadata,
-            settings,
-            autofix.into(),
-            &messages,
-        );
+    if let Some(err) = parse_error {
+        // Notify the user of any parse errors.
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!(
+                "{}{} {}{}{} {err}",
+                "error".red().bold(),
+                ":".bold(),
+                "Failed to parse ".bold(),
+                fs::relativize_path(path).bold(),
+                ":".bold()
+            );
+        }
+
+        // Purge the cache.
+        cache::del(path, package.as_ref(), settings, autofix.into());
+    } else {
+        // Re-populate the cache.
+        if let Some(metadata) = metadata {
+            cache::set(
+                path,
+                package.as_ref(),
+                &metadata,
+                settings,
+                autofix.into(),
+                &messages,
+            );
+        }
     }
 
     Ok(Diagnostics { messages, fixed })
@@ -114,45 +146,80 @@ pub fn lint_stdin(
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Lint the inputs.
-    let (messages, fixed) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
-        let (transformed, fixed, messages) = lint_fix(
+    let (
+        LinterResult {
+            data: messages,
+            error: parse_error,
+        },
+        fixed,
+    ) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
+        if let Ok((result, transformed, fixed)) = lint_fix(
             contents,
             path.unwrap_or_else(|| Path::new("-")),
             package,
             settings,
-        )?;
+        ) {
+            if matches!(autofix, fix::FixMode::Apply) {
+                // Write the contents to stdout, regardless of whether any errors were fixed.
+                io::stdout().write_all(transformed.as_bytes())?;
+            } else if matches!(autofix, fix::FixMode::Diff) {
+                // But only write a diff if it's non-empty.
+                if fixed > 0 {
+                    let text_diff = TextDiff::from_lines(contents, &transformed);
+                    let mut unified_diff = text_diff.unified_diff();
+                    if let Some(path) = path {
+                        unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                    }
 
-        if matches!(autofix, fix::FixMode::Apply) {
-            // Write the contents to stdout, regardless of whether any errors were fixed.
-            io::stdout().write_all(transformed.as_bytes())?;
-        } else if matches!(autofix, fix::FixMode::Diff) {
-            // But only write a diff if it's non-empty.
-            if fixed > 0 {
-                let text_diff = TextDiff::from_lines(contents, &transformed);
-                let mut unified_diff = text_diff.unified_diff();
-                if let Some(path) = path {
-                    unified_diff.header(&fs::relativize_path(path), &fs::relativize_path(path));
+                    let mut stdout = io::stdout().lock();
+                    unified_diff.to_writer(&mut stdout)?;
+                    stdout.write_all(b"\n")?;
+                    stdout.flush()?;
                 }
-
-                let mut stdout = io::stdout().lock();
-                unified_diff.to_writer(&mut stdout)?;
-                stdout.write_all(b"\n")?;
-                stdout.flush()?;
             }
-        }
 
-        (messages, fixed)
+            (result, fixed)
+        } else {
+            // If we fail to autofix, lint the original source code.
+            let result = lint_only(
+                contents,
+                path.unwrap_or_else(|| Path::new("-")),
+                package,
+                settings,
+                autofix.into(),
+            );
+            let fixed = 0;
+
+            // Write the contents to stdout anyway.
+            if matches!(autofix, fix::FixMode::Apply) {
+                io::stdout().write_all(contents.as_bytes())?;
+            }
+
+            (result, fixed)
+        }
     } else {
-        let messages = lint_only(
+        let result = lint_only(
             contents,
             path.unwrap_or_else(|| Path::new("-")),
             package,
             settings,
             autofix.into(),
-        )?;
+        );
         let fixed = 0;
-        (messages, fixed)
+        (result, fixed)
     };
+
+    if let Some(err) = parse_error {
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!(
+                "{}{} Failed to parse {}: {err}",
+                "error".red().bold(),
+                ":".bold(),
+                path.map_or_else(|| "-".into(), fs::relativize_path).bold()
+            );
+        }
+    }
 
     Ok(Diagnostics { messages, fixed })
 }

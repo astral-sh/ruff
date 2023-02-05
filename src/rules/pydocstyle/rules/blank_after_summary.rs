@@ -4,7 +4,42 @@ use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::{Availability, Violation};
+
+use crate::{define_violation, AutofixKind};
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct BlankLineAfterSummary {
+        pub num_lines: usize,
+    }
+);
+fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String {
+    "Insert single blank line".to_string()
+}
+impl Violation for BlankLineAfterSummary {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let BlankLineAfterSummary { num_lines } = self;
+        if *num_lines == 0 {
+            format!("1 blank line required between summary line and description")
+        } else {
+            format!(
+                "1 blank line required between summary line and description (found {num_lines})"
+            )
+        }
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let BlankLineAfterSummary { num_lines } = self;
+        if *num_lines > 0 {
+            return Some(fmt_blank_line_after_summary_autofix_msg);
+        }
+        None
+    }
+}
 
 /// D205
 pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
@@ -22,7 +57,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     }
     if lines_count > 1 && blanks_count != 1 {
         let mut diagnostic = Diagnostic::new(
-            violations::BlankLineAfterSummary {
+            BlankLineAfterSummary {
                 num_lines: blanks_count,
             },
             Range::from_located(docstring.expr),

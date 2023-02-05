@@ -9,7 +9,7 @@ Unsupported installation method
 ===============================
 ruff no longer supports installation with `python setup.py install`.
 Please use `python -m pip install .` instead.
-"""
+""",
 )
 sys.exit(1)
 
@@ -22,3 +22,5 @@ sys.exit(1)
 # To be removed once GitHub catches up.
 
 setup(name="ruff", install_requires=[])
+if True: a = 1; \
+  b = 2

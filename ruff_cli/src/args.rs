@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::path::PathBuf;
 
 use clap::{command, Parser};
@@ -36,7 +38,7 @@ pub enum Command {
     #[clap(alias = "--explain")]
     Rule {
         #[arg(value_parser=Rule::from_code)]
-        rule: &'static Rule,
+        rule: Rule,
 
         /// Output format
         #[arg(long, value_enum, default_value = "text")]
@@ -209,11 +211,12 @@ pub struct CheckArgs {
     /// Exit with status code "0", even upon detecting lint violations.
     #[arg(short, long, help_heading = "Miscellaneous")]
     pub exit_zero: bool,
-    /// Enable or disable automatic update checks.
+    /// Does nothing and will be removed in the future.
     #[arg(
         long,
         overrides_with("no_update_check"),
-        help_heading = "Miscellaneous"
+        help_heading = "Miscellaneous",
+        hide = true
     )]
     update_check: bool,
     #[clap(long, overrides_with("update_check"), hide = true)]
@@ -237,6 +240,7 @@ pub struct CheckArgs {
         conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
+        conflicts_with = "fix",
     )]
     pub add_noqa: bool,
     /// See the files Ruff will be run against with the current settings.
@@ -309,13 +313,13 @@ pub struct LogLevelArgs {
 impl From<&LogLevelArgs> for LogLevel {
     fn from(args: &LogLevelArgs) -> Self {
         if args.silent {
-            LogLevel::Silent
+            Self::Silent
         } else if args.quiet {
-            LogLevel::Quiet
+            Self::Quiet
         } else if args.verbose {
-            LogLevel::Verbose
+            Self::Verbose
         } else {
-            LogLevel::Default
+            Self::Default
         }
     }
 }

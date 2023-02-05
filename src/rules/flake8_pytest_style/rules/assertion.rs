@@ -9,9 +9,64 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct CompositeAssertion;
+);
+impl Violation for CompositeAssertion {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Assertion should be broken down into multiple parts")
+    }
+}
+
+define_violation!(
+    pub struct AssertInExcept {
+        pub name: String,
+    }
+);
+impl Violation for AssertInExcept {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let AssertInExcept { name } = self;
+        format!(
+            "Found assertion on exception `{name}` in except block, use `pytest.raises()` instead"
+        )
+    }
+}
+
+define_violation!(
+    pub struct AssertAlwaysFalse;
+);
+impl Violation for AssertAlwaysFalse {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Assertion always fails, replace with `pytest.fail()`")
+    }
+}
+
+define_violation!(
+    pub struct UnittestAssertion {
+        pub assertion: String,
+    }
+);
+impl AlwaysAutofixableViolation for UnittestAssertion {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnittestAssertion { assertion } = self;
+        format!("Use a regular `assert` instead of unittest-style `{assertion}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let UnittestAssertion { assertion } = self;
+        format!("Replace `{assertion}(...)` with `assert ...`")
+    }
+}
 
 /// Visitor that tracks assert statements and checks if they reference
 /// the exception name.
@@ -22,7 +77,7 @@ struct ExceptionHandlerVisitor<'a> {
 }
 
 impl<'a> ExceptionHandlerVisitor<'a> {
-    fn new(exception_name: &'a str) -> Self {
+    const fn new(exception_name: &'a str) -> Self {
         Self {
             exception_name,
             current_assert: None,
@@ -52,7 +107,7 @@ where
                 if let Some(current_assert) = self.current_assert {
                     if id.as_str() == self.exception_name {
                         self.errors.push(Diagnostic::new(
-                            violations::AssertInExcept {
+                            AssertInExcept {
                                 name: id.to_string(),
                             },
                             Range::from_located(current_assert),
@@ -68,7 +123,7 @@ where
 /// Check if the test expression is a composite condition.
 /// For example, `a and b` or `not (a or b)`. The latter is equivalent
 /// to `not a and not b` by De Morgan's laws.
-fn is_composite_condition(test: &Expr) -> bool {
+const fn is_composite_condition(test: &Expr) -> bool {
     match &test.node {
         ExprKind::BoolOp {
             op: Boolop::And, ..
@@ -102,7 +157,7 @@ pub fn unittest_assertion(
         ExprKind::Attribute { attr, .. } => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 let mut diagnostic = Diagnostic::new(
-                    violations::UnittestAssertion {
+                    UnittestAssertion {
                         assertion: unittest_assert.to_string(),
                     },
                     Range::from_located(func),
@@ -129,7 +184,7 @@ pub fn unittest_assertion(
 pub fn assert_falsy(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Diagnostic> {
     if is_falsy_constant(test_expr) {
         Some(Diagnostic::new(
-            violations::AssertAlwaysFalse,
+            AssertAlwaysFalse,
             Range::from_located(assert_stmt),
         ))
     } else {
@@ -157,7 +212,7 @@ pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic
 pub fn composite_condition(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Diagnostic> {
     if is_composite_condition(test_expr) {
         Some(Diagnostic::new(
-            violations::CompositeAssertion,
+            CompositeAssertion,
             Range::from_located(assert_stmt),
         ))
     } else {

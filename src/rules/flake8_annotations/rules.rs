@@ -1,34 +1,167 @@
 use log::error;
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_ast::{Constant, Expr, ExprKind, Stmt};
+
+use ruff_macros::derive_message_formats;
+
+use crate::ast::helpers::ReturnStatementVisitor;
+use crate::ast::types::Range;
+use crate::ast::visitor::Visitor;
+use crate::ast::{cast, helpers};
+use crate::checkers::ast::Checker;
+use crate::define_violation;
+use crate::docstrings::definition::{Definition, DefinitionKind};
+use crate::registry::{Diagnostic, Rule};
+use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::visibility;
+use crate::visibility::Visibility;
 
 use super::fixes;
 use super::helpers::match_function_def;
-use crate::ast::types::Range;
-use crate::ast::visitor::Visitor;
-use crate::ast::{cast, helpers, visitor};
-use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::registry::{Diagnostic, Rule};
-use crate::visibility::Visibility;
-use crate::{violations, visibility};
 
-#[derive(Default)]
-struct ReturnStatementVisitor<'a> {
-    returns: Vec<Option<&'a Expr>>,
+define_violation!(
+    pub struct MissingTypeFunctionArgument {
+        pub name: String,
+    }
+);
+impl Violation for MissingTypeFunctionArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingTypeFunctionArgument { name } = self;
+        format!("Missing type annotation for function argument `{name}`")
+    }
 }
 
-impl<'a, 'b> Visitor<'b> for ReturnStatementVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        match &stmt.node {
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                // Don't recurse.
-            }
-            StmtKind::Return { value } => self.returns.push(value.as_ref().map(|expr| &**expr)),
-            _ => visitor::walk_stmt(self, stmt),
-        }
+define_violation!(
+    pub struct MissingTypeArgs {
+        pub name: String,
+    }
+);
+impl Violation for MissingTypeArgs {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingTypeArgs { name } = self;
+        format!("Missing type annotation for `*{name}`")
+    }
+}
+
+define_violation!(
+    pub struct MissingTypeKwargs {
+        pub name: String,
+    }
+);
+impl Violation for MissingTypeKwargs {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingTypeKwargs { name } = self;
+        format!("Missing type annotation for `**{name}`")
+    }
+}
+
+define_violation!(
+    pub struct MissingTypeSelf {
+        pub name: String,
+    }
+);
+impl Violation for MissingTypeSelf {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingTypeSelf { name } = self;
+        format!("Missing type annotation for `{name}` in method")
+    }
+}
+
+define_violation!(
+    pub struct MissingTypeCls {
+        pub name: String,
+    }
+);
+impl Violation for MissingTypeCls {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingTypeCls { name } = self;
+        format!("Missing type annotation for `{name}` in classmethod")
+    }
+}
+
+define_violation!(
+    pub struct MissingReturnTypePublicFunction {
+        pub name: String,
+    }
+);
+impl Violation for MissingReturnTypePublicFunction {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingReturnTypePublicFunction { name } = self;
+        format!("Missing return type annotation for public function `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct MissingReturnTypePrivateFunction {
+        pub name: String,
+    }
+);
+impl Violation for MissingReturnTypePrivateFunction {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingReturnTypePrivateFunction { name } = self;
+        format!("Missing return type annotation for private function `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct MissingReturnTypeSpecialMethod {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingReturnTypeSpecialMethod { name } = self;
+        format!("Missing return type annotation for special method `{name}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add `None` return type".to_string()
+    }
+}
+
+define_violation!(
+    pub struct MissingReturnTypeStaticMethod {
+        pub name: String,
+    }
+);
+impl Violation for MissingReturnTypeStaticMethod {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingReturnTypeStaticMethod { name } = self;
+        format!("Missing return type annotation for staticmethod `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct MissingReturnTypeClassMethod {
+        pub name: String,
+    }
+);
+impl Violation for MissingReturnTypeClassMethod {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let MissingReturnTypeClassMethod { name } = self;
+        format!("Missing return type annotation for classmethod `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct DynamicallyTypedExpression {
+        pub name: String,
+    }
+);
+impl Violation for DynamicallyTypedExpression {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DynamicallyTypedExpression { name } = self;
+        format!("Dynamically typed expressions (typing.Any) are disallowed in `{name}`")
     }
 }
 
@@ -58,7 +191,7 @@ where
 {
     if checker.match_typing_expr(annotation, "Any") {
         checker.diagnostics.push(Diagnostic::new(
-            violations::DynamicallyTypedExpression { name: func() },
+            DynamicallyTypedExpression { name: func() },
             Range::from_located(annotation),
         ));
     };
@@ -115,7 +248,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             .enabled(&Rule::MissingTypeFunctionArgument)
                         {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingTypeFunctionArgument {
+                                MissingTypeFunctionArgument {
                                     name: arg.node.arg.to_string(),
                                 },
                                 Range::from_located(arg),
@@ -145,7 +278,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.rules.enabled(&Rule::MissingTypeArgs) {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingTypeArgs {
+                                MissingTypeArgs {
                                     name: arg.node.arg.to_string(),
                                 },
                                 Range::from_located(arg),
@@ -175,7 +308,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                     {
                         if checker.settings.rules.enabled(&Rule::MissingTypeKwargs) {
                             checker.diagnostics.push(Diagnostic::new(
-                                violations::MissingTypeKwargs {
+                                MissingTypeKwargs {
                                     name: arg.node.arg.to_string(),
                                 },
                                 Range::from_located(arg),
@@ -192,7 +325,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
                             if checker.settings.rules.enabled(&Rule::MissingTypeCls) {
                                 checker.diagnostics.push(Diagnostic::new(
-                                    violations::MissingTypeCls {
+                                    MissingTypeCls {
                                         name: arg.node.arg.to_string(),
                                     },
                                     Range::from_located(arg),
@@ -201,7 +334,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         } else {
                             if checker.settings.rules.enabled(&Rule::MissingTypeSelf) {
                                 checker.diagnostics.push(Diagnostic::new(
-                                    violations::MissingTypeSelf {
+                                    MissingTypeSelf {
                                         name: arg.node.arg.to_string(),
                                     },
                                     Range::from_located(arg),
@@ -237,7 +370,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .enabled(&Rule::MissingReturnTypeClassMethod)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::MissingReturnTypeClassMethod {
+                            MissingReturnTypeClassMethod {
                                 name: name.to_string(),
                             },
                             helpers::identifier_range(stmt, checker.locator),
@@ -252,7 +385,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .enabled(&Rule::MissingReturnTypeStaticMethod)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::MissingReturnTypeStaticMethod {
+                            MissingReturnTypeStaticMethod {
                                 name: name.to_string(),
                             },
                             helpers::identifier_range(stmt, checker.locator),
@@ -270,7 +403,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                             && has_any_typed_arg)
                         {
                             let mut diagnostic = Diagnostic::new(
-                                violations::MissingReturnTypeSpecialMethod {
+                                MissingReturnTypeSpecialMethod {
                                     name: name.to_string(),
                                 },
                                 helpers::identifier_range(stmt, checker.locator),
@@ -293,7 +426,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                         .enabled(&Rule::MissingReturnTypeSpecialMethod)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            violations::MissingReturnTypeSpecialMethod {
+                            MissingReturnTypeSpecialMethod {
                                 name: name.to_string(),
                             },
                             helpers::identifier_range(stmt, checker.locator),
@@ -308,7 +441,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                 .enabled(&Rule::MissingReturnTypePublicFunction)
                             {
                                 checker.diagnostics.push(Diagnostic::new(
-                                    violations::MissingReturnTypePublicFunction {
+                                    MissingReturnTypePublicFunction {
                                         name: name.to_string(),
                                     },
                                     helpers::identifier_range(stmt, checker.locator),
@@ -322,7 +455,7 @@ pub fn definition(checker: &mut Checker, definition: &Definition, visibility: &V
                                 .enabled(&Rule::MissingReturnTypePrivateFunction)
                             {
                                 checker.diagnostics.push(Diagnostic::new(
-                                    violations::MissingReturnTypePrivateFunction {
+                                    MissingReturnTypePrivateFunction {
                                         name: name.to_string(),
                                     },
                                     helpers::identifier_range(stmt, checker.locator),

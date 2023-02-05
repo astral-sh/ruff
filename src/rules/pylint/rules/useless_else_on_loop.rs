@@ -2,8 +2,23 @@ use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+
+define_violation!(
+    pub struct UselessElseOnLoop;
+);
+impl Violation for UselessElseOnLoop {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!(
+            "Else clause on loop without a break statement, remove the else and de-indent all the \
+             code inside it"
+        )
+    }
+}
 
 fn loop_exits_early(body: &[Stmt]) -> bool {
     body.iter().any(|stmt| match &stmt.node {
@@ -34,7 +49,7 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
 pub fn useless_else_on_loop(checker: &mut Checker, stmt: &Stmt, body: &[Stmt], orelse: &[Stmt]) {
     if !orelse.is_empty() && !loop_exits_early(body) {
         checker.diagnostics.push(Diagnostic::new(
-            violations::UselessElseOnLoop,
+            UselessElseOnLoop,
             helpers::else_range(stmt, checker.locator).unwrap(),
         ));
     }

@@ -37,14 +37,26 @@ impl FromStr for PythonVersion {
                     "Specified a version below the minimum supported Python version. Defaulting \
                      to Python 3.7."
                 );
-                Ok(PythonVersion::Py37)
+                Ok(Self::Py37)
             }
-            "py37" => Ok(PythonVersion::Py37),
-            "py38" => Ok(PythonVersion::Py38),
-            "py39" => Ok(PythonVersion::Py39),
-            "py310" => Ok(PythonVersion::Py310),
-            "py311" => Ok(PythonVersion::Py311),
+            "py37" => Ok(Self::Py37),
+            "py38" => Ok(Self::Py38),
+            "py39" => Ok(Self::Py39),
+            "py310" => Ok(Self::Py310),
+            "py311" => Ok(Self::Py311),
             _ => Err(anyhow!("Unknown version: {string} (try: \"py37\")")),
+        }
+    }
+}
+
+impl PythonVersion {
+    pub const fn as_tuple(&self) -> (u32, u32) {
+        match self {
+            Self::Py37 => (3, 7),
+            Self::Py38 => (3, 8),
+            Self::Py39 => (3, 9),
+            Self::Py310 => (3, 10),
+            Self::Py311 => (3, 11),
         }
     }
 }

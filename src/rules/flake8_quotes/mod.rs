@@ -11,21 +11,20 @@ mod tests {
 
     use super::settings::Quote;
     use crate::assert_yaml_snapshot;
-    use crate::linter::test_path;
     use crate::registry::Rule;
     use crate::settings::Settings;
+    use crate::test::test_path;
 
     #[test_case(Path::new("doubles.py"))]
     #[test_case(Path::new("doubles_escaped.py"))]
+    #[test_case(Path::new("doubles_implicit.py"))]
     #[test_case(Path::new("doubles_multiline_string.py"))]
     #[test_case(Path::new("doubles_noqa.py"))]
     #[test_case(Path::new("doubles_wrapped.py"))]
-    fn doubles(path: &Path) -> Result<()> {
-        let snapshot = format!("doubles_{}", path.to_string_lossy());
+    fn require_singles(path: &Path) -> Result<()> {
+        let snapshot = format!("require_singles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_quotes")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_quotes").join(path).as_path(),
             &Settings {
                 flake8_quotes: super::settings::Settings {
                     inline_quotes: Quote::Single,
@@ -47,15 +46,14 @@ mod tests {
 
     #[test_case(Path::new("singles.py"))]
     #[test_case(Path::new("singles_escaped.py"))]
+    #[test_case(Path::new("singles_implicit.py"))]
     #[test_case(Path::new("singles_multiline_string.py"))]
     #[test_case(Path::new("singles_noqa.py"))]
     #[test_case(Path::new("singles_wrapped.py"))]
-    fn singles(path: &Path) -> Result<()> {
-        let snapshot = format!("singles_{}", path.to_string_lossy());
+    fn require_doubles(path: &Path) -> Result<()> {
+        let snapshot = format!("require_doubles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_quotes")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_quotes").join(path).as_path(),
             &Settings {
                 flake8_quotes: super::settings::Settings {
                     inline_quotes: Quote::Double,
@@ -85,12 +83,10 @@ mod tests {
     #[test_case(Path::new("docstring_singles_module_singleline.py"))]
     #[test_case(Path::new("docstring_singles_class.py"))]
     #[test_case(Path::new("docstring_singles_function.py"))]
-    fn double_docstring(path: &Path) -> Result<()> {
-        let snapshot = format!("double_docstring_{}", path.to_string_lossy());
+    fn require_docstring_doubles(path: &Path) -> Result<()> {
+        let snapshot = format!("require_docstring_doubles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_quotes")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_quotes").join(path).as_path(),
             &Settings {
                 flake8_quotes: super::settings::Settings {
                     inline_quotes: Quote::Single,
@@ -120,12 +116,10 @@ mod tests {
     #[test_case(Path::new("docstring_singles_module_singleline.py"))]
     #[test_case(Path::new("docstring_singles_class.py"))]
     #[test_case(Path::new("docstring_singles_function.py"))]
-    fn single_docstring(path: &Path) -> Result<()> {
-        let snapshot = format!("single_docstring_{}", path.to_string_lossy());
+    fn require_docstring_singles(path: &Path) -> Result<()> {
+        let snapshot = format!("require_docstring_singles_over_{}", path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_quotes")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_quotes").join(path).as_path(),
             &Settings {
                 flake8_quotes: super::settings::Settings {
                     inline_quotes: Quote::Single,

@@ -13,7 +13,9 @@ pub fn check_file_path(
 
     // flake8-no-pep420
     if settings.rules.enabled(&Rule::ImplicitNamespacePackage) {
-        if let Some(diagnostic) = implicit_namespace_package(path, package) {
+        if let Some(diagnostic) =
+            implicit_namespace_package(path, package, &settings.project_root, &settings.src)
+        {
             diagnostics.push(diagnostic);
         }
     }

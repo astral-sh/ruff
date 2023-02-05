@@ -84,11 +84,9 @@ pub(crate) fn section_contexts<'a>(
             section_name: context.section_name,
             previous_line: context.previous_line,
             line: context.line,
-            following_lines: if let Some(end) = end {
+            following_lines: end.map_or(context.following_lines, |end| {
                 &lines[context.original_index + 1..end]
-            } else {
-                context.following_lines
-            },
+            }),
             original_index: context.original_index,
             is_last_section: end.is_none(),
         });

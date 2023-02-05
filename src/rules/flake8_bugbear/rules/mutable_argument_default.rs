@@ -1,10 +1,20 @@
-use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Operator};
-
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::Violation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Operator};
 
+define_violation!(
+    pub struct MutableArgumentDefault;
+);
+impl Violation for MutableArgumentDefault {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Do not use mutable data structures for argument defaults")
+    }
+}
 const MUTABLE_FUNCS: &[&[&str]] = &[
     &["", "dict"],
     &["", "list"],
@@ -152,7 +162,7 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
                 .map_or(false, |expr| is_immutable_annotation(checker, expr))
         {
             checker.diagnostics.push(Diagnostic::new(
-                violations::MutableArgumentDefault,
+                MutableArgumentDefault,
                 Range::from_located(default),
             ));
         }

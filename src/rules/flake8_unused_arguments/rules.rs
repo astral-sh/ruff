@@ -4,14 +4,84 @@ use regex::Regex;
 use rustc_hash::FxHashMap;
 use rustpython_ast::{Arg, Arguments};
 
-use super::helpers;
-use super::types::Argumentable;
+use ruff_macros::derive_message_formats;
+
 use crate::ast::function_type;
 use crate::ast::function_type::FunctionType;
 use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
+use crate::violation::Violation;
 use crate::visibility;
+
+use super::helpers;
+use super::types::Argumentable;
+
+define_violation!(
+    pub struct UnusedFunctionArgument {
+        pub name: String,
+    }
+);
+impl Violation for UnusedFunctionArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnusedFunctionArgument { name } = self;
+        format!("Unused function argument: `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct UnusedMethodArgument {
+        pub name: String,
+    }
+);
+impl Violation for UnusedMethodArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnusedMethodArgument { name } = self;
+        format!("Unused method argument: `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct UnusedClassMethodArgument {
+        pub name: String,
+    }
+);
+impl Violation for UnusedClassMethodArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnusedClassMethodArgument { name } = self;
+        format!("Unused class method argument: `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct UnusedStaticMethodArgument {
+        pub name: String,
+    }
+);
+impl Violation for UnusedStaticMethodArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnusedStaticMethodArgument { name } = self;
+        format!("Unused static method argument: `{name}`")
+    }
+}
+
+define_violation!(
+    pub struct UnusedLambdaArgument {
+        pub name: String,
+    }
+);
+impl Violation for UnusedLambdaArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnusedLambdaArgument { name } = self;
+        format!("Unused lambda argument: `{name}`")
+    }
+}
 
 /// Check a plain function for unused arguments.
 fn function(
@@ -135,7 +205,7 @@ pub fn unused_arguments(
                         function(
                             &Argumentable::Function,
                             args,
-                            &scope.values,
+                            &scope.bindings,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -164,7 +234,7 @@ pub fn unused_arguments(
                         method(
                             &Argumentable::Method,
                             args,
-                            &scope.values,
+                            &scope.bindings,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -193,7 +263,7 @@ pub fn unused_arguments(
                         method(
                             &Argumentable::ClassMethod,
                             args,
-                            &scope.values,
+                            &scope.bindings,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -222,7 +292,7 @@ pub fn unused_arguments(
                         function(
                             &Argumentable::StaticMethod,
                             args,
-                            &scope.values,
+                            &scope.bindings,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -245,7 +315,7 @@ pub fn unused_arguments(
                 function(
                     &Argumentable::Lambda,
                     args,
-                    &scope.values,
+                    &scope.bindings,
                     bindings,
                     &checker.settings.dummy_variable_rgx,
                     checker

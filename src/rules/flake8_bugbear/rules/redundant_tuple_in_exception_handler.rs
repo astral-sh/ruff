@@ -1,11 +1,33 @@
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind};
-
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind};
+
+define_violation!(
+    pub struct RedundantTupleInExceptionHandler {
+        pub name: String,
+    }
+);
+impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let RedundantTupleInExceptionHandler { name } = self;
+        format!(
+            "A length-one tuple literal is redundant. Write `except {name}` instead of `except \
+             ({name},)`."
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        let RedundantTupleInExceptionHandler { name } = self;
+        format!("Replace with `except {name}`")
+    }
+}
 
 /// B013
 pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[Excepthandler]) {
@@ -20,7 +42,7 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             continue;
         };
         let mut diagnostic = Diagnostic::new(
-            violations::RedundantTupleInExceptionHandler {
+            RedundantTupleInExceptionHandler {
                 name: unparse_expr(elt, checker.stylist),
             },
             Range::from_located(type_),

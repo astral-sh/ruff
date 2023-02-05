@@ -1,3 +1,6 @@
+use crate::define_violation;
+use crate::violation::AlwaysAutofixableViolation;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Operator};
 
 use crate::ast::helpers::unparse_expr;
@@ -5,7 +8,20 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violations;
+
+define_violation!(
+    pub struct UsePEP604Annotation;
+);
+impl AlwaysAutofixableViolation for UsePEP604Annotation {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use `X | Y` for type annotations")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Convert to `X | Y`".to_string()
+    }
+}
 
 fn optional(expr: &Expr) -> Expr {
     Expr::new(
@@ -80,8 +96,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
 
     match typing_member {
         TypingMember::Optional => {
-            let mut diagnostic =
-                Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(UsePEP604Annotation, Range::from_located(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
@@ -92,8 +107,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             checker.diagnostics.push(diagnostic);
         }
         TypingMember::Union => {
-            let mut diagnostic =
-                Diagnostic::new(violations::UsePEP604Annotation, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(UsePEP604Annotation, Range::from_located(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
                     ExprKind::Slice { .. } => {

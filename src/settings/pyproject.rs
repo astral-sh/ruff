@@ -19,7 +19,7 @@ pub struct Pyproject {
 }
 
 impl Pyproject {
-    pub fn new(options: Options) -> Self {
+    pub const fn new(options: Options) -> Self {
         Self {
             tool: Some(Tools {
                 ruff: Some(options),
@@ -99,9 +99,7 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
 pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
-    if path.as_ref().ends_with("ruff.toml") {
-        parse_ruff_toml(path)
-    } else if path.as_ref().ends_with("pyproject.toml") {
+    if path.as_ref().ends_with("pyproject.toml") {
         let pyproject = parse_pyproject_toml(&path).map_err(|err| {
             anyhow!(
                 "Failed to parse `{}`: {}",
@@ -114,16 +112,12 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
             .and_then(|tool| tool.ruff)
             .unwrap_or_default())
     } else {
-        Err(anyhow!(
-            "Unrecognized settings file: `{}`",
-            path.as_ref().to_string_lossy()
-        ))
+        parse_ruff_toml(path)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::env::current_dir;
     use std::str::FromStr;
 
     use anyhow::Result;
@@ -141,6 +135,7 @@ mod tests {
         find_settings_toml, parse_pyproject_toml, Options, Pyproject, Tools,
     };
     use crate::settings::types::PatternPrefixPair;
+    use crate::test::test_resource_path;
 
     #[test]
     fn deserialize() -> Result<()> {
@@ -270,13 +265,8 @@ other-attribute = 1
 
     #[test]
     fn find_and_parse_pyproject_toml() -> Result<()> {
-        let cwd = current_dir()?;
-        let pyproject =
-            find_settings_toml(cwd.join("resources/test/fixtures/__init__.py"))?.unwrap();
-        assert_eq!(
-            pyproject,
-            cwd.join("resources/test/fixtures/pyproject.toml")
-        );
+        let pyproject = find_settings_toml(test_resource_path("fixtures/__init__.py"))?.unwrap();
+        assert_eq!(pyproject, test_resource_path("fixtures/pyproject.toml"));
 
         let pyproject = parse_pyproject_toml(&pyproject)?;
         let config = pyproject.tool.unwrap().ruff.unwrap();
