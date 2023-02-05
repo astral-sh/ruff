@@ -91,11 +91,29 @@ fn equivalent(format: &CFormatSpec, value: &Constant) -> bool {
 /// Checks if the format string matches the constant type formatting it
 fn check_constant(formats: &[CFormatStrOrBytes<String>], value: &Constant) -> bool {
     let formats = get_all_specs(formats);
+    // If there is more than one format, this is not valid python and we should return true so that
+    // no error is reported
     if formats.len() != 1 {
-        return false;
+        return true;
     }
     let format = formats.get(0).unwrap();
     equivalent(format, value)
+}
+
+fn check_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool {
+    let formats = get_all_specs(formats);
+    // If there are more formats that values, the statement is invalid
+    if formats.len() > elts.len() {
+        return true;
+    }
+    for (format, elt) in formats.iter().zip(elts) {
+        if let ExprKind::Constant { value, .. } = &elt.node {
+            if !equivalent(format, value) {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 /// PLE1307
@@ -147,7 +165,7 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, left: &Expr, r
 
     // Parse the parameters.
     let valid = match &right.node {
-        ExprKind::Tuple { elts, .. } => true,
+        ExprKind::Tuple { elts, .. } => check_tuple(&format_strings, elts),
         ExprKind::Dict { keys, values } => true,
         ExprKind::Constant { value, .. } => check_constant(&format_strings, value),
         _ => return,
