@@ -857,6 +857,7 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP034 | extraneous-parentheses | Avoid extraneous parentheses | 🛠 |
 | UP035 | import-replacements | Import from `{module}` instead: {names} | 🛠 |
 | UP036 | outdated-version-block | Version block is outdated for minimum Python version | 🛠 |
+| UP037 | quoted-annotation | Remove quotes from type annotation | 🛠 |
 
 ### flake8-2020 (YTT)
 
@@ -1344,6 +1345,8 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLR0133 | comparison-of-constant | Two constants compared in a comparison, consider replacing `{left_constant} {op} {right_constant}` |  |
 | PLR0206 | property-with-parameters | Cannot have defined parameters for properties |  |
 | PLR0402 | consider-using-from-import | Use `from {module} import {name}` in lieu of alias | 🛠 |
+| PLR0911 | too-many-return-statements | Too many return statements ({returns}/{max_returns}) |  |
+| PLR0912 | too-many-branches | Too many branches ({branches}/{max_branches}) |  |
 | PLR0913 | too-many-arguments | Too many arguments to function call ({c_args}/{max_args}) |  |
 | PLR0915 | too-many-statements | Too many statements ({statements}/{max_statements}) |  |
 | PLR1701 | consider-merging-isinstance | Merge these isinstance calls: `isinstance({obj}, ({types}))` |  |
@@ -3743,7 +3746,7 @@ allow-magic-value-types = ["int"]
 
 #### [`max-args`](#max-args)
 
-Maximum number of arguments allowed for a function definition (see: `PLR0913`).
+Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).
 
 **Default value**: `5`
 
@@ -3758,9 +3761,43 @@ max-args = 5
 
 ---
 
+#### [`max-branches`](#max-branches)
+
+Maximum number of branches allowed for a function or method body (see: `PLR0912`).
+
+**Default value**: `12`
+
+**Type**: `int`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pylint]
+max-branches = 12
+```
+
+---
+
+#### [`max-returns`](#max-returns)
+
+Maximum number of return statements allowed for a function or method body (see `PLR0911`)
+
+**Default value**: `6`
+
+**Type**: `int`
+
+**Example usage**:
+
+```toml
+[tool.ruff.pylint]
+max-returns = 6
+```
+
+---
+
 #### [`max-statements`](#max-statements)
 
-Maximum number of statements allowed for a method or a statement (see: `PLR0915`).
+Maximum number of statements allowed for a function or method body (see: `PLR0915`).
 
 **Default value**: `50`
 

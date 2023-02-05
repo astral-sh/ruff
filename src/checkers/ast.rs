@@ -592,6 +592,28 @@ where
                     pylint::rules::too_many_arguments(self, args, stmt);
                 }
 
+                if self.settings.rules.enabled(&Rule::TooManyReturnStatements) {
+                    if let Some(diagnostic) = pylint::rules::too_many_return_statements(
+                        stmt,
+                        body,
+                        self.settings.pylint.max_returns,
+                        self.locator,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+
+                if self.settings.rules.enabled(&Rule::TooManyBranches) {
+                    if let Some(diagnostic) = pylint::rules::too_many_branches(
+                        stmt,
+                        body,
+                        self.settings.pylint.max_branches,
+                        self.locator,
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+
                 if self.settings.rules.enabled(&Rule::TooManyStatements) {
                     if let Some(diagnostic) = pylint::rules::too_many_statements(
                         stmt,
@@ -3330,20 +3352,37 @@ where
                     Some(Callable::MypyExtension) => {
                         self.visit_expr(func);
 
-                        // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
-                        let mut arguments = args.iter().chain(keywords.iter().map(|keyword| {
-                            let KeywordData { value, .. } = &keyword.node;
-                            value
-                        }));
-                        if let Some(expr) = arguments.next() {
+                        if let Some(arg) = args.first() {
+                            // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
                             self.in_type_definition = true;
-                            self.visit_expr(expr);
+                            self.visit_expr(arg);
                             self.in_type_definition = prev_in_type_definition;
-                        }
-                        for expr in arguments {
-                            self.in_type_definition = false;
-                            self.visit_expr(expr);
-                            self.in_type_definition = prev_in_type_definition;
+
+                            for arg in args.iter().skip(1) {
+                                self.in_type_definition = false;
+                                self.visit_expr(arg);
+                                self.in_type_definition = prev_in_type_definition;
+                            }
+                            for keyword in keywords {
+                                let KeywordData { value, .. } = &keyword.node;
+                                self.in_type_definition = false;
+                                self.visit_expr(value);
+                                self.in_type_definition = prev_in_type_definition;
+                            }
+                        } else {
+                            // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
+                            for keyword in keywords {
+                                let KeywordData { value, arg, .. } = &keyword.node;
+                                if arg.as_ref().map_or(false, |arg| arg == "type") {
+                                    self.in_type_definition = true;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
+                                } else {
+                                    self.in_type_definition = false;
+                                    self.visit_expr(value);
+                                    self.in_type_definition = prev_in_type_definition;
+                                }
+                            }
                         }
                     }
                     None => {
@@ -4347,6 +4386,11 @@ impl<'a> Checker<'a> {
             self.deferred_string_type_definitions.pop()
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
+                if self.annotations_future_enabled {
+                    if self.settings.rules.enabled(&Rule::QuotedAnnotation) {
+                        pyupgrade::rules::quoted_annotation(self, expression, range);
+                    }
+                }
                 relocate_expr(&mut expr, range);
                 allocator.push(expr);
                 stacks.push((in_annotation, context));

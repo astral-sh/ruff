@@ -80,3 +80,9 @@ def f():
 
     bar = 1
     print(bar)
+
+
+# Unfixable due to trailing underscore (`_line_` wouldn't be considered an ignorable
+# variable name).
+for line_ in range(self.header_lines):
+     fp.readline()
