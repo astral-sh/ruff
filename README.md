@@ -1380,7 +1380,7 @@ For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception |  |
+| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception | 🛠 |
 
 ### flake8-self (SLF)
 
