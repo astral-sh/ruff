@@ -490,14 +490,12 @@ ruff_macros::define_rule_mapping!(
     RUF100 => violations::UnusedNOQA,
 
     DJ08 => rules::flake8_django::rules::ModelDunderStr,
-    DJ13=> rules::flake8_django::rules::ReceiverDecoratorChecker,
+    DJ13 => rules::flake8_django::rules::ReceiverDecoratorChecker,
+    DJ01 => rules::flake8_django::rules::ModelStringFieldNullable,
 );
 
 #[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
 pub enum Linter {
-    /// [flake8-django](https://pypi.org/project/flake8-django/)
-    #[prefix = "DJ"]
-    Flake8Django,
     /// [Pyflakes](https://pypi.org/project/pyflakes/)
     #[prefix = "F"]
     Pyflakes,
@@ -553,6 +551,9 @@ pub enum Linter {
     /// [flake8-debugger](https://pypi.org/project/flake8-debugger/)
     #[prefix = "T10"]
     Flake8Debugger,
+    /// [flake8-django](https://pypi.org/project/flake8-django/)
+    #[prefix = "DJ"]
+    Flake8Django,
     /// [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
     #[prefix = "EM"]
     Flake8ErrMsg,

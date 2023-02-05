@@ -731,6 +731,11 @@ where
                 decorator_list,
                 body,
             } => {
+                if self.settings.rules.enabled(&Rule::ModelStringFieldNullable) {
+                    let mut errors =
+                        flake8_django::rules::ModelStringFieldNullable::check(bases, body);
+                    self.diagnostics.append(&mut errors);
+                }
                 if self.settings.rules.enabled(&Rule::ModelDunderStr) {
                     if let Some(diagnostic) =
                         flake8_django::rules::ModelDunderStr::check_dunder_str(bases, body, stmt)

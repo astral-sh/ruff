@@ -37,4 +37,17 @@ mod tests {
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
+
+    #[test_case(Rule::ModelStringFieldNullable, Path::new("DJ01.py"); "DJ01")]
+    fn check_if_string_field_has_null(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("./resources/test/fixtures/flake8_django")
+                .join(path)
+                .as_path(),
+            &settings::Settings::for_rule(rule_code),
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
 }
