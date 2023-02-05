@@ -5,22 +5,22 @@ print("%d %d" % (1, 1.1))
 
 "foo %e bar %s" % ("1", 2)
 
-"%d" % "1"  # [bad-string-format-type]
-"%(key)d" % {"key": "1"}  # [bad-string-format-type]
-"%x" % 1.1  # [bad-string-format-type]
-"%(key)x" % {"key": 1.1}  # [bad-string-format-type]
-"%d" % []  # [bad-string-format-type]
-"%(key)d" % {"key": []}  # [bad-string-format-type]
+"%d" % "1"
+"%(key)d" % {"key": "1"}
+"%x" % 1.1
+"%(key)x" % {"key": 1.1}
+"%d" % []
+"%(key)d" % {"key": []}
 
 WORD = "abc"
-"%d" % WORD  # [bad-string-format-type]
-"%d %s" % (WORD, WORD)  # [bad-string-format-type]
+"%d" % WORD
+"%d %s" % (WORD, WORD)
 
 # These SHOULD NOT have a warning
 VALUES_TO_FORMAT = (1, "2", 3.0)
 "%d %s %f" % VALUES_TO_FORMAT
 # Warning: Pylint IS able to throw warnings for the one below, but we do not have the power to do this yet
-"%d %d %f" % VALUES_TO_FORMAT  # [bad-string-format-type]
+"%d %d %f" % VALUES_TO_FORMAT
 
 "%s" % "1"
 

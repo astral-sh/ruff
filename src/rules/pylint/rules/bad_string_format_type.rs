@@ -85,13 +85,13 @@ fn get_all_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 fn equivalent(format: &CFormatSpec, value: &Constant) -> bool {
     let clean_constant = constant_to_data(value);
     let clean_format = char_to_data(format.format_char);
-    match clean_constant {
-        // We will not try to handle other
-        DataType::Other => false,
+    match clean_format {
+        // We can ALWAYS format as string
+        DataType::String => true,
         _ => {
-            if let DataType::String = clean_format {
-                // We can ALWAYS format as string (unless other)
-                true
+            if let DataType::Other = clean_constant {
+                // If the format is not string, we cannot format other
+                false
             } else {
                 clean_constant == clean_format
             }
