@@ -11,6 +11,8 @@ print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
 "%d" % ([],)
 "%(key)d" % {"key": []}
 
+print("%d" % ("%s" % ("nested",),))
+
 # These should have a warning, but do not right now do to our limitations
 WORD = "abc"
 "%d" % WORD
@@ -44,3 +46,5 @@ print("%d %d"
 "%(key)s" % {"key": []}
 "%s" % None
 "%(key)s" % {"key": None}
+print("%s" % ("%s" % ("nested",),))
+print("%s" % ("%d" % (5,),))
