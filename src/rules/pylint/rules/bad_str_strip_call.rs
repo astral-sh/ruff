@@ -40,7 +40,7 @@ fn remove_duplicates(s: &str) -> String {
 pub fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
         if let ExprKind::Constant {
-            value: Constant::Str(_),
+            value: Constant::Str(_) | Constant::Bytes(_),
             ..
         } = &value.node
         {

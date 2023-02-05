@@ -5,92 +5,146 @@ expression: diagnostics
 - kind:
     BadStrStripCall: ~
   location:
-    row: 1
+    row: 2
     column: 20
   end_location:
-    row: 1
+    row: 2
     column: 27
   fix:
     content:
       - "\"Helo\""
     location:
-      row: 1
+      row: 2
       column: 20
     end_location:
-      row: 1
+      row: 2
       column: 27
   parent: ~
 - kind:
     BadStrStripCall: ~
   location:
-    row: 3
+    row: 4
     column: 20
   end_location:
-    row: 3
+    row: 4
     column: 27
   fix:
     content:
       - "\"Helo\""
     location:
-      row: 3
+      row: 4
       column: 20
     end_location:
-      row: 3
+      row: 4
       column: 27
   parent: ~
 - kind:
     BadStrStripCall: ~
   location:
-    row: 5
+    row: 6
     column: 20
   end_location:
-    row: 5
+    row: 6
     column: 29
   fix:
     content:
       - "\"🤣🙃👀😀\""
     location:
-      row: 5
+      row: 6
       column: 20
     end_location:
-      row: 5
+      row: 6
       column: 29
   parent: ~
 - kind:
     BadStrStripCall: ~
   location:
-    row: 9
+    row: 10
     column: 4
   end_location:
-    row: 11
+    row: 12
     column: 3
   fix:
     content:
       - "\"\"\""
       - "ther alofcsIwudikpy,ng$@mbv9\"\"\""
     location:
-      row: 9
+      row: 10
       column: 4
     end_location:
-      row: 11
+      row: 12
       column: 3
   parent: ~
 - kind:
     BadStrStripCall: ~
   location:
-    row: 14
+    row: 15
     column: 20
   end_location:
-    row: 16
+    row: 17
     column: 29
   fix:
     content:
       - "\"can wegtsupidlyorfh?\""
     location:
-      row: 14
+      row: 15
       column: 20
     end_location:
-      row: 16
+      row: 17
       column: 29
+  parent: ~
+- kind:
+    BadStrStripCall: ~
+  location:
+    row: 19
+    column: 10
+  end_location:
+    row: 19
+    column: 19
+  fix:
+    content:
+      - "'htp:/'"
+    location:
+      row: 19
+      column: 10
+    end_location:
+      row: 19
+      column: 19
+  parent: ~
+- kind:
+    BadStrStripCall: ~
+  location:
+    row: 20
+    column: 11
+  end_location:
+    row: 20
+    column: 20
+  fix:
+    content:
+      - "'htp:/'"
+    location:
+      row: 20
+      column: 11
+    end_location:
+      row: 20
+      column: 20
+  parent: ~
+- kind:
+    BadStrStripCall: ~
+  location:
+    row: 21
+    column: 11
+  end_location:
+    row: 21
+    column: 20
+  fix:
+    content:
+      - "'htp:/'"
+    location:
+      row: 21
+      column: 11
+    end_location:
+      row: 21
+      column: 20
   parent: ~
 
