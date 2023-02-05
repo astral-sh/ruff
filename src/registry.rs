@@ -93,7 +93,9 @@ ruff_macros::define_rule_mapping!(
     PLR2004 => rules::pylint::rules::MagicValueComparison,
     PLW0120 => rules::pylint::rules::UselessElseOnLoop,
     PLW0602 => rules::pylint::rules::GlobalVariableNotAssigned,
+    PLR0911 => rules::pylint::rules::TooManyReturnStatements,
     PLR0913 => rules::pylint::rules::TooManyArguments,
+    PLR0912 => rules::pylint::rules::TooManyBranches,
     PLR0915 => rules::pylint::rules::TooManyStatements,
     // flake8-builtins
     A001 => rules::flake8_builtins::rules::BuiltinVariableShadowing,
@@ -259,6 +261,7 @@ ruff_macros::define_rule_mapping!(
     UP034 => rules::pyupgrade::rules::ExtraneousParentheses,
     UP035 => rules::pyupgrade::rules::ImportReplacements,
     UP036 => rules::pyupgrade::rules::OutdatedVersionBlock,
+    UP037 => rules::pyupgrade::rules::QuotedAnnotation,
     // pydocstyle
     D100 => rules::pydocstyle::rules::PublicModule,
     D101 => rules::pydocstyle::rules::PublicClass,

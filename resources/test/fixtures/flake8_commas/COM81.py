@@ -60,7 +60,7 @@ group_by = ('foobar' * 3),
 def foo():
     return False,
 
-==> callable_before_parenth_form.py <==
+# ==> callable_before_parenth_form.py <==
 def foo(
     bar,
 ):

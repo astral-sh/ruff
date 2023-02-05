@@ -1,0 +1,17 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    TooManyReturnStatements:
+      returns: 11
+      max_returns: 6
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 19
+  fix: ~
+  parent: ~
+
