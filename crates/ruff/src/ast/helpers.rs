@@ -755,6 +755,33 @@ pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
         .count()
 }
 
+/// Return the range of the first parenthesis pair after a given [`Location`].
+pub fn match_parens(start: Location, locator: &Locator) -> Option<Range> {
+    let contents = locator.slice_source_code_at(start);
+    let mut fix_start = None;
+    let mut fix_end = None;
+    let mut count: usize = 0;
+    for (start, tok, end) in lexer::make_tokenizer_located(contents, start).flatten() {
+        if matches!(tok, Tok::Lpar) {
+            if count == 0 {
+                fix_start = Some(start);
+            }
+            count += 1;
+        }
+        if matches!(tok, Tok::Rpar) {
+            count -= 1;
+            if count == 0 {
+                fix_end = Some(end);
+                break;
+            }
+        }
+    }
+    match (fix_start, fix_end) {
+        (Some(start), Some(end)) => Some(Range::new(start, end)),
+        _ => None,
+    }
+}
+
 /// Return the appropriate visual `Range` for any message that spans a `Stmt`.
 /// Specifically, this method returns the range of a function or class name,
 /// rather than that of the entire function or class body.
