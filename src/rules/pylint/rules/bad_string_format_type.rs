@@ -40,13 +40,12 @@ impl PartialEq for DataType {
         matches!(
             (self, other),
             (DataType::String, DataType::String)
-                | (DataType::Integer, DataType::Integer)
-                | (DataType::Float, DataType::Float)
-                | (DataType::Number, DataType::Number)
-                | (DataType::Number, DataType::Integer)
-                | (DataType::Number, DataType::Float)
-                | (DataType::Integer, DataType::Number)
-                | (DataType::Float, DataType::Number)
+                | (DataType::Integer, DataType::Integer | DataType::Number)
+                | (DataType::Float, DataType::Float | DataType::Number)
+                | (
+                    DataType::Number,
+                    DataType::Number | DataType::Integer | DataType::Float
+                )
         )
     }
 }
@@ -75,7 +74,7 @@ fn get_all_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
     for format in formats {
         for (_, item) in format.iter() {
             if let CFormatPart::Spec(spec) = item {
-                specs.push(spec.clone());
+                specs.push(spec);
             }
         }
     }
@@ -86,7 +85,18 @@ fn get_all_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 fn equivalent(format: &CFormatSpec, value: &Constant) -> bool {
     let clean_constant = constant_to_data(value);
     let clean_format = char_to_data(format.format_char);
-    clean_constant == clean_format
+    match clean_constant {
+        // We will not try to handle other
+        DataType::Other => false,
+        _ => {
+            if let DataType::String = clean_format {
+                // We can ALWAYS format as string (unless other)
+                true
+            } else {
+                clean_constant == clean_format
+            }
+        }
+    }
 }
 
 /// Checks if the format string matches the constant type formatting it
