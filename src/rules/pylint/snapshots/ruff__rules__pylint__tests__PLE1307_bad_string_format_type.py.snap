@@ -92,4 +92,14 @@ expression: diagnostics
     column: 23
   fix: ~
   parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 14
+    column: 6
+  end_location:
+    row: 14
+    column: 34
+  fix: ~
+  parent: ~
 
