@@ -123,6 +123,9 @@ fn check_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool {
             if !equivalent(format, value) {
                 return false;
             }
+        // Names cannot be understood yet
+        } else if let ExprKind::Name { .. } = &elt.node {
+            continue;
         // Non-Constant values can only be formatted as string
         } else if format.format_char != 's' {
             return false;
@@ -160,6 +163,9 @@ fn check_dict(
                 if !equivalent(format, value) {
                     return false;
                 }
+            // Non-Constant values can only be formatted as string
+            } else if let ExprKind::Name { .. } = &value.node {
+                continue;
             // Non-Constant values can only be formatted as string
             } else if format.format_char != 's' {
                 return false;
