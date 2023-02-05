@@ -17,7 +17,7 @@ from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
 def main(*, plugin: str, url: str, prefix_code: str) -> None:
     """Generate boilerplate for a new plugin."""
     # Create the test fixture folder.
-    (ROOT_DIR / "resources/test/fixtures" / dir_name(plugin)).mkdir(
+    (ROOT_DIR / "crates/ruff/resources/test/fixtures" / dir_name(plugin)).mkdir(
         exist_ok=True,
     )
 
@@ -45,9 +45,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics =test_path(
-            Path::new("../../resources/test/fixtures/%s")
-                .join(path)
-                .as_path(),
+            Path::new("%s").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
