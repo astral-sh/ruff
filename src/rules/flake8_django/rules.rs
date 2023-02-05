@@ -126,7 +126,7 @@ impl Violation for ModelStringFieldNullable {
         format!("Avoid using null=True on string-based fields such as {field}.")
     }
 }
-const NOT_NULL_TRUE_FIELDS: [&'static str; 6] = [
+const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
     "CharField",
     "TextField",
     "SlugField",
@@ -137,7 +137,7 @@ const NOT_NULL_TRUE_FIELDS: [&'static str; 6] = [
 impl ModelStringFieldNullable {
     pub fn check(bases: &[Expr], body: &[Stmt]) -> Vec<Diagnostic> {
         let mut errors = Vec::new();
-        if !bases.iter().any(|val| is_model(val)) {
+        if !bases.iter().any(is_model) {
             return errors;
         }
         for statement in body.iter() {
@@ -154,7 +154,7 @@ impl ModelStringFieldNullable {
         errors
     }
 
-    fn check_nullable_field(value: &Box<Expr>) -> Option<&str> {
+    fn check_nullable_field(value: &Expr) -> Option<&str> {
         let Call {func, keywords, ..} = &value.node else {
            return None;
         };

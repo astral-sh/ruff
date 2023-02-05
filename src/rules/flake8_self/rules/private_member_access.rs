@@ -35,7 +35,7 @@ pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
             if !VALID_IDS.contains(&id.as_str()) {
                 checker.diagnostics.push(Diagnostic::new(
                     PrivateMemberAccess {
-                        access: format!("{}.{}", id, attr),
+                        access: format!("{id}.{attr}"),
                     },
                     Range::from_located(expr),
                 ));

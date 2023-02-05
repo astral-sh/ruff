@@ -174,12 +174,7 @@ pub fn unused_loop_control_variable(
                 let scope = checker.current_scope();
                 if let Some(binding) = iter::once(scope.bindings.get(name))
                     .flatten()
-                    .chain(
-                        iter::once(scope.rebounds.get(name))
-                            .flatten()
-                            .into_iter()
-                            .flatten(),
-                    )
+                    .chain(iter::once(scope.rebounds.get(name)).flatten().flatten())
                     .find_map(|index| {
                         let binding = &checker.bindings[*index];
                         if let Some(source) = &binding.source {

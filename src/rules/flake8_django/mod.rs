@@ -8,17 +8,15 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
-    use crate::linter::test_path;
     use crate::registry::Rule;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::ModelDunderStr, Path::new("DJ08.py"); "DJ08")]
     fn has_dunder_str(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_django")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_django").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -29,9 +27,7 @@ mod tests {
     fn receiver_decorator_checker(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_django")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_django").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -42,9 +38,7 @@ mod tests {
     fn check_if_string_field_has_null(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
-            Path::new("./resources/test/fixtures/flake8_django")
-                .join(path)
-                .as_path(),
+            Path::new("flake8_django").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);

@@ -794,7 +794,7 @@ mod tests {
         for rule in Rule::iter() {
             let code = rule.code();
             let (linter, rest) =
-                Linter::parse_code(code).unwrap_or_else(|| panic!("couldn't parse {:?}", code));
+                Linter::parse_code(code).unwrap_or_else(|| panic!("couldn't parse {code:?}"));
             assert_eq!(code, format!("{}{rest}", linter.common_prefix()));
         }
     }
