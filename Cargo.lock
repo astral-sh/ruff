@@ -127,6 +127,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bisection"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "021e079a1bab0ecce6cf4b4b74c0c37afa4a697136eb3b127875c84a8f04a8c3"
+
+[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1887,6 +1893,7 @@ name = "ruff"
 version = "0.0.241"
 dependencies = [
  "anyhow",
+ "bisection",
  "bitflags",
  "cfg-if",
  "chrono",

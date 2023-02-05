@@ -13,6 +13,34 @@ use crate::violation::Violation;
 ruff_macros::define_rule_mapping!(
     // pycodestyle errors
     E101 => rules::pycodestyle::rules::MixedSpacesAndTabs,
+    #[cfg(feature = "logical_lines")]
+    E111 => rules::pycodestyle::rules::IndentationWithInvalidMultiple,
+    #[cfg(feature = "logical_lines")]
+    E112 => rules::pycodestyle::rules::NoIndentedBlock,
+    #[cfg(feature = "logical_lines")]
+    E113 => rules::pycodestyle::rules::UnexpectedIndentation,
+    #[cfg(feature = "logical_lines")]
+    E114 => rules::pycodestyle::rules::IndentationWithInvalidMultipleComment,
+    #[cfg(feature = "logical_lines")]
+    E115 => rules::pycodestyle::rules::NoIndentedBlockComment,
+    #[cfg(feature = "logical_lines")]
+    E116 => rules::pycodestyle::rules::UnexpectedIndentationComment,
+    #[cfg(feature = "logical_lines")]
+    E117 => rules::pycodestyle::rules::OverIndented,
+    #[cfg(feature = "logical_lines")]
+    E201 => rules::pycodestyle::rules::WhitespaceAfterOpenBracket,
+    #[cfg(feature = "logical_lines")]
+    E202 => rules::pycodestyle::rules::WhitespaceBeforeCloseBracket,
+    #[cfg(feature = "logical_lines")]
+    E203 => rules::pycodestyle::rules::WhitespaceBeforePunctuation,
+    #[cfg(feature = "logical_lines")]
+    E221 => rules::pycodestyle::rules::MultipleSpacesBeforeOperator,
+    #[cfg(feature = "logical_lines")]
+    E222 => rules::pycodestyle::rules::MultipleSpacesAfterOperator,
+    #[cfg(feature = "logical_lines")]
+    E223 => rules::pycodestyle::rules::TabBeforeOperator,
+    #[cfg(feature = "logical_lines")]
+    E224 => rules::pycodestyle::rules::TabAfterOperator,
     E401 => rules::pycodestyle::rules::MultipleImportsOnOneLine,
     E402 => rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
     E501 => rules::pycodestyle::rules::LineTooLong,
@@ -671,7 +699,8 @@ impl Linter {
 pub enum LintSource {
     Ast,
     Io,
-    Lines,
+    PhysicalLines,
+    LogicalLines,
     Tokens,
     Imports,
     NoQa,
@@ -695,7 +724,7 @@ impl Rule {
             | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
             | Rule::ShebangPython
-            | Rule::ShebangWhitespace => &LintSource::Lines,
+            | Rule::ShebangWhitespace => &LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
@@ -714,6 +743,21 @@ impl Rule {
             Rule::IOError => &LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
             Rule::ImplicitNamespacePackage => &LintSource::Filesystem,
+            #[cfg(feature = "logical_lines")]
+            Rule::IndentationWithInvalidMultiple
+            | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MultipleSpacesAfterOperator
+            | Rule::MultipleSpacesBeforeOperator
+            | Rule::NoIndentedBlock
+            | Rule::NoIndentedBlockComment
+            | Rule::OverIndented
+            | Rule::TabAfterOperator
+            | Rule::TabBeforeOperator
+            | Rule::UnexpectedIndentation
+            | Rule::UnexpectedIndentationComment
+            | Rule::WhitespaceAfterOpenBracket
+            | Rule::WhitespaceBeforeCloseBracket
+            | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }
     }
