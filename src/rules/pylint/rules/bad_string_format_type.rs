@@ -14,6 +14,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::violation::Violation;
+use std::collections::HashMap;
 
 define_violation!(
     pub struct BadStringFormatType;
@@ -106,6 +107,7 @@ fn check_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool {
     if formats.len() > elts.len() {
         return true;
     }
+
     for (format, elt) in formats.iter().zip(elts) {
         if let ExprKind::Constant { value, .. } = &elt.node {
             if !equivalent(format, value) {
@@ -116,6 +118,45 @@ fn check_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool {
     true
 }
 
+fn check_dict(
+    formats: &[CFormatStrOrBytes<String>],
+    keys: &[Option<Expr>],
+    values: &[Expr],
+) -> bool {
+    let formats = get_all_specs(formats);
+    // If there are more formats that values, the statement is invalid
+    if formats.len() > values.len() {
+        return true;
+    }
+    let formats_hash: HashMap<String, &&CFormatSpec> = formats
+        .iter()
+        .map(|format| (format.mapping_key.clone().unwrap(), format))
+        .collect();
+    for (key, value) in keys.iter().zip(values) {
+        let clean_key = match key {
+            Some(key) => key,
+            None => return true,
+        };
+        if let ExprKind::Constant {
+            value: Constant::Str(item),
+            ..
+        } = &clean_key.node
+        {
+            let format = formats_hash.get(item).unwrap();
+            if let ExprKind::Constant { value, .. } = &value.node {
+                if !equivalent(format, value) {
+                    return false;
+                }
+            }
+        } else {
+            // If the key is not a string, we cannot check it
+            return true;
+        }
+    }
+    true
+}
+
+//TODO Let string format to anything
 /// PLE1307
 pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, left: &Expr, right: &Expr) {
     // If the modulo symbol is on a separate line, abort.
@@ -166,7 +207,7 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, left: &Expr, r
     // Parse the parameters.
     let valid = match &right.node {
         ExprKind::Tuple { elts, .. } => check_tuple(&format_strings, elts),
-        ExprKind::Dict { keys, values } => true,
+        ExprKind::Dict { keys, values } => check_dict(&format_strings, keys, values),
         ExprKind::Constant { value, .. } => check_constant(&format_strings, value),
         _ => return,
     };
