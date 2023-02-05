@@ -1,8 +1,5 @@
 [workspace]
-members = [
-  "crates/*",
-  "ruff_dev",
-]
+members = ["crates/*"]
 default-members = ["crates/ruff", "crates/ruff_cli"]
 
 [profile.release]
