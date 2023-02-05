@@ -1,0 +1,6 @@
+extend = "../../pyproject.toml"
+src = ["."]
+# Enable I001, and re-enable F841, to test extension priority.
+extend-select = ["I001", "F841"]
+extend-ignore = ["F401"]
+extend-exclude = ["./docs/concepts/file.py"]
