@@ -2,14 +2,12 @@
 use once_cell::sync::Lazy;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::settings::types::PythonVersion;
-
 // See: https://pycqa.github.io/isort/docs/configuration/options.html#known-standard-library
-pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<PythonVersion, FxHashSet<&'static str>>> =
+pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<(u32, u32), FxHashSet<&'static str>>> =
     Lazy::new(|| {
         FxHashMap::from_iter([
             (
-                PythonVersion::Py37,
+                (3, 7),
                 FxHashSet::from_iter([
                     "_ast",
                     "_dummy_thread",
@@ -230,7 +228,7 @@ pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<PythonVersion, FxHashSet<&'sta
                 ]),
             ),
             (
-                PythonVersion::Py38,
+                (3, 8),
                 FxHashSet::from_iter([
                     "_ast",
                     "_dummy_thread",
@@ -450,7 +448,7 @@ pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<PythonVersion, FxHashSet<&'sta
                 ]),
             ),
             (
-                PythonVersion::Py39,
+                (3, 9),
                 FxHashSet::from_iter([
                     "_ast",
                     "_thread",
@@ -670,7 +668,7 @@ pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<PythonVersion, FxHashSet<&'sta
                 ]),
             ),
             (
-                PythonVersion::Py310,
+                (3, 10),
                 FxHashSet::from_iter([
                     "_ast",
                     "_thread",
@@ -888,7 +886,7 @@ pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<PythonVersion, FxHashSet<&'sta
                 ]),
             ),
             (
-                PythonVersion::Py311,
+                (3, 11),
                 FxHashSet::from_iter([
                     "_ast",
                     "_thread",

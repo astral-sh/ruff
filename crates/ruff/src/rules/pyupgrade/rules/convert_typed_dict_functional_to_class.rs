@@ -9,10 +9,10 @@ use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::python::identifiers::is_identifier;
-use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
+use ruff_python::identifiers::is_identifier;
+use ruff_python::keyword::KWLIST;
 
 define_violation!(
     pub struct ConvertTypedDictFunctionalToClass {

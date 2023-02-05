@@ -2,11 +2,11 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
 use crate::fix::Fix;
-use crate::python::string::{self};
 use crate::registry::Diagnostic;
 use crate::source_code::{Locator, Stylist};
 use crate::violation::{Availability, Violation};
 use crate::{define_violation, AutofixKind};
+use ruff_python::string::{self};
 
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};

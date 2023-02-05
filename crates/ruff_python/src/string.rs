@@ -43,7 +43,7 @@ pub fn strip_quotes_and_prefixes(s: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use crate::python::string::{is_lower, is_upper, strip_quotes_and_prefixes};
+    use crate::string::{is_lower, is_upper, strip_quotes_and_prefixes};
 
     #[test]
     fn test_is_lower() {

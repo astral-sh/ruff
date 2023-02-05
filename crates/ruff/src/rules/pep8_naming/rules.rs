@@ -6,11 +6,11 @@ use crate::ast::helpers::identifier_range;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::define_violation;
-use crate::python::string::{self};
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
+use ruff_python::string::{self};
 
 define_violation!(
     pub struct InvalidClassName {

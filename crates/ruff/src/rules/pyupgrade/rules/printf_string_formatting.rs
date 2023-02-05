@@ -16,11 +16,11 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::python::identifiers::is_identifier;
-use crate::python::keyword::KWLIST;
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyupgrade::helpers::curly_escape;
+use ruff_python::identifiers::is_identifier;
+use ruff_python::keyword::KWLIST;
 
 define_violation!(
     pub struct PrintfStringFormatting;

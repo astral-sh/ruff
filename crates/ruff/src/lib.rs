@@ -22,7 +22,6 @@ pub mod linter;
 pub mod logging;
 pub mod message;
 mod noqa;
-mod python;
 pub mod registry;
 pub mod resolver;
 mod rule_redirects;

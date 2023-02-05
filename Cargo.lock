@@ -1929,6 +1929,7 @@ dependencies = [
  "path-absolutize",
  "regex",
  "ruff_macros",
+ "ruff_python",
  "rustc-hash",
  "rustpython-ast",
  "rustpython-common",
@@ -2016,6 +2017,15 @@ dependencies = [
  "quote",
  "syn",
  "textwrap",
+]
+
+[[package]]
+name = "ruff_python"
+version = "0.0.241"
+dependencies = [
+ "once_cell",
+ "regex",
+ "rustc-hash",
 ]
 
 [[package]]
