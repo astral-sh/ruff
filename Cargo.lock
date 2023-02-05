@@ -948,7 +948,7 @@ version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f92123bf2fe0d9f1b5df1964727b970ca3b2d0203d47cf97fb1f36d856b6398"
 dependencies = [
- "phf 0.11.1",
+ "phf",
  "rust-stemmers",
 ]
 
@@ -1576,15 +1576,6 @@ dependencies = [
 
 [[package]]
 name = "phf"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabbf1ead8a5bcbc20f5f8b939ee3f5b0f6f281b6ad3468b84656b658b455259"
-dependencies = [
- "phf_shared 0.10.0",
-]
-
-[[package]]
-name = "phf"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "928c6535de93548188ef63bb7c4036bd415cd8f36ad25af44b9789b2ee72a48c"
@@ -1594,32 +1585,12 @@ dependencies = [
 
 [[package]]
 name = "phf_codegen"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb1c3a8bc4dd4e5cfce29b44ffc14bedd2ee294559a294e2a4d4c9e9a6a13cd"
-dependencies = [
- "phf_generator 0.10.0",
- "phf_shared 0.10.0",
-]
-
-[[package]]
-name = "phf_codegen"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a56ac890c5e3ca598bbdeaa99964edb5b0258a583a9eb6ef4e89fc85d9224770"
 dependencies = [
- "phf_generator 0.11.1",
+ "phf_generator",
  "phf_shared 0.11.1",
-]
-
-[[package]]
-name = "phf_generator"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d5285893bb5eb82e6aaf5d59ee909a06a16737a8970984dd7746ba9283498d6"
-dependencies = [
- "phf_shared 0.10.0",
- "rand",
 ]
 
 [[package]]
@@ -1959,9 +1930,9 @@ dependencies = [
  "regex",
  "ruff_macros",
  "rustc-hash",
- "rustpython-ast 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc)",
- "rustpython-common 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc)",
- "rustpython-parser 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc)",
+ "rustpython-ast",
+ "rustpython-common",
+ "rustpython-parser",
  "schemars",
  "semver",
  "serde",
@@ -2026,9 +1997,9 @@ dependencies = [
  "once_cell",
  "ruff",
  "ruff_cli",
- "rustpython-ast 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383)",
- "rustpython-common 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc)",
- "rustpython-parser 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383)",
+ "rustpython-ast",
+ "rustpython-common",
+ "rustpython-parser",
  "schemars",
  "serde_json",
  "strum",
@@ -2092,46 +2063,11 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
-dependencies = [
- "num-bigint",
- "rustpython-common 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383)",
- "rustpython-compiler-core 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383)",
-]
-
-[[package]]
-name = "rustpython-ast"
-version = "0.2.0"
 source = "git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc#adc23253e4b58980b407ba2760dbe61681d752fc"
 dependencies = [
  "num-bigint",
- "rustpython-common 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc)",
- "rustpython-compiler-core 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc)",
-]
-
-[[package]]
-name = "rustpython-common"
-version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
-dependencies = [
- "ascii",
- "bitflags",
- "cfg-if",
- "hexf-parse",
- "itertools",
- "lexical-parse-float",
- "libc",
- "lock_api",
- "num-bigint",
- "num-complex",
- "num-traits",
- "once_cell",
- "radium",
- "rand",
- "siphasher",
- "unic-ucd-category",
- "volatile",
- "widestring",
+ "rustpython-common",
+ "rustpython-compiler-core",
 ]
 
 [[package]]
@@ -2162,23 +2098,6 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
-dependencies = [
- "bincode",
- "bitflags",
- "bstr 0.2.17",
- "itertools",
- "lz4_flex",
- "num-bigint",
- "num-complex",
- "num_enum",
- "serde",
- "thiserror",
-]
-
-[[package]]
-name = "rustpython-compiler-core"
-version = "0.2.0"
 source = "git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc#adc23253e4b58980b407ba2760dbe61681d752fc"
 dependencies = [
  "bincode",
@@ -2196,31 +2115,6 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383#4f38cb68e4a97aeea9eb19673803a0bd5f655383"
-dependencies = [
- "ahash",
- "anyhow",
- "itertools",
- "lalrpop",
- "lalrpop-util",
- "log",
- "num-bigint",
- "num-traits",
- "phf 0.10.1",
- "phf_codegen 0.10.0",
- "rustc-hash",
- "rustpython-ast 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383)",
- "rustpython-compiler-core 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383)",
- "thiserror",
- "tiny-keccak",
- "unic-emoji-char",
- "unic-ucd-ident",
- "unicode_names2",
-]
-
-[[package]]
-name = "rustpython-parser"
-version = "0.2.0"
 source = "git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc#adc23253e4b58980b407ba2760dbe61681d752fc"
 dependencies = [
  "ahash",
@@ -2231,11 +2125,11 @@ dependencies = [
  "log",
  "num-bigint",
  "num-traits",
- "phf 0.11.1",
- "phf_codegen 0.11.1",
+ "phf",
+ "phf_codegen",
  "rustc-hash",
- "rustpython-ast 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc)",
- "rustpython-compiler-core 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=adc23253e4b58980b407ba2760dbe61681d752fc)",
+ "rustpython-ast",
+ "rustpython-compiler-core",
  "thiserror",
  "tiny-keccak",
  "unic-emoji-char",
@@ -2535,8 +2429,8 @@ dependencies = [
  "dirs",
  "fnv",
  "nom",
- "phf 0.11.1",
- "phf_codegen 0.11.1",
+ "phf",
+ "phf_codegen",
 ]
 
 [[package]]
