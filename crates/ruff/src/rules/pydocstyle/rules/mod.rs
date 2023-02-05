@@ -52,7 +52,6 @@ mod non_imperative_mood;
 mod not_empty;
 mod not_missing;
 mod one_liner;
-mod regexes;
 mod sections;
 mod starts_with_this;
 mod triple_quotes;
