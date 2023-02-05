@@ -546,11 +546,6 @@ where
                 {
                     pyupgrade::rules::functools_cache(self, decorator_list);
                 }
-                if self.settings.rules.enabled(&Rule::QuotedAnnotations)
-                    && self.annotations_future_enabled
-                {
-                    pyupgrade::rules::quoted_annotations(self, stmt);
-                }
 
                 if self.settings.rules.enabled(&Rule::UselessExpression) {
                     flake8_bugbear::rules::useless_expression(self, body);
@@ -1715,11 +1710,6 @@ where
                     if let Some(value) = value {
                         pycodestyle::rules::do_not_assign_lambda(self, target, value, stmt);
                     }
-                }
-                if self.settings.rules.enabled(&Rule::QuotedAnnotations)
-                    && self.annotations_future_enabled
-                {
-                    pyupgrade::rules::quoted_annotations(self, stmt);
                 }
             }
             StmtKind::Delete { .. } => {}
@@ -4354,6 +4344,11 @@ impl<'a> Checker<'a> {
             self.deferred_string_type_definitions.pop()
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
+                if self.annotations_future_enabled {
+                    if self.settings.rules.enabled(&Rule::QuotedAnnotations) {
+                        pyupgrade::rules::quoted_annotations(self, expression, range);
+                    }
+                }
                 relocate_expr(&mut expr, range);
                 allocator.push(expr);
                 stacks.push((in_annotation, context));
@@ -4373,12 +4368,6 @@ impl<'a> Checker<'a> {
             }
         }
         for (expr, (in_annotation, (scopes, parents))) in allocator.iter().zip(stacks) {
-            if self.settings.rules.enabled(&Rule::QuotedAnnotations)
-            // && self.annotations_future_enabled
-            {
-                pyupgrade::rules::remove_quotes(self, expr);
-            }
-
             self.scope_stack = scopes;
             self.parents = parents;
             self.in_annotation = in_annotation;
