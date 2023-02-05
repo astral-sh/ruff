@@ -10,17 +10,18 @@ print("%d %d" % (1, 1.1))
 "%x" % 1.1
 "%(key)x" % {"key": 1.1}
 "%d" % []
+"%d" % ([],)
 "%(key)d" % {"key": []}
 
+# These should have a warning, but do not right now do to our limitations
 WORD = "abc"
 "%d" % WORD
 "%d %s" % (WORD, WORD)
+VALUES_TO_FORMAT = (1, "2", 3.0)
+"%d %d %f" % VALUES_TO_FORMAT
 
 # These SHOULD NOT have a warning
-VALUES_TO_FORMAT = (1, "2", 3.0)
 "%d %s %f" % VALUES_TO_FORMAT
-# Warning: Pylint IS able to throw warnings for the one below, but we do not have the power to do this yet
-"%d %d %f" % VALUES_TO_FORMAT
 
 "%s" % "1"
 

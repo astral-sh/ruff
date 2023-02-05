@@ -123,6 +123,9 @@ fn check_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool {
             if !equivalent(format, value) {
                 return false;
             }
+        // Non-Constant values can only be formatted as string
+        } else if format.format_char != 's' {
+            return false;
         }
     }
     true
@@ -157,6 +160,9 @@ fn check_dict(
                 if !equivalent(format, value) {
                     return false;
                 }
+            // Non-Constant values can only be formatted as string
+            } else if format.format_char != 's' {
+                return false;
             }
         } else {
             // If the key is not a string, we cannot check it
@@ -166,7 +172,15 @@ fn check_dict(
     true
 }
 
-//TODO Let string format to anything
+fn check_other(formats: &[CFormatStrOrBytes<String>]) -> bool {
+    let formats = get_all_specs(formats);
+    // If there is more than one format the code is not valid, do not check this error
+    if formats.len() != 1 {
+        return true;
+    }
+    formats.get(0).unwrap().format_char == 's'
+}
+
 /// PLE1307
 pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, left: &Expr, right: &Expr) {
     // If the modulo symbol is on a separate line, abort.
@@ -219,7 +233,9 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, left: &Expr, r
         ExprKind::Tuple { elts, .. } => check_tuple(&format_strings, elts),
         ExprKind::Dict { keys, values } => check_dict(&format_strings, keys, values),
         ExprKind::Constant { value, .. } => check_constant(&format_strings, value),
-        _ => return,
+        // TODO: find a way to understand variables
+        ExprKind::Name { .. } => true,
+        _ => check_other(&format_strings),
     };
     if !valid {
         checker.diagnostics.push(Diagnostic::new(
