@@ -592,15 +592,6 @@ pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
     false
 }
 
-/// Returns `true` if a call is an argumented `super` invocation.
-pub fn is_super_call_with_arguments(func: &Expr, args: &[Expr]) -> bool {
-    if let ExprKind::Name { id, .. } = &func.node {
-        id == "super" && !args.is_empty()
-    } else {
-        false
-    }
-}
-
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
 pub fn uses_magic_variable_access(checker: &Checker, body: &[Stmt]) -> bool {
     any_over_body(body, &|expr| {
