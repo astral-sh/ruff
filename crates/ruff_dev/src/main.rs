@@ -16,7 +16,7 @@ mod utils;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
-const ROOT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../");
+const ROOT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]

@@ -158,19 +158,16 @@ fn test_ruff_black_compatibility() -> Result<()> {
     // that is triggering a syntax error on purpose.
     let excludes = ["E999.py", "W605_1.py"];
 
-    let paths: Vec<walkdir::DirEntry> = WalkDir::new(fixtures_dir)
+    let paths = WalkDir::new(fixtures_dir)
         .into_iter()
+        .flatten()
         .filter(|entry| {
-            entry.as_ref().map_or(true, |entry| {
-                entry
-                    .path()
-                    .extension()
-                    .map_or(false, |ext| ext == "py" || ext == "pyi")
-                    && !excludes.contains(&entry.path().file_name().unwrap().to_str().unwrap())
-            })
-        })
-        .filter_map(Result::ok)
-        .collect();
+            entry
+                .path()
+                .extension()
+                .map_or(false, |ext| ext == "py" || ext == "pyi")
+                && !excludes.contains(&entry.path().file_name().unwrap().to_str().unwrap())
+        });
 
     let ruff_args = [
         "-",
