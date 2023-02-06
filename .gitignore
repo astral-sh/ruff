@@ -1,6 +1,6 @@
 # Local cache
 .ruff_cache
-resources/test/cpython
+crates/ruff/resources/test/cpython
 docs/
 mkdocs.yml
 .overrides

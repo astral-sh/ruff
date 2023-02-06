@@ -1,0 +1,83 @@
+[package]
+name = "ruff"
+version = "0.0.241"
+authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
+edition = "2021"
+rust-version = "1.65.0"
+documentation = "https://github.com/charliermarsh/ruff"
+homepage = "https://github.com/charliermarsh/ruff"
+repository = "https://github.com/charliermarsh/ruff"
+readme = "README.md"
+license = "MIT"
+
+[lib]
+name = "ruff"
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+anyhow = { version = "1.0.66" }
+bisection = { version = "0.1.0" }
+bitflags = { version = "1.3.2" }
+cfg-if = { version = "1.0.0" }
+chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
+clap = { version = "4.0.1", features = ["derive", "env"] }
+colored = { version = "2.0.0" }
+dirs = { version = "4.0.0" }
+fern = { version = "0.6.1" }
+glob = { version = "0.3.0" }
+globset = { version = "0.4.9" }
+ignore = { version = "0.4.18" }
+imperative = { version = "1.0.3" }
+itertools = { version = "0.10.5" }
+libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a8725d161fe8b3ed73a6758b21e177" }
+log = { version = "0.4.17" }
+natord = { version = "1.0.9" }
+nohash-hasher = { version = "0.2.0" }
+num-bigint = { version = "0.4.3" }
+num-traits = "0.2.15"
+once_cell = { version = "1.16.0" }
+path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
+regex = { version = "1.6.0" }
+ruff_macros = { version = "0.0.241", path = "../ruff_macros" }
+ruff_python = { version = "0.0.241", path = "../ruff_python" }
+rustc-hash = { version = "1.1.0" }
+rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
+schemars = { version = "0.8.11" }
+semver = { version = "1.0.16" }
+serde = { version = "1.0.147", features = ["derive"] }
+shellexpand = { version = "3.0.0" }
+smallvec = { version = "1.10.0" }
+strum = { version = "0.24.1", features = ["strum_macros"] }
+strum_macros = { version = "0.24.3" }
+textwrap = { version = "0.16.0" }
+thiserror = { version = "1.0" }
+titlecase = { version = "2.2.1" }
+toml = { version = "0.6.0" }
+
+# https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
+# For (future) wasm-pack support
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2.7", features = ["js"] }
+console_error_panic_hook = { version = "0.1.7" }
+console_log = { version = "0.2.0" }
+serde-wasm-bindgen = { version = "0.4" }
+js-sys = { version = "0.3.60" }
+wasm-bindgen = { version = "0.2.83" }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+is_executable = "1.0.1"
+
+[dev-dependencies]
+insta = { version = "1.19.0", features = ["yaml", "redactions"] }
+test-case = { version = "2.2.2" }
+wasm-bindgen-test = { version = "0.3.33" }
+
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+criterion = { version = "0.4.0" }
+
+[features]
+default = []
+logical_lines = []

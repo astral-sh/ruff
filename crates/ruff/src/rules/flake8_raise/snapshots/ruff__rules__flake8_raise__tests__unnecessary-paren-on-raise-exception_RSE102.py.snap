@@ -1,0 +1,113 @@
+---
+source: crates/ruff/src/rules/flake8_raise/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryParenOnRaiseException: ~
+  location:
+    row: 5
+    column: 20
+  end_location:
+    row: 5
+    column: 22
+  fix:
+    content:
+      - ""
+    location:
+      row: 5
+      column: 20
+    end_location:
+      row: 5
+      column: 22
+  parent: ~
+- kind:
+    UnnecessaryParenOnRaiseException: ~
+  location:
+    row: 13
+    column: 15
+  end_location:
+    row: 13
+    column: 17
+  fix:
+    content:
+      - ""
+    location:
+      row: 13
+      column: 15
+    end_location:
+      row: 13
+      column: 17
+  parent: ~
+- kind:
+    UnnecessaryParenOnRaiseException: ~
+  location:
+    row: 16
+    column: 16
+  end_location:
+    row: 16
+    column: 18
+  fix:
+    content:
+      - ""
+    location:
+      row: 16
+      column: 15
+    end_location:
+      row: 16
+      column: 18
+  parent: ~
+- kind:
+    UnnecessaryParenOnRaiseException: ~
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 20
+    column: 6
+  fix:
+    content:
+      - ""
+    location:
+      row: 19
+      column: 15
+    end_location:
+      row: 20
+      column: 6
+  parent: ~
+- kind:
+    UnnecessaryParenOnRaiseException: ~
+  location:
+    row: 23
+    column: 15
+  end_location:
+    row: 25
+    column: 1
+  fix:
+    content:
+      - ""
+    location:
+      row: 23
+      column: 15
+    end_location:
+      row: 25
+      column: 1
+  parent: ~
+- kind:
+    UnnecessaryParenOnRaiseException: ~
+  location:
+    row: 28
+    column: 15
+  end_location:
+    row: 30
+    column: 1
+  fix:
+    content:
+      - ""
+    location:
+      row: 28
+      column: 15
+    end_location:
+      row: 30
+      column: 1
+  parent: ~
+

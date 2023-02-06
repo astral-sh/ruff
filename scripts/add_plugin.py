@@ -17,12 +17,12 @@ from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
 def main(*, plugin: str, url: str, prefix_code: str) -> None:
     """Generate boilerplate for a new plugin."""
     # Create the test fixture folder.
-    (ROOT_DIR / "resources/test/fixtures" / dir_name(plugin)).mkdir(
+    (ROOT_DIR / "crates/ruff/resources/test/fixtures" / dir_name(plugin)).mkdir(
         exist_ok=True,
     )
 
     # Create the Plugin rules module.
-    plugin_dir = ROOT_DIR / "src/rules" / dir_name(plugin)
+    plugin_dir = ROOT_DIR / "crates/ruff/src/rules" / dir_name(plugin)
     plugin_dir.mkdir(exist_ok=True)
 
     with (plugin_dir / "mod.rs").open("w+") as fp:
@@ -45,9 +45,7 @@ mod tests {
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics =test_path(
-            Path::new("./resources/test/fixtures/%s")
-                .join(path)
-                .as_path(),
+            Path::new("%s").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
@@ -69,13 +67,13 @@ mod tests {
     (plugin_dir / "snapshots").mkdir(exist_ok=True)
 
     # Add the plugin to `rules/mod.rs`.
-    with (ROOT_DIR / "src/rules/mod.rs").open("a") as fp:
+    with (ROOT_DIR / "crates/ruff/src/rules/mod.rs").open("a") as fp:
         fp.write(f"pub mod {dir_name(plugin)};")
 
     # Add the relevant sections to `src/registry.rs`.
-    content = (ROOT_DIR / "src/registry.rs").read_text()
+    content = (ROOT_DIR / "crates/ruff/src/registry.rs").read_text()
 
-    with (ROOT_DIR / "src/registry.rs").open("w") as fp:
+    with (ROOT_DIR / "crates/ruff/src/registry.rs").open("w") as fp:
         for line in content.splitlines():
             indent = get_indent(line)
 
