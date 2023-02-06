@@ -89,7 +89,7 @@ expression: diagnostics
     column: 29
   fix:
     content:
-      - "\"Hel\\to\""
+      - "\"Helo\\t\""
     location:
       row: 14
       column: 20
@@ -108,7 +108,7 @@ expression: diagnostics
     column: 30
   fix:
     content:
-      - "r\"He\\tlo\""
+      - "r\"Helo\\t\""
     location:
       row: 17
       column: 20
@@ -127,7 +127,7 @@ expression: diagnostics
     column: 29
   fix:
     content:
-      - "\"Hel\\\\o\""
+      - "\"Helo\\\\\""
     location:
       row: 20
       column: 20
@@ -146,7 +146,7 @@ expression: diagnostics
     column: 30
   fix:
     content:
-      - "r\"He\\lo\""
+      - "r\"Helo\\\""
     location:
       row: 23
       column: 20
