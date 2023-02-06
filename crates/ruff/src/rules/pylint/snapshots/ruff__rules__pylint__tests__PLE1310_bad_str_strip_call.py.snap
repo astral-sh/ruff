@@ -1,9 +1,10 @@
 ---
-source: src/rules/pylint/mod.rs
+source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BadStrStripCall: ~
+    BadStrStripCall:
+      kind: Strip
   location:
     row: 2
     column: 20
@@ -21,130 +22,256 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    BadStrStripCall: ~
+    BadStrStripCall:
+      kind: Strip
   location:
-    row: 4
+    row: 5
     column: 20
   end_location:
-    row: 4
+    row: 5
     column: 27
   fix:
     content:
       - "\"Helo\""
     location:
-      row: 4
+      row: 5
       column: 20
     end_location:
-      row: 4
+      row: 5
       column: 27
   parent: ~
 - kind:
-    BadStrStripCall: ~
+    BadStrStripCall:
+      kind: Strip
   location:
-    row: 6
+    row: 8
     column: 20
   end_location:
-    row: 6
+    row: 8
+    column: 28
+  fix:
+    content:
+      - "u\"Helo\""
+    location:
+      row: 8
+      column: 20
+    end_location:
+      row: 8
+      column: 28
+  parent: ~
+- kind:
+    BadStrStripCall:
+      kind: Strip
+  location:
+    row: 11
+    column: 20
+  end_location:
+    row: 11
+    column: 28
+  fix:
+    content:
+      - "r\"Helo\""
+    location:
+      row: 11
+      column: 20
+    end_location:
+      row: 11
+      column: 28
+  parent: ~
+- kind:
+    BadStrStripCall:
+      kind: Strip
+  location:
+    row: 14
+    column: 20
+  end_location:
+    row: 14
+    column: 29
+  fix:
+    content:
+      - "\"Hel\\to\""
+    location:
+      row: 14
+      column: 20
+    end_location:
+      row: 14
+      column: 29
+  parent: ~
+- kind:
+    BadStrStripCall:
+      kind: Strip
+  location:
+    row: 17
+    column: 20
+  end_location:
+    row: 17
+    column: 30
+  fix:
+    content:
+      - "r\"He\\tlo\""
+    location:
+      row: 17
+      column: 20
+    end_location:
+      row: 17
+      column: 30
+  parent: ~
+- kind:
+    BadStrStripCall:
+      kind: Strip
+  location:
+    row: 20
+    column: 20
+  end_location:
+    row: 20
+    column: 29
+  fix:
+    content:
+      - "\"Hel\\\\o\""
+    location:
+      row: 20
+      column: 20
+    end_location:
+      row: 20
+      column: 29
+  parent: ~
+- kind:
+    BadStrStripCall:
+      kind: Strip
+  location:
+    row: 23
+    column: 20
+  end_location:
+    row: 23
+    column: 30
+  fix:
+    content:
+      - "r\"He\\lo\""
+    location:
+      row: 23
+      column: 20
+    end_location:
+      row: 23
+      column: 30
+  parent: ~
+- kind:
+    BadStrStripCall:
+      kind: Strip
+  location:
+    row: 26
+    column: 20
+  end_location:
+    row: 26
     column: 29
   fix:
     content:
       - "\"🤣🙃👀😀\""
     location:
-      row: 6
+      row: 26
       column: 20
     end_location:
-      row: 6
+      row: 26
       column: 29
   parent: ~
 - kind:
-    BadStrStripCall: ~
+    BadStrStripCall:
+      kind: Strip
   location:
-    row: 10
+    row: 30
     column: 4
   end_location:
-    row: 12
+    row: 32
     column: 3
-  fix:
-    content:
-      - "\"\"\""
-      - "ther alofcsIwudikpy,ng$@mbv9\"\"\""
-    location:
-      row: 10
-      column: 4
-    end_location:
-      row: 12
-      column: 3
+  fix: ~
   parent: ~
 - kind:
-    BadStrStripCall: ~
+    BadStrStripCall:
+      kind: Strip
   location:
-    row: 15
+    row: 36
     column: 20
   end_location:
-    row: 17
+    row: 38
     column: 29
-  fix:
-    content:
-      - "\"can wegtsupidlyorfh?\""
-    location:
-      row: 15
-      column: 20
-    end_location:
-      row: 17
-      column: 29
+  fix: ~
   parent: ~
 - kind:
-    BadStrStripCall: ~
+    BadStrStripCall:
+      kind: Strip
   location:
-    row: 19
+    row: 42
+    column: 4
+  end_location:
+    row: 44
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      kind: Strip
+  location:
+    row: 49
+    column: 4
+  end_location:
+    row: 51
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      kind: Strip
+  location:
+    row: 61
     column: 10
   end_location:
-    row: 19
+    row: 61
     column: 19
   fix:
     content:
       - "'htp:/'"
     location:
-      row: 19
+      row: 61
       column: 10
     end_location:
-      row: 19
+      row: 61
       column: 19
   parent: ~
 - kind:
-    BadStrStripCall: ~
+    BadStrStripCall:
+      kind: LStrip
   location:
-    row: 20
+    row: 64
     column: 11
   end_location:
-    row: 20
+    row: 64
     column: 20
   fix:
     content:
       - "'htp:/'"
     location:
-      row: 20
+      row: 64
       column: 11
     end_location:
-      row: 20
+      row: 64
       column: 20
   parent: ~
 - kind:
-    BadStrStripCall: ~
+    BadStrStripCall:
+      kind: RStrip
   location:
-    row: 21
+    row: 67
     column: 11
   end_location:
-    row: 21
+    row: 67
     column: 20
   fix:
     content:
       - "'htp:/'"
     location:
-      row: 21
+      row: 67
       column: 11
     end_location:
-      row: 21
+      row: 67
       column: 20
   parent: ~
 

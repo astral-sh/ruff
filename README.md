@@ -1336,7 +1336,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLE0604 | invalid-all-object | Invalid object in `__all__`, must contain only strings |  |
 | PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
-| PLE1310 | bad-str-strip-call | Strip string contains duplicate characters | 🛠 |
+| PLE1310 | bad-str-strip-call | String `{kind}` call contains duplicate characters | 🛠 |
 
 #### Refactor (PLR)
 

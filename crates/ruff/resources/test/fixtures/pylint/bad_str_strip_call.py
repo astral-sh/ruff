@@ -1,26 +1,73 @@
-# These SHOULD have a warning
+# PLE1310
 "Hello World".strip("Hello")
 
+# PLE1310
 "Hello World".strip("Hello")
 
+# PLE1310
+"Hello World".strip(u"Hello")
+
+# PLE1310
+"Hello World".strip(r"Hello")
+
+# PLE1310
+"Hello World".strip("Hel\tlo")
+
+# PLE1310
+"Hello World".strip(r"He\tllo")
+
+# PLE1310
+"Hello World".strip("Hel\\lo")
+
+# PLE1310
+"Hello World".strip(r"He\\llo")
+
+# PLE1310
 "Hello World".strip("🤣🤣🤣🤣🙃👀😀")
 
-
+# PLE1310
 "Hello World".strip(
     """
-there are a lot of characters I would like to strip today, including $ and @ and maybe even 9
+there are a lot of characters to strip
 """
 )
 
-"Hello World".strip("can we get a stupidly long" \
-                    "string of characters to strip" \
+# PLE1310
+"Hello World".strip("can we get a long " \
+                    "string of characters to strip " \
                     "please?")
 
+# PLE1310
+"Hello World".strip(
+    "can we get a long "
+    "string of characters to strip "
+    "please?"
+)
+
+# PLE1310
+"Hello World".strip(
+    "can \t we get a long"
+    "string \t of characters to strip"
+    "please?"
+)
+
+# PLE1310
+"Hello World".strip(
+    "abc def"
+    "ghi"
+)
+
+# PLE1310
 u''.strip('http://')
+
+# PLE1310
 u''.lstrip('http://')
+
+# PLE1310
 b''.rstrip('http://')
 
+# OK
+''.strip('Hi')
 
-# These should NOT have a warning
-''.strip('yo')
+# OK
 ''.strip()
