@@ -1,0 +1,15 @@
+---
+source: crates/ruff/src/rules/flake8_no_pep420/mod.rs
+expression: diagnostics
+---
+- kind:
+    ImplicitNamespacePackage: "./resources/test/fixtures/flake8_no_pep420/test_fail_empty/example.py"
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 0
+  fix: ~
+  parent: ~
+

@@ -1243,7 +1243,7 @@ For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checki
 | TCH002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
 | TCH003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
 | TCH004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
-| TCH005 | empty-type-checking-block | Found empty type-checking block |  |
+| TCH005 | empty-type-checking-block | Found empty type-checking block | 🛠 |
 
 ### flake8-unused-arguments (ARG)
 
@@ -1391,7 +1391,7 @@ For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception |  |
+| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception | 🛠 |
 
 ### flake8-self (SLF)
 
