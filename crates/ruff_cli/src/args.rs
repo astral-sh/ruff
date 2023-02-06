@@ -453,7 +453,7 @@ impl ConfigProcessor for &Overrides {
                 .ignore
                 .iter()
                 .cloned()
-                .chain(self.extend_ignore.iter().cloned())
+                .chain(self.extend_ignore.iter().cloned().into_iter())
                 .flatten()
                 .collect(),
             extend_select: self.extend_select.clone().unwrap_or_default(),
