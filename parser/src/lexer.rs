@@ -115,10 +115,6 @@ where
         *self.window.last_mut().expect("never empty") = next;
         next
     }
-
-    fn change_first(&mut self, ch: char) {
-        *self.window.first_mut().expect("never empty") = Some(ch);
-    }
 }
 
 impl<T, const N: usize, Idx> Index<Idx> for CharWindow<T, N>
@@ -135,7 +131,6 @@ where
 
 pub struct Lexer<T: Iterator<Item = char>> {
     window: CharWindow<T, 3>,
-
     at_begin_of_line: bool,
     nesting: usize, // Amount of parenthesis
     indentations: Indentations,
@@ -160,60 +155,7 @@ pub fn make_tokenizer_located(
     source: &str,
     start_location: Location,
 ) -> impl Iterator<Item = LexResult> + '_ {
-    let nlh = NewlineHandler::new(source.chars());
-    Lexer::new(nlh, start_location)
-}
-
-// The newline handler is an iterator which collapses different newline
-// types into \n always.
-pub struct NewlineHandler<T: Iterator<Item = char>> {
-    window: CharWindow<T, 2>,
-}
-
-impl<T> NewlineHandler<T>
-where
-    T: Iterator<Item = char>,
-{
-    pub fn new(source: T) -> Self {
-        let mut nlh = NewlineHandler {
-            window: CharWindow::new(source),
-        };
-        nlh.shift();
-        nlh.shift();
-        nlh
-    }
-
-    fn shift(&mut self) -> Option<char> {
-        let result = self.window[0];
-        self.window.slide();
-        result
-    }
-}
-
-impl<T> Iterator for NewlineHandler<T>
-where
-    T: Iterator<Item = char>,
-{
-    type Item = char;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // Collapse \r\n into \n
-        loop {
-            match self.window[..2] {
-                [Some('\r'), Some('\n')] => {
-                    // Windows EOL into \n
-                    self.shift();
-                }
-                [Some('\r'), _] => {
-                    // MAC EOL into \n
-                    self.window.change_first('\n');
-                }
-                _ => break,
-            }
-        }
-
-        self.shift()
-    }
+    Lexer::new(source.chars(), start_location)
 }
 
 impl<T> Lexer<T>
@@ -446,10 +388,9 @@ where
     fn lex_comment(&mut self) -> LexResult {
         let start_pos = self.get_pos();
         let mut value = String::new();
-        value.push(self.next_char().unwrap());
         loop {
             match self.window[0] {
-                Some('\n') | None => {
+                Some('\n' | '\r') | None => {
                     let end_pos = self.get_pos();
                     return Ok((start_pos, Tok::Comment(value), end_pos));
                 }
@@ -487,7 +428,6 @@ where
                             continue;
                         }
                     }
-
                     if c == '\n' && !triple_quoted {
                         return Err(LexicalError {
                             error: LexicalErrorType::OtherError(
@@ -613,7 +553,7 @@ where
                     spaces = 0;
                     tabs = 0;
                 }
-                Some('\n') => {
+                Some('\n' | '\r') => {
                     // Empty line!
                     self.next_char();
                     spaces = 0;
@@ -1059,7 +999,7 @@ where
                     }
                 }
             }
-            '\n' => {
+            '\n' | '\r' => {
                 let tok_start = self.get_pos();
                 self.next_char();
                 let tok_end = self.get_pos();
@@ -1082,13 +1022,16 @@ where
             }
             '\\' => {
                 self.next_char();
-                if let Some('\n') = self.window[0] {
-                    self.next_char();
-                } else {
-                    return Err(LexicalError {
-                        error: LexicalErrorType::LineContinuationError,
-                        location: self.get_pos(),
-                    });
+                match self.window[0] {
+                    Some('\n' | '\r') => {
+                        self.next_char();
+                    }
+                    _ => {
+                        return Err(LexicalError {
+                            error: LexicalErrorType::LineContinuationError,
+                            location: self.get_pos(),
+                        })
+                    }
                 }
 
                 if self.window[0].is_none() {
@@ -1136,12 +1079,22 @@ where
 
     /// Helper function to go to the next character coming up.
     fn next_char(&mut self) -> Option<char> {
-        let c = self.window[0];
+        let mut c = self.window[0];
         self.window.slide();
-        if c == Some('\n') {
-            self.location.newline();
-        } else {
-            self.location.go_right();
+        match c {
+            Some('\n') => {
+                self.location.newline();
+            }
+            Some('\r') => {
+                if self.window[0] == Some('\n') {
+                    self.window.slide();
+                }
+                self.location.newline();
+                c = Some('\n');
+            }
+            _ => {
+                self.location.go_right();
+            }
         }
         c
     }
@@ -1189,7 +1142,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{make_tokenizer, NewlineHandler, StringKind, Tok};
+    use super::{make_tokenizer, StringKind, Tok};
     use num_bigint::BigInt;
 
     const WINDOWS_EOL: &str = "\r\n";
@@ -1199,16 +1152,6 @@ mod tests {
     pub fn lex_source(source: &str) -> Vec<Tok> {
         let lexer = make_tokenizer(source);
         lexer.map(|x| x.unwrap().1).collect()
-    }
-
-    #[test]
-    fn test_newline_processor() {
-        // Escape \ followed by \n (by removal):
-        let src = "b\\\r\n";
-        assert_eq!(4, src.len());
-        let nlh = NewlineHandler::new(src.chars());
-        let x: Vec<char> = nlh.collect();
-        assert_eq!(vec!['b', '\\', '\n'], x);
     }
 
     fn stok(s: &str) -> Tok {
@@ -1644,5 +1587,34 @@ mod tests {
         let source = r#""\N{EN SPACE}""#;
         let tokens = lex_source(source);
         assert_eq!(tokens, vec![stok(r"\N{EN SPACE}"), Tok::Newline])
+    }
+
+    macro_rules! test_triple_quoted {
+        ($($name:ident: $eol:expr,)*) => {
+        $(
+            #[test]
+            fn $name() {
+                let source = format!("\"\"\"{0} test string{0} \"\"\"", $eol);
+                let tokens = lex_source(&source);
+                assert_eq!(
+                    tokens,
+                    vec![
+                        Tok::String {
+                            value: "\n test string\n ".to_owned(),
+                            kind: StringKind::String,
+                            triple_quoted: true,
+                        },
+                        Tok::Newline,
+                    ]
+                )
+            }
+        )*
+        }
+    }
+
+    test_triple_quoted! {
+        test_triple_quoted_windows_eol: WINDOWS_EOL,
+        test_triple_quoted_mac_eol: MAC_EOL,
+        test_triple_quoted_unix_eol: UNIX_EOL,
     }
 }
