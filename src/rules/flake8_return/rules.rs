@@ -242,7 +242,8 @@ fn has_refs_before_next_assign(id: &str, return_location: Location, stack: &Stac
     let mut before_assign: &Location = &Location::default();
     let mut after_assign: Option<&Location> = None;
     if let Some(assigns) = stack.assigns.get(&id) {
-        for location in assigns.iter().sorted() {
+        for range in assigns.iter().sorted() {
+            let location = &range.location;
             if location.row() > return_location.row() {
                 after_assign = Some(location);
                 break;
@@ -287,7 +288,8 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
         }
     }
     if let Some(refs) = stack.assigns.get(&id) {
-        for location in refs {
+        for range in refs {
+            let location = &range.location;
             for (try_location, try_end_location) in &stack.tries {
                 if try_location.row() < location.row() && location.row() <= try_end_location.row() {
                     return true;
@@ -334,11 +336,36 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
 
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(assign_expr) = stack.assign_values.get(id.as_str()) {
-                diagnostic.amend(Fix::replacement(
-                    unparse_expr(assign_expr, checker.stylist),
-                    expr.location,
-                    expr.end_location.expect("Expression has no end location"),
-                ));
+                if let Some(assign_locations) = stack.assigns.get(id.as_str()) {
+                    let expr_loc = expr.end_location.unwrap();
+                    if let Some(last_assign_loc) = assign_locations
+                        .into_iter()
+                        .rev()
+                        .find(|x| x.location < expr_loc)
+                    {
+                        let in_between_source = checker
+                            .locator
+                            .slice_source_code_range(&Range::new(
+                                last_assign_loc.end_location,
+                                expr.location,
+                            ))
+                            .to_owned();
+                        let fixed_source = match in_between_source.strip_prefix(|chr| {
+                            checker.stylist.line_ending().as_str().contains(chr) || chr == ';'
+                        }) {
+                            Some(val) => val.to_owned(),
+                            None => in_between_source,
+                        }; // Avoid trailing newline and causing invalid syntax with semicolon usage
+                        println!("{:?}\n{:?}\n{:?}\n",fixed_source.clone() + &unparse_expr(&assign_expr.clone(), checker.stylist),
+                        last_assign_loc.location,
+                        expr.end_location.unwrap());
+                        diagnostic.amend(Fix::replacement(
+                            fixed_source + &unparse_expr(&assign_expr.clone(), checker.stylist),
+                            last_assign_loc.location,
+                            expr.end_location.unwrap(),
+                        ));
+                    }
+                }
             }
         }
         checker.diagnostics.push(diagnostic);

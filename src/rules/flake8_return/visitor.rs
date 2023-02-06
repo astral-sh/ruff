@@ -1,6 +1,7 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Expr, ExprKind, Location, Stmt, StmtKind};
 
+use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 
@@ -12,10 +13,10 @@ pub struct Stack<'a> {
     pub elifs: Vec<&'a Stmt>,
     pub refs: FxHashMap<&'a str, Vec<Location>>,
     pub non_locals: FxHashSet<&'a str>,
-    pub assigns: FxHashMap<&'a str, Vec<Location>>,
+    pub assigns: FxHashMap<&'a str, Vec<Range>>,
     pub loops: Vec<(Location, Location)>,
     pub tries: Vec<(Location, Location)>,
-    pub assign_values: FxHashMap<&'a str, rustpython_ast::Located<ExprKind>>,
+    pub assign_values: FxHashMap<&'a str, Expr>,
 }
 
 #[derive(Default)]
@@ -30,14 +31,6 @@ impl<'a> ReturnVisitor<'a> {
                 for elt in elts {
                     self.visit_assign_target(elt);
                 }
-                return;
-            }
-            ExprKind::Name { id, .. } => {
-                self.stack
-                    .assigns
-                    .entry(id)
-                    .or_insert_with(Vec::new)
-                    .push(expr.location);
                 return;
             }
             ExprKind::Attribute { .. } => {
@@ -109,6 +102,16 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                         self.stack.assign_values.insert(id, *value.clone());
                     }
 
+                    // This is hacky, but I don't kmow how to pass the "context" of the
+                    // statement in another way.
+                    if let ExprKind::Name { id, .. } = &target.node {
+                        self.stack
+                            .assigns
+                            .entry(&id)
+                            .or_insert_with(Vec::new)
+                            .push(Range::from_located(stmt));
+                        return;
+                    }
                     self.visit_assign_target(target);
                 }
             }
