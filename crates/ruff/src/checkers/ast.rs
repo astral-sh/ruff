@@ -5302,10 +5302,10 @@ pub fn check_ast(
     // Check any deferred statements.
     checker.check_deferred_functions();
     checker.check_deferred_lambdas();
-    checker.check_deferred_assignments();
     checker.check_deferred_type_definitions();
     let mut allocator = vec![];
     checker.check_deferred_string_type_definitions(&mut allocator);
+    checker.check_deferred_assignments();
     checker.check_deferred_for_loops();
 
     // Check docstrings.
