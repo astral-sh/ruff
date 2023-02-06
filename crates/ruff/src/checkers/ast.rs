@@ -4391,7 +4391,7 @@ impl<'a> Checker<'a> {
             self.deferred_string_type_definitions.pop()
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
-                if self.annotations_future_enabled {
+                if in_annotation && self.annotations_future_enabled {
                     if self.settings.rules.enabled(&Rule::QuotedAnnotation) {
                         pyupgrade::rules::quoted_annotation(self, expression, range);
                     }

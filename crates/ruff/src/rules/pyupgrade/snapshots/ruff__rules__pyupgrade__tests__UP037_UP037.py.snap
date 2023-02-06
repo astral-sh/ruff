@@ -1,5 +1,5 @@
 ---
-source: src/rules/pyupgrade/mod.rs
+source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -510,90 +510,18 @@ expression: diagnostics
     QuotedAnnotation: ~
   location:
     row: 69
-    column: 17
-  end_location:
-    row: 69
-    column: 22
-  fix:
-    content:
-      - str
-    location:
-      row: 69
-      column: 17
-    end_location:
-      row: 69
-      column: 22
-  parent: ~
-- kind:
-    QuotedAnnotation: ~
-  location:
-    row: 69
-    column: 24
-  end_location:
-    row: 69
-    column: 29
-  fix:
-    content:
-      - int
-    location:
-      row: 69
-      column: 24
-    end_location:
-      row: 69
-      column: 29
-  parent: ~
-- kind:
-    QuotedAnnotation: ~
-  location:
-    row: 71
-    column: 9
-  end_location:
-    row: 71
-    column: 14
-  fix:
-    content:
-      - str
-    location:
-      row: 71
-      column: 9
-    end_location:
-      row: 71
-      column: 14
-  parent: ~
-- kind:
-    QuotedAnnotation: ~
-  location:
-    row: 73
-    column: 9
-  end_location:
-    row: 73
-    column: 18
-  fix:
-    content:
-      - MyClass
-    location:
-      row: 73
-      column: 9
-    end_location:
-      row: 73
-      column: 18
-  parent: ~
-- kind:
-    QuotedAnnotation: ~
-  location:
-    row: 75
     column: 14
   end_location:
-    row: 75
+    row: 69
     column: 17
   fix:
     content:
       - X
     location:
-      row: 75
+      row: 69
       column: 14
     end_location:
-      row: 75
+      row: 69
       column: 17
   parent: ~
 
