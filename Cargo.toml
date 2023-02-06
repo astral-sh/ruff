@@ -10,4 +10,4 @@ rustpython-compiler-core = { path = "core" }
 rustpython-codegen = { path = "codegen" }
 rustpython-parser = { path = "parser" }
 
-thiserror = "1.0"
+thiserror = { workspace = true }

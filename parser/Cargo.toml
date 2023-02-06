@@ -12,7 +12,7 @@ edition = "2021"
 default = ["lalrpop"]  # removing this causes potential build failure
 
 [build-dependencies]
-anyhow = "1.0.45"
+anyhow = { workspace = true }
 lalrpop = { version = "0.19.8", optional = true }
 phf_codegen = "0.11.1"
 tiny-keccak = { version = "2", features = ["sha3"] }
@@ -21,18 +21,19 @@ tiny-keccak = { version = "2", features = ["sha3"] }
 rustpython-ast = { path = "../ast", version = "0.2.0" }
 rustpython-compiler-core = { path = "../core", version = "0.2.0" }
 
-ahash = "0.7.6"
-itertools = "0.10.3"
-lalrpop-util = "0.19.8"
-log = "0.4.16"
-num-bigint = "0.4.3"
-num-traits = "0.2.14"
-phf = "0.11.1"
-rustc-hash = "1.1.0"
-thiserror = "1.0"
+ahash = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+num-bigint = { workspace = true }
+num-traits = { workspace = true }
+thiserror = { workspace = true }
+
 unic-emoji-char = "0.9.0"
 unic-ucd-ident  = "0.9.0"
 unicode_names2 = "0.5.0"
+lalrpop-util = "0.19.8"
+phf = "0.11.1"
+rustc-hash = "1.1.0"
 
 [dev-dependencies]
-insta = "1.14.0"
+insta = { workspace = true }
