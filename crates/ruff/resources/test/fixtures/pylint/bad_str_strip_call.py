@@ -11,16 +11,16 @@
 "Hello World".strip(r"Hello")
 
 # PLE1310
-"Hello World".strip("Hel\tlo")
+"Hello World".strip("Hello\t")
 
 # PLE1310
-"Hello World".strip(r"He\tllo")
+"Hello World".strip(r"Hello\t")
 
 # PLE1310
-"Hello World".strip("Hel\\lo")
+"Hello World".strip("Hello\\")
 
 # PLE1310
-"Hello World".strip(r"He\\llo")
+"Hello World".strip(r"Hello\\")
 
 # PLE1310
 "Hello World".strip("🤣🤣🤣🤣🙃👀😀")
