@@ -1,4 +1,5 @@
 pub use await_outside_async::{await_outside_async, AwaitOutsideAsync};
+pub use bad_str_strip_call::{bad_str_strip_call, BadStrStripCall};
 pub use comparison_of_constant::{comparison_of_constant, ComparisonOfConstant};
 pub use consider_using_sys_exit::{consider_using_sys_exit, ConsiderUsingSysExit};
 pub use global_variable_not_assigned::GlobalVariableNotAssigned;
@@ -23,6 +24,7 @@ pub use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub use useless_import_alias::{useless_import_alias, UselessImportAlias};
 
 mod await_outside_async;
+mod bad_str_strip_call;
 mod comparison_of_constant;
 mod consider_using_sys_exit;
 mod global_variable_not_assigned;

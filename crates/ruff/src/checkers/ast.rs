@@ -2637,6 +2637,9 @@ where
                 if self.settings.rules.enabled(&Rule::ConsiderUsingSysExit) {
                     pylint::rules::consider_using_sys_exit(self, func);
                 }
+                if self.settings.rules.enabled(&Rule::BadStrStripCall) {
+                    pylint::rules::bad_str_strip_call(self, func, args);
+                }
 
                 // flake8-pytest-style
                 if self.settings.rules.enabled(&Rule::PatchWithLambda) {
