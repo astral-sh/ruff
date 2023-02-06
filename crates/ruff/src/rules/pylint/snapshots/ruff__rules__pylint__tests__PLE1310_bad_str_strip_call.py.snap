@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 2
     column: 20
@@ -16,8 +16,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 5
     column: 20
@@ -28,8 +28,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 8
     column: 20
@@ -40,8 +40,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 11
     column: 20
@@ -52,8 +52,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 14
     column: 20
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 17
     column: 20
@@ -76,8 +76,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 20
     column: 20
@@ -88,8 +88,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 23
     column: 20
@@ -100,8 +100,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 26
     column: 20
@@ -112,8 +112,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 30
     column: 4
@@ -124,8 +124,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 36
     column: 20
@@ -136,8 +136,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 42
     column: 4
@@ -148,8 +148,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 49
     column: 4
@@ -160,8 +160,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: Strip
-      suggestion: ~
+      strip: Strip
+      removal: ~
   location:
     row: 61
     column: 10
@@ -172,8 +172,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: LStrip
-      suggestion: RemovePrefix
+      strip: LStrip
+      removal: RemovePrefix
   location:
     row: 64
     column: 11
@@ -184,8 +184,8 @@ expression: diagnostics
   parent: ~
 - kind:
     BadStrStripCall:
-      kind: RStrip
-      suggestion: RemoveSuffix
+      strip: RStrip
+      removal: RemoveSuffix
   location:
     row: 67
     column: 11
