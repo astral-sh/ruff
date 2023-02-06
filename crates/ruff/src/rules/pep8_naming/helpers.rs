@@ -28,6 +28,16 @@ pub fn is_namedtuple_assignment(checker: &Checker, stmt: &Stmt) -> bool {
     };
     checker.resolve_call_path(value).map_or(false, |call_path| {
         call_path.as_slice() == ["collections", "namedtuple"]
+            || call_path.as_slice() == ["typing", "NamedTuple"]
+    })
+}
+
+pub fn is_typeddict_assignment(checker: &Checker, stmt: &Stmt) -> bool {
+    let StmtKind::Assign { value, .. } = &stmt.node else {
+        return false;
+    };
+    checker.resolve_call_path(value).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TypedDict"]
     })
 }
 

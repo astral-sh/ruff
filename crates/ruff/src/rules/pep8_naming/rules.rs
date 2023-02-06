@@ -327,6 +327,7 @@ pub fn non_lowercase_variable_in_function(
 ) {
     if name.to_lowercase() != name
         && !helpers::is_namedtuple_assignment(checker, stmt)
+        && !helpers::is_typeddict_assignment(checker, stmt)
         && !helpers::is_type_var_assignment(checker, stmt)
     {
         checker.diagnostics.push(Diagnostic::new(
