@@ -66,12 +66,6 @@ x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 
 x: NamedTuple(typename="X", fields=[("foo", "int")])
 
-x = TypeVar("x", "str", "int")
-
-x = cast("str", x)
-
-X = List["MyClass"]
-
 X: MyCallable("X")
 
 
@@ -106,3 +100,9 @@ def foo(*, inplace):
 
 
 x: Annotated[1:2] = ...
+
+x = TypeVar("x", "str", "int")
+
+x = cast("str", x)
+
+X = List["MyClass"]
