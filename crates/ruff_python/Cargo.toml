@@ -1,6 +1,6 @@
 [package]
 name = "ruff_python"
-version = "0.0.241"
+version = "0.0.242"
 edition = "2021"
 
 [lib]
