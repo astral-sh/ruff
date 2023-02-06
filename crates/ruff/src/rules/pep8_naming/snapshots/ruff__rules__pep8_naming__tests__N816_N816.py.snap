@@ -1,15 +1,15 @@
 ---
-source: src/rules/pep8_naming/mod.rs
+source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
     MixedCaseVariableInGlobalScope:
       name: mixedCase
   location:
-    row: 6
+    row: 7
     column: 0
   end_location:
-    row: 6
+    row: 7
     column: 9
   fix: ~
   parent: ~
@@ -17,10 +17,10 @@ expression: diagnostics
     MixedCaseVariableInGlobalScope:
       name: _mixedCase
   location:
-    row: 7
+    row: 8
     column: 0
   end_location:
-    row: 7
+    row: 8
     column: 10
   fix: ~
   parent: ~
@@ -28,10 +28,10 @@ expression: diagnostics
     MixedCaseVariableInGlobalScope:
       name: mixed_Case
   location:
-    row: 8
+    row: 9
     column: 0
   end_location:
-    row: 8
+    row: 9
     column: 10
   fix: ~
   parent: ~
