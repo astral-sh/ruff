@@ -468,9 +468,7 @@ where
             } => {
                 if self.settings.rules.enabled(&Rule::ReceiverDecoratorChecker) {
                     if let Some(diagnostic) =
-                        flake8_django::rules::ReceiverDecoratorChecker::check_decorator(
-                            decorator_list,
-                        )
+                        flake8_django::rules::receiver_decorator_checker(decorator_list)
                     {
                         self.diagnostics.push(diagnostic);
                     }
@@ -765,13 +763,14 @@ where
                 body,
             } => {
                 if self.settings.rules.enabled(&Rule::ModelStringFieldNullable) {
-                    let mut errors =
-                        flake8_django::rules::ModelStringFieldNullable::check(bases, body);
-                    self.diagnostics.append(&mut errors);
+                    self.diagnostics
+                        .extend(flake8_django::rules::model_string_field_nullable(
+                            self, bases, body,
+                        ));
                 }
                 if self.settings.rules.enabled(&Rule::ModelDunderStr) {
                     if let Some(diagnostic) =
-                        flake8_django::rules::ModelDunderStr::check_dunder_str(bases, body, stmt)
+                        flake8_django::rules::model_dunder_str(self, bases, body, stmt)
                     {
                         self.diagnostics.push(diagnostic);
                     }
