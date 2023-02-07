@@ -19,7 +19,9 @@ use smallvec::smallvec;
 use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python::typing::TYPING_EXTENSIONS;
 
-use crate::ast::helpers::{binding_range, collect_call_path, extract_handler_names};
+use crate::ast::helpers::{
+    binding_range, collect_call_path, extract_handler_names, from_relative_import, to_module_path,
+};
 use crate::ast::operations::{extract_all_names, AllNamesFlags};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
@@ -55,6 +57,7 @@ type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 pub struct Checker<'a> {
     // Input data.
     pub(crate) path: &'a Path,
+    module_path: Option<Vec<String>>,
     package: Option<&'a Path>,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
@@ -119,6 +122,7 @@ impl<'a> Checker<'a> {
         noqa: flags::Noqa,
         path: &'a Path,
         package: Option<&'a Path>,
+        module_path: Option<Vec<String>>,
         locator: &'a Locator,
         style: &'a Stylist,
         indexer: &'a Indexer,
@@ -130,6 +134,7 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             package,
+            module_path,
             locator,
             stylist: style,
             indexer,
@@ -234,32 +239,36 @@ impl<'a> Checker<'a> {
         if let Some(head) = call_path.first() {
             if let Some(binding) = self.find_binding(head) {
                 match &binding.kind {
-                    BindingKind::Importation(.., name) => {
-                        // Ignore relative imports.
-                        if name.starts_with('.') {
-                            return None;
-                        }
-                        let mut source_path: CallPath = name.split('.').collect();
-                        source_path.extend(call_path.into_iter().skip(1));
-                        return Some(source_path);
-                    }
-                    BindingKind::SubmoduleImportation(name, ..) => {
-                        // Ignore relative imports.
-                        if name.starts_with('.') {
-                            return None;
-                        }
-                        let mut source_path: CallPath = name.split('.').collect();
-                        source_path.extend(call_path.into_iter().skip(1));
-                        return Some(source_path);
+                    BindingKind::Importation(.., name)
+                    | BindingKind::SubmoduleImportation(name, ..) => {
+                        return if name.starts_with('.') {
+                            if let Some(module) = &self.module_path {
+                                let mut source_path = from_relative_import(module, name);
+                                source_path.extend(call_path.into_iter().skip(1));
+                                Some(source_path)
+                            } else {
+                                None
+                            }
+                        } else {
+                            let mut source_path: CallPath = name.split('.').collect();
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        };
                     }
                     BindingKind::FromImportation(.., name) => {
-                        // Ignore relative imports.
-                        if name.starts_with('.') {
-                            return None;
-                        }
-                        let mut source_path: CallPath = name.split('.').collect();
-                        source_path.extend(call_path.into_iter().skip(1));
-                        return Some(source_path);
+                        return if name.starts_with('.') {
+                            if let Some(module) = &self.module_path {
+                                let mut source_path = from_relative_import(module, name);
+                                source_path.extend(call_path.into_iter().skip(1));
+                                Some(source_path)
+                            } else {
+                                None
+                            }
+                        } else {
+                            let mut source_path: CallPath = name.split('.').collect();
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        };
                     }
                     BindingKind::Builtin => {
                         let mut source_path: CallPath = smallvec![];
@@ -5285,6 +5294,7 @@ pub fn check_ast(
         noqa,
         path,
         package,
+        package.and_then(|package| to_module_path(package, path)),
         locator,
         stylist,
         indexer,
