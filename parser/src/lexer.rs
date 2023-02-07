@@ -1,7 +1,37 @@
-//! This module takes care of lexing python source text.
+//! This module takes care of lexing Python source text.
 //!
-//! This means source code is translated into separate tokens.
-
+//! This means source code is scanned and translated into separate tokens. The rules
+//! governing what is and is not a valid token are defined in the Python reference
+//! guide section on [Lexical analysis].
+//!
+//! The primary function in this module is [`make_tokenizer`], which takes a string slice
+//! and returns an iterator over the tokens in the source code. The tokens are currently returned
+//! as a `Result<Spanned, LexicalError>`, where [`Spanned`] is a tuple containing the
+//! start and end [`Location`] and a [`Tok`] denoting the token.
+//!
+//! # Example
+//!
+//! ```
+//! use rustpython_parser::lexer::{make_tokenizer, Tok};
+//! use rustpython_parser::token::StringKind;
+//!
+//! let source = "x = 'RustPython'";
+//! let tokens = make_tokenizer(source)
+//!     .map(|tok| tok.expect("Failed to lex"))
+//!     .collect::<Vec<_>>();
+//!
+//! for (start, token, end) in tokens {
+//!     println!(
+//!         "{0},{1}-{2},{3:<5} {token:?}",
+//!         start.row(),
+//!         start.column(),
+//!         end.row(),
+//!         end.column(),
+//!     );
+//! }
+//! ```
+//!
+//! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 pub use super::token::{StringKind, Tok};
 use crate::ast::Location;
 use crate::error::{LexicalError, LexicalErrorType};
@@ -16,6 +46,8 @@ use std::str::FromStr;
 use unic_emoji_char::is_emoji_presentation;
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
+// Indentations are tracked by a stack of indentation levels. IndentationLevel keeps
+// track of the number of tabs and spaces at the current level.
 #[derive(Clone, Copy, PartialEq, Debug, Default)]
 struct IndentationLevel {
     tabs: u32,
@@ -57,6 +89,9 @@ impl IndentationLevel {
     }
 }
 
+// The indentations stack is used to keep track of the current indentation level.
+// Similar to the CPython implementation, the Indentations stack always has at
+// least one level which is never popped. See Reference 2.1.8.
 #[derive(Debug)]
 struct Indentations {
     indent_stack: Vec<IndentationLevel>,
@@ -93,6 +128,8 @@ impl Default for Indentations {
     }
 }
 
+// A CharWindow is a sliding window over an iterator of chars. It is used to
+// allow for look-ahead when scanning tokens from the source code.
 struct CharWindow<T: Iterator<Item = char>, const N: usize> {
     source: T,
     window: [Option<char>; N],
@@ -129,28 +166,53 @@ where
     }
 }
 
+/// A lexer for Python source code.
 pub struct Lexer<T: Iterator<Item = char>> {
+    // Contains the source code to be lexed.
     window: CharWindow<T, 3>,
+    // Are we at the beginning of a line?
     at_begin_of_line: bool,
-    nesting: usize, // Amount of parenthesis
+    // Amount of parenthesis.
+    nesting: usize,
+    // Indentation levels.
     indentations: Indentations,
-
+    // Pending list of tokens to be returned.
     pending: Vec<Spanned>,
+    // The current location.
     location: Location,
 }
 
 // generated in build.rs, in gen_phf()
+/// A map of keywords to their tokens.
 pub static KEYWORDS: phf::Map<&'static str, Tok> =
     include!(concat!(env!("OUT_DIR"), "/keywords.rs"));
 
+/// Contains a Token along with its start and end location.
 pub type Spanned = (Location, Tok, Location);
+/// The result of lexing a token.
 pub type LexResult = Result<Spanned, LexicalError>;
 
+/// Create a new tokenizer from a source string.
+///
+/// # Examples
+///
+/// ```
+/// use rustpython_parser::lexer::{make_tokenizer};
+///
+/// let source = "def hello(): return 'world'";
+/// let tokenizer = make_tokenizer(source);
+///
+/// for token in tokenizer {
+///    println!("{:?}", token);
+/// }
+/// ```
 #[inline]
 pub fn make_tokenizer(source: &str) -> impl Iterator<Item = LexResult> + '_ {
     make_tokenizer_located(source, Location::default())
 }
 
+/// Create a new tokenizer from a source string, starting at a given location.
+/// You probably want to use [`make_tokenizer`] instead.
 pub fn make_tokenizer_located(
     source: &str,
     start_location: Location,
@@ -162,6 +224,8 @@ impl<T> Lexer<T>
 where
     T: Iterator<Item = char>,
 {
+    /// Create a new lexer from T and a starting location. You probably want to use
+    /// [`make_tokenizer`] instead.
     pub fn new(input: T, start: Location) -> Self {
         let mut lxr = Lexer {
             at_begin_of_line: true,
@@ -172,6 +236,7 @@ where
             location: start,
             window: CharWindow::new(input),
         };
+        // Fill the window.
         lxr.window.slide();
         lxr.window.slide();
         lxr.window.slide();
@@ -182,7 +247,7 @@ where
         lxr
     }
 
-    // Lexer helper functions:
+    /// Lex an identifier. Also used for keywords and string/bytes literals with a prefix.
     fn lex_identifier(&mut self) -> LexResult {
         // Detect potential string like rb'' b'' f'' u'' r''
         match self.window[..3] {
@@ -384,7 +449,7 @@ where
         }
     }
 
-    /// Skip everything until end of line
+    /// Lex a single comment.
     fn lex_comment(&mut self) -> LexResult {
         let start_pos = self.get_pos();
         let mut value = String::new();
@@ -400,6 +465,7 @@ where
         }
     }
 
+    /// Lex a string literal.
     fn lex_string(&mut self, kind: StringKind) -> LexResult {
         let start_pos = self.get_pos();
         for _ in 0..kind.prefix_len() {
@@ -474,6 +540,8 @@ where
         Ok((start_pos, tok, end_pos))
     }
 
+    // Checks if the character c is a valid starting character as described
+    // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
     fn is_identifier_start(&self, c: char) -> bool {
         match c {
             'a'..='z' | 'A'..='Z' | '_' => true,
@@ -481,6 +549,8 @@ where
         }
     }
 
+    // Checks if the character c is a valid continuation character as described
+    // in https://docs.python.org/3/reference/lexical_analysis.html#identifiers
     fn is_identifier_continuation(&self) -> bool {
         match self.window[0] {
             Some('a'..='z' | 'A'..='Z' | '_' | '0'..='9') => true,
@@ -489,8 +559,8 @@ where
         }
     }
 
-    /// This is the main entry point. Call this function to retrieve the next token.
-    /// This function is used by the iterator implementation.
+    // This is the main entry point. Call this function to retrieve the next token.
+    // This function is used by the iterator implementation.
     fn inner_next(&mut self) -> LexResult {
         // top loop, keep on processing, until we have something pending.
         while self.pending.is_empty() {
@@ -505,7 +575,7 @@ where
         Ok(self.pending.remove(0))
     }
 
-    /// Given we are at the start of a line, count the number of spaces and/or tabs until the first character.
+    // Given we are at the start of a line, count the number of spaces and/or tabs until the first character.
     fn eat_indentation(&mut self) -> Result<IndentationLevel, LexicalError> {
         // Determine indentation:
         let mut spaces: u32 = 0;
@@ -574,6 +644,7 @@ where
         Ok(IndentationLevel { tabs, spaces })
     }
 
+    // Push/pop indents/dedents based on the current indentation level.
     fn handle_indentations(&mut self) -> Result<(), LexicalError> {
         let indentation_level = self.eat_indentation()?;
 
@@ -626,10 +697,10 @@ where
         Ok(())
     }
 
-    /// Take a look at the next character, if any, and decide upon the next steps.
+    // Take a look at the next character, if any, and decide upon the next steps.
     fn consume_normal(&mut self) -> Result<(), LexicalError> {
-        // Check if we have some character:
         if let Some(c) = self.window[0] {
+            // Identifiers are the most common case.
             if self.is_identifier_start(c) {
                 let identifier = self.lex_identifier()?;
                 self.emit(identifier);
@@ -666,7 +737,7 @@ where
         Ok(())
     }
 
-    /// Okay, we are facing a weird character, what is it? Determine that.
+    // Dispatch based on the given character.
     fn consume_character(&mut self, c: char) -> Result<(), LexicalError> {
         match c {
             '0'..='9' => {
@@ -1060,12 +1131,13 @@ where
                         location: self.get_pos(),
                     });
                 }
-            } // Ignore all the rest..
+            }
         }
 
         Ok(())
     }
 
+    // Used by single character tokens to advance the window and emit the correct token.
     fn eat_single_char(&mut self, ty: Tok) {
         let tok_start = self.get_pos();
         self.next_char().unwrap_or_else(|| unsafe {
@@ -1077,7 +1149,7 @@ where
         self.emit((tok_start, ty, tok_end));
     }
 
-    /// Helper function to go to the next character coming up.
+    // Helper function to go to the next character coming up.
     fn next_char(&mut self) -> Option<char> {
         let mut c = self.window[0];
         self.window.slide();
@@ -1099,22 +1171,20 @@ where
         c
     }
 
-    /// Helper function to retrieve the current position.
+    // Helper function to retrieve the current position.
     fn get_pos(&self) -> Location {
         self.location
     }
 
-    /// Helper function to emit a lexed token to the queue of tokens.
+    // Helper function to emit a lexed token to the queue of tokens.
     fn emit(&mut self, spanned: Spanned) {
         self.pending.push(spanned);
     }
 }
 
-/* Implement iterator pattern for the get_tok function.
-
-Calling the next element in the iterator will yield the next lexical
-token.
-*/
+// Implement iterator pattern for Lexer.
+// Calling the next element in the iterator will yield the next lexical
+// token.
 impl<T> Iterator for Lexer<T>
 where
     T: Iterator<Item = char>,
@@ -1122,9 +1192,6 @@ where
     type Item = LexResult;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // Idea: create some sort of hash map for single char tokens:
-        // let mut X = HashMap::new();
-        // X.insert('=', Tok::Equal);
         let token = self.inner_next();
         trace!(
             "Lex token {:?}, nesting={:?}, indent stack: {:?}",
