@@ -2251,8 +2251,8 @@ fix-only = true
 
 #### [`fixable`](#fixable)
 
-A list of rule codes or prefixes to consider autofixable. By default, all rules are
-considered autofixable.
+A list of rule codes or prefixes to consider autofixable. By default,
+all rules are considered autofixable.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]`
 
@@ -2744,8 +2744,9 @@ suppress-none-returning = true
 
 #### [`check-typed-exception`](#check-typed-exception)
 
-Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default,
-`try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.
+Whether to disallow `try`-`except`-`pass` (`S110`) for specific
+exception types. By default, `try`-`except`-`pass` is only
+disallowed for `Exception` and `BaseException`.
 
 **Default value**: `false`
 
@@ -2979,8 +2980,8 @@ The following values are supported:
 
 * `csv` — a comma-separated list, e.g.
   `@pytest.mark.parametrize('name1,name2', ...)`
-* `tuple` (default) — e.g.
-  `@pytest.mark.parametrize(('name1', 'name2'), ...)`
+* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+  ...)`
 * `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
 
 **Default value**: `tuple`
@@ -3001,10 +3002,10 @@ parametrize-names-type = "list"
 Expected type for each row of values in `@pytest.mark.parametrize` in
 case of multiple parameters. The following values are supported:
 
-* `tuple` (default) — e.g.
-  `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])`
-* `list` — e.g.
-  `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`
+* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+  [(1, 2), (3, 4)])`
+* `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2],
+  [3, 4]])`
 
 **Default value**: `tuple`
 
@@ -3767,7 +3768,8 @@ allow-magic-value-types = ["int"]
 
 #### [`max-args`](#max-args)
 
-Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).
+Maximum number of arguments allowed for a function or method definition
+(see: `PLR0913`).
 
 **Default value**: `5`
 
@@ -3784,7 +3786,8 @@ max-args = 5
 
 #### [`max-branches`](#max-branches)
 
-Maximum number of branches allowed for a function or method body (see: `PLR0912`).
+Maximum number of branches allowed for a function or method body (see:
+`PLR0912`).
 
 **Default value**: `12`
 
@@ -3801,7 +3804,8 @@ max-branches = 12
 
 #### [`max-returns`](#max-returns)
 
-Maximum number of return statements allowed for a function or method body (see `PLR0911`)
+Maximum number of return statements allowed for a function or method
+body (see `PLR0911`)
 
 **Default value**: `6`
 
@@ -3818,7 +3822,8 @@ max-returns = 6
 
 #### [`max-statements`](#max-statements)
 
-Maximum number of statements allowed for a function or method body (see: `PLR0915`).
+Maximum number of statements allowed for a function or method body (see:
+`PLR0915`).
 
 **Default value**: `50`
 
