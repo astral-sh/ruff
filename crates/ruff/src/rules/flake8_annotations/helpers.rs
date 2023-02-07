@@ -1,4 +1,4 @@
-use rustpython_ast::{Arguments, Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{Arguments, Expr, Stmt, StmtKind};
 
 use crate::ast::cast;
 use crate::checkers::ast::Checker;

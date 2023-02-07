@@ -2,7 +2,7 @@ use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
 use ruff_macros::derive_message_formats;
 use ruff_python::string::{self};
-use rustpython_ast::{Cmpop, Expr, ExprKind};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

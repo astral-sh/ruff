@@ -1,6 +1,6 @@
 use ruff_macros::derive_message_formats;
 use ruff_python::string::{self};
-use rustpython_ast::{Arg, Arguments, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{Arg, Arguments, Expr, ExprKind, Stmt};
 
 use super::helpers;
 use crate::ast::function_type;

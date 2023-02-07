@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Location};
+use rustpython_parser::ast::{Expr, ExprKind, Location};
 
 use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;

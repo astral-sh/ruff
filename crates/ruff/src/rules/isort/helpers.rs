@@ -1,4 +1,4 @@
-use rustpython_ast::{Location, Stmt};
+use rustpython_parser::ast::{Location, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
@@ -124,7 +124,7 @@ pub fn find_splice_location(body: &[Stmt], locator: &Locator) -> Location {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_ast::Location;
+    use rustpython_parser::ast::Location;
     use rustpython_parser::parser;
 
     use super::find_splice_location;

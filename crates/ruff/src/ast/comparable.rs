@@ -2,7 +2,7 @@
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
 
 use num_bigint::BigInt;
-use rustpython_ast::{
+use rustpython_parser::ast::{
     Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Expr, ExprContext, ExprKind, Keyword,
     Operator, Unaryop,
 };

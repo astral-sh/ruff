@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem};
+use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem};
 
 use super::helpers::is_empty_or_null_string;
 use crate::ast::helpers::{format_call_path, to_call_path};

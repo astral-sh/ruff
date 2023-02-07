@@ -1,6 +1,6 @@
 use ruff_macros::derive_message_formats;
 use ruff_python::string::is_lower;
-use rustpython_ast::{ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;

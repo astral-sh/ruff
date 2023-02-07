@@ -1,6 +1,6 @@
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{Stmt, StmtKind};
 
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;

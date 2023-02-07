@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{ExprKind, Location, Stmt, StmtKind};
+use rustpython_parser::ast::{ExprKind, Location, Stmt, StmtKind};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 

@@ -2,10 +2,9 @@
 
 use std::ops::Deref;
 
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Suite, Withitem};
 use rustpython_parser::ast::{
-    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Expr, ExprKind,
-    Operator, Stmt, StmtKind,
+    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Excepthandler,
+    ExcepthandlerKind, Expr, ExprKind, Operator, Stmt, StmtKind, Suite, Withitem,
 };
 
 use crate::source_code::stylist::{Indentation, LineEnding, Quote, Stylist};

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 

@@ -3,7 +3,7 @@ use libcst_native::{
     Codegen, CodegenState, CompoundStatement, Expression, ParenthesizableWhitespace,
     SmallStatement, Statement, Suite,
 };
-use rustpython_ast::{Expr, Keyword, Location};
+use rustpython_parser::ast::{Expr, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 

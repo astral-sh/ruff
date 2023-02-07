@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, ExprKind, Keyword, Location};
+use rustpython_parser::ast::{Expr, ExprKind, Keyword, Location};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;

@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use rustpython_ast::Stmt;
+use rustpython_parser::ast::Stmt;
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 

@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
 
 use super::helpers;
 use crate::ast::types::Range;

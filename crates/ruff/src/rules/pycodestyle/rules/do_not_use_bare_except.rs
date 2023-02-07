@@ -1,6 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Excepthandler, Stmt, StmtKind};
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::{Excepthandler, Expr, Stmt, StmtKind};
 
 use crate::ast::helpers::except_range;
 use crate::define_violation;

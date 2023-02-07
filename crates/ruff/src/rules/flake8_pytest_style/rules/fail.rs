@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, Keyword};
+use rustpython_parser::ast::{Expr, Keyword};
 
 use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 use crate::ast::helpers::SimpleCallArgs;

@@ -1,6 +1,6 @@
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{

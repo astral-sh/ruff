@@ -1,4 +1,4 @@
-use rustpython_ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 const PASSWORD_NAMES: [&str; 7] = [
     "password", "pass", "passwd", "pwd", "secret", "token", "secrete",

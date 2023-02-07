@@ -3,8 +3,7 @@ use std::cmp::Ordering;
 use log::error;
 use num_bigint::{BigInt, Sign};
 use ruff_macros::derive_message_formats;
-use rustpython_ast::Location;
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 

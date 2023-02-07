@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{ArgData, Arguments, Expr, Located};
+use rustpython_parser::ast::{ArgData, Arguments, Expr, Located};
 
 use super::super::helpers::{matches_password_name, string_literal};
 use crate::ast::types::Range;

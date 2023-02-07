@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, ExprKind};
 
 /// Return `true` if an `Expr` _could_ be a `DataFrame`. This rules out
 /// obviously-wrong cases, like constants and literals.

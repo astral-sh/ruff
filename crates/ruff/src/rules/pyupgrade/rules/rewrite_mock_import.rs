@@ -5,7 +5,7 @@ use libcst_native::{
 };
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 use serde::{Deserialize, Serialize};
 
 use crate::ast::helpers::collect_call_path;

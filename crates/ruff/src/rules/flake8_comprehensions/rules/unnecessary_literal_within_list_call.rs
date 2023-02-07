@@ -1,6 +1,6 @@
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, ExprKind};
 
 use super::helpers;
 use crate::ast::types::Range;

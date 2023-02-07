@@ -1,7 +1,7 @@
 use ruff_macros::derive_message_formats;
 use ruff_python::identifiers::{is_identifier, is_mangled_private};
 use ruff_python::keyword::KWLIST;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;

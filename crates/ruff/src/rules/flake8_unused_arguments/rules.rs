@@ -3,7 +3,7 @@ use std::iter;
 use regex::Regex;
 use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Arg, Arguments};
+use rustpython_parser::ast::{Arg, Arguments};
 
 use super::helpers;
 use super::types::Argumentable;

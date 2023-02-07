@@ -3,7 +3,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, Result};
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Location};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::token::Tok;
 

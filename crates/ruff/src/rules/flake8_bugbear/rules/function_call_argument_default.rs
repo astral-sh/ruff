@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
 use super::mutable_argument_default::is_mutable_func;
 use crate::ast::helpers::{compose_call_path, to_call_path};

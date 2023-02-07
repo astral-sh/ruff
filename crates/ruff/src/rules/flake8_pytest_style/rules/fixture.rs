@@ -1,7 +1,7 @@
 use anyhow::Result;
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt, StmtKind};
+use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt, StmtKind};
 
 use super::helpers::{
     get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,

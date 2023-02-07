@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::ast::helpers::{find_keyword, is_const_true};

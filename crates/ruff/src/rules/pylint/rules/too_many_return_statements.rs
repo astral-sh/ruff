@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::Stmt;
+use rustpython_parser::ast::Stmt;
 
 use crate::ast::helpers::{identifier_range, ReturnStatementVisitor};
 use crate::ast::visitor::Visitor;

@@ -1,6 +1,6 @@
 use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Comprehension, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Comprehension, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers::collect_arg_names;
 use crate::ast::types::{Node, Range};

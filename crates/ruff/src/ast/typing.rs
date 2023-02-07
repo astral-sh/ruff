@@ -1,5 +1,5 @@
 use ruff_python::typing::{PEP_585_BUILTINS_ELIGIBLE, PEP_593_SUBSCRIPTS, SUBSCRIPTS};
-use rustpython_ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, ExprKind};
 
 use crate::ast::types::CallPath;
 

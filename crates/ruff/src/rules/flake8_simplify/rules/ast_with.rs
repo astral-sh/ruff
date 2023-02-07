@@ -1,6 +1,6 @@
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Located, Stmt, StmtKind, Withitem};
+use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
 
 use super::fix_with;
 use crate::ast::helpers::{first_colon_range, has_comments_in};

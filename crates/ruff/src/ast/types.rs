@@ -2,8 +2,7 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Arguments, Expr, Keyword, Stmt};
-use rustpython_parser::ast::{Located, Location};
+use rustpython_parser::ast::{Arguments, Expr, Keyword, Located, Location, Stmt};
 
 fn id() -> usize {
     static COUNTER: AtomicUsize = AtomicUsize::new(1);

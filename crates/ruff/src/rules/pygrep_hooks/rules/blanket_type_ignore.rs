@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::define_violation;

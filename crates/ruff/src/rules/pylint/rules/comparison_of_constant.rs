@@ -2,7 +2,7 @@ use std::fmt;
 
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Cmpop, Expr, ExprKind, Located};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Located};
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;

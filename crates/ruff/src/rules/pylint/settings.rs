@@ -4,7 +4,7 @@ use std::hash::Hash;
 
 use anyhow::anyhow;
 use ruff_macros::ConfigurationOptions;
-use rustpython_ast::Constant;
+use rustpython_parser::ast::Constant;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]

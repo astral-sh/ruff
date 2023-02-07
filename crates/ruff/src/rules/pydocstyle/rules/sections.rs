@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashSet;
-use rustpython_ast::StmtKind;
+use rustpython_parser::ast::StmtKind;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
