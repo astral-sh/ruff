@@ -146,7 +146,7 @@ ruff_macros::define_rule_mapping!(
     B014 => rules::flake8_bugbear::rules::DuplicateHandlerException,
     B015 => rules::flake8_bugbear::rules::UselessComparison,
     B016 => rules::flake8_bugbear::rules::CannotRaiseLiteral,
-    B017 => rules::flake8_bugbear::rules::NoAssertRaisesException,
+    B017 => rules::flake8_bugbear::rules::AssertRaisesException,
     B018 => rules::flake8_bugbear::rules::UselessExpression,
     B019 => rules::flake8_bugbear::rules::CachedInstanceMethod,
     B020 => rules::flake8_bugbear::rules::LoopVariableOverridesIterator,

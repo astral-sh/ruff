@@ -36,6 +36,12 @@ def main() -> None:
         raise ValueError(msg)
     content = content.replace(DOCUMENTATION_LINK, "")
 
+    # Replace all GitHub links with relative links.
+    content = content.replace(
+        "https://github.com/charliermarsh/ruff/blob/main/docs/rules/",
+        "rules/",
+    )
+
     Path("docs").mkdir(parents=True, exist_ok=True)
 
     # Split the README.md into sections.
@@ -71,8 +77,13 @@ def main() -> None:
     ]
     config["extra"] = {"analytics": {"provider": "fathom"}}
 
-    Path(".overrides/partials/integrations/analytics").mkdir(parents=True, exist_ok=True)
-    with Path(".overrides/partials/integrations/analytics/fathom.html").open("w+") as fp:
+    Path(".overrides/partials/integrations/analytics").mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    with Path(".overrides/partials/integrations/analytics/fathom.html").open(
+        "w+",
+    ) as fp:
         fp.write(FATHOM_SCRIPT)
 
     with Path("mkdocs.yml").open("w+") as fp:

@@ -278,25 +278,31 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let mut stdout = BufWriter::new(io::stdout().lock());
     match format {
         HelpFormat::Text => {
-            writeln!(stdout, "{}\n", rule.as_ref())?;
-            writeln!(stdout, "Code: {} ({})\n", rule.code(), linter.name())?;
-
+            writeln!(
+                stdout,
+                "[{}] {} ({})",
+                linter.name(),
+                rule.as_ref(),
+                rule.code(),
+            )?;
+            writeln!(stdout)?;
             if let Some(explanation) = rule.explanation() {
-                writeln!(stdout, "{}\n", explanation)?;
+                writeln!(stdout, "{}", explanation.trim())?;
             } else {
-                writeln!(stdout, "Message formats:\n")?;
+                writeln!(stdout, "Message formats:")?;
                 for format in rule.message_formats() {
                     writeln!(stdout, "* {format}")?;
                 }
             }
 
             if let Some(autofix) = rule.autofixable() {
+                writeln!(stdout)?;
                 writeln!(
                     stdout,
                     "{}",
                     match autofix.available {
-                        AutofixAvailability::Sometimes => "Autofix is sometimes available.\n",
-                        AutofixAvailability::Always => "Autofix is always available.\n",
+                        AutofixAvailability::Sometimes => "Autofix is sometimes available.",
+                        AutofixAvailability::Always => "Autofix is always available.",
                     }
                 )?;
             }
