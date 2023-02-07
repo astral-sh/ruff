@@ -224,7 +224,10 @@ pub fn invalid_function_name(
     ignore_names: &[String],
     locator: &Locator,
 ) -> Option<Diagnostic> {
-    if name.to_lowercase() != name && !ignore_names.iter().any(|ignore_name| ignore_name == name) {
+    if ignore_names.iter().any(|ignore_name| ignore_name == name) {
+        return None;
+    }
+    if name.to_lowercase() != name {
         return Some(Diagnostic::new(
             InvalidFunctionName {
                 name: name.to_string(),
@@ -236,7 +239,10 @@ pub fn invalid_function_name(
 }
 
 /// N803
-pub fn invalid_argument_name(name: &str, arg: &Arg) -> Option<Diagnostic> {
+pub fn invalid_argument_name(name: &str, arg: &Arg, ignore_names: &[String]) -> Option<Diagnostic> {
+    if ignore_names.iter().any(|ignore_name| ignore_name == name) {
+        return None;
+    }
     if name.to_lowercase() != name {
         return Some(Diagnostic::new(
             InvalidArgumentName {
@@ -269,15 +275,17 @@ pub fn invalid_first_argument_name_for_class_method(
     ) {
         return None;
     }
-    if let Some(arg) = args.posonlyargs.first() {
+    if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
         if arg.node.arg != "cls" {
-            return Some(Diagnostic::new(
-                InvalidFirstArgumentNameForClassMethod,
-                Range::from_located(arg),
-            ));
-        }
-    } else if let Some(arg) = args.args.first() {
-        if arg.node.arg != "cls" {
+            if checker
+                .settings
+                .pep8_naming
+                .ignore_names
+                .iter()
+                .any(|ignore_name| ignore_name == name)
+            {
+                return None;
+            }
             return Some(Diagnostic::new(
                 InvalidFirstArgumentNameForClassMethod,
                 Range::from_located(arg),
@@ -312,6 +320,15 @@ pub fn invalid_first_argument_name_for_method(
     if arg.node.arg == "self" {
         return None;
     }
+    if checker
+        .settings
+        .pep8_naming
+        .ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name == name)
+    {
+        return None;
+    }
     Some(Diagnostic::new(
         InvalidFirstArgumentNameForMethod,
         Range::from_located(arg),
@@ -325,6 +342,16 @@ pub fn non_lowercase_variable_in_function(
     stmt: &Stmt,
     name: &str,
 ) {
+    if checker
+        .settings
+        .pep8_naming
+        .ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name == name)
+    {
+        return;
+    }
+
     if name.to_lowercase() != name
         && !helpers::is_namedtuple_assignment(checker, stmt)
         && !helpers::is_typeddict_assignment(checker, stmt)
@@ -450,6 +477,15 @@ pub fn mixed_case_variable_in_class_scope(
     stmt: &Stmt,
     name: &str,
 ) {
+    if checker
+        .settings
+        .pep8_naming
+        .ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name == name)
+    {
+        return;
+    }
     if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInClassScope {
@@ -467,6 +503,15 @@ pub fn mixed_case_variable_in_global_scope(
     stmt: &Stmt,
     name: &str,
 ) {
+    if checker
+        .settings
+        .pep8_naming
+        .ignore_names
+        .iter()
+        .any(|ignore_name| ignore_name == name)
+    {
+        return;
+    }
     if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInGlobalScope {
