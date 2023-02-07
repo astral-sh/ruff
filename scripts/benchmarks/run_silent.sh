@@ -6,7 +6,7 @@
 ###
 
 hyperfine --ignore-failure --warmup 5 \
-  "./target/release/ruff ./resources/test/cpython/ --no-cache --silent" \
-  "pycodestyle resources/test/cpython -qq" \
-  "flake8 resources/test/cpython -qq" \
-  "pylint resources/test/cpython -j 0  --recursive=y --disable=E,W,C,R"
+  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache --silent" \
+  "pycodestyle ./crates/ruff/resources/test/cpython -qq" \
+  "flake8 ./crates/ruff/resources/test/cpython -qq" \
+  "pylint ./crates/ruff/resources/test/cpython -j 0  --recursive=y --disable=E,W,C,R"

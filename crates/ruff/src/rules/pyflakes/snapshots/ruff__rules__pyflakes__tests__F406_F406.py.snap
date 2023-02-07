@@ -1,0 +1,27 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    ImportStarNotPermitted:
+      name: F634
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    ImportStarNotPermitted:
+      name: F634
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 22
+  fix: ~
+  parent: ~
+

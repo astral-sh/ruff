@@ -1,0 +1,103 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    ReturnBoolConditionDirectly:
+      cond: a
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 6
+    column: 20
+  fix:
+    content:
+      - return bool(a)
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 6
+      column: 20
+  parent: ~
+- kind:
+    ReturnBoolConditionDirectly:
+      cond: a == b
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 14
+    column: 20
+  fix:
+    content:
+      - return a == b
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 14
+      column: 20
+  parent: ~
+- kind:
+    ReturnBoolConditionDirectly:
+      cond: b
+  location:
+    row: 21
+    column: 4
+  end_location:
+    row: 24
+    column: 20
+  fix:
+    content:
+      - return bool(b)
+    location:
+      row: 21
+      column: 4
+    end_location:
+      row: 24
+      column: 20
+  parent: ~
+- kind:
+    ReturnBoolConditionDirectly:
+      cond: b
+  location:
+    row: 32
+    column: 8
+  end_location:
+    row: 35
+    column: 24
+  fix:
+    content:
+      - return bool(b)
+    location:
+      row: 32
+      column: 8
+    end_location:
+      row: 35
+      column: 24
+  parent: ~
+- kind:
+    ReturnBoolConditionDirectly:
+      cond: a
+  location:
+    row: 57
+    column: 4
+  end_location:
+    row: 60
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    ReturnBoolConditionDirectly:
+      cond: a
+  location:
+    row: 83
+    column: 4
+  end_location:
+    row: 86
+    column: 20
+  fix: ~
+  parent: ~
+

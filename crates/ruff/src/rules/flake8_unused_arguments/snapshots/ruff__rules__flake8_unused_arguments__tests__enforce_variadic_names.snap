@@ -1,0 +1,137 @@
+---
+source: src/rules/flake8_unused_arguments/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedFunctionArgument:
+      name: a
+  location:
+    row: 1
+    column: 6
+  end_location:
+    row: 1
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: b
+  location:
+    row: 1
+    column: 9
+  end_location:
+    row: 1
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: a
+  location:
+    row: 5
+    column: 6
+  end_location:
+    row: 5
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: b
+  location:
+    row: 5
+    column: 9
+  end_location:
+    row: 5
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: args
+  location:
+    row: 5
+    column: 13
+  end_location:
+    row: 5
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: kwargs
+  location:
+    row: 5
+    column: 21
+  end_location:
+    row: 5
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument:
+      name: a
+  location:
+    row: 10
+    column: 16
+  end_location:
+    row: 10
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument:
+      name: b
+  location:
+    row: 10
+    column: 19
+  end_location:
+    row: 10
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument:
+      name: a
+  location:
+    row: 13
+    column: 16
+  end_location:
+    row: 13
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument:
+      name: b
+  location:
+    row: 13
+    column: 19
+  end_location:
+    row: 13
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument:
+      name: args
+  location:
+    row: 13
+    column: 23
+  end_location:
+    row: 13
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    UnusedMethodArgument:
+      name: kwargs
+  location:
+    row: 13
+    column: 31
+  end_location:
+    row: 13
+    column: 37
+  fix: ~
+  parent: ~
+

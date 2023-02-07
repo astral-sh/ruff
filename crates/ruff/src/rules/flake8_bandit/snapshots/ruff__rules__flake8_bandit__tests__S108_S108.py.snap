@@ -1,0 +1,38 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    HardcodedTempFile:
+      string: /tmp/abc
+  location:
+    row: 5
+    column: 10
+  end_location:
+    row: 5
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedTempFile:
+      string: /var/tmp/123
+  location:
+    row: 8
+    column: 10
+  end_location:
+    row: 8
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedTempFile:
+      string: /dev/shm/unit/test
+  location:
+    row: 11
+    column: 10
+  end_location:
+    row: 11
+    column: 30
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,59 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    AvoidQuoteEscape: ~
+  location:
+    row: 1
+    column: 25
+  end_location:
+    row: 1
+    column: 47
+  fix:
+    content:
+      - "\"This is a 'string'\""
+    location:
+      row: 1
+      column: 25
+    end_location:
+      row: 1
+      column: 47
+  parent: ~
+- kind:
+    AvoidQuoteEscape: ~
+  location:
+    row: 2
+    column: 25
+  end_location:
+    row: 2
+    column: 52
+  fix:
+    content:
+      - "\"This is \\\\ a \\\\'string'\""
+    location:
+      row: 2
+      column: 25
+    end_location:
+      row: 2
+      column: 52
+  parent: ~
+- kind:
+    AvoidQuoteEscape: ~
+  location:
+    row: 10
+    column: 4
+  end_location:
+    row: 10
+    column: 16
+  fix:
+    content:
+      - "\"'string'\""
+    location:
+      row: 10
+      column: 4
+    end_location:
+      row: 10
+      column: 16
+  parent: ~
+

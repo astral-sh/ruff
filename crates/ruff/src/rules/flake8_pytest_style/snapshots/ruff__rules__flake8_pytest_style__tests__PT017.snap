@@ -1,0 +1,16 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    AssertInExcept:
+      name: e
+  location:
+    row: 19
+    column: 8
+  end_location:
+    row: 19
+    column: 37
+  fix: ~
+  parent: ~
+

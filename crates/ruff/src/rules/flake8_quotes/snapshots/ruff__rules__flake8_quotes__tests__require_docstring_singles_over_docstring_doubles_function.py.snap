@@ -1,0 +1,64 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadQuotesDocstring:
+      quote: single
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 56
+  fix:
+    content:
+      - "'''function without params, single line docstring'''"
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 2
+      column: 56
+  parent: ~
+- kind:
+    BadQuotesDocstring:
+      quote: single
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 10
+    column: 7
+  fix:
+    content:
+      - "'''"
+      - "        function without params, multiline docstring"
+      - "    '''"
+    location:
+      row: 8
+      column: 4
+    end_location:
+      row: 10
+      column: 7
+  parent: ~
+- kind:
+    BadQuotesDocstring:
+      quote: single
+  location:
+    row: 27
+    column: 4
+  end_location:
+    row: 27
+    column: 27
+  fix:
+    content:
+      - "'Single line docstring'"
+    location:
+      row: 27
+      column: 4
+    end_location:
+      row: 27
+      column: 27
+  parent: ~
+

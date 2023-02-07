@@ -1,0 +1,148 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadFilePermissions:
+      mask: 151
+  location:
+    row: 6
+    column: 24
+  end_location:
+    row: 6
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 7
+  location:
+    row: 7
+    column: 24
+  end_location:
+    row: 7
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 511
+  location:
+    row: 9
+    column: 24
+  end_location:
+    row: 9
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 504
+  location:
+    row: 10
+    column: 24
+  end_location:
+    row: 10
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 510
+  location:
+    row: 11
+    column: 24
+  end_location:
+    row: 11
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 511
+  location:
+    row: 13
+    column: 22
+  end_location:
+    row: 13
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 511
+  location:
+    row: 14
+    column: 23
+  end_location:
+    row: 14
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 511
+  location:
+    row: 15
+    column: 24
+  end_location:
+    row: 15
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 511
+  location:
+    row: 17
+    column: 18
+  end_location:
+    row: 17
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 511
+  location:
+    row: 18
+    column: 18
+  end_location:
+    row: 18
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 511
+  location:
+    row: 19
+    column: 18
+  end_location:
+    row: 19
+    column: 60
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 8
+  location:
+    row: 20
+    column: 26
+  end_location:
+    row: 20
+    column: 38
+  fix: ~
+  parent: ~
+- kind:
+    BadFilePermissions:
+      mask: 2
+  location:
+    row: 22
+    column: 24
+  end_location:
+    row: 22
+    column: 36
+  fix: ~
+  parent: ~
+

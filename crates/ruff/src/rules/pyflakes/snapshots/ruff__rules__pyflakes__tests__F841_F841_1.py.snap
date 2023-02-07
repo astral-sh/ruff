@@ -1,0 +1,93 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedVariable:
+      name: x
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: y
+  location:
+    row: 6
+    column: 7
+  end_location:
+    row: 6
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: coords
+  location:
+    row: 16
+    column: 13
+  end_location:
+    row: 16
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: coords
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 20
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: a
+  location:
+    row: 24
+    column: 5
+  end_location:
+    row: 24
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: b
+  location:
+    row: 24
+    column: 8
+  end_location:
+    row: 24
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: x
+  location:
+    row: 24
+    column: 14
+  end_location:
+    row: 24
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: y
+  location:
+    row: 24
+    column: 17
+  end_location:
+    row: 24
+    column: 18
+  fix: ~
+  parent: ~
+

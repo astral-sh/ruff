@@ -1,0 +1,209 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - generators
+        - nested_scopes
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 48
+  fix:
+    content:
+      - ""
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 2
+      column: 0
+  parent: ~
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - unicode_literals
+        - with_statement
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 55
+  fix:
+    content:
+      - ""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 3
+      column: 0
+  parent: ~
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - absolute_import
+        - division
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 48
+  fix:
+    content:
+      - ""
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 4
+      column: 0
+  parent: ~
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - generator_stop
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 37
+  fix:
+    content:
+      - ""
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 5
+      column: 0
+  parent: ~
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - generator_stop
+        - print_function
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 53
+  fix:
+    content:
+      - ""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 6
+      column: 0
+  parent: ~
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - generators
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 49
+  fix:
+    content:
+      - from __future__ import invalid_module
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 49
+  parent: ~
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - generator_stop
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 41
+  fix:
+    content:
+      - ""
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 10
+      column: 0
+  parent: ~
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - generators
+  location:
+    row: 10
+    column: 4
+  end_location:
+    row: 10
+    column: 37
+  fix:
+    content:
+      - pass
+    location:
+      row: 10
+      column: 4
+    end_location:
+      row: 10
+      column: 37
+  parent: ~
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - generator_stop
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 13
+    column: 41
+  fix:
+    content:
+      - ""
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 14
+      column: 0
+  parent: ~
+- kind:
+    UnnecessaryFutureImport:
+      names:
+        - generators
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 53
+  fix:
+    content:
+      - from __future__ import invalid_module
+    location:
+      row: 14
+      column: 4
+    end_location:
+      row: 14
+      column: 53
+  parent: ~
+

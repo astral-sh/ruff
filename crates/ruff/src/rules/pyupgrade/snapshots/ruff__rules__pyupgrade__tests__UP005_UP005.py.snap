@@ -1,0 +1,85 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    DeprecatedUnittestAlias:
+      alias: assertEquals
+      target: assertEqual
+  location:
+    row: 6
+    column: 8
+  end_location:
+    row: 6
+    column: 25
+  fix:
+    content:
+      - self.assertEqual
+    location:
+      row: 6
+      column: 8
+    end_location:
+      row: 6
+      column: 25
+  parent: ~
+- kind:
+    DeprecatedUnittestAlias:
+      alias: assertEquals
+      target: assertEqual
+  location:
+    row: 7
+    column: 8
+  end_location:
+    row: 7
+    column: 25
+  fix:
+    content:
+      - self.assertEqual
+    location:
+      row: 7
+      column: 8
+    end_location:
+      row: 7
+      column: 25
+  parent: ~
+- kind:
+    DeprecatedUnittestAlias:
+      alias: failUnlessAlmostEqual
+      target: assertAlmostEqual
+  location:
+    row: 9
+    column: 8
+  end_location:
+    row: 9
+    column: 34
+  fix:
+    content:
+      - self.assertAlmostEqual
+    location:
+      row: 9
+      column: 8
+    end_location:
+      row: 9
+      column: 34
+  parent: ~
+- kind:
+    DeprecatedUnittestAlias:
+      alias: assertNotRegexpMatches
+      target: assertNotRegex
+  location:
+    row: 10
+    column: 8
+  end_location:
+    row: 10
+    column: 35
+  fix:
+    content:
+      - self.assertNotRegex
+    location:
+      row: 10
+      column: 8
+    end_location:
+      row: 10
+      column: 35
+  parent: ~
+

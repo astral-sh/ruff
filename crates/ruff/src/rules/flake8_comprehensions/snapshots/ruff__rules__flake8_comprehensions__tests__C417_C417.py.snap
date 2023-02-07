@@ -1,0 +1,93 @@
+---
+source: src/rules/flake8_comprehensions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: list
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 4
+    column: 5
+  end_location:
+    row: 4
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: set
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 35
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: dict
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 6
+    column: 5
+  end_location:
+    row: 6
+    column: 35
+  fix: ~
+  parent: ~
+

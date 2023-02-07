@@ -1,0 +1,65 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    PercentFormatExtraNamedArguments:
+      missing:
+        - b
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 34
+  fix:
+    content:
+      - "{a: \"?\", }"
+    location:
+      row: 3
+      column: 16
+    end_location:
+      row: 3
+      column: 34
+  parent: ~
+- kind:
+    PercentFormatExtraNamedArguments:
+      missing:
+        - b
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 29
+  fix:
+    content:
+      - "{\"a\": 1, }"
+    location:
+      row: 8
+      column: 10
+    end_location:
+      row: 8
+      column: 29
+  parent: ~
+- kind:
+    PercentFormatExtraNamedArguments:
+      missing:
+        - b
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 29
+  fix:
+    content:
+      - "{'a': 1, }"
+    location:
+      row: 9
+      column: 10
+    end_location:
+      row: 9
+      column: 29
+  parent: ~
+

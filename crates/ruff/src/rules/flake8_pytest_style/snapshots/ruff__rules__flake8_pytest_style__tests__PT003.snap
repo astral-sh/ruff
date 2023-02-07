@@ -1,0 +1,149 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    ExtraneousScopeFunction: ~
+  location:
+    row: 14
+    column: 16
+  end_location:
+    row: 14
+    column: 32
+  fix:
+    content:
+      - ""
+    location:
+      row: 14
+      column: 16
+    end_location:
+      row: 14
+      column: 32
+  parent: ~
+- kind:
+    ExtraneousScopeFunction: ~
+  location:
+    row: 19
+    column: 16
+  end_location:
+    row: 19
+    column: 32
+  fix:
+    content:
+      - ""
+    location:
+      row: 19
+      column: 16
+    end_location:
+      row: 19
+      column: 34
+  parent: ~
+- kind:
+    ExtraneousScopeFunction: ~
+  location:
+    row: 24
+    column: 35
+  end_location:
+    row: 24
+    column: 51
+  fix:
+    content:
+      - ""
+    location:
+      row: 24
+      column: 33
+    end_location:
+      row: 24
+      column: 51
+  parent: ~
+- kind:
+    ExtraneousScopeFunction: ~
+  location:
+    row: 29
+    column: 35
+  end_location:
+    row: 29
+    column: 51
+  fix:
+    content:
+      - ""
+    location:
+      row: 29
+      column: 35
+    end_location:
+      row: 29
+      column: 53
+  parent: ~
+- kind:
+    ExtraneousScopeFunction: ~
+  location:
+    row: 37
+    column: 30
+  end_location:
+    row: 37
+    column: 46
+  fix:
+    content:
+      - ""
+    location:
+      row: 37
+      column: 28
+    end_location:
+      row: 37
+      column: 46
+  parent: ~
+- kind:
+    ExtraneousScopeFunction: ~
+  location:
+    row: 43
+    column: 4
+  end_location:
+    row: 43
+    column: 20
+  fix:
+    content:
+      - ""
+    location:
+      row: 43
+      column: 4
+    end_location:
+      row: 44
+      column: 4
+  parent: ~
+- kind:
+    ExtraneousScopeFunction: ~
+  location:
+    row: 52
+    column: 4
+  end_location:
+    row: 52
+    column: 20
+  fix:
+    content:
+      - ""
+    location:
+      row: 51
+      column: 21
+    end_location:
+      row: 52
+      column: 20
+  parent: ~
+- kind:
+    ExtraneousScopeFunction: ~
+  location:
+    row: 66
+    column: 4
+  end_location:
+    row: 67
+    column: 18
+  fix:
+    content:
+      - ""
+    location:
+      row: 66
+      column: 4
+    end_location:
+      row: 70
+      column: 4
+  parent: ~
+

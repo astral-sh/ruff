@@ -1,0 +1,63 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 10
+    column: 28
+  fix:
+    content:
+      - "print(\"py3\")"
+      - "for item in range(10):"
+      - "    print(f\"PY3-{item}\")"
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 10
+      column: 28
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 20
+    column: 32
+  fix:
+    content:
+      - "    print(\"py3\")"
+      - "    for item in range(10):"
+      - "        print(f\"PY3-{item}\")"
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 20
+      column: 32
+  parent: ~
+- kind:
+    OutdatedVersionBlock: ~
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 24
+    column: 50
+  fix:
+    content:
+      - "print(\"PY3!\")"
+    location:
+      row: 23
+      column: 0
+    end_location:
+      row: 24
+      column: 50
+  parent: ~
+

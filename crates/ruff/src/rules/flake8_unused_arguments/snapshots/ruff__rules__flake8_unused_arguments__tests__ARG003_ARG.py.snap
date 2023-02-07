@@ -1,0 +1,16 @@
+---
+source: src/rules/flake8_unused_arguments/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedClassMethodArgument:
+      name: x
+  location:
+    row: 45
+    column: 15
+  end_location:
+    row: 45
+    column: 16
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,60 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    HardcodedPasswordDefault:
+      string: default
+  location:
+    row: 5
+    column: 28
+  end_location:
+    row: 5
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordDefault:
+      string: posonly
+  location:
+    row: 13
+    column: 44
+  end_location:
+    row: 13
+    column: 53
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordDefault:
+      string: kwonly
+  location:
+    row: 21
+    column: 38
+  end_location:
+    row: 21
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordDefault:
+      string: posonly
+  location:
+    row: 29
+    column: 38
+  end_location:
+    row: 29
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordDefault:
+      string: kwonly
+  location:
+    row: 29
+    column: 61
+  end_location:
+    row: 29
+    column: 69
+  fix: ~
+  parent: ~
+

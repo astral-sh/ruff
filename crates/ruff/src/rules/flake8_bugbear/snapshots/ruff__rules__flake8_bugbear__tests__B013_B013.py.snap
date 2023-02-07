@@ -1,0 +1,24 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    RedundantTupleInExceptionHandler:
+      name: ValueError
+  location:
+    row: 3
+    column: 7
+  end_location:
+    row: 3
+    column: 20
+  fix:
+    content:
+      - ValueError
+    location:
+      row: 3
+      column: 7
+    end_location:
+      row: 3
+      column: 20
+  parent: ~
+

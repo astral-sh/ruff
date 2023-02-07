@@ -15,15 +15,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     env:
-       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
+      CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly-2022-11-01
-          override: true
-          target: wasm32-unknown-unknown
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@v3
         with:
           node-version: 18
@@ -32,7 +28,7 @@ jobs:
       - uses: jetli/wasm-pack-action@v0.4.0
       - uses: jetli/wasm-bindgen-action@v0.2.0
       - name: "Run wasm-pack"
-        run: wasm-pack build --target web --out-dir playground/src/pkg . -- -p ruff
+        run: wasm-pack build --target web --out-dir ../../playground/src/pkg crates/ruff
       - name: "Install Node dependencies"
         run: npm ci
         working-directory: playground

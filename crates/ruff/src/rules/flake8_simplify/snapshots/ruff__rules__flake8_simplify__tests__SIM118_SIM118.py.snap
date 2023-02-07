@@ -1,0 +1,185 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    KeyInDict:
+      key: key
+      dict: obj
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 17
+  fix:
+    content:
+      - obj
+    location:
+      row: 1
+      column: 7
+    end_location:
+      row: 1
+      column: 17
+  parent: ~
+- kind:
+    KeyInDict:
+      key: "foo[\"bar\"]"
+      dict: obj
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 24
+  fix:
+    content:
+      - obj
+    location:
+      row: 3
+      column: 14
+    end_location:
+      row: 3
+      column: 24
+  parent: ~
+- kind:
+    KeyInDict:
+      key: "foo['bar']"
+      dict: obj
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 24
+  fix:
+    content:
+      - obj
+    location:
+      row: 5
+      column: 14
+    end_location:
+      row: 5
+      column: 24
+  parent: ~
+- kind:
+    KeyInDict:
+      key: foo()
+      dict: obj
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 19
+  fix:
+    content:
+      - obj
+    location:
+      row: 7
+      column: 9
+    end_location:
+      row: 7
+      column: 19
+  parent: ~
+- kind:
+    KeyInDict:
+      key: key
+      dict: obj
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 21
+  fix:
+    content:
+      - obj
+    location:
+      row: 9
+      column: 11
+    end_location:
+      row: 9
+      column: 21
+  parent: ~
+- kind:
+    KeyInDict:
+      key: k
+      dict: obj
+  location:
+    row: 16
+    column: 7
+  end_location:
+    row: 16
+    column: 22
+  fix:
+    content:
+      - obj
+    location:
+      row: 16
+      column: 12
+    end_location:
+      row: 16
+      column: 22
+  parent: ~
+- kind:
+    KeyInDict:
+      key: k
+      dict: obj
+  location:
+    row: 18
+    column: 7
+  end_location:
+    row: 18
+    column: 22
+  fix:
+    content:
+      - obj
+    location:
+      row: 18
+      column: 12
+    end_location:
+      row: 18
+      column: 22
+  parent: ~
+- kind:
+    KeyInDict:
+      key: k
+      dict: obj
+  location:
+    row: 20
+    column: 10
+  end_location:
+    row: 20
+    column: 25
+  fix:
+    content:
+      - obj
+    location:
+      row: 20
+      column: 15
+    end_location:
+      row: 20
+      column: 25
+  parent: ~
+- kind:
+    KeyInDict:
+      key: k
+      dict: obj
+  location:
+    row: 22
+    column: 7
+  end_location:
+    row: 22
+    column: 22
+  fix:
+    content:
+      - obj
+    location:
+      row: 22
+      column: 12
+    end_location:
+      row: 22
+      column: 22
+  parent: ~
+

@@ -1,0 +1,130 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 7
+    column: 3
+  fix:
+    content:
+      - "\"\"\""
+      - this is not a docstring
+      - "\"\"\""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 7
+      column: 3
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 11
+    column: 20
+  end_location:
+    row: 13
+    column: 3
+  fix:
+    content:
+      - "\"\"\""
+      - "    class params \\t not a docstring"
+      - "\"\"\""
+    location:
+      row: 11
+      column: 20
+    end_location:
+      row: 13
+      column: 3
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 20
+    column: 7
+  fix:
+    content:
+      - "\"\"\""
+      - "    this is not a docstring"
+      - "    \"\"\""
+    location:
+      row: 18
+      column: 4
+    end_location:
+      row: 20
+      column: 7
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 23
+    column: 20
+  end_location:
+    row: 24
+    column: 37
+  fix:
+    content:
+      - "\"\"\""
+      - "        definitely not a docstring\"\"\""
+    location:
+      row: 23
+      column: 20
+    end_location:
+      row: 24
+      column: 37
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 32
+    column: 8
+  end_location:
+    row: 34
+    column: 11
+  fix:
+    content:
+      - "\"\"\""
+      - "        this is not a docstring"
+      - "        \"\"\""
+    location:
+      row: 32
+      column: 8
+    end_location:
+      row: 34
+      column: 11
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 37
+    column: 12
+  end_location:
+    row: 39
+    column: 15
+  fix:
+    content:
+      - "\"\"\""
+      - "            Looks like a docstring, but in reality it isn't - only modules, classes and functions"
+      - "            \"\"\""
+    location:
+      row: 37
+      column: 12
+    end_location:
+      row: 39
+      column: 15
+  parent: ~
+

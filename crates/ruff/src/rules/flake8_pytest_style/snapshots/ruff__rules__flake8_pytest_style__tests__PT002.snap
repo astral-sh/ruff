@@ -1,0 +1,27 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    FixturePositionalArgs:
+      function: my_fixture
+  location:
+    row: 14
+    column: 1
+  end_location:
+    row: 14
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    FixturePositionalArgs:
+      function: my_fixture
+  location:
+    row: 19
+    column: 1
+  end_location:
+    row: 19
+    column: 39
+  fix: ~
+  parent: ~
+

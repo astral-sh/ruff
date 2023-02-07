@@ -1,0 +1,16 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    PercentFormatUnsupportedFormatCharacter:
+      char: j
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 11
+  fix: ~
+  parent: ~
+

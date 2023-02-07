@@ -1,0 +1,35 @@
+---
+source: src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    VerboseRaise: ~
+  location:
+    row: 20
+    column: 14
+  end_location:
+    row: 20
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    VerboseRaise: ~
+  location:
+    row: 54
+    column: 18
+  end_location:
+    row: 54
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    VerboseRaise: ~
+  location:
+    row: 64
+    column: 22
+  end_location:
+    row: 64
+    column: 23
+  fix: ~
+  parent: ~
+

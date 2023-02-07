@@ -1,0 +1,65 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    IncorrectFixtureParenthesesStyle:
+      expected_parens: ()
+      actual_parens: ""
+  location:
+    row: 9
+    column: 1
+  end_location:
+    row: 9
+    column: 15
+  fix:
+    content:
+      - ()
+    location:
+      row: 9
+      column: 15
+    end_location:
+      row: 9
+      column: 15
+  parent: ~
+- kind:
+    IncorrectFixtureParenthesesStyle:
+      expected_parens: ()
+      actual_parens: ""
+  location:
+    row: 34
+    column: 1
+  end_location:
+    row: 34
+    column: 8
+  fix:
+    content:
+      - ()
+    location:
+      row: 34
+      column: 8
+    end_location:
+      row: 34
+      column: 8
+  parent: ~
+- kind:
+    IncorrectFixtureParenthesesStyle:
+      expected_parens: ()
+      actual_parens: ""
+  location:
+    row: 59
+    column: 1
+  end_location:
+    row: 59
+    column: 8
+  fix:
+    content:
+      - ()
+    location:
+      row: 59
+      column: 8
+    end_location:
+      row: 59
+      column: 8
+  parent: ~
+

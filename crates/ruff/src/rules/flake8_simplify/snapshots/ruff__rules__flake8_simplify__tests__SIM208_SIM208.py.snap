@@ -1,0 +1,43 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    DoubleNegation:
+      expr: a
+  location:
+    row: 1
+    column: 3
+  end_location:
+    row: 1
+    column: 14
+  fix:
+    content:
+      - a
+    location:
+      row: 1
+      column: 3
+    end_location:
+      row: 1
+      column: 14
+  parent: ~
+- kind:
+    DoubleNegation:
+      expr: a == b
+  location:
+    row: 4
+    column: 3
+  end_location:
+    row: 4
+    column: 21
+  fix:
+    content:
+      - a == b
+    location:
+      row: 4
+      column: 3
+    end_location:
+      row: 4
+      column: 21
+  parent: ~
+

@@ -1,0 +1,80 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    ConvertNamedTupleFunctionalToClass:
+      name: NT1
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 61
+  fix:
+    content:
+      - "class NT1(NamedTuple):"
+      - "    a: int"
+      - "    b: tuple[str, ...]"
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 61
+  parent: ~
+- kind:
+    ConvertNamedTupleFunctionalToClass:
+      name: NT2
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 12
+    column: 1
+  fix:
+    content:
+      - "class NT2(NamedTuple):"
+      - "    a: int"
+      - "    b: str = \"foo\""
+      - "    c: list[bool] = [True]"
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 12
+      column: 1
+  parent: ~
+- kind:
+    ConvertNamedTupleFunctionalToClass:
+      name: NT3
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 56
+  fix:
+    content:
+      - "class NT3(typing.NamedTuple):"
+      - "    a: int"
+      - "    b: str"
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 56
+  parent: ~
+- kind:
+    ConvertNamedTupleFunctionalToClass:
+      name: NT4
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 22
+    column: 1
+  fix: ~
+  parent: ~
+

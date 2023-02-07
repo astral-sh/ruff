@@ -1,0 +1,41 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    ConstantImportedAsNonConstant:
+      name: CONST
+      asname: const
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    ConstantImportedAsNonConstant:
+      name: CONSTANT
+      asname: constant
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    ConstantImportedAsNonConstant:
+      name: ANOTHER_CONSTANT
+      asname: another_constant
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 52
+  fix: ~
+  parent: ~
+

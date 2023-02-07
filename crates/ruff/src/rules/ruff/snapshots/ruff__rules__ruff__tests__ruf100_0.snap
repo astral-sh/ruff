@@ -1,0 +1,306 @@
+---
+source: src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedNOQA:
+      codes: ~
+  location:
+    row: 9
+    column: 11
+  end_location:
+    row: 9
+    column: 17
+  fix:
+    content:
+      - ""
+    location:
+      row: 9
+      column: 9
+    end_location:
+      row: 9
+      column: 17
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - E501
+  location:
+    row: 13
+    column: 11
+  end_location:
+    row: 13
+    column: 23
+  fix:
+    content:
+      - ""
+    location:
+      row: 13
+      column: 9
+    end_location:
+      row: 13
+      column: 23
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F841
+          - E501
+  location:
+    row: 16
+    column: 11
+  end_location:
+    row: 16
+    column: 29
+  fix:
+    content:
+      - ""
+    location:
+      row: 16
+      column: 9
+    end_location:
+      row: 16
+      column: 29
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown:
+          - W191
+        disabled:
+          - F821
+        unmatched:
+          - F841
+  location:
+    row: 19
+    column: 11
+  end_location:
+    row: 19
+    column: 35
+  fix:
+    content:
+      - ""
+    location:
+      row: 19
+      column: 9
+    end_location:
+      row: 19
+      column: 35
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown:
+          - V101
+        disabled: []
+        unmatched:
+          - F841
+  location:
+    row: 22
+    column: 11
+  end_location:
+    row: 22
+    column: 29
+  fix:
+    content:
+      - ""
+    location:
+      row: 22
+      column: 9
+    end_location:
+      row: 22
+      column: 29
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - E501
+  location:
+    row: 26
+    column: 9
+  end_location:
+    row: 26
+    column: 21
+  fix:
+    content:
+      - ""
+    location:
+      row: 26
+      column: 9
+    end_location:
+      row: 26
+      column: 21
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: d
+  location:
+    row: 29
+    column: 4
+  end_location:
+    row: 29
+    column: 5
+  fix:
+    content:
+      - ""
+    location:
+      row: 29
+      column: 0
+    end_location:
+      row: 30
+      column: 0
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - E501
+  location:
+    row: 29
+    column: 32
+  end_location:
+    row: 29
+    column: 44
+  fix:
+    content:
+      - ""
+    location:
+      row: 29
+      column: 9
+    end_location:
+      row: 29
+      column: 44
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F841
+  location:
+    row: 55
+    column: 5
+  end_location:
+    row: 55
+    column: 23
+  fix:
+    content:
+      - "# noqa: E501"
+    location:
+      row: 55
+      column: 5
+    end_location:
+      row: 55
+      column: 23
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - E501
+  location:
+    row: 63
+    column: 5
+  end_location:
+    row: 63
+    column: 17
+  fix:
+    content:
+      - ""
+    location:
+      row: 63
+      column: 3
+    end_location:
+      row: 63
+      column: 17
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes: ~
+  location:
+    row: 71
+    column: 5
+  end_location:
+    row: 71
+    column: 11
+  fix:
+    content:
+      - ""
+    location:
+      row: 71
+      column: 3
+    end_location:
+      row: 71
+      column: 11
+  parent: ~
+- kind:
+    UnusedImport:
+      name: shelve
+      ignore_init: false
+      multiple: false
+  location:
+    row: 85
+    column: 7
+  end_location:
+    row: 85
+    column: 13
+  fix:
+    content:
+      - ""
+    location:
+      row: 85
+      column: 0
+    end_location:
+      row: 86
+      column: 0
+  parent: ~
+- kind:
+    LineTooLong:
+      - 103
+      - 88
+  location:
+    row: 90
+    column: 88
+  end_location:
+    row: 90
+    column: 103
+  fix: ~
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F401
+  location:
+    row: 90
+    column: 91
+  end_location:
+    row: 90
+    column: 103
+  fix:
+    content:
+      - ""
+    location:
+      row: 90
+      column: 89
+    end_location:
+      row: 90
+      column: 103
+  parent: ~
+

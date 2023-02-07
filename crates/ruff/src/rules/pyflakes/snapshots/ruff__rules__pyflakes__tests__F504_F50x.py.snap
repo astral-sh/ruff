@@ -1,0 +1,25 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    PercentFormatExtraNamedArguments:
+      missing:
+        - baz
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 32
+  fix:
+    content:
+      - "{'bar': 1, }"
+    location:
+      row: 8
+      column: 12
+    end_location:
+      row: 8
+      column: 32
+  parent: ~
+

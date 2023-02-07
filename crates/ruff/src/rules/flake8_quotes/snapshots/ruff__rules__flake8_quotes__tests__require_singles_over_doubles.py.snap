@@ -1,0 +1,62 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadQuotesInlineString:
+      quote: single
+  location:
+    row: 1
+    column: 24
+  end_location:
+    row: 1
+    column: 45
+  fix:
+    content:
+      - "'double quote string'"
+    location:
+      row: 1
+      column: 24
+    end_location:
+      row: 1
+      column: 45
+  parent: ~
+- kind:
+    BadQuotesInlineString:
+      quote: single
+  location:
+    row: 2
+    column: 24
+  end_location:
+    row: 2
+    column: 46
+  fix:
+    content:
+      - "u'double quote string'"
+    location:
+      row: 2
+      column: 24
+    end_location:
+      row: 2
+      column: 46
+  parent: ~
+- kind:
+    BadQuotesInlineString:
+      quote: single
+  location:
+    row: 3
+    column: 24
+  end_location:
+    row: 3
+    column: 46
+  fix:
+    content:
+      - "f'double quote string'"
+    location:
+      row: 3
+      column: 24
+    end_location:
+      row: 3
+      column: 46
+  parent: ~
+

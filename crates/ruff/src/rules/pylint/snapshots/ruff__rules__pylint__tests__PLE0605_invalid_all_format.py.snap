@@ -1,0 +1,85 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    InvalidAllFormat: ~
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 7
+  fix: ~
+  parent: ~
+

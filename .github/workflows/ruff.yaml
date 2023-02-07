@@ -26,21 +26,17 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          default: true
-      - name: Build wheels - x86_64
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels - x86_64"
         uses: messense/maturin-action@v1
         with:
           target: x86_64
           args: --release --out dist --sdist
-      - name: Install built wheel - x86_64
+      - name: "Install built wheel - x86_64"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-      - name: Upload wheels
+      - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
           name: wheels
@@ -53,20 +49,16 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          default: true
-      - name: Build wheels - universal2
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels - universal2"
         uses: messense/maturin-action@v1
         with:
           args: --release --universal2 --out dist
-      - name: Install built wheel - universal2
+      - name: "Install built wheel - universal2"
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*universal2.whl --force-reinstall
-      - name: Upload wheels
+      - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
           name: wheels
@@ -83,22 +75,18 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.target }}
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          default: true
-      - name: Build wheels
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           args: --release --out dist
-      - name: Install built wheel
+      - name: "Install built wheel"
         shell: bash
         run: |
           python -m pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-      - name: Upload wheels
+      - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
           name: wheels
@@ -115,17 +103,19 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - name: Build wheels
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: auto
           args: --release --out dist
-      - name: Install built wheel
+      - name: "Install built wheel"
         if: matrix.target == 'x86_64'
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-      - name: Upload wheels
+      - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
           name: wheels
@@ -141,12 +131,14 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Build wheels
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --no-default-features --release --out dist
+          args: --release --out dist
       - uses: uraimo/run-on-arch-action@v2.5.0
         if: matrix.target != 'ppc64'
         name: Install built wheel
@@ -160,7 +152,7 @@ jobs:
             pip3 install -U pip
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-      - name: Upload wheels
+      - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
           name: wheels
@@ -179,13 +171,15 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
-      - name: Build wheels
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
           args: --release --out dist
-      - name: Install built wheel
+      - name: "Install built wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
         uses: addnab/docker-run-action@v3
         with:
@@ -194,7 +188,7 @@ jobs:
           run: |
             apk add py3-pip
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links /io/dist/ --force-reinstall
-      - name: Upload wheels
+      - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
           name: wheels
@@ -214,7 +208,9 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Build wheels
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
@@ -230,7 +226,7 @@ jobs:
             apk add py3-pip
           run: |
             pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-      - name: Upload wheels
+      - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
           name: wheels
@@ -254,17 +250,19 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: pypy${{ matrix.python-version }}
-      - name: Build wheels
+      - name: "Prep README.md"
+        run: python scripts/transform_readme.py --target pypi
+      - name: "Build wheels"
         uses: messense/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: auto
           args: --release --out dist -i pypy${{ matrix.python-version }}
-      - name: Install built wheel
+      - name: "Install built wheel"
         if: matrix.target == 'x86_64'
         run: |
           pip install dist/${{ env.PACKAGE_NAME }}-*.whl --force-reinstall
-      - name: Upload wheels
+      - name: "Upload wheels"
         uses: actions/upload-artifact@v3
         with:
           name: wheels
@@ -288,13 +286,13 @@ jobs:
         with:
           name: wheels
       - uses: actions/setup-python@v4
-      - name: Publish to PyPi
+      - name: "Publish to PyPi"
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.RUFF_TOKEN }}
         run: |
           pip install --upgrade twine
           twine upload --skip-existing *
-      - name: Update pre-commit mirror
+      - name: "Update pre-commit mirror"
         run: |
           curl -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.RUFF_PRE_COMMIT_PAT }}" -H "X-GitHub-Api-Version: 2022-11-28" https://api.github.com/repos/charliermarsh/ruff-pre-commit/dispatches --data '{"event_type": "pypi_release"}'

@@ -1,0 +1,60 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    Jinja2AutoescapeFalse:
+      value: true
+  location:
+    row: 9
+    column: 67
+  end_location:
+    row: 9
+    column: 76
+  fix: ~
+  parent: ~
+- kind:
+    Jinja2AutoescapeFalse:
+      value: true
+  location:
+    row: 10
+    column: 44
+  end_location:
+    row: 10
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    Jinja2AutoescapeFalse:
+      value: true
+  location:
+    row: 13
+    column: 23
+  end_location:
+    row: 13
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    Jinja2AutoescapeFalse:
+      value: false
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    Jinja2AutoescapeFalse:
+      value: true
+  location:
+    row: 29
+    column: 46
+  end_location:
+    row: 29
+    column: 57
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,89 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedImport:
+      name: ".background.BackgroundTasks"
+      ignore_init: false
+      multiple: false
+  location:
+    row: 7
+    column: 24
+  end_location:
+    row: 7
+    column: 39
+  fix:
+    content:
+      - ""
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 8
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      name: ".datastructures.UploadFile"
+      ignore_init: false
+      multiple: false
+  location:
+    row: 10
+    column: 28
+  end_location:
+    row: 10
+    column: 52
+  fix:
+    content:
+      - ""
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 11
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      name: background
+      ignore_init: false
+      multiple: false
+  location:
+    row: 16
+    column: 7
+  end_location:
+    row: 16
+    column: 17
+  fix:
+    content:
+      - ""
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 17
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      name: datastructures
+      ignore_init: false
+      multiple: false
+  location:
+    row: 19
+    column: 7
+  end_location:
+    row: 19
+    column: 35
+  fix:
+    content:
+      - ""
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 20
+      column: 0
+  parent: ~
+

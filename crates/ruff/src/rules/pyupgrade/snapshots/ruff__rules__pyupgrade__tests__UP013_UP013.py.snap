@@ -1,0 +1,231 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType1
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 52
+  fix:
+    content:
+      - "class MyType1(TypedDict):"
+      - "    a: int"
+      - "    b: str"
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 52
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType2
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 50
+  fix:
+    content:
+      - "class MyType2(TypedDict):"
+      - "    a: int"
+      - "    b: str"
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 50
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType3
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 44
+  fix:
+    content:
+      - "class MyType3(TypedDict):"
+      - "    a: int"
+      - "    b: str"
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 44
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType4
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 30
+  fix:
+    content:
+      - "class MyType4(TypedDict):"
+      - "    pass"
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 14
+      column: 30
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType5
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 46
+  fix:
+    content:
+      - "class MyType5(TypedDict):"
+      - "    a: \"hello\""
+    location:
+      row: 17
+      column: 0
+    end_location:
+      row: 17
+      column: 46
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType6
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 41
+  fix:
+    content:
+      - "class MyType6(TypedDict):"
+      - "    a: \"hello\""
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 18
+      column: 41
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType7
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 56
+  fix:
+    content:
+      - "class MyType7(TypedDict):"
+      - "    a: NotRequired[dict]"
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 21
+      column: 56
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType8
+  location:
+    row: 24
+    column: 0
+  end_location:
+    row: 24
+    column: 65
+  fix:
+    content:
+      - "class MyType8(TypedDict, total=False):"
+      - "    x: int"
+      - "    y: int"
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 24
+      column: 65
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType9
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 27
+    column: 55
+  fix: ~
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType10
+  location:
+    row: 30
+    column: 0
+  end_location:
+    row: 30
+    column: 59
+  fix:
+    content:
+      - "class MyType10(TypedDict):"
+      - "    key: Literal[\"value\"]"
+    location:
+      row: 30
+      column: 0
+    end_location:
+      row: 30
+      column: 59
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType11
+  location:
+    row: 33
+    column: 0
+  end_location:
+    row: 33
+    column: 53
+  fix:
+    content:
+      - "class MyType11(typing.TypedDict):"
+      - "    key: int"
+    location:
+      row: 33
+      column: 0
+    end_location:
+      row: 33
+      column: 53
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType12
+  location:
+    row: 37
+    column: 0
+  end_location:
+    row: 37
+    column: 58
+  fix: ~
+  parent: ~
+

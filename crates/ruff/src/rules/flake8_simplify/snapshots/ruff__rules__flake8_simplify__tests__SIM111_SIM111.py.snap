@@ -1,0 +1,111 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
+  location:
+    row: 25
+    column: 4
+  end_location:
+    row: 27
+    column: 24
+  fix:
+    content:
+      - return all(not check(x) for x in iterable)
+    location:
+      row: 25
+      column: 4
+    end_location:
+      row: 28
+      column: 15
+  parent: ~
+- kind:
+    ConvertLoopToAll:
+      all: return all(x.is_empty() for x in iterable)
+  location:
+    row: 33
+    column: 4
+  end_location:
+    row: 35
+    column: 24
+  fix:
+    content:
+      - return all(x.is_empty() for x in iterable)
+    location:
+      row: 33
+      column: 4
+    end_location:
+      row: 36
+      column: 15
+  parent: ~
+- kind:
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
+  location:
+    row: 64
+    column: 4
+  end_location:
+    row: 68
+    column: 19
+  fix:
+    content:
+      - return all(not check(x) for x in iterable)
+    location:
+      row: 64
+      column: 4
+    end_location:
+      row: 68
+      column: 19
+  parent: ~
+- kind:
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
+  location:
+    row: 83
+    column: 4
+  end_location:
+    row: 87
+    column: 19
+  fix:
+    content:
+      - return all(not check(x) for x in iterable)
+    location:
+      row: 83
+      column: 4
+    end_location:
+      row: 87
+      column: 19
+  parent: ~
+- kind:
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
+  location:
+    row: 134
+    column: 4
+  end_location:
+    row: 136
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    ConvertLoopToAll:
+      all: return all(not check(x) for x in iterable)
+  location:
+    row: 154
+    column: 4
+  end_location:
+    row: 156
+    column: 24
+  fix:
+    content:
+      - return all(not check(x) for x in iterable)
+    location:
+      row: 154
+      column: 4
+    end_location:
+      row: 157
+      column: 15
+  parent: ~
+

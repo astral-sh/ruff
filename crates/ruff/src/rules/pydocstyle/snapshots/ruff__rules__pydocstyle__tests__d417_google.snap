@@ -1,0 +1,117 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+        - z
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 11
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+        - z
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 24
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+        - z
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 36
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+        - z
+  location:
+    row: 39
+    column: 0
+  end_location:
+    row: 49
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+  location:
+    row: 52
+    column: 0
+  end_location:
+    row: 62
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+  location:
+    row: 65
+    column: 0
+  end_location:
+    row: 74
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+  location:
+    row: 77
+    column: 0
+  end_location:
+    row: 84
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - x
+  location:
+    row: 98
+    column: 0
+  end_location:
+    row: 105
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - "*args"
+  location:
+    row: 108
+    column: 0
+  end_location:
+    row: 115
+    column: 12
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,16 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    HardcodedPasswordFuncArg:
+      string: s3cr3t
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 25
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,7 @@
+[tool.ruff]
+src = ["."]
+
+# This will make sure that `exclude` paths are rooted
+# to where the configuration file was found; this file exists
+# in a `resources/test` hierarchy.
+exclude = ["resources"]

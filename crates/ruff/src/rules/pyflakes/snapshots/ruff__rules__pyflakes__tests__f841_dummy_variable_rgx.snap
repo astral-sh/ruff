@@ -1,0 +1,190 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedVariable:
+      name: e
+  location:
+    row: 3
+    column: 21
+  end_location:
+    row: 3
+    column: 22
+  fix:
+    content:
+      - ""
+    location:
+      row: 3
+      column: 17
+    end_location:
+      row: 3
+      column: 22
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: foo
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 20
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 21
+      column: 0
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: a
+  location:
+    row: 21
+    column: 5
+  end_location:
+    row: 21
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: b
+  location:
+    row: 21
+    column: 8
+  end_location:
+    row: 21
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: baz
+  location:
+    row: 26
+    column: 13
+  end_location:
+    row: 26
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: _
+  location:
+    row: 35
+    column: 4
+  end_location:
+    row: 35
+    column: 5
+  fix:
+    content:
+      - ""
+    location:
+      row: 35
+      column: 0
+    end_location:
+      row: 36
+      column: 0
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: __
+  location:
+    row: 36
+    column: 4
+  end_location:
+    row: 36
+    column: 6
+  fix:
+    content:
+      - ""
+    location:
+      row: 36
+      column: 0
+    end_location:
+      row: 37
+      column: 0
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: _discarded
+  location:
+    row: 37
+    column: 4
+  end_location:
+    row: 37
+    column: 14
+  fix:
+    content:
+      - pass
+    location:
+      row: 37
+      column: 4
+    end_location:
+      row: 37
+      column: 18
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: b
+  location:
+    row: 51
+    column: 8
+  end_location:
+    row: 51
+    column: 9
+  fix:
+    content:
+      - pass
+    location:
+      row: 51
+      column: 8
+    end_location:
+      row: 51
+      column: 13
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: my_file
+  location:
+    row: 79
+    column: 25
+  end_location:
+    row: 79
+    column: 32
+  fix:
+    content:
+      - ""
+    location:
+      row: 79
+      column: 21
+    end_location:
+      row: 79
+      column: 32
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: my_file
+  location:
+    row: 85
+    column: 24
+  end_location:
+    row: 85
+    column: 31
+  fix:
+    content:
+      - ""
+    location:
+      row: 85
+      column: 20
+    end_location:
+      row: 85
+      column: 31
+  parent: ~
+

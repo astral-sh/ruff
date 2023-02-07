@@ -1,0 +1,115 @@
+---
+source: src/rules/flake8_blind_except/mod.rs
+expression: diagnostics
+---
+- kind:
+    BlindExcept:
+      name: BaseException
+  location:
+    row: 25
+    column: 7
+  end_location:
+    row: 25
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept:
+      name: Exception
+  location:
+    row: 31
+    column: 7
+  end_location:
+    row: 31
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept:
+      name: Exception
+  location:
+    row: 42
+    column: 7
+  end_location:
+    row: 42
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept:
+      name: BaseException
+  location:
+    row: 45
+    column: 11
+  end_location:
+    row: 45
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept:
+      name: Exception
+  location:
+    row: 54
+    column: 7
+  end_location:
+    row: 54
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept:
+      name: Exception
+  location:
+    row: 60
+    column: 7
+  end_location:
+    row: 60
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept:
+      name: BaseException
+  location:
+    row: 62
+    column: 7
+  end_location:
+    row: 62
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept:
+      name: Exception
+  location:
+    row: 69
+    column: 7
+  end_location:
+    row: 69
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept:
+      name: Exception
+  location:
+    row: 75
+    column: 7
+  end_location:
+    row: 75
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    BlindExcept:
+      name: Exception
+  location:
+    row: 81
+    column: 7
+  end_location:
+    row: 81
+    column: 16
+  fix: ~
+  parent: ~
+

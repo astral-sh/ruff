@@ -1,0 +1,11 @@
+[package]
+name = "ruff_python"
+version = "0.0.242"
+edition = "2021"
+
+[lib]
+
+[dependencies]
+once_cell = { version = "1.16.0" }
+regex = { version = "1.6.0" }
+rustc-hash = { version = "1.1.0" }

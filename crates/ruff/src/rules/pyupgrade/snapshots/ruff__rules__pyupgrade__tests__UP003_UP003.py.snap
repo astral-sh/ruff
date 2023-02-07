@@ -1,0 +1,100 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    TypeOfPrimitive:
+      primitive: Str
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 8
+  fix:
+    content:
+      - str
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 8
+  parent: ~
+- kind:
+    TypeOfPrimitive:
+      primitive: Bytes
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 9
+  fix:
+    content:
+      - bytes
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 9
+  parent: ~
+- kind:
+    TypeOfPrimitive:
+      primitive: Int
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 7
+  fix:
+    content:
+      - int
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 7
+  parent: ~
+- kind:
+    TypeOfPrimitive:
+      primitive: Float
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 9
+  fix:
+    content:
+      - float
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 9
+  parent: ~
+- kind:
+    TypeOfPrimitive:
+      primitive: Complex
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 8
+  fix:
+    content:
+      - complex
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 8
+  parent: ~
+

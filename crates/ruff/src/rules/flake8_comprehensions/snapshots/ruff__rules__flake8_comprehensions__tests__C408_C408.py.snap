@@ -1,0 +1,81 @@
+---
+source: src/rules/flake8_comprehensions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryCollectionCall:
+      obj_type: tuple
+  location:
+    row: 1
+    column: 4
+  end_location:
+    row: 1
+    column: 11
+  fix:
+    content:
+      - ()
+    location:
+      row: 1
+      column: 4
+    end_location:
+      row: 1
+      column: 11
+  parent: ~
+- kind:
+    UnnecessaryCollectionCall:
+      obj_type: list
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 10
+  fix:
+    content:
+      - "[]"
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 2
+      column: 10
+  parent: ~
+- kind:
+    UnnecessaryCollectionCall:
+      obj_type: dict
+  location:
+    row: 3
+    column: 5
+  end_location:
+    row: 3
+    column: 11
+  fix:
+    content:
+      - "{}"
+    location:
+      row: 3
+      column: 5
+    end_location:
+      row: 3
+      column: 11
+  parent: ~
+- kind:
+    UnnecessaryCollectionCall:
+      obj_type: dict
+  location:
+    row: 4
+    column: 5
+  end_location:
+    row: 4
+    column: 14
+  fix:
+    content:
+      - "{\"a\": 1}"
+    location:
+      row: 4
+      column: 5
+    end_location:
+      row: 4
+      column: 14
+  parent: ~
+

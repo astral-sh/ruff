@@ -1,0 +1,27 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    InvalidArgumentName:
+      name: A
+  location:
+    row: 1
+    column: 15
+  end_location:
+    row: 1
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    InvalidArgumentName:
+      name: A
+  location:
+    row: 6
+    column: 27
+  end_location:
+    row: 6
+    column: 28
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,17 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    PercentFormatMissingArgument:
+      missing:
+        - bar
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 14
+  fix: ~
+  parent: ~
+

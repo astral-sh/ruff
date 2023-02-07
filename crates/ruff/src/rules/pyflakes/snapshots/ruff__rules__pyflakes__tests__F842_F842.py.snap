@@ -1,0 +1,27 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedAnnotation:
+      name: name
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UnusedAnnotation:
+      name: age
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 7
+  fix: ~
+  parent: ~
+

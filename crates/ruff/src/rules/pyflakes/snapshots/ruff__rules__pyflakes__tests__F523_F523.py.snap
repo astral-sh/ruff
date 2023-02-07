@@ -1,0 +1,91 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    StringDotFormatExtraPositionalArguments:
+      missing:
+        - "1"
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatExtraPositionalArguments:
+      missing:
+        - "0"
+        - "2"
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatExtraPositionalArguments:
+      missing:
+        - "2"
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatExtraPositionalArguments:
+      missing:
+        - "1"
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatExtraPositionalArguments:
+      missing:
+        - "1"
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatExtraPositionalArguments:
+      missing:
+        - "1"
+        - "2"
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatExtraPositionalArguments:
+      missing:
+        - "2"
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 23
+  fix: ~
+  parent: ~
+

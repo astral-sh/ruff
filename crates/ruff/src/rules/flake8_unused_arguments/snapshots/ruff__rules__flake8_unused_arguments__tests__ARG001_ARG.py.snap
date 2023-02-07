@@ -1,0 +1,93 @@
+---
+source: src/rules/flake8_unused_arguments/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedFunctionArgument:
+      name: self
+  location:
+    row: 9
+    column: 6
+  end_location:
+    row: 9
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: x
+  location:
+    row: 9
+    column: 12
+  end_location:
+    row: 9
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: cls
+  location:
+    row: 13
+    column: 6
+  end_location:
+    row: 13
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: x
+  location:
+    row: 13
+    column: 11
+  end_location:
+    row: 13
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: self
+  location:
+    row: 17
+    column: 6
+  end_location:
+    row: 17
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: x
+  location:
+    row: 17
+    column: 12
+  end_location:
+    row: 17
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: cls
+  location:
+    row: 21
+    column: 6
+  end_location:
+    row: 21
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UnusedFunctionArgument:
+      name: x
+  location:
+    row: 21
+    column: 11
+  end_location:
+    row: 21
+    column: 12
+  fix: ~
+  parent: ~
+

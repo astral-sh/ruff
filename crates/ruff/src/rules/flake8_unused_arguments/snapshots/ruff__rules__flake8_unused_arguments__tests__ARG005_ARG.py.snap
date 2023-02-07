@@ -1,0 +1,16 @@
+---
+source: src/rules/flake8_unused_arguments/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedLambdaArgument:
+      name: x
+  location:
+    row: 28
+    column: 7
+  end_location:
+    row: 28
+    column: 8
+  fix: ~
+  parent: ~
+

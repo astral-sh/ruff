@@ -1,0 +1,60 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    RaisesTooBroad:
+      exception: ValueError
+  location:
+    row: 17
+    column: 23
+  end_location:
+    row: 17
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    RaisesTooBroad:
+      exception: socket.error
+  location:
+    row: 20
+    column: 23
+  end_location:
+    row: 20
+    column: 35
+  fix: ~
+  parent: ~
+- kind:
+    RaisesTooBroad:
+      exception: ValueError
+  location:
+    row: 25
+    column: 23
+  end_location:
+    row: 25
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    RaisesTooBroad:
+      exception: ValueError
+  location:
+    row: 28
+    column: 23
+  end_location:
+    row: 28
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    RaisesTooBroad:
+      exception: ValueError
+  location:
+    row: 31
+    column: 23
+  end_location:
+    row: 31
+    column: 33
+  fix: ~
+  parent: ~
+

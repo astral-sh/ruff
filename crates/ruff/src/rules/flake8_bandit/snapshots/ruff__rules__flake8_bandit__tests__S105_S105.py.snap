@@ -1,0 +1,412 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 13
+    column: 11
+  end_location:
+    row: 13
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 15
+    column: 9
+  end_location:
+    row: 15
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 16
+    column: 6
+  end_location:
+    row: 16
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 17
+    column: 9
+  end_location:
+    row: 17
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 18
+    column: 8
+  end_location:
+    row: 18
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 19
+    column: 10
+  end_location:
+    row: 19
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 20
+    column: 18
+  end_location:
+    row: 20
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 21
+    column: 18
+  end_location:
+    row: 21
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 23
+    column: 16
+  end_location:
+    row: 23
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 24
+    column: 12
+  end_location:
+    row: 24
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 25
+    column: 14
+  end_location:
+    row: 25
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 26
+    column: 11
+  end_location:
+    row: 26
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 27
+    column: 14
+  end_location:
+    row: 27
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 28
+    column: 13
+  end_location:
+    row: 28
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 29
+    column: 15
+  end_location:
+    row: 29
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 30
+    column: 23
+  end_location:
+    row: 30
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 31
+    column: 23
+  end_location:
+    row: 31
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 35
+    column: 15
+  end_location:
+    row: 35
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 39
+    column: 19
+  end_location:
+    row: 39
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 40
+    column: 16
+  end_location:
+    row: 40
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 41
+    column: 17
+  end_location:
+    row: 41
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 42
+    column: 14
+  end_location:
+    row: 42
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 43
+    column: 17
+  end_location:
+    row: 43
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 44
+    column: 16
+  end_location:
+    row: 44
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 45
+    column: 18
+  end_location:
+    row: 45
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 47
+    column: 12
+  end_location:
+    row: 47
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 48
+    column: 9
+  end_location:
+    row: 48
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 49
+    column: 10
+  end_location:
+    row: 49
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 50
+    column: 7
+  end_location:
+    row: 50
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 51
+    column: 10
+  end_location:
+    row: 51
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 52
+    column: 9
+  end_location:
+    row: 52
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 53
+    column: 11
+  end_location:
+    row: 53
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: s3cr3t
+  location:
+    row: 54
+    column: 20
+  end_location:
+    row: 54
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: "1\n2"
+  location:
+    row: 56
+    column: 12
+  end_location:
+    row: 56
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: "3\t4"
+  location:
+    row: 59
+    column: 12
+  end_location:
+    row: 59
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HardcodedPasswordString:
+      string: "5\r6"
+  location:
+    row: 62
+    column: 12
+  end_location:
+    row: 62
+    column: 18
+  fix: ~
+  parent: ~
+

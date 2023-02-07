@@ -1,0 +1,16 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    ForwardAnnotationSyntaxError:
+      body: ///
+  location:
+    row: 9
+    column: 11
+  end_location:
+    row: 9
+    column: 16
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,95 @@
+---
+source: crates/ruff/src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    EmptyTypeCheckingBlock: ~
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 8
+  fix:
+    content:
+      - ""
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 5
+      column: 0
+  parent: ~
+- kind:
+    EmptyTypeCheckingBlock: ~
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 8
+  fix:
+    content:
+      - ""
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 9
+      column: 0
+  parent: ~
+- kind:
+    EmptyTypeCheckingBlock: ~
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 8
+  fix:
+    content:
+      - ""
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 12
+      column: 0
+  parent: ~
+- kind:
+    EmptyTypeCheckingBlock: ~
+  location:
+    row: 16
+    column: 8
+  end_location:
+    row: 16
+    column: 12
+  fix:
+    content:
+      - ""
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 17
+      column: 0
+  parent: ~
+- kind:
+    EmptyTypeCheckingBlock: ~
+  location:
+    row: 22
+    column: 8
+  end_location:
+    row: 22
+    column: 12
+  fix:
+    content:
+      - ""
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 23
+      column: 0
+  parent: ~
+

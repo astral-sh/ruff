@@ -1,0 +1,41 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    UsePEP604Annotation: ~
+  location:
+    row: 40
+    column: 3
+  end_location:
+    row: 40
+    column: 16
+  fix:
+    content:
+      - int | None
+    location:
+      row: 40
+      column: 3
+    end_location:
+      row: 40
+      column: 16
+  parent: ~
+- kind:
+    UsePEP604Annotation: ~
+  location:
+    row: 42
+    column: 20
+  end_location:
+    row: 42
+    column: 47
+  fix:
+    content:
+      - "List[int] | List[str]"
+    location:
+      row: 42
+      column: 20
+    end_location:
+      row: 42
+      column: 47
+  parent: ~
+

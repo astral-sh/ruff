@@ -1,0 +1,385 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    OSErrorAlias:
+      name: socket.error
+  location:
+    row: 10
+    column: 6
+  end_location:
+    row: 10
+    column: 18
+  fix:
+    content:
+      - OSError
+    location:
+      row: 10
+      column: 6
+    end_location:
+      row: 10
+      column: 18
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: mmap.error
+  location:
+    row: 11
+    column: 6
+  end_location:
+    row: 11
+    column: 16
+  fix:
+    content:
+      - OSError
+    location:
+      row: 11
+      column: 6
+    end_location:
+      row: 11
+      column: 16
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: select.error
+  location:
+    row: 12
+    column: 6
+  end_location:
+    row: 12
+    column: 18
+  fix:
+    content:
+      - OSError
+    location:
+      row: 12
+      column: 6
+    end_location:
+      row: 12
+      column: 18
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: socket.error
+  location:
+    row: 14
+    column: 6
+  end_location:
+    row: 14
+    column: 18
+  fix:
+    content:
+      - OSError
+    location:
+      row: 14
+      column: 6
+    end_location:
+      row: 14
+      column: 18
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: mmap.error
+  location:
+    row: 15
+    column: 6
+  end_location:
+    row: 15
+    column: 16
+  fix:
+    content:
+      - OSError
+    location:
+      row: 15
+      column: 6
+    end_location:
+      row: 15
+      column: 16
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: select.error
+  location:
+    row: 16
+    column: 6
+  end_location:
+    row: 16
+    column: 18
+  fix:
+    content:
+      - OSError
+    location:
+      row: 16
+      column: 6
+    end_location:
+      row: 16
+      column: 18
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: socket.error
+  location:
+    row: 18
+    column: 6
+  end_location:
+    row: 18
+    column: 18
+  fix:
+    content:
+      - OSError
+    location:
+      row: 18
+      column: 6
+    end_location:
+      row: 18
+      column: 18
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: error
+  location:
+    row: 25
+    column: 6
+  end_location:
+    row: 25
+    column: 11
+  fix:
+    content:
+      - OSError
+    location:
+      row: 25
+      column: 6
+    end_location:
+      row: 25
+      column: 11
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: error
+  location:
+    row: 28
+    column: 6
+  end_location:
+    row: 28
+    column: 11
+  fix:
+    content:
+      - OSError
+    location:
+      row: 28
+      column: 6
+    end_location:
+      row: 28
+      column: 11
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: error
+  location:
+    row: 31
+    column: 6
+  end_location:
+    row: 31
+    column: 11
+  fix:
+    content:
+      - OSError
+    location:
+      row: 31
+      column: 6
+    end_location:
+      row: 31
+      column: 11
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: EnvironmentError
+  location:
+    row: 34
+    column: 6
+  end_location:
+    row: 34
+    column: 22
+  fix:
+    content:
+      - OSError
+    location:
+      row: 34
+      column: 6
+    end_location:
+      row: 34
+      column: 22
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: IOError
+  location:
+    row: 35
+    column: 6
+  end_location:
+    row: 35
+    column: 13
+  fix:
+    content:
+      - OSError
+    location:
+      row: 35
+      column: 6
+    end_location:
+      row: 35
+      column: 13
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: WindowsError
+  location:
+    row: 36
+    column: 6
+  end_location:
+    row: 36
+    column: 18
+  fix:
+    content:
+      - OSError
+    location:
+      row: 36
+      column: 6
+    end_location:
+      row: 36
+      column: 18
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: EnvironmentError
+  location:
+    row: 38
+    column: 6
+  end_location:
+    row: 38
+    column: 22
+  fix:
+    content:
+      - OSError
+    location:
+      row: 38
+      column: 6
+    end_location:
+      row: 38
+      column: 22
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: IOError
+  location:
+    row: 39
+    column: 6
+  end_location:
+    row: 39
+    column: 13
+  fix:
+    content:
+      - OSError
+    location:
+      row: 39
+      column: 6
+    end_location:
+      row: 39
+      column: 13
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: WindowsError
+  location:
+    row: 40
+    column: 6
+  end_location:
+    row: 40
+    column: 18
+  fix:
+    content:
+      - OSError
+    location:
+      row: 40
+      column: 6
+    end_location:
+      row: 40
+      column: 18
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: EnvironmentError
+  location:
+    row: 42
+    column: 6
+  end_location:
+    row: 42
+    column: 22
+  fix:
+    content:
+      - OSError
+    location:
+      row: 42
+      column: 6
+    end_location:
+      row: 42
+      column: 22
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: WindowsError
+  location:
+    row: 48
+    column: 6
+  end_location:
+    row: 48
+    column: 18
+  fix:
+    content:
+      - OSError
+    location:
+      row: 48
+      column: 6
+    end_location:
+      row: 48
+      column: 18
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: EnvironmentError
+  location:
+    row: 49
+    column: 6
+  end_location:
+    row: 49
+    column: 22
+  fix:
+    content:
+      - OSError
+    location:
+      row: 49
+      column: 6
+    end_location:
+      row: 49
+      column: 22
+  parent: ~
+- kind:
+    OSErrorAlias:
+      name: IOError
+  location:
+    row: 50
+    column: 6
+  end_location:
+    row: 50
+    column: 13
+  fix:
+    content:
+      - OSError
+    location:
+      row: 50
+      column: 6
+    end_location:
+      row: 50
+      column: 13
+  parent: ~
+

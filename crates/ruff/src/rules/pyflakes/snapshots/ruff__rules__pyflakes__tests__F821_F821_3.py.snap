@@ -1,0 +1,27 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UndefinedName:
+      name: key
+  location:
+    row: 11
+    column: 8
+  end_location:
+    row: 11
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: value
+  location:
+    row: 11
+    column: 15
+  end_location:
+    row: 11
+    column: 22
+  fix: ~
+  parent: ~
+

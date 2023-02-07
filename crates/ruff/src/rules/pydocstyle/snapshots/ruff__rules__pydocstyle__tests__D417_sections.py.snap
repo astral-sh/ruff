@@ -1,0 +1,149 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+  location:
+    row: 283
+    column: 4
+  end_location:
+    row: 293
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+  location:
+    row: 300
+    column: 0
+  end_location:
+    row: 306
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - test
+        - y
+        - z
+  location:
+    row: 324
+    column: 4
+  end_location:
+    row: 330
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - test
+        - y
+        - z
+  location:
+    row: 336
+    column: 4
+  end_location:
+    row: 343
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - a
+        - y
+        - z
+  location:
+    row: 349
+    column: 4
+  end_location:
+    row: 355
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - a
+        - b
+  location:
+    row: 361
+    column: 4
+  end_location:
+    row: 367
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+  location:
+    row: 389
+    column: 0
+  end_location:
+    row: 398
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - test
+        - y
+        - z
+  location:
+    row: 425
+    column: 4
+  end_location:
+    row: 434
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - test
+        - y
+        - z
+  location:
+    row: 440
+    column: 4
+  end_location:
+    row: 453
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - a
+        - z
+  location:
+    row: 459
+    column: 4
+  end_location:
+    row: 469
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    DocumentAllArguments:
+      names:
+        - y
+  location:
+    row: 489
+    column: 4
+  end_location:
+    row: 497
+    column: 11
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,187 @@
+---
+source: src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedImport:
+      name: typing.Union
+      ignore_init: false
+      multiple: false
+  location:
+    row: 37
+    column: 8
+  end_location:
+    row: 37
+    column: 13
+  fix:
+    content:
+      - from typing import (
+      - "        Mapping,  # noqa: F401"
+      - "        )"
+    location:
+      row: 35
+      column: 4
+    end_location:
+      row: 38
+      column: 5
+  parent:
+    row: 35
+    column: 4
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F401
+  location:
+    row: 52
+    column: 19
+  end_location:
+    row: 52
+    column: 31
+  fix:
+    content:
+      - ""
+    location:
+      row: 52
+      column: 17
+    end_location:
+      row: 52
+      column: 31
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled: []
+        unmatched:
+          - F401
+  location:
+    row: 59
+    column: 19
+  end_location:
+    row: 59
+    column: 31
+  fix:
+    content:
+      - ""
+    location:
+      row: 59
+      column: 17
+    end_location:
+      row: 59
+      column: 31
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled:
+          - F501
+        unmatched: []
+  location:
+    row: 66
+    column: 15
+  end_location:
+    row: 66
+    column: 27
+  fix:
+    content:
+      - ""
+    location:
+      row: 66
+      column: 13
+    end_location:
+      row: 66
+      column: 27
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled:
+          - F501
+        unmatched: []
+  location:
+    row: 72
+    column: 26
+  end_location:
+    row: 72
+    column: 38
+  fix:
+    content:
+      - ""
+    location:
+      row: 72
+      column: 24
+    end_location:
+      row: 72
+      column: 38
+  parent: ~
+- kind:
+    UnusedImport:
+      name: typing.Awaitable
+      ignore_init: false
+      multiple: true
+  location:
+    row: 89
+    column: 23
+  end_location:
+    row: 89
+    column: 32
+  fix:
+    content:
+      - pass
+    location:
+      row: 89
+      column: 4
+    end_location:
+      row: 89
+      column: 52
+  parent: ~
+- kind:
+    UnusedImport:
+      name: typing.AwaitableGenerator
+      ignore_init: false
+      multiple: true
+  location:
+    row: 89
+    column: 34
+  end_location:
+    row: 89
+    column: 52
+  fix:
+    content:
+      - pass
+    location:
+      row: 89
+      column: 4
+    end_location:
+      row: 89
+      column: 52
+  parent: ~
+- kind:
+    UnusedNOQA:
+      codes:
+        unknown: []
+        disabled:
+          - F501
+        unmatched: []
+  location:
+    row: 89
+    column: 54
+  end_location:
+    row: 89
+    column: 66
+  fix:
+    content:
+      - ""
+    location:
+      row: 89
+      column: 52
+    end_location:
+      row: 89
+      column: 66
+  parent: ~
+

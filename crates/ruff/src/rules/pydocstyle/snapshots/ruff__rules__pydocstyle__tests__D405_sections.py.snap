@@ -1,0 +1,43 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    CapitalizeSectionName:
+      name: returns
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 23
+    column: 7
+  fix:
+    content:
+      - Returns
+    location:
+      row: 19
+      column: 4
+    end_location:
+      row: 19
+      column: 11
+  parent: ~
+- kind:
+    CapitalizeSectionName:
+      name: Short summary
+  location:
+    row: 207
+    column: 4
+  end_location:
+    row: 221
+    column: 7
+  fix:
+    content:
+      - Short Summary
+    location:
+      row: 209
+      column: 4
+    end_location:
+      row: 209
+      column: 17
+  parent: ~
+

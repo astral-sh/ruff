@@ -1,0 +1,29 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    ImportShadowedByLoopVar:
+      name: os
+      line: 1
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    ImportShadowedByLoopVar:
+      name: path
+      line: 2
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 8
+  fix: ~
+  parent: ~
+

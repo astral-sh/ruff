@@ -1,0 +1,60 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    InvalidClassName:
+      name: bad
+  location:
+    row: 1
+    column: 6
+  end_location:
+    row: 1
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    InvalidClassName:
+      name: _bad
+  location:
+    row: 5
+    column: 6
+  end_location:
+    row: 5
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    InvalidClassName:
+      name: bad_class
+  location:
+    row: 9
+    column: 6
+  end_location:
+    row: 9
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    InvalidClassName:
+      name: Bad_Class
+  location:
+    row: 13
+    column: 6
+  end_location:
+    row: 13
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    InvalidClassName:
+      name: BAD_CLASS
+  location:
+    row: 17
+    column: 6
+  end_location:
+    row: 17
+    column: 15
+  fix: ~
+  parent: ~
+

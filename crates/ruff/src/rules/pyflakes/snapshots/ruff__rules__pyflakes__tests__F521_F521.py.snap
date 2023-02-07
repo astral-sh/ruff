@@ -1,0 +1,82 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    StringDotFormatInvalidFormat:
+      message: "Single '{' encountered in format string"
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatInvalidFormat:
+      message: "Single '}' encountered in format string"
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatInvalidFormat:
+      message: "Expected '}' before end of string"
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatInvalidFormat:
+      message: Max string recursion exceeded
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatInvalidFormat:
+      message: Empty attribute in format string
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatInvalidFormat:
+      message: Empty attribute in format string
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    StringDotFormatInvalidFormat:
+      message: Empty attribute in format string
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 26
+  fix: ~
+  parent: ~
+

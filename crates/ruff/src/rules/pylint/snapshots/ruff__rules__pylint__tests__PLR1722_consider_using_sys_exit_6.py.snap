@@ -1,0 +1,27 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    ConsiderUsingSysExit:
+      name: exit
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ConsiderUsingSysExit:
+      name: quit
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 4
+  fix: ~
+  parent: ~
+

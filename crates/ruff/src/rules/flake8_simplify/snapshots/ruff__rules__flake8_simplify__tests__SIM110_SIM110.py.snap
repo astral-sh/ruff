@@ -1,0 +1,92 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    ConvertLoopToAny:
+      any: return any(check(x) for x in iterable)
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 5
+    column: 23
+  fix:
+    content:
+      - return any(check(x) for x in iterable)
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 6
+      column: 16
+  parent: ~
+- kind:
+    ConvertLoopToAny:
+      any: return any(check(x) for x in iterable)
+  location:
+    row: 55
+    column: 4
+  end_location:
+    row: 59
+    column: 20
+  fix:
+    content:
+      - return any(check(x) for x in iterable)
+    location:
+      row: 55
+      column: 4
+    end_location:
+      row: 59
+      column: 20
+  parent: ~
+- kind:
+    ConvertLoopToAny:
+      any: return any(check(x) for x in iterable)
+  location:
+    row: 73
+    column: 4
+  end_location:
+    row: 77
+    column: 20
+  fix:
+    content:
+      - return any(check(x) for x in iterable)
+    location:
+      row: 73
+      column: 4
+    end_location:
+      row: 77
+      column: 20
+  parent: ~
+- kind:
+    ConvertLoopToAny:
+      any: return any(check(x) for x in iterable)
+  location:
+    row: 124
+    column: 4
+  end_location:
+    row: 126
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    ConvertLoopToAny:
+      any: return any(check(x) for x in iterable)
+  location:
+    row: 144
+    column: 4
+  end_location:
+    row: 146
+    column: 23
+  fix:
+    content:
+      - return any(check(x) for x in iterable)
+    location:
+      row: 144
+      column: 4
+    end_location:
+      row: 147
+      column: 16
+  parent: ~
+

@@ -1,0 +1,157 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    ParametrizeNamesWrongType:
+      expected: tuple
+  location:
+    row: 9
+    column: 25
+  end_location:
+    row: 9
+    column: 40
+  fix:
+    content:
+      - "(\"param1\", \"param2\")"
+    location:
+      row: 9
+      column: 25
+    end_location:
+      row: 9
+      column: 40
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: tuple
+  location:
+    row: 14
+    column: 25
+  end_location:
+    row: 14
+    column: 56
+  fix:
+    content:
+      - "(\"param1\", \"param2\")"
+    location:
+      row: 14
+      column: 25
+    end_location:
+      row: 14
+      column: 56
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: tuple
+  location:
+    row: 19
+    column: 25
+  end_location:
+    row: 19
+    column: 40
+  fix:
+    content:
+      - "(\"param1\", \"param2\")"
+    location:
+      row: 19
+      column: 25
+    end_location:
+      row: 19
+      column: 40
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: csv
+  location:
+    row: 29
+    column: 25
+  end_location:
+    row: 29
+    column: 36
+  fix:
+    content:
+      - "\"param1\""
+    location:
+      row: 29
+      column: 25
+    end_location:
+      row: 29
+      column: 36
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: tuple
+  location:
+    row: 34
+    column: 25
+  end_location:
+    row: 34
+    column: 45
+  fix:
+    content:
+      - "(\"param1\", \"param2\")"
+    location:
+      row: 34
+      column: 25
+    end_location:
+      row: 34
+      column: 45
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: csv
+  location:
+    row: 39
+    column: 25
+  end_location:
+    row: 39
+    column: 35
+  fix:
+    content:
+      - "\"param1\""
+    location:
+      row: 39
+      column: 25
+    end_location:
+      row: 39
+      column: 35
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: tuple
+  location:
+    row: 44
+    column: 25
+  end_location:
+    row: 44
+    column: 50
+  fix:
+    content:
+      - "(some_expr, another_expr)"
+    location:
+      row: 44
+      column: 25
+    end_location:
+      row: 44
+      column: 50
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: tuple
+  location:
+    row: 49
+    column: 25
+  end_location:
+    row: 49
+    column: 46
+  fix:
+    content:
+      - "(some_expr, \"param2\")"
+    location:
+      row: 49
+      column: 25
+    end_location:
+      row: 49
+      column: 46
+  parent: ~
+

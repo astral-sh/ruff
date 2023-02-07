@@ -1,0 +1,49 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    YieldOutsideFunction:
+      keyword: Yield
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    YieldOutsideFunction:
+      keyword: Yield
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    YieldOutsideFunction:
+      keyword: YieldFrom
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    YieldOutsideFunction:
+      keyword: Await
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 9
+  fix: ~
+  parent: ~
+

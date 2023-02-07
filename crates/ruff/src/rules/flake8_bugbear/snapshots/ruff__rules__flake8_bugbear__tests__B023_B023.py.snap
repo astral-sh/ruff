@@ -1,0 +1,269 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 12
+    column: 29
+  end_location:
+    row: 12
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: y
+  location:
+    row: 13
+    column: 29
+  end_location:
+    row: 13
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 16
+    column: 15
+  end_location:
+    row: 16
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 28
+    column: 18
+  end_location:
+    row: 28
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 29
+    column: 18
+  end_location:
+    row: 29
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 30
+    column: 18
+  end_location:
+    row: 30
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 31
+    column: 21
+  end_location:
+    row: 31
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 40
+    column: 33
+  end_location:
+    row: 40
+    column: 34
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 42
+    column: 13
+  end_location:
+    row: 42
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: a
+  location:
+    row: 50
+    column: 29
+  end_location:
+    row: 50
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: a_
+  location:
+    row: 51
+    column: 29
+  end_location:
+    row: 51
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: b
+  location:
+    row: 52
+    column: 29
+  end_location:
+    row: 52
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: c
+  location:
+    row: 53
+    column: 29
+  end_location:
+    row: 53
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: j
+  location:
+    row: 61
+    column: 16
+  end_location:
+    row: 61
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: k
+  location:
+    row: 61
+    column: 20
+  end_location:
+    row: 61
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: l
+  location:
+    row: 68
+    column: 9
+  end_location:
+    row: 68
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: i
+  location:
+    row: 82
+    column: 15
+  end_location:
+    row: 82
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 117
+    column: 23
+  end_location:
+    row: 117
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 118
+    column: 26
+  end_location:
+    row: 118
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 119
+    column: 36
+  end_location:
+    row: 119
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 120
+    column: 37
+  end_location:
+    row: 120
+    column: 38
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: x
+  location:
+    row: 121
+    column: 36
+  end_location:
+    row: 121
+    column: 37
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: name
+  location:
+    row: 171
+    column: 28
+  end_location:
+    row: 171
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    FunctionUsesLoopVariable:
+      name: i
+  location:
+    row: 174
+    column: 28
+  end_location:
+    row: 174
+    column: 29
+  fix: ~
+  parent: ~
+

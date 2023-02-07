@@ -1,0 +1,121 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    NativeLiterals:
+      literal_type: Str
+  location:
+    row: 20
+    column: 0
+  end_location:
+    row: 20
+    column: 5
+  fix:
+    content:
+      - "\"\""
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 20
+      column: 5
+  parent: ~
+- kind:
+    NativeLiterals:
+      literal_type: Str
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 10
+  fix:
+    content:
+      - "\"foo\""
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 21
+      column: 10
+  parent: ~
+- kind:
+    NativeLiterals:
+      literal_type: Str
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 23
+    column: 7
+  fix:
+    content:
+      - "\"\"\""
+      - "foo\"\"\""
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 23
+      column: 7
+  parent: ~
+- kind:
+    NativeLiterals:
+      literal_type: Bytes
+  location:
+    row: 24
+    column: 0
+  end_location:
+    row: 24
+    column: 7
+  fix:
+    content:
+      - "b\"\""
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 24
+      column: 7
+  parent: ~
+- kind:
+    NativeLiterals:
+      literal_type: Bytes
+  location:
+    row: 25
+    column: 0
+  end_location:
+    row: 25
+    column: 13
+  fix:
+    content:
+      - "b\"foo\""
+    location:
+      row: 25
+      column: 0
+    end_location:
+      row: 25
+      column: 13
+  parent: ~
+- kind:
+    NativeLiterals:
+      literal_type: Bytes
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 27
+    column: 7
+  fix:
+    content:
+      - "b\"\"\""
+      - "foo\"\"\""
+    location:
+      row: 26
+      column: 0
+    end_location:
+      row: 27
+      column: 7
+  parent: ~
+

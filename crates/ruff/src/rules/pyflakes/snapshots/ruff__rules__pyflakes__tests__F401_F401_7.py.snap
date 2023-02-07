@@ -1,0 +1,72 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedImport:
+      name: typing.Union
+      ignore_init: false
+      multiple: false
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 30
+    column: 9
+  fix:
+    content:
+      - from typing import (
+      - "    Mapping,  # noqa: F401"
+      - "    )"
+    location:
+      row: 28
+      column: 0
+    end_location:
+      row: 31
+      column: 1
+  parent:
+    row: 28
+    column: 0
+- kind:
+    UnusedImport:
+      name: typing.Awaitable
+      ignore_init: false
+      multiple: true
+  location:
+    row: 66
+    column: 19
+  end_location:
+    row: 66
+    column: 28
+  fix:
+    content:
+      - ""
+    location:
+      row: 66
+      column: 0
+    end_location:
+      row: 67
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      name: typing.AwaitableGenerator
+      ignore_init: false
+      multiple: true
+  location:
+    row: 66
+    column: 30
+  end_location:
+    row: 66
+    column: 48
+  fix:
+    content:
+      - ""
+    location:
+      row: 66
+      column: 0
+    end_location:
+      row: 67
+      column: 0
+  parent: ~
+

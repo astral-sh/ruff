@@ -1,0 +1,81 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NewLineAfterSectionName:
+      name: Returns
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 36
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 32
+      column: 11
+    end_location:
+      row: 32
+      column: 12
+  parent: ~
+- kind:
+    NewLineAfterSectionName:
+      name: Raises
+  location:
+    row: 207
+    column: 4
+  end_location:
+    row: 221
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 218
+      column: 10
+    end_location:
+      row: 218
+      column: 11
+  parent: ~
+- kind:
+    NewLineAfterSectionName:
+      name: Returns
+  location:
+    row: 252
+    column: 4
+  end_location:
+    row: 262
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 257
+      column: 11
+    end_location:
+      row: 257
+      column: 12
+  parent: ~
+- kind:
+    NewLineAfterSectionName:
+      name: Raises
+  location:
+    row: 252
+    column: 4
+  end_location:
+    row: 262
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 259
+      column: 10
+    end_location:
+      row: 259
+      column: 11
+  parent: ~
+

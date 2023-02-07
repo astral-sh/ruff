@@ -1,0 +1,315 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedVariable:
+      name: x
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 5
+  fix:
+    content:
+      - ""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 6
+      column: 0
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: y
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 5
+  fix:
+    content:
+      - ""
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 7
+      column: 0
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: x
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 13
+    column: 5
+  fix:
+    content:
+      - ""
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 14
+      column: 0
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: y
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 5
+  fix:
+    content:
+      - ""
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 15
+      column: 0
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: x1
+  location:
+    row: 21
+    column: 18
+  end_location:
+    row: 21
+    column: 20
+  fix:
+    content:
+      - ""
+    location:
+      row: 21
+      column: 14
+    end_location:
+      row: 21
+      column: 20
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: x3
+  location:
+    row: 27
+    column: 19
+  end_location:
+    row: 27
+    column: 21
+  fix:
+    content:
+      - ""
+    location:
+      row: 27
+      column: 15
+    end_location:
+      row: 27
+      column: 21
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: y3
+  location:
+    row: 27
+    column: 32
+  end_location:
+    row: 27
+    column: 34
+  fix:
+    content:
+      - ""
+    location:
+      row: 27
+      column: 28
+    end_location:
+      row: 27
+      column: 34
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: z3
+  location:
+    row: 27
+    column: 45
+  end_location:
+    row: 27
+    column: 47
+  fix:
+    content:
+      - ""
+    location:
+      row: 27
+      column: 41
+    end_location:
+      row: 27
+      column: 47
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: x1
+  location:
+    row: 32
+    column: 5
+  end_location:
+    row: 32
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: y1
+  location:
+    row: 32
+    column: 9
+  end_location:
+    row: 32
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: coords2
+  location:
+    row: 33
+    column: 15
+  end_location:
+    row: 33
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: coords3
+  location:
+    row: 34
+    column: 4
+  end_location:
+    row: 34
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: x1
+  location:
+    row: 40
+    column: 25
+  end_location:
+    row: 40
+    column: 27
+  fix:
+    content:
+      - ""
+    location:
+      row: 40
+      column: 21
+    end_location:
+      row: 40
+      column: 27
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: x2
+  location:
+    row: 45
+    column: 46
+  end_location:
+    row: 45
+    column: 48
+  fix:
+    content:
+      - ""
+    location:
+      row: 45
+      column: 42
+    end_location:
+      row: 45
+      column: 48
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: x
+  location:
+    row: 50
+    column: 4
+  end_location:
+    row: 50
+    column: 5
+  fix:
+    content:
+      - ""
+    location:
+      row: 50
+      column: 4
+    end_location:
+      row: 50
+      column: 8
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: y
+  location:
+    row: 56
+    column: 4
+  end_location:
+    row: 56
+    column: 5
+  fix:
+    content:
+      - ""
+    location:
+      row: 56
+      column: 4
+    end_location:
+      row: 57
+      column: 8
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: x
+  location:
+    row: 61
+    column: 4
+  end_location:
+    row: 61
+    column: 5
+  fix:
+    content:
+      - pass
+    location:
+      row: 61
+      column: 4
+    end_location:
+      row: 65
+      column: 5
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: y
+  location:
+    row: 67
+    column: 4
+  end_location:
+    row: 67
+    column: 5
+  fix:
+    content:
+      - ""
+    location:
+      row: 67
+      column: 0
+    end_location:
+      row: 69
+      column: 0
+  parent: ~
+

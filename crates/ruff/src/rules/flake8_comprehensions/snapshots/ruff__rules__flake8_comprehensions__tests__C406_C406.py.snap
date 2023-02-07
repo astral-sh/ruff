@@ -1,0 +1,81 @@
+---
+source: src/rules/flake8_comprehensions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryLiteralDict:
+      obj_type: list
+  location:
+    row: 1
+    column: 5
+  end_location:
+    row: 1
+    column: 19
+  fix:
+    content:
+      - "{1: 2}"
+    location:
+      row: 1
+      column: 5
+    end_location:
+      row: 1
+      column: 19
+  parent: ~
+- kind:
+    UnnecessaryLiteralDict:
+      obj_type: tuple
+  location:
+    row: 2
+    column: 5
+  end_location:
+    row: 2
+    column: 20
+  fix:
+    content:
+      - "{1: 2,}"
+    location:
+      row: 2
+      column: 5
+    end_location:
+      row: 2
+      column: 20
+  parent: ~
+- kind:
+    UnnecessaryLiteralDict:
+      obj_type: list
+  location:
+    row: 3
+    column: 5
+  end_location:
+    row: 3
+    column: 13
+  fix:
+    content:
+      - "{}"
+    location:
+      row: 3
+      column: 5
+    end_location:
+      row: 3
+      column: 13
+  parent: ~
+- kind:
+    UnnecessaryLiteralDict:
+      obj_type: tuple
+  location:
+    row: 4
+    column: 5
+  end_location:
+    row: 4
+    column: 13
+  fix:
+    content:
+      - "{}"
+    location:
+      row: 4
+      column: 5
+    end_location:
+      row: 4
+      column: 13
+  parent: ~
+

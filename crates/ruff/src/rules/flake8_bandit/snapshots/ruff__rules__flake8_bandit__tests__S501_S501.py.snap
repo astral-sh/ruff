@@ -1,0 +1,203 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    RequestWithNoCertValidation:
+      string: requests
+  location:
+    row: 5
+    column: 53
+  end_location:
+    row: 5
+    column: 58
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: requests
+  location:
+    row: 7
+    column: 54
+  end_location:
+    row: 7
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: requests
+  location:
+    row: 9
+    column: 53
+  end_location:
+    row: 9
+    column: 58
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: requests
+  location:
+    row: 11
+    column: 56
+  end_location:
+    row: 11
+    column: 61
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: requests
+  location:
+    row: 13
+    column: 55
+  end_location:
+    row: 13
+    column: 60
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: requests
+  location:
+    row: 15
+    column: 57
+  end_location:
+    row: 15
+    column: 62
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: requests
+  location:
+    row: 17
+    column: 54
+  end_location:
+    row: 17
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 20
+    column: 49
+  end_location:
+    row: 20
+    column: 54
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 22
+    column: 38
+  end_location:
+    row: 22
+    column: 43
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 24
+    column: 42
+  end_location:
+    row: 24
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 26
+    column: 39
+  end_location:
+    row: 26
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 28
+    column: 39
+  end_location:
+    row: 28
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 30
+    column: 38
+  end_location:
+    row: 30
+    column: 43
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 32
+    column: 40
+  end_location:
+    row: 32
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 34
+    column: 41
+  end_location:
+    row: 34
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 36
+    column: 41
+  end_location:
+    row: 36
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 38
+    column: 20
+  end_location:
+    row: 38
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithNoCertValidation:
+      string: httpx
+  location:
+    row: 40
+    column: 25
+  end_location:
+    row: 40
+    column: 30
+  fix: ~
+  parent: ~
+

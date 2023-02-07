@@ -1,0 +1,29 @@
+---
+source: src/rules/mccabe/mod.rs
+expression: diagnostics
+---
+- kind:
+    FunctionIsTooComplex:
+      name: try_else
+      complexity: 4
+  location:
+    row: 73
+    column: 4
+  end_location:
+    row: 73
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: handle
+      complexity: 9
+  location:
+    row: 113
+    column: 8
+  end_location:
+    row: 113
+    column: 14
+  fix: ~
+  parent: ~
+

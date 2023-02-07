@@ -1,0 +1,281 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "1"
+      repeated_value: false
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "b\"123\""
+      repeated_value: false
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: true
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 18
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 17
+      column: 10
+    end_location:
+      row: 18
+      column: 10
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 23
+    column: 4
+  end_location:
+    row: 23
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 24
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: true
+  location:
+    row: 25
+    column: 4
+  end_location:
+    row: 25
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 24
+      column: 10
+    end_location:
+      row: 25
+      column: 10
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 26
+    column: 4
+  end_location:
+    row: 26
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: true
+  location:
+    row: 31
+    column: 4
+  end_location:
+    row: 31
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 30
+      column: 10
+    end_location:
+      row: 31
+      column: 10
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 32
+    column: 4
+  end_location:
+    row: 32
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 33
+    column: 4
+  end_location:
+    row: 33
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 34
+    column: 4
+  end_location:
+    row: 34
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 41
+    column: 4
+  end_location:
+    row: 41
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: false
+  location:
+    row: 43
+    column: 4
+  end_location:
+    row: 43
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: true
+  location:
+    row: 45
+    column: 4
+  end_location:
+    row: 45
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 44
+      column: 8
+    end_location:
+      row: 45
+      column: 10
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: true
+  location:
+    row: 49
+    column: 13
+  end_location:
+    row: 49
+    column: 16
+  fix:
+    content:
+      - ""
+    location:
+      row: 49
+      column: 11
+    end_location:
+      row: 49
+      column: 19
+  parent: ~
+- kind:
+    MultiValueRepeatedKeyLiteral:
+      name: "\"a\""
+      repeated_value: true
+  location:
+    row: 50
+    column: 21
+  end_location:
+    row: 50
+    column: 24
+  fix:
+    content:
+      - ""
+    location:
+      row: 50
+      column: 19
+    end_location:
+      row: 50
+      column: 27
+  parent: ~
+

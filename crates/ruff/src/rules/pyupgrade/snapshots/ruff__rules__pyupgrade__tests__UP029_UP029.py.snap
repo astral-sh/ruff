@@ -1,0 +1,87 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryBuiltinImport:
+      names:
+        - "*"
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 22
+  fix:
+    content:
+      - ""
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 2
+      column: 0
+  parent: ~
+- kind:
+    UnnecessaryBuiltinImport:
+      names:
+        - ascii
+        - bytes
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 42
+  fix:
+    content:
+      - from builtins import compile
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 42
+  parent: ~
+- kind:
+    UnnecessaryBuiltinImport:
+      names:
+        - filter
+        - zip
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 46
+  fix:
+    content:
+      - from six.moves import zip_longest
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 46
+  parent: ~
+- kind:
+    UnnecessaryBuiltinImport:
+      names:
+        - open
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 19
+  fix:
+    content:
+      - ""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 6
+      column: 0
+  parent: ~
+

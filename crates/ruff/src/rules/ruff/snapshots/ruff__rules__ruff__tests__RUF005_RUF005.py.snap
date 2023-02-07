@@ -1,0 +1,244 @@
+---
+source: src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[1, 2, 3, *foo]"
+  location:
+    row: 10
+    column: 6
+  end_location:
+    row: 10
+    column: 21
+  fix:
+    content:
+      - "[1, 2, 3, *foo]"
+    location:
+      row: 10
+      column: 6
+    end_location:
+      row: 10
+      column: 21
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(7, 8, 9, *zoob)"
+  location:
+    row: 12
+    column: 7
+  end_location:
+    row: 12
+    column: 23
+  fix:
+    content:
+      - "(7, 8, 9, *zoob)"
+    location:
+      row: 12
+      column: 7
+    end_location:
+      row: 12
+      column: 23
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(*quux, 10, 11, 12)"
+  location:
+    row: 13
+    column: 7
+  end_location:
+    row: 13
+    column: 26
+  fix:
+    content:
+      - "(*quux, 10, 11, 12)"
+    location:
+      row: 13
+      column: 7
+    end_location:
+      row: 13
+      column: 26
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[*spom, 13, 14, 15]"
+  location:
+    row: 15
+    column: 7
+  end_location:
+    row: 15
+    column: 26
+  fix:
+    content:
+      - "[*spom, 13, 14, 15]"
+    location:
+      row: 15
+      column: 7
+    end_location:
+      row: 15
+      column: 26
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(\"we all say\", *yay())"
+  location:
+    row: 16
+    column: 12
+  end_location:
+    row: 16
+    column: 36
+  fix:
+    content:
+      - "(\"we all say\", *yay())"
+    location:
+      row: 16
+      column: 12
+    end_location:
+      row: 16
+      column: 36
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(\"we all think\", *Fun().yay())"
+  location:
+    row: 17
+    column: 13
+  end_location:
+    row: 17
+    column: 45
+  fix:
+    content:
+      - "(\"we all think\", *Fun().yay())"
+    location:
+      row: 17
+      column: 13
+    end_location:
+      row: 17
+      column: 45
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(\"we all feel\", *Fun.words)"
+  location:
+    row: 18
+    column: 15
+  end_location:
+    row: 18
+    column: 44
+  fix:
+    content:
+      - "(\"we all feel\", *Fun.words)"
+    location:
+      row: 18
+      column: 15
+    end_location:
+      row: 18
+      column: 44
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[\"a\", \"b\", \"c\", *eggs]"
+  location:
+    row: 20
+    column: 8
+  end_location:
+    row: 20
+    column: 30
+  fix:
+    content:
+      - "[\"a\", \"b\", \"c\", *eggs]"
+    location:
+      row: 20
+      column: 8
+    end_location:
+      row: 20
+      column: 30
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(\"yes\", \"no\", \"pants\", *zoob)"
+  location:
+    row: 20
+    column: 38
+  end_location:
+    row: 20
+    column: 67
+  fix:
+    content:
+      - "(\"yes\", \"no\", \"pants\", *zoob)"
+    location:
+      row: 20
+      column: 38
+    end_location:
+      row: 20
+      column: 67
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "(*zoob,)"
+  location:
+    row: 22
+    column: 6
+  end_location:
+    row: 22
+    column: 15
+  fix:
+    content:
+      - "(*zoob,)"
+    location:
+      row: 22
+      column: 6
+    end_location:
+      row: 22
+      column: 15
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[*first, 4, 5, 6]"
+  location:
+    row: 32
+    column: 9
+  end_location:
+    row: 39
+    column: 1
+  fix: ~
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[*foo]"
+  location:
+    row: 41
+    column: 0
+  end_location:
+    row: 41
+    column: 8
+  fix:
+    content:
+      - "[*foo]"
+    location:
+      row: 41
+      column: 0
+    end_location:
+      row: 41
+      column: 8
+  parent: ~
+- kind:
+    UnpackInsteadOfConcatenatingToCollectionLiteral:
+      expr: "[*foo]"
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 8
+  fix:
+    content:
+      - "[*foo]"
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 44
+      column: 8
+  parent: ~
+

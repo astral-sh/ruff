@@ -1,0 +1,31 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    ImportStarUsage:
+      name: name
+      sources:
+        - mymodule
+  location:
+    row: 5
+    column: 10
+  end_location:
+    row: 5
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ImportStarUsage:
+      name: a
+      sources:
+        - mymodule
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 7
+  fix: ~
+  parent: ~
+

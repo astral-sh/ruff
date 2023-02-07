@@ -1,0 +1,27 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    GlobalVariableNotAssigned:
+      name: X
+  location:
+    row: 5
+    column: 11
+  end_location:
+    row: 5
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    GlobalVariableNotAssigned:
+      name: X
+  location:
+    row: 9
+    column: 11
+  end_location:
+    row: 9
+    column: 12
+  fix: ~
+  parent: ~
+

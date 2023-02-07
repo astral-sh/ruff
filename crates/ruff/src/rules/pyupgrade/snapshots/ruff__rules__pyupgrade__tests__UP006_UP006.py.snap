@@ -1,0 +1,81 @@
+---
+source: src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    UsePEP585Annotation:
+      name: List
+  location:
+    row: 4
+    column: 9
+  end_location:
+    row: 4
+    column: 20
+  fix:
+    content:
+      - list
+    location:
+      row: 4
+      column: 9
+    end_location:
+      row: 4
+      column: 20
+  parent: ~
+- kind:
+    UsePEP585Annotation:
+      name: List
+  location:
+    row: 11
+    column: 9
+  end_location:
+    row: 11
+    column: 13
+  fix:
+    content:
+      - list
+    location:
+      row: 11
+      column: 9
+    end_location:
+      row: 11
+      column: 13
+  parent: ~
+- kind:
+    UsePEP585Annotation:
+      name: List
+  location:
+    row: 18
+    column: 9
+  end_location:
+    row: 18
+    column: 15
+  fix:
+    content:
+      - list
+    location:
+      row: 18
+      column: 9
+    end_location:
+      row: 18
+      column: 15
+  parent: ~
+- kind:
+    UsePEP585Annotation:
+      name: List
+  location:
+    row: 25
+    column: 9
+  end_location:
+    row: 25
+    column: 14
+  fix:
+    content:
+      - list
+    location:
+      row: 25
+      column: 9
+    end_location:
+      row: 25
+      column: 14
+  parent: ~
+

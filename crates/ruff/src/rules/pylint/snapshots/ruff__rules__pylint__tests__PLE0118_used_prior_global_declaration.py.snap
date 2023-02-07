@@ -1,0 +1,161 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 7
+  location:
+    row: 5
+    column: 10
+  end_location:
+    row: 5
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 17
+  location:
+    row: 15
+    column: 10
+  end_location:
+    row: 15
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 25
+  location:
+    row: 23
+    column: 10
+  end_location:
+    row: 23
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 35
+  location:
+    row: 33
+    column: 10
+  end_location:
+    row: 33
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 43
+  location:
+    row: 41
+    column: 4
+  end_location:
+    row: 41
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 53
+  location:
+    row: 51
+    column: 4
+  end_location:
+    row: 51
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 61
+  location:
+    row: 59
+    column: 8
+  end_location:
+    row: 59
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 71
+  location:
+    row: 69
+    column: 8
+  end_location:
+    row: 69
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 79
+  location:
+    row: 77
+    column: 8
+  end_location:
+    row: 77
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 89
+  location:
+    row: 87
+    column: 8
+  end_location:
+    row: 87
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 97
+  location:
+    row: 95
+    column: 8
+  end_location:
+    row: 95
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 107
+  location:
+    row: 105
+    column: 8
+  end_location:
+    row: 105
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    UsedPriorGlobalDeclaration:
+      name: x
+      line: 114
+  location:
+    row: 113
+    column: 13
+  end_location:
+    row: 113
+    column: 14
+  fix: ~
+  parent: ~
+

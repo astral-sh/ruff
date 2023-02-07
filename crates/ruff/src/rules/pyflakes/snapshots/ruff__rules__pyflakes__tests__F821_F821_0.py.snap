@@ -1,0 +1,148 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UndefinedName:
+      name: self
+  location:
+    row: 2
+    column: 11
+  end_location:
+    row: 2
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: self
+  location:
+    row: 6
+    column: 12
+  end_location:
+    row: 6
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: self
+  location:
+    row: 10
+    column: 8
+  end_location:
+    row: 10
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: numeric_string
+  location:
+    row: 21
+    column: 11
+  end_location:
+    row: 21
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: Bar
+  location:
+    row: 58
+    column: 3
+  end_location:
+    row: 58
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: TOMATO
+  location:
+    row: 83
+    column: 10
+  end_location:
+    row: 83
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: B
+  location:
+    row: 87
+    column: 7
+  end_location:
+    row: 87
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: B
+  location:
+    row: 90
+    column: 7
+  end_location:
+    row: 90
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: B
+  location:
+    row: 92
+    column: 10
+  end_location:
+    row: 92
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: B
+  location:
+    row: 93
+    column: 13
+  end_location:
+    row: 93
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: PEP593Test123
+  location:
+    row: 115
+    column: 8
+  end_location:
+    row: 115
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: foo
+  location:
+    row: 123
+    column: 13
+  end_location:
+    row: 123
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: bar
+  location:
+    row: 123
+    column: 20
+  end_location:
+    row: 123
+    column: 25
+  fix: ~
+  parent: ~
+

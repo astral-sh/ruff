@@ -1,0 +1,24 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    SectionNotOverIndented:
+      name: Returns
+  location:
+    row: 135
+    column: 4
+  end_location:
+    row: 141
+    column: 7
+  fix:
+    content:
+      - "    "
+    location:
+      row: 137
+      column: 0
+    end_location:
+      row: 137
+      column: 8
+  parent: ~
+

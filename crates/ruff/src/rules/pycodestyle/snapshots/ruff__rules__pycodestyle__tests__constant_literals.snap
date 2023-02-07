@@ -1,0 +1,220 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 4
+    column: 3
+  end_location:
+    row: 4
+    column: 17
+  fix:
+    content:
+      - "=="
+    location:
+      row: 4
+      column: 9
+    end_location:
+      row: 4
+      column: 11
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 6
+    column: 3
+  end_location:
+    row: 6
+    column: 16
+  fix:
+    content:
+      - "=="
+    location:
+      row: 6
+      column: 9
+    end_location:
+      row: 6
+      column: 11
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 8
+    column: 3
+  end_location:
+    row: 8
+    column: 16
+  fix:
+    content:
+      - "=="
+    location:
+      row: 8
+      column: 8
+    end_location:
+      row: 8
+      column: 10
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 10
+    column: 3
+  end_location:
+    row: 10
+    column: 17
+  fix:
+    content:
+      - "=="
+    location:
+      row: 10
+      column: 9
+    end_location:
+      row: 10
+      column: 11
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 12
+    column: 3
+  end_location:
+    row: 12
+    column: 17
+  fix:
+    content:
+      - "=="
+    location:
+      row: 12
+      column: 9
+    end_location:
+      row: 12
+      column: 11
+  parent: ~
+- kind:
+    TrueFalseComparison:
+      - false
+      - Eq
+  location:
+    row: 14
+    column: 3
+  end_location:
+    row: 14
+    column: 8
+  fix:
+    content:
+      - False is None
+    location:
+      row: 14
+      column: 3
+    end_location:
+      row: 14
+      column: 16
+  parent: ~
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 14
+    column: 12
+  end_location:
+    row: 14
+    column: 16
+  fix:
+    content:
+      - False is None
+    location:
+      row: 14
+      column: 3
+    end_location:
+      row: 14
+      column: 16
+  parent: ~
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 16
+    column: 3
+  end_location:
+    row: 16
+    column: 7
+  fix:
+    content:
+      - None is False
+    location:
+      row: 16
+      column: 3
+    end_location:
+      row: 16
+      column: 16
+  parent: ~
+- kind:
+    TrueFalseComparison:
+      - false
+      - Eq
+  location:
+    row: 16
+    column: 11
+  end_location:
+    row: 16
+    column: 16
+  fix:
+    content:
+      - None is False
+    location:
+      row: 16
+      column: 3
+    end_location:
+      row: 16
+      column: 16
+  parent: ~
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 22
+    column: 12
+  end_location:
+    row: 22
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    NoneComparison: Eq
+  location:
+    row: 24
+    column: 3
+  end_location:
+    row: 24
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    TrueFalseComparison:
+      - false
+      - Eq
+  location:
+    row: 26
+    column: 12
+  end_location:
+    row: 26
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    TrueFalseComparison:
+      - false
+      - Eq
+  location:
+    row: 28
+    column: 3
+  end_location:
+    row: 28
+    column: 8
+  fix: ~
+  parent: ~
+

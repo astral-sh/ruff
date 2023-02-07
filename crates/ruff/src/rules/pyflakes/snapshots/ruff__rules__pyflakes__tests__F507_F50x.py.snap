@@ -1,0 +1,29 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    PercentFormatPositionalCountMismatch:
+      wanted: 2
+      got: 1
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    PercentFormatPositionalCountMismatch:
+      wanted: 2
+      got: 3
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 19
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,38 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    IncorrectFixtureNameUnderscore:
+      function: _my_fixture
+  location:
+    row: 41
+    column: 0
+  end_location:
+    row: 42
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    IncorrectFixtureNameUnderscore:
+      function: _activate_context
+  location:
+    row: 46
+    column: 0
+  end_location:
+    row: 48
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    IncorrectFixtureNameUnderscore:
+      function: _activate_context
+  location:
+    row: 52
+    column: 0
+  end_location:
+    row: 57
+    column: 34
+  fix: ~
+  parent: ~
+

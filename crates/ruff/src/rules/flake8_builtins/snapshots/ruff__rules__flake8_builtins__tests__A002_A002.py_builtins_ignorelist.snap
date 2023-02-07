@@ -1,0 +1,82 @@
+---
+source: src/rules/flake8_builtins/mod.rs
+expression: diagnostics
+---
+- kind:
+    BuiltinArgumentShadowing:
+      name: str
+  location:
+    row: 1
+    column: 10
+  end_location:
+    row: 1
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinArgumentShadowing:
+      name: type
+  location:
+    row: 1
+    column: 18
+  end_location:
+    row: 1
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinArgumentShadowing:
+      name: complex
+  location:
+    row: 1
+    column: 25
+  end_location:
+    row: 1
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinArgumentShadowing:
+      name: Exception
+  location:
+    row: 1
+    column: 34
+  end_location:
+    row: 1
+    column: 43
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinArgumentShadowing:
+      name: getattr
+  location:
+    row: 1
+    column: 47
+  end_location:
+    row: 1
+    column: 54
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinArgumentShadowing:
+      name: bytes
+  location:
+    row: 5
+    column: 16
+  end_location:
+    row: 5
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinArgumentShadowing:
+      name: float
+  location:
+    row: 11
+    column: 15
+  end_location:
+    row: 11
+    column: 20
+  fix: ~
+  parent: ~
+

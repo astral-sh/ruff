@@ -1,0 +1,305 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    DashedUnderlineAfterSection:
+      name: Returns
+  location:
+    row: 42
+    column: 4
+  end_location:
+    row: 47
+    column: 7
+  fix:
+    content:
+      - "    -------"
+      - ""
+    location:
+      row: 45
+      column: 0
+    end_location:
+      row: 45
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Returns
+  location:
+    row: 54
+    column: 4
+  end_location:
+    row: 58
+    column: 7
+  fix:
+    content:
+      - "    -------"
+      - ""
+    location:
+      row: 57
+      column: 0
+    end_location:
+      row: 57
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Raises
+  location:
+    row: 207
+    column: 4
+  end_location:
+    row: 221
+    column: 7
+  fix:
+    content:
+      - "    ------"
+      - ""
+    location:
+      row: 219
+      column: 0
+    end_location:
+      row: 219
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Returns
+  location:
+    row: 252
+    column: 4
+  end_location:
+    row: 262
+    column: 7
+  fix:
+    content:
+      - "    -------"
+      - ""
+    location:
+      row: 258
+      column: 0
+    end_location:
+      row: 258
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Raises
+  location:
+    row: 252
+    column: 4
+  end_location:
+    row: 262
+    column: 7
+  fix:
+    content:
+      - "    ------"
+      - ""
+    location:
+      row: 260
+      column: 0
+    end_location:
+      row: 260
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 269
+    column: 4
+  end_location:
+    row: 274
+    column: 7
+  fix:
+    content:
+      - "    ----"
+      - ""
+    location:
+      row: 272
+      column: 0
+    end_location:
+      row: 272
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 284
+    column: 8
+  end_location:
+    row: 292
+    column: 11
+  fix:
+    content:
+      - "        ----"
+      - ""
+    location:
+      row: 289
+      column: 0
+    end_location:
+      row: 289
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 301
+    column: 4
+  end_location:
+    row: 306
+    column: 7
+  fix:
+    content:
+      - "    ----"
+      - ""
+    location:
+      row: 304
+      column: 0
+    end_location:
+      row: 304
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 313
+    column: 8
+  end_location:
+    row: 319
+    column: 11
+  fix:
+    content:
+      - "        ----"
+      - ""
+    location:
+      row: 316
+      column: 0
+    end_location:
+      row: 316
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 325
+    column: 8
+  end_location:
+    row: 330
+    column: 11
+  fix:
+    content:
+      - "        ----"
+      - ""
+    location:
+      row: 328
+      column: 0
+    end_location:
+      row: 328
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 337
+    column: 8
+  end_location:
+    row: 343
+    column: 11
+  fix:
+    content:
+      - "        ----"
+      - ""
+    location:
+      row: 340
+      column: 0
+    end_location:
+      row: 340
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 350
+    column: 8
+  end_location:
+    row: 355
+    column: 11
+  fix:
+    content:
+      - "        ----"
+      - ""
+    location:
+      row: 353
+      column: 0
+    end_location:
+      row: 353
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 362
+    column: 8
+  end_location:
+    row: 367
+    column: 11
+  fix:
+    content:
+      - "        ----"
+      - ""
+    location:
+      row: 365
+      column: 0
+    end_location:
+      row: 365
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 371
+    column: 8
+  end_location:
+    row: 382
+    column: 11
+  fix:
+    content:
+      - "        ----"
+      - ""
+    location:
+      row: 374
+      column: 0
+    end_location:
+      row: 374
+      column: 0
+  parent: ~
+- kind:
+    DashedUnderlineAfterSection:
+      name: Args
+  location:
+    row: 490
+    column: 8
+  end_location:
+    row: 497
+    column: 11
+  fix:
+    content:
+      - "        ----"
+      - ""
+    location:
+      row: 495
+      column: 0
+    end_location:
+      row: 495
+      column: 0
+  parent: ~
+

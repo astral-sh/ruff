@@ -1,0 +1,49 @@
+---
+source: src/rules/flake8_comprehensions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessarySubscriptReversal:
+      func: set
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessarySubscriptReversal:
+      func: reversed
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessarySubscriptReversal:
+      func: sorted
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessarySubscriptReversal:
+      func: sorted
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 35
+  fix: ~
+  parent: ~
+

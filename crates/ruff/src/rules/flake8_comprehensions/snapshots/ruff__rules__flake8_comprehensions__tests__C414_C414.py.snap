@@ -1,0 +1,161 @@
+---
+source: src/rules/flake8_comprehensions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: list
+      outer: list
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: tuple
+      outer: list
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: list
+      outer: tuple
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: tuple
+      outer: tuple
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: set
+      outer: set
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: list
+      outer: set
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: tuple
+      outer: set
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: sorted
+      outer: set
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: reversed
+      outer: set
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: list
+      outer: sorted
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: tuple
+      outer: sorted
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: sorted
+      outer: sorted
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: reversed
+      outer: sorted
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 19
+  fix: ~
+  parent: ~
+

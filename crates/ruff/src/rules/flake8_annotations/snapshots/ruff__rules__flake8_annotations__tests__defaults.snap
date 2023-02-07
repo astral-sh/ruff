@@ -1,0 +1,247 @@
+---
+source: src/rules/flake8_annotations/mod.rs
+expression: diagnostics
+---
+- kind:
+    MissingReturnTypePublicFunction:
+      name: foo
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: a
+  location:
+    row: 4
+    column: 8
+  end_location:
+    row: 4
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: b
+  location:
+    row: 4
+    column: 11
+  end_location:
+    row: 4
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    MissingReturnTypePublicFunction:
+      name: foo
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: b
+  location:
+    row: 9
+    column: 16
+  end_location:
+    row: 9
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: b
+  location:
+    row: 14
+    column: 16
+  end_location:
+    row: 14
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    MissingReturnTypePublicFunction:
+      name: foo
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MissingReturnTypePublicFunction:
+      name: foo
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 24
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: a
+  location:
+    row: 44
+    column: 11
+  end_location:
+    row: 44
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: foo
+  location:
+    row: 49
+    column: 46
+  end_location:
+    row: 49
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: "*args"
+  location:
+    row: 54
+    column: 23
+  end_location:
+    row: 54
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: "**kwargs"
+  location:
+    row: 54
+    column: 38
+  end_location:
+    row: 54
+    column: 41
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: "*args"
+  location:
+    row: 59
+    column: 23
+  end_location:
+    row: 59
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: "**kwargs"
+  location:
+    row: 64
+    column: 38
+  end_location:
+    row: 64
+    column: 41
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeSelf:
+      name: self
+  location:
+    row: 74
+    column: 12
+  end_location:
+    row: 74
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: a
+  location:
+    row: 78
+    column: 28
+  end_location:
+    row: 78
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: foo
+  location:
+    row: 82
+    column: 66
+  end_location:
+    row: 82
+    column: 69
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: "*params"
+  location:
+    row: 86
+    column: 42
+  end_location:
+    row: 86
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: "**options"
+  location:
+    row: 86
+    column: 58
+  end_location:
+    row: 86
+    column: 61
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: "*params"
+  location:
+    row: 90
+    column: 42
+  end_location:
+    row: 90
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: "**options"
+  location:
+    row: 94
+    column: 58
+  end_location:
+    row: 94
+    column: 61
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeCls:
+      name: cls
+  location:
+    row: 104
+    column: 12
+  end_location:
+    row: 104
+    column: 15
+  fix: ~
+  parent: ~
+

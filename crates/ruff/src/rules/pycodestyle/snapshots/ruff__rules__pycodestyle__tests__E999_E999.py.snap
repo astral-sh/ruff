@@ -1,0 +1,16 @@
+---
+source: src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    SyntaxError:
+      message: unindent does not match any outer indentation level
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 0
+  fix: ~
+  parent: ~
+

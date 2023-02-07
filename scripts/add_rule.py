@@ -21,15 +21,15 @@ def snake_case(name: str) -> str:
     ).lstrip("_")
 
 
-def main(*, name: str, code: str, linter: str) -> None:
+def main(*, name: str, code: str, linter: str) -> None:  # noqa: PLR0915
     """Generate boilerplate for a new rule."""
     # Create a test fixture.
-    with (ROOT_DIR / "resources/test/fixtures" / dir_name(linter) / f"{code}.py").open(
+    with (ROOT_DIR / "crates/ruff/resources/test/fixtures" / dir_name(linter) / f"{code}.py").open(
         "a",
     ):
         pass
 
-    plugin_module = ROOT_DIR / "src/rules" / dir_name(linter)
+    plugin_module = ROOT_DIR / "crates/ruff/src/rules" / dir_name(linter)
     rule_name_snake = snake_case(name)
 
     # Add the relevant `#testcase` macro.
@@ -102,11 +102,11 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
         fp.write("\n")
 
     # Add the relevant code-to-violation pair to `src/registry.rs`.
-    content = (ROOT_DIR / "src/registry.rs").read_text()
+    content = (ROOT_DIR / "crates/ruff/src/registry.rs").read_text()
 
     seen_macro = False
     has_written = False
-    with (ROOT_DIR / "src/registry.rs").open("w") as fp:
+    with (ROOT_DIR / "crates/ruff/src/registry.rs").open("w") as fp:
         for line in content.splitlines():
             fp.write(line)
             fp.write("\n")

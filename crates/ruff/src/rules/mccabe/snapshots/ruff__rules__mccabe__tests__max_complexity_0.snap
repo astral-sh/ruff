@@ -1,0 +1,269 @@
+---
+source: src/rules/mccabe/mod.rs
+expression: diagnostics
+---
+- kind:
+    FunctionIsTooComplex:
+      name: trivial
+      complexity: 1
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: expr_as_statement
+      complexity: 1
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 7
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: sequential
+      complexity: 1
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: if_elif_else_dead_path
+      complexity: 3
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: nested_ifs
+      complexity: 3
+  location:
+    row: 29
+    column: 4
+  end_location:
+    row: 29
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: for_loop
+      complexity: 2
+  location:
+    row: 40
+    column: 4
+  end_location:
+    row: 40
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: for_else
+      complexity: 2
+  location:
+    row: 46
+    column: 4
+  end_location:
+    row: 46
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: recursive
+      complexity: 2
+  location:
+    row: 54
+    column: 4
+  end_location:
+    row: 54
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: nested_functions
+      complexity: 3
+  location:
+    row: 62
+    column: 4
+  end_location:
+    row: 62
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: a
+      complexity: 2
+  location:
+    row: 63
+    column: 8
+  end_location:
+    row: 63
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: b
+      complexity: 1
+  location:
+    row: 64
+    column: 12
+  end_location:
+    row: 64
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: try_else
+      complexity: 4
+  location:
+    row: 73
+    column: 4
+  end_location:
+    row: 73
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: nested_try_finally
+      complexity: 3
+  location:
+    row: 85
+    column: 4
+  end_location:
+    row: 85
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: foobar
+      complexity: 3
+  location:
+    row: 96
+    column: 10
+  end_location:
+    row: 96
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: annotated_assign
+      complexity: 1
+  location:
+    row: 107
+    column: 4
+  end_location:
+    row: 107
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: handle
+      complexity: 9
+  location:
+    row: 113
+    column: 8
+  end_location:
+    row: 113
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: a
+      complexity: 1
+  location:
+    row: 118
+    column: 16
+  end_location:
+    row: 118
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: b
+      complexity: 2
+  location:
+    row: 121
+    column: 16
+  end_location:
+    row: 121
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: c
+      complexity: 1
+  location:
+    row: 126
+    column: 16
+  end_location:
+    row: 126
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: error
+      complexity: 1
+  location:
+    row: 129
+    column: 16
+  end_location:
+    row: 129
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: info
+      complexity: 1
+  location:
+    row: 132
+    column: 16
+  end_location:
+    row: 132
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    FunctionIsTooComplex:
+      name: exception
+      complexity: 1
+  location:
+    row: 135
+    column: 16
+  end_location:
+    row: 135
+    column: 25
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,102 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 26
+  fix:
+    content:
+      - "\"\"\" not a docstring\"\"\""
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 26
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 26
+  fix:
+    content:
+      - "\"\"\" not a docstring\"\"\""
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 11
+      column: 26
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 15
+    column: 38
+  end_location:
+    row: 17
+    column: 3
+  fix:
+    content:
+      - "\"\"\""
+      - "    not a"
+      - "\"\"\""
+    location:
+      row: 15
+      column: 38
+    end_location:
+      row: 17
+      column: 3
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 19
+  fix:
+    content:
+      - "\"\"\"docstring\"\"\""
+    location:
+      row: 17
+      column: 4
+    end_location:
+      row: 17
+      column: 19
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 22
+    column: 4
+  end_location:
+    row: 22
+    column: 27
+  fix:
+    content:
+      - "\"\"\" not a docstring \"\"\""
+    location:
+      row: 22
+      column: 4
+    end_location:
+      row: 22
+      column: 27
+  parent: ~
+

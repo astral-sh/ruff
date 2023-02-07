@@ -1,0 +1,278 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedImport:
+      name: foo1
+      ignore_init: false
+      multiple: false
+  location:
+    row: 3
+    column: 11
+  end_location:
+    row: 3
+    column: 15
+  fix:
+    content:
+      - ""
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 17
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo2
+      ignore_init: false
+      multiple: false
+  location:
+    row: 4
+    column: 11
+  end_location:
+    row: 4
+    column: 15
+  fix:
+    content:
+      - ""
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 21
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo3
+      ignore_init: false
+      multiple: false
+  location:
+    row: 7
+    column: 11
+  end_location:
+    row: 7
+    column: 15
+  fix:
+    content:
+      - ""
+    location:
+      row: 7
+      column: 4
+    end_location:
+      row: 8
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo4
+      ignore_init: false
+      multiple: false
+  location:
+    row: 11
+    column: 11
+  end_location:
+    row: 11
+    column: 15
+  fix:
+    content:
+      - ""
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 12
+      column: 10
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo5
+      ignore_init: false
+      multiple: false
+  location:
+    row: 16
+    column: 18
+  end_location:
+    row: 16
+    column: 22
+  fix:
+    content:
+      - ""
+    location:
+      row: 16
+      column: 11
+    end_location:
+      row: 16
+      column: 22
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo6
+      ignore_init: false
+      multiple: false
+  location:
+    row: 21
+    column: 16
+  end_location:
+    row: 21
+    column: 20
+  fix:
+    content:
+      - ""
+    location:
+      row: 21
+      column: 9
+    end_location:
+      row: 21
+      column: 20
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo7
+      ignore_init: false
+      multiple: false
+  location:
+    row: 26
+    column: 17
+  end_location:
+    row: 26
+    column: 21
+  fix:
+    content:
+      - ""
+    location:
+      row: 26
+      column: 10
+    end_location:
+      row: 26
+      column: 21
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo8
+      ignore_init: false
+      multiple: false
+  location:
+    row: 30
+    column: 18
+  end_location:
+    row: 30
+    column: 22
+  fix:
+    content:
+      - ""
+    location:
+      row: 30
+      column: 11
+    end_location:
+      row: 30
+      column: 24
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo9
+      ignore_init: false
+      multiple: false
+  location:
+    row: 31
+    column: 22
+  end_location:
+    row: 31
+    column: 26
+  fix:
+    content:
+      - ""
+    location:
+      row: 31
+      column: 15
+    end_location:
+      row: 31
+      column: 32
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo10
+      ignore_init: false
+      multiple: false
+  location:
+    row: 35
+    column: 15
+  end_location:
+    row: 35
+    column: 20
+  fix:
+    content:
+      - ""
+    location:
+      row: 35
+      column: 8
+    end_location:
+      row: 36
+      column: 4
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo11
+      ignore_init: false
+      multiple: false
+  location:
+    row: 40
+    column: 16
+  end_location:
+    row: 40
+    column: 21
+  fix:
+    content:
+      - ""
+    location:
+      row: 40
+      column: 9
+    end_location:
+      row: 41
+      column: 9
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo12
+      ignore_init: false
+      multiple: false
+  location:
+    row: 46
+    column: 7
+  end_location:
+    row: 46
+    column: 12
+  fix:
+    content:
+      - ""
+    location:
+      row: 46
+      column: 0
+    end_location:
+      row: 46
+      column: 12
+  parent: ~
+- kind:
+    UnusedImport:
+      name: foo13
+      ignore_init: false
+      multiple: false
+  location:
+    row: 51
+    column: 7
+  end_location:
+    row: 51
+    column: 12
+  fix:
+    content:
+      - ""
+    location:
+      row: 51
+      column: 0
+    end_location:
+      row: 51
+      column: 12
+  parent: ~
+

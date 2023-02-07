@@ -1,0 +1,103 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    ParametrizeNamesWrongType:
+      expected: csv
+  location:
+    row: 24
+    column: 25
+  end_location:
+    row: 24
+    column: 45
+  fix:
+    content:
+      - "\"param1,param2\""
+    location:
+      row: 24
+      column: 25
+    end_location:
+      row: 24
+      column: 45
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: csv
+  location:
+    row: 29
+    column: 25
+  end_location:
+    row: 29
+    column: 36
+  fix:
+    content:
+      - "\"param1\""
+    location:
+      row: 29
+      column: 25
+    end_location:
+      row: 29
+      column: 36
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: csv
+  location:
+    row: 34
+    column: 25
+  end_location:
+    row: 34
+    column: 45
+  fix:
+    content:
+      - "\"param1,param2\""
+    location:
+      row: 34
+      column: 25
+    end_location:
+      row: 34
+      column: 45
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: csv
+  location:
+    row: 39
+    column: 25
+  end_location:
+    row: 39
+    column: 35
+  fix:
+    content:
+      - "\"param1\""
+    location:
+      row: 39
+      column: 25
+    end_location:
+      row: 39
+      column: 35
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: csv
+  location:
+    row: 44
+    column: 25
+  end_location:
+    row: 44
+    column: 50
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeNamesWrongType:
+      expected: csv
+  location:
+    row: 49
+    column: 25
+  end_location:
+    row: 49
+    column: 46
+  fix: ~
+  parent: ~
+

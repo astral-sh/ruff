@@ -1,6 +1,9 @@
 # Local cache
 .ruff_cache
-resources/test/cpython
+crates/ruff/resources/test/cpython
+docs/
+mkdocs.yml
+.overrides
 
 ###
 # Rust.gitignore
@@ -182,3 +185,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 .vimspector.json
+
+# Visual Studio Code
+.vscode/

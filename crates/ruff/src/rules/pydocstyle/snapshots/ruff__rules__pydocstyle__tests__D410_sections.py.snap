@@ -1,0 +1,45 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    BlankLineAfterSection:
+      name: Returns
+  location:
+    row: 67
+    column: 4
+  end_location:
+    row: 78
+    column: 7
+  fix:
+    content:
+      - ""
+      - ""
+    location:
+      row: 71
+      column: 0
+    end_location:
+      row: 71
+      column: 0
+  parent: ~
+- kind:
+    BlankLineAfterSection:
+      name: Returns
+  location:
+    row: 207
+    column: 4
+  end_location:
+    row: 221
+    column: 7
+  fix:
+    content:
+      - ""
+      - ""
+    location:
+      row: 218
+      column: 0
+    end_location:
+      row: 218
+      column: 0
+  parent: ~
+

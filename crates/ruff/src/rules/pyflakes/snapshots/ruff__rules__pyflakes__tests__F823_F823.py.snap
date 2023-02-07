@@ -1,0 +1,16 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UndefinedLocal:
+      name: my_var
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 10
+  fix: ~
+  parent: ~
+

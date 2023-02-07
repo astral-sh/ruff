@@ -1,0 +1,90 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    ConsiderMergingIsinstance:
+      obj: "var[3]"
+      types:
+        - float
+        - int
+  location:
+    row: 15
+    column: 7
+  end_location:
+    row: 15
+    column: 96
+  fix: ~
+  parent: ~
+- kind:
+    ConsiderMergingIsinstance:
+      obj: "var[4]"
+      types:
+        - float
+        - int
+  location:
+    row: 17
+    column: 13
+  end_location:
+    row: 17
+    column: 103
+  fix: ~
+  parent: ~
+- kind:
+    ConsiderMergingIsinstance:
+      obj: "var[5]"
+      types:
+        - float
+        - int
+  location:
+    row: 19
+    column: 13
+  end_location:
+    row: 19
+    column: 73
+  fix: ~
+  parent: ~
+- kind:
+    ConsiderMergingIsinstance:
+      obj: "var[10]"
+      types:
+        - list
+        - str
+  location:
+    row: 23
+    column: 13
+  end_location:
+    row: 23
+    column: 158
+  fix: ~
+  parent: ~
+- kind:
+    ConsiderMergingIsinstance:
+      obj: "var[11]"
+      types:
+        - float
+        - int
+  location:
+    row: 24
+    column: 13
+  end_location:
+    row: 24
+    column: 95
+  fix: ~
+  parent: ~
+- kind:
+    ConsiderMergingIsinstance:
+      obj: "var[12]"
+      types:
+        - float
+        - int
+        - list
+  location:
+    row: 30
+    column: 13
+  end_location:
+    row: 30
+    column: 75
+  fix: ~
+  parent: ~
+

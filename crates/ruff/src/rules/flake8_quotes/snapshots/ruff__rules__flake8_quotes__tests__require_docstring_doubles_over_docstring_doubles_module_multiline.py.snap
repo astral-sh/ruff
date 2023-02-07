@@ -1,0 +1,47 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadQuotesMultilineString:
+      quote: single
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 6
+    column: 3
+  fix:
+    content:
+      - "'''"
+      - this is not a docstring
+      - "'''"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 6
+      column: 3
+  parent: ~
+- kind:
+    BadQuotesMultilineString:
+      quote: single
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 11
+    column: 3
+  fix:
+    content:
+      - "'''"
+      - this is not a docstring
+      - "'''"
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 11
+      column: 3
+  parent: ~
+

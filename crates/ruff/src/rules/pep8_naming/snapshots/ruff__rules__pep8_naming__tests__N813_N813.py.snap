@@ -1,0 +1,41 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    CamelcaseImportedAsLowercase:
+      name: Camel
+      asname: camel
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    CamelcaseImportedAsLowercase:
+      name: CamelCase
+      asname: camelcase
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 38
+  fix: ~
+  parent: ~
+- kind:
+    CamelcaseImportedAsLowercase:
+      name: AnotherCamelCase
+      asname: another_camelcase
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 53
+  fix: ~
+  parent: ~
+

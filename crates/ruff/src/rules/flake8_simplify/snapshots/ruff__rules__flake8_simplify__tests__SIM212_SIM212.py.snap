@@ -1,0 +1,45 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    IfExprWithTwistedArms:
+      expr_body: b
+      expr_else: a
+  location:
+    row: 1
+    column: 4
+  end_location:
+    row: 1
+    column: 21
+  fix:
+    content:
+      - a if a else b
+    location:
+      row: 1
+      column: 4
+    end_location:
+      row: 1
+      column: 21
+  parent: ~
+- kind:
+    IfExprWithTwistedArms:
+      expr_body: b + c
+      expr_else: a
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 25
+  fix:
+    content:
+      - a if a else b + c
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 25
+  parent: ~
+

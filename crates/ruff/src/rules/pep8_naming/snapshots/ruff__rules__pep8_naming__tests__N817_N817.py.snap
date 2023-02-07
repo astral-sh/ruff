@@ -1,0 +1,29 @@
+---
+source: src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    CamelcaseImportedAsAcronym:
+      name: CaMel
+      asname: CM
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    CamelcaseImportedAsAcronym:
+      name: CamelCase
+      asname: CC
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 31
+  fix: ~
+  parent: ~
+

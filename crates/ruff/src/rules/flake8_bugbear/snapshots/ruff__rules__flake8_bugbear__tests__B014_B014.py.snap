@@ -1,0 +1,65 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    DuplicateHandlerException:
+      names:
+        - OSError
+  location:
+    row: 17
+    column: 7
+  end_location:
+    row: 17
+    column: 25
+  fix:
+    content:
+      - OSError
+    location:
+      row: 17
+      column: 7
+    end_location:
+      row: 17
+      column: 25
+  parent: ~
+- kind:
+    DuplicateHandlerException:
+      names:
+        - MyError
+  location:
+    row: 28
+    column: 7
+  end_location:
+    row: 28
+    column: 25
+  fix:
+    content:
+      - MyError
+    location:
+      row: 28
+      column: 7
+    end_location:
+      row: 28
+      column: 25
+  parent: ~
+- kind:
+    DuplicateHandlerException:
+      names:
+        - re.error
+  location:
+    row: 49
+    column: 7
+  end_location:
+    row: 49
+    column: 27
+  fix:
+    content:
+      - re.error
+    location:
+      row: 49
+      column: 7
+    end_location:
+      row: 49
+      column: 27
+  parent: ~
+

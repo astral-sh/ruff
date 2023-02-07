@@ -40,7 +40,7 @@
       ]
     },
     "exclude": {
-      "description": "A list of file patterns to exclude from linting.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
+      "description": "A list of file patterns to exclude from linting.\n\nExclusions are based on globs, and can be either:\n\n* Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). * Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
       "type": [
         "array",
         "null"
@@ -57,7 +57,7 @@
       ]
     },
     "extend-exclude": {
-      "description": "A list of file patterns to omit from linting, in addition to those specified by `exclude`.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "description": "A list of file patterns to omit from linting, in addition to those specified by `exclude`.\n\nExclusions are based on globs, and can be either:\n\n* Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). * Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "array",
         "null"
@@ -66,18 +66,8 @@
         "type": "string"
       }
     },
-    "extend-ignore": {
-      "description": "A list of rule codes or prefixes to ignore, in addition to those specified by `ignore`.\n\nNote that `extend-ignore` is applied after resolving rules from `ignore`/`select` and a less specific rule in `extend-ignore` would overwrite a more specific rule in `select`. It is recommended to only use `extend-ignore` when extending a `pyproject.toml` file via `extend`.",
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/definitions/RuleSelector"
-      }
-    },
     "extend-select": {
-      "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.\n\nNote that `extend-select` is applied after resolving rules from `ignore`/`select` and a less specific rule in `extend-select` would overwrite a more specific rule in `ignore`. It is recommended to only use `extend-select` when extending a `pyproject.toml` file via `extend`.",
+      "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
       "type": [
         "array",
         "null"
@@ -111,7 +101,7 @@
       ]
     },
     "fixable": {
-      "description": "A list of rule codes or prefixes to consider autofixable.",
+      "description": "A list of rule codes or prefixes to consider autofixable. By default, all rules are considered autofixable.",
       "type": [
         "array",
         "null"
@@ -566,7 +556,7 @@
           ]
         },
         "suppress-none-returning": {
-          "description": "Whether to suppress `ANN200`-level violations for functions that meet either of the following criteria:\n\n- Contain no `return` statement. - Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
+          "description": "Whether to suppress `ANN200`-level violations for functions that meet either of the following criteria:\n\n* Contain no `return` statement. * Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
           "type": [
             "boolean",
             "null"
@@ -578,6 +568,13 @@
     "Flake8BanditOptions": {
       "type": "object",
       "properties": {
+        "check-typed-exception": {
+          "description": "Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default, `try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "hardcoded-tmp-directory": {
           "description": "A list of directories to consider temporary.",
           "type": [
@@ -652,7 +649,7 @@
       "type": "object",
       "properties": {
         "allow-multiline": {
-          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).",
+          "description": "Whether to allow implicit string concatenations for multiline strings. By default, implicit concatenations of multiline strings are allowed (but continuation lines, delimited with a backslash, are prohibited).\n\nNote that setting `allow-multiline = false` should typically be coupled with disabling `explicit-string-concatenation` (`ISC003`). Otherwise, both explicit and implicit multiline string concatenations will be seen as violations.",
           "type": [
             "boolean",
             "null"
@@ -705,7 +702,7 @@
           ]
         },
         "parametrize-names-type": {
-          "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported: * `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize('name1,name2', ...)` * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), ...)` * `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`",
+          "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported:\n\n* `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize('name1,name2', ...)` * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), ...)` * `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`",
           "anyOf": [
             {
               "$ref": "#/definitions/ParametrizeNameType"
@@ -716,7 +713,7 @@
           ]
         },
         "parametrize-values-row-type": {
-          "description": "Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported: * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])` * `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`",
+          "description": "Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported:\n\n* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])` * `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`",
           "anyOf": [
             {
               "$ref": "#/definitions/ParametrizeValuesRowType"
@@ -727,7 +724,7 @@
           ]
         },
         "parametrize-values-type": {
-          "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported: * `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))` * `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`",
+          "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported:\n\n* `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))` * `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`",
           "anyOf": [
             {
               "$ref": "#/definitions/ParametrizeValuesType"
@@ -771,7 +768,7 @@
           ]
         },
         "docstring-quotes": {
-          "description": "Quote style to prefer for docstrings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "description": "Quote style to prefer for docstrings (either \"single\" or \"double\").",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -782,7 +779,7 @@
           ]
         },
         "inline-quotes": {
-          "description": "Quote style to prefer for inline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "description": "Quote style to prefer for inline strings (either \"single\" or \"double\").",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -793,7 +790,7 @@
           ]
         },
         "multiline-quotes": {
-          "description": "Quote style to prefer for multiline strings (either \"single\" (`'`) or \"double\" (`\"`)).",
+          "description": "Quote style to prefer for multiline strings (either \"single\" or \"double\").",
           "anyOf": [
             {
               "$ref": "#/definitions/Quote"
@@ -847,7 +844,7 @@
           }
         },
         "strict": {
-          "description": "Enforce TC001, TC002, and TC003 rules even when valid runtime imports are present for the same module. See: https://github.com/snok/flake8-type-checking#strict.",
+          "description": "Enforce TC001, TC002, and TC003 rules even when valid runtime imports are present for the same module. See flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
           "type": [
             "boolean",
             "null"
@@ -940,6 +937,16 @@
             "null"
           ]
         },
+        "forced-separate": {
+          "description": "A list of modules to separate into auxiliary block(s) of imports, in the order specified.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
           "type": [
@@ -959,6 +966,14 @@
           "items": {
             "type": "string"
           }
+        },
+        "lines-after-imports": {
+          "description": "The number of blank lines to place after imports. -1 for automatic determination.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int"
         },
         "no-lines-before": {
           "description": "A list of sections that should _not_ be delineated from the previous section via empty lines.",
@@ -981,7 +996,7 @@
           "description": "Whether to place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local), or vice versa.\n\nThe default (\"furthest-to-closest\") is equivalent to isort's `reverse-relative` default (`reverse-relative = false`); setting this to \"closest-to-furthest\" is equivalent to isort's `reverse-relative = true`.",
           "anyOf": [
             {
-              "$ref": "#/definitions/RelatveImportsOrder"
+              "$ref": "#/definitions/RelativeImportsOrder"
             },
             {
               "type": "null"
@@ -1105,7 +1120,7 @@
       "type": "object",
       "properties": {
         "keep-runtime-typing": {
-          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively.",
+          "description": "Whether to avoid PEP 585 (`List[int]` -> `list[int]`) and PEP 604 (`Optional[str]` -> `str | None`) rewrites even if a file imports `from __future__ import annotations`. Note that this setting is only applicable when the target Python version is below 3.9 and 3.10 respectively, and enabling it is equivalent to disabling `use-pep585-annotation` (`UP006`) and `use-pep604-annotation` (`UP007`) entirely.",
           "type": [
             "boolean",
             "null"
@@ -1118,7 +1133,7 @@
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
-          "description": "Whether or not line-length violations (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
+          "description": "Whether line-length violations (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
           "type": [
             "boolean",
             "null"
@@ -1157,7 +1172,7 @@
       "type": "object",
       "properties": {
         "allow-magic-value-types": {
-          "description": "Constant types to ignore when used as \"magic values\".",
+          "description": "Constant types to ignore when used as \"magic values\" (see: `PLR2004`).",
           "type": [
             "array",
             "null"
@@ -1165,6 +1180,42 @@
           "items": {
             "$ref": "#/definitions/ConstantType"
           }
+        },
+        "max-args": {
+          "description": "Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "max-branches": {
+          "description": "Maximum number of branches allowed for a function or method body (see: `PLR0912`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "max-returns": {
+          "description": "Maximum number of return statements allowed for a function or method body (see `PLR0911`)",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "max-statements": {
+          "description": "Maximum number of statements allowed for a function or method body (see: `PLR0915`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false
@@ -1182,14 +1233,14 @@
     "Quote": {
       "oneOf": [
         {
-          "description": "Use single quotes (`'`).",
+          "description": "Use single quotes.",
           "type": "string",
           "enum": [
             "single"
           ]
         },
         {
-          "description": "Use double quotes (`\"`).",
+          "description": "Use double quotes.",
           "type": "string",
           "enum": [
             "double"
@@ -1197,7 +1248,7 @@
         }
       ]
     },
-    "RelatveImportsOrder": {
+    "RelativeImportsOrder": {
       "oneOf": [
         {
           "description": "Place \"closer\" imports (fewer `.` characters, most local) before \"further\" imports (more `.` characters, least local).",
@@ -1616,10 +1667,17 @@
         "PLE011",
         "PLE0117",
         "PLE0118",
+        "PLE06",
+        "PLE060",
+        "PLE0604",
+        "PLE0605",
         "PLE1",
         "PLE11",
         "PLE114",
         "PLE1142",
+        "PLE13",
+        "PLE131",
+        "PLE1310",
         "PLR",
         "PLR0",
         "PLR01",
@@ -1631,6 +1689,12 @@
         "PLR04",
         "PLR040",
         "PLR0402",
+        "PLR09",
+        "PLR091",
+        "PLR0911",
+        "PLR0912",
+        "PLR0913",
+        "PLR0915",
         "PLR1",
         "PLR17",
         "PLR170",
@@ -1727,6 +1791,10 @@
         "RET506",
         "RET507",
         "RET508",
+        "RSE",
+        "RSE1",
+        "RSE10",
+        "RSE102",
         "RUF",
         "RUF0",
         "RUF00",
@@ -1750,6 +1818,7 @@
         "S107",
         "S108",
         "S11",
+        "S110",
         "S113",
         "S3",
         "S32",
@@ -1803,6 +1872,10 @@
         "SIM4",
         "SIM40",
         "SIM401",
+        "SLF",
+        "SLF0",
+        "SLF00",
+        "SLF001",
         "T",
         "T1",
         "T10",
@@ -1859,7 +1932,6 @@
         "UP013",
         "UP014",
         "UP015",
-        "UP016",
         "UP017",
         "UP018",
         "UP019",
@@ -1880,6 +1952,9 @@
         "UP032",
         "UP033",
         "UP034",
+        "UP035",
+        "UP036",
+        "UP037",
         "W",
         "W2",
         "W29",

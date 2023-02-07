@@ -1,0 +1,159 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    RequestWithoutTimeout:
+      timeout: ~
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: None
+  location:
+    row: 4
+    column: 42
+  end_location:
+    row: 4
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: ~
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: None
+  location:
+    row: 7
+    column: 43
+  end_location:
+    row: 7
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: None
+  location:
+    row: 10
+    column: 42
+  end_location:
+    row: 10
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: ~
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: None
+  location:
+    row: 13
+    column: 45
+  end_location:
+    row: 13
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: ~
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: None
+  location:
+    row: 16
+    column: 44
+  end_location:
+    row: 16
+    column: 48
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: ~
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: None
+  location:
+    row: 19
+    column: 46
+  end_location:
+    row: 19
+    column: 50
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: ~
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    RequestWithoutTimeout:
+      timeout: None
+  location:
+    row: 22
+    column: 43
+  end_location:
+    row: 22
+    column: 47
+  fix: ~
+  parent: ~
+

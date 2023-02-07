@@ -1,0 +1,49 @@
+---
+source: src/rules/flake8_annotations/mod.rs
+expression: diagnostics
+---
+- kind:
+    DynamicallyTypedExpression:
+      name: a
+  location:
+    row: 10
+    column: 11
+  end_location:
+    row: 10
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: foo
+  location:
+    row: 15
+    column: 46
+  end_location:
+    row: 15
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: a
+  location:
+    row: 40
+    column: 28
+  end_location:
+    row: 40
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    DynamicallyTypedExpression:
+      name: foo_method
+  location:
+    row: 44
+    column: 66
+  end_location:
+    row: 44
+    column: 69
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,157 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedImport:
+      name: functools
+      ignore_init: false
+      multiple: false
+  location:
+    row: 2
+    column: 7
+  end_location:
+    row: 2
+    column: 16
+  fix:
+    content:
+      - import os
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 20
+  parent: ~
+- kind:
+    UnusedImport:
+      name: collections.OrderedDict
+      ignore_init: false
+      multiple: false
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 15
+  fix:
+    content:
+      - from collections import (
+      - "    Counter,"
+      - "    namedtuple,"
+      - )
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 8
+      column: 1
+  parent:
+    row: 4
+    column: 0
+- kind:
+    UnusedImport:
+      name: logging.handlers
+      ignore_init: false
+      multiple: false
+  location:
+    row: 12
+    column: 7
+  end_location:
+    row: 12
+    column: 23
+  fix:
+    content:
+      - ""
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 13
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      name: shelve
+      ignore_init: false
+      multiple: false
+  location:
+    row: 32
+    column: 11
+  end_location:
+    row: 32
+    column: 17
+  fix:
+    content:
+      - ""
+    location:
+      row: 32
+      column: 0
+    end_location:
+      row: 33
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      name: importlib
+      ignore_init: false
+      multiple: false
+  location:
+    row: 33
+    column: 11
+  end_location:
+    row: 33
+    column: 20
+  fix:
+    content:
+      - pass
+    location:
+      row: 33
+      column: 4
+    end_location:
+      row: 33
+      column: 20
+  parent: ~
+- kind:
+    UnusedImport:
+      name: pathlib
+      ignore_init: false
+      multiple: false
+  location:
+    row: 37
+    column: 11
+  end_location:
+    row: 37
+    column: 18
+  fix:
+    content:
+      - ""
+    location:
+      row: 37
+      column: 0
+    end_location:
+      row: 38
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      name: pickle
+      ignore_init: false
+      multiple: false
+  location:
+    row: 52
+    column: 15
+  end_location:
+    row: 52
+    column: 21
+  fix:
+    content:
+      - pass
+    location:
+      row: 52
+      column: 8
+    end_location:
+      row: 52
+      column: 21
+  parent: ~
+

@@ -1,0 +1,17 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    RedefinedWhileUnused:
+      name: os
+      line: 4
+  location:
+    row: 5
+    column: 11
+  end_location:
+    row: 5
+    column: 13
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,27 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnsafeYAMLLoad:
+      loader: ~
+  location:
+    row: 10
+    column: 8
+  end_location:
+    row: 10
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    UnsafeYAMLLoad:
+      loader: Loader
+  location:
+    row: 24
+    column: 23
+  end_location:
+    row: 24
+    column: 34
+  fix: ~
+  parent: ~
+

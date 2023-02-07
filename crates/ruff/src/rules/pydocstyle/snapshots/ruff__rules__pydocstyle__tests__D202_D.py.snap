@@ -1,0 +1,81 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoBlankLineAfterFunction:
+      num_lines: 1
+  location:
+    row: 142
+    column: 4
+  end_location:
+    row: 142
+    column: 24
+  fix:
+    content:
+      - ""
+    location:
+      row: 143
+      column: 0
+    end_location:
+      row: 144
+      column: 0
+  parent: ~
+- kind:
+    NoBlankLineAfterFunction:
+      num_lines: 1
+  location:
+    row: 151
+    column: 4
+  end_location:
+    row: 151
+    column: 37
+  fix:
+    content:
+      - ""
+    location:
+      row: 152
+      column: 0
+    end_location:
+      row: 153
+      column: 0
+  parent: ~
+- kind:
+    NoBlankLineAfterFunction:
+      num_lines: 1
+  location:
+    row: 555
+    column: 4
+  end_location:
+    row: 558
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 559
+      column: 0
+    end_location:
+      row: 560
+      column: 0
+  parent: ~
+- kind:
+    NoBlankLineAfterFunction:
+      num_lines: 1
+  location:
+    row: 568
+    column: 4
+  end_location:
+    row: 571
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 572
+      column: 0
+    end_location:
+      row: 573
+      column: 0
+  parent: ~
+

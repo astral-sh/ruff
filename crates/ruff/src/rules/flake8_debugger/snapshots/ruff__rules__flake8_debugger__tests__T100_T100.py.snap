@@ -1,0 +1,113 @@
+---
+source: src/rules/flake8_debugger/mod.rs
+expression: diagnostics
+---
+- kind:
+    Debugger:
+      using_type:
+        Call: breakpoint
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    Debugger:
+      using_type:
+        Import: pdb
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    Debugger:
+      using_type:
+        Import: builtins.breakpoint
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    Debugger:
+      using_type:
+        Import: pdb.set_trace
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    Debugger:
+      using_type:
+        Import: celery.contrib.rdb.set_trace
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    Debugger:
+      using_type:
+        Import: celery.contrib.rdb
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    Debugger:
+      using_type:
+        Call: builtins.breakpoint
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    Debugger:
+      using_type:
+        Call: pdb.set_trace
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    Debugger:
+      using_type:
+        Call: celery.contrib.rdb.set_trace
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 11
+  fix: ~
+  parent: ~
+

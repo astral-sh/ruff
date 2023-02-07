@@ -1,0 +1,233 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    YodaConditions:
+      suggestion: "compare == \"yoda\""
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 17
+  fix:
+    content:
+      - "compare == \"yoda\""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 17
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: "compare == \"yoda\""
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 17
+  fix:
+    content:
+      - "compare == \"yoda\""
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 17
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age == 42
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 9
+  fix:
+    content:
+      - age == 42
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 9
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: "compare == (\"a\", \"b\")"
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 21
+  fix:
+    content:
+      - "compare == (\"a\", \"b\")"
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 21
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: "compare >= \"yoda\""
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 17
+  fix:
+    content:
+      - "compare >= \"yoda\""
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 17
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: "compare > \"yoda\""
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 16
+  fix:
+    content:
+      - "compare > \"yoda\""
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 16
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age < 42
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 8
+  fix:
+    content:
+      - age < 42
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 8
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age == YODA
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 11
+  fix:
+    content:
+      - age == YODA
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 11
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age < YODA
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 10
+  fix:
+    content:
+      - age < YODA
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 10
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age <= YODA
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 11
+  fix:
+    content:
+      - age <= YODA
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 11
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age == JediOrder.YODA
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 21
+  fix:
+    content:
+      - age == JediOrder.YODA
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 12
+      column: 21
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: (number - 100) > 0
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 18
+  fix:
+    content:
+      - (number - 100) > 0
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 17
+  parent: ~
+

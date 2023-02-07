@@ -1,0 +1,16 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    RaisesTooBroad:
+      exception: ZeroDivisionError
+  location:
+    row: 12
+    column: 23
+  end_location:
+    row: 12
+    column: 40
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,27 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    FixtureParamWithoutValue:
+      name: _fixture
+  location:
+    row: 9
+    column: 13
+  end_location:
+    row: 9
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    FixtureParamWithoutValue:
+      name: _fixture
+  location:
+    row: 13
+    column: 16
+  end_location:
+    row: 13
+    column: 24
+  fix: ~
+  parent: ~
+

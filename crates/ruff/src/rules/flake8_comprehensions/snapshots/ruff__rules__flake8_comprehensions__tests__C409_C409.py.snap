@@ -1,0 +1,103 @@
+---
+source: src/rules/flake8_comprehensions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryLiteralWithinTupleCall:
+      literal: list
+  location:
+    row: 1
+    column: 5
+  end_location:
+    row: 1
+    column: 14
+  fix:
+    content:
+      - ()
+    location:
+      row: 1
+      column: 5
+    end_location:
+      row: 1
+      column: 14
+  parent: ~
+- kind:
+    UnnecessaryLiteralWithinTupleCall:
+      literal: list
+  location:
+    row: 2
+    column: 5
+  end_location:
+    row: 2
+    column: 18
+  fix:
+    content:
+      - "(1, 2)"
+    location:
+      row: 2
+      column: 5
+    end_location:
+      row: 2
+      column: 18
+  parent: ~
+- kind:
+    UnnecessaryLiteralWithinTupleCall:
+      literal: tuple
+  location:
+    row: 3
+    column: 5
+  end_location:
+    row: 3
+    column: 18
+  fix:
+    content:
+      - "(1, 2)"
+    location:
+      row: 3
+      column: 5
+    end_location:
+      row: 3
+      column: 18
+  parent: ~
+- kind:
+    UnnecessaryLiteralWithinTupleCall:
+      literal: list
+  location:
+    row: 4
+    column: 5
+  end_location:
+    row: 7
+    column: 2
+  fix:
+    content:
+      - (
+      - "    1,"
+      - "    2"
+      - )
+    location:
+      row: 4
+      column: 5
+    end_location:
+      row: 7
+      column: 2
+  parent: ~
+- kind:
+    UnnecessaryLiteralWithinTupleCall:
+      literal: tuple
+  location:
+    row: 8
+    column: 5
+  end_location:
+    row: 10
+    column: 1
+  fix:
+    content:
+      - "(1, 2)"
+    location:
+      row: 8
+      column: 5
+    end_location:
+      row: 10
+      column: 1
+  parent: ~
+

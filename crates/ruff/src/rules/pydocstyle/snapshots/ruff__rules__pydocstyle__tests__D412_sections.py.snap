@@ -1,0 +1,24 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoBlankLinesBetweenHeaderAndContent:
+      name: Short summary
+  location:
+    row: 207
+    column: 4
+  end_location:
+    row: 221
+    column: 7
+  fix:
+    content:
+      - ""
+    location:
+      row: 211
+      column: 0
+    end_location:
+      row: 212
+      column: 0
+  parent: ~
+

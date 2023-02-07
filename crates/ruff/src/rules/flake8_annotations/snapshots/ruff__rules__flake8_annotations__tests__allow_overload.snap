@@ -1,0 +1,16 @@
+---
+source: src/rules/flake8_annotations/mod.rs
+expression: diagnostics
+---
+- kind:
+    MissingReturnTypePublicFunction:
+      name: bar
+  location:
+    row: 29
+    column: 8
+  end_location:
+    row: 29
+    column: 11
+  fix: ~
+  parent: ~
+

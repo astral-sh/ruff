@@ -1,0 +1,43 @@
+---
+source: src/rules/flake8_comprehensions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryComprehension:
+      obj_type: list
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 14
+  fix:
+    content:
+      - list(x)
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 14
+  parent: ~
+- kind:
+    UnnecessaryComprehension:
+      obj_type: set
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 14
+  fix:
+    content:
+      - set(x)
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 14
+  parent: ~
+

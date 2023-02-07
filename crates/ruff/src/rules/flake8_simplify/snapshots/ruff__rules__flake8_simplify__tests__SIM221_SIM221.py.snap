@@ -1,0 +1,62 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    AOrNotA:
+      name: a
+  location:
+    row: 1
+    column: 3
+  end_location:
+    row: 1
+    column: 13
+  fix:
+    content:
+      - "True"
+    location:
+      row: 1
+      column: 3
+    end_location:
+      row: 1
+      column: 13
+  parent: ~
+- kind:
+    AOrNotA:
+      name: a
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 14
+  fix:
+    content:
+      - "True"
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 14
+  parent: ~
+- kind:
+    AOrNotA:
+      name: a
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 7
+    column: 14
+  fix:
+    content:
+      - "True"
+    location:
+      row: 7
+      column: 4
+    end_location:
+      row: 7
+      column: 14
+  parent: ~
+

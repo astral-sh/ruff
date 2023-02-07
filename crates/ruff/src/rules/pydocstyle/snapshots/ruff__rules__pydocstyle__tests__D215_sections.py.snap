@@ -1,0 +1,43 @@
+---
+source: src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    SectionUnderlineNotOverIndented:
+      name: Returns
+  location:
+    row: 147
+    column: 4
+  end_location:
+    row: 153
+    column: 7
+  fix:
+    content:
+      - "    "
+    location:
+      row: 150
+      column: 0
+    end_location:
+      row: 150
+      column: 9
+  parent: ~
+- kind:
+    SectionUnderlineNotOverIndented:
+      name: Returns
+  location:
+    row: 161
+    column: 4
+  end_location:
+    row: 165
+    column: 7
+  fix:
+    content:
+      - "    "
+    location:
+      row: 164
+      column: 0
+    end_location:
+      row: 164
+      column: 9
+  parent: ~
+

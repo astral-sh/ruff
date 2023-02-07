@@ -1,0 +1,17 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    TooManyArguments:
+      c_args: 6
+      max_args: 5
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 10
+    column: 8
+  fix: ~
+  parent: ~
+

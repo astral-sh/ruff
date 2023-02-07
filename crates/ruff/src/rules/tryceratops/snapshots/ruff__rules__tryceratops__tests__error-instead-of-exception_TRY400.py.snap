@@ -1,0 +1,85 @@
+---
+source: src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 15
+    column: 8
+  end_location:
+    row: 15
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 18
+    column: 12
+  end_location:
+    row: 18
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 25
+    column: 8
+  end_location:
+    row: 25
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 28
+    column: 12
+  end_location:
+    row: 28
+    column: 48
+  fix: ~
+  parent: ~
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 35
+    column: 8
+  end_location:
+    row: 35
+    column: 41
+  fix: ~
+  parent: ~
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 38
+    column: 12
+  end_location:
+    row: 38
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 45
+    column: 8
+  end_location:
+    row: 45
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    ErrorInsteadOfException: ~
+  location:
+    row: 48
+    column: 12
+  end_location:
+    row: 48
+    column: 53
+  fix: ~
+  parent: ~
+

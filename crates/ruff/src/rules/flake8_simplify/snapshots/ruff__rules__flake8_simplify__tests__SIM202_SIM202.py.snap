@@ -1,0 +1,65 @@
+---
+source: src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    NegateNotEqualOp:
+      left: a
+      right: b
+  location:
+    row: 2
+    column: 3
+  end_location:
+    row: 2
+    column: 13
+  fix:
+    content:
+      - a == b
+    location:
+      row: 2
+      column: 3
+    end_location:
+      row: 2
+      column: 13
+  parent: ~
+- kind:
+    NegateNotEqualOp:
+      left: a
+      right: b + c
+  location:
+    row: 6
+    column: 3
+  end_location:
+    row: 6
+    column: 19
+  fix:
+    content:
+      - a == b + c
+    location:
+      row: 6
+      column: 3
+    end_location:
+      row: 6
+      column: 19
+  parent: ~
+- kind:
+    NegateNotEqualOp:
+      left: a + b
+      right: c
+  location:
+    row: 10
+    column: 3
+  end_location:
+    row: 10
+    column: 19
+  fix:
+    content:
+      - a + b == c
+    location:
+      row: 10
+      column: 3
+    end_location:
+      row: 10
+      column: 19
+  parent: ~
+

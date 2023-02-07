@@ -1,0 +1,82 @@
+---
+source: src/rules/flake8_return/mod.rs
+expression: diagnostics
+---
+- kind:
+    SuperfluousElseContinue:
+      branch: Elif
+  location:
+    row: 8
+    column: 8
+  end_location:
+    row: 8
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    SuperfluousElseContinue:
+      branch: Elif
+  location:
+    row: 22
+    column: 8
+  end_location:
+    row: 22
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    SuperfluousElseContinue:
+      branch: Else
+  location:
+    row: 36
+    column: 8
+  end_location:
+    row: 36
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    SuperfluousElseContinue:
+      branch: Else
+  location:
+    row: 47
+    column: 12
+  end_location:
+    row: 47
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    SuperfluousElseContinue:
+      branch: Else
+  location:
+    row: 63
+    column: 8
+  end_location:
+    row: 63
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    SuperfluousElseContinue:
+      branch: Else
+  location:
+    row: 74
+    column: 12
+  end_location:
+    row: 74
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    SuperfluousElseContinue:
+      branch: Else
+  location:
+    row: 85
+    column: 8
+  end_location:
+    row: 85
+    column: 12
+  fix: ~
+  parent: ~
+

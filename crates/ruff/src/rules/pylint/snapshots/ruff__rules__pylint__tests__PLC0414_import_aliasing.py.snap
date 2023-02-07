@@ -1,0 +1,149 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    UselessImportAlias: ~
+  location:
+    row: 6
+    column: 7
+  end_location:
+    row: 6
+    column: 33
+  fix:
+    content:
+      - collections
+    location:
+      row: 6
+      column: 7
+    end_location:
+      row: 6
+      column: 33
+  parent: ~
+- kind:
+    UselessImportAlias: ~
+  location:
+    row: 7
+    column: 24
+  end_location:
+    row: 7
+    column: 50
+  fix:
+    content:
+      - OrderedDict
+    location:
+      row: 7
+      column: 24
+    end_location:
+      row: 7
+      column: 50
+  parent: ~
+- kind:
+    UselessImportAlias: ~
+  location:
+    row: 16
+    column: 14
+  end_location:
+    row: 16
+    column: 24
+  fix:
+    content:
+      - bar
+    location:
+      row: 16
+      column: 14
+    end_location:
+      row: 16
+      column: 24
+  parent: ~
+- kind:
+    UselessImportAlias: ~
+  location:
+    row: 19
+    column: 18
+  end_location:
+    row: 19
+    column: 28
+  fix:
+    content:
+      - bar
+    location:
+      row: 19
+      column: 18
+    end_location:
+      row: 19
+      column: 28
+  parent: ~
+- kind:
+    UselessImportAlias: ~
+  location:
+    row: 20
+    column: 22
+  end_location:
+    row: 20
+    column: 38
+  fix:
+    content:
+      - foobar
+    location:
+      row: 20
+      column: 22
+    end_location:
+      row: 20
+      column: 38
+  parent: ~
+- kind:
+    UselessImportAlias: ~
+  location:
+    row: 22
+    column: 14
+  end_location:
+    row: 22
+    column: 24
+  fix:
+    content:
+      - foo
+    location:
+      row: 22
+      column: 14
+    end_location:
+      row: 22
+      column: 24
+  parent: ~
+- kind:
+    UselessImportAlias: ~
+  location:
+    row: 23
+    column: 26
+  end_location:
+    row: 23
+    column: 38
+  fix:
+    content:
+      - foo2
+    location:
+      row: 23
+      column: 26
+    end_location:
+      row: 23
+      column: 38
+  parent: ~
+- kind:
+    UselessImportAlias: ~
+  location:
+    row: 25
+    column: 20
+  end_location:
+    row: 25
+    column: 36
+  fix:
+    content:
+      - foobar
+    location:
+      row: 25
+      column: 20
+    end_location:
+      row: 25
+      column: 36
+  parent: ~
+

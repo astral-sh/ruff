@@ -1,0 +1,138 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 1
+    column: 3
+  end_location:
+    row: 1
+    column: 13
+  fix:
+    content:
+      - "=="
+    location:
+      row: 1
+      column: 5
+    end_location:
+      row: 1
+      column: 7
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: IsNot
+  location:
+    row: 4
+    column: 3
+  end_location:
+    row: 4
+    column: 15
+  fix:
+    content:
+      - "!="
+    location:
+      row: 4
+      column: 7
+    end_location:
+      row: 4
+      column: 13
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: IsNot
+  location:
+    row: 7
+    column: 3
+  end_location:
+    row: 8
+    column: 13
+  fix:
+    content:
+      - "!="
+    location:
+      row: 7
+      column: 7
+    end_location:
+      row: 8
+      column: 11
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 11
+    column: 3
+  end_location:
+    row: 11
+    column: 17
+  fix:
+    content:
+      - "=="
+    location:
+      row: 11
+      column: 9
+    end_location:
+      row: 11
+      column: 11
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 14
+    column: 3
+  end_location:
+    row: 14
+    column: 18
+  fix:
+    content:
+      - "=="
+    location:
+      row: 14
+      column: 14
+    end_location:
+      row: 14
+      column: 16
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 17
+    column: 3
+  end_location:
+    row: 17
+    column: 20
+  fix:
+    content:
+      - "=="
+    location:
+      row: 17
+      column: 16
+    end_location:
+      row: 17
+      column: 18
+  parent: ~
+- kind:
+    IsLiteral:
+      cmpop: Is
+  location:
+    row: 20
+    column: 13
+  end_location:
+    row: 20
+    column: 19
+  fix:
+    content:
+      - "=="
+    location:
+      row: 20
+      column: 15
+    end_location:
+      row: 20
+      column: 17
+  parent: ~
+

@@ -1,0 +1,180 @@
+---
+source: src/rules/flake8_comprehensions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnnecessaryLiteralSet:
+      obj_type: list
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 11
+  fix:
+    content:
+      - "{1, 2}"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 11
+  parent: ~
+- kind:
+    UnnecessaryLiteralSet:
+      obj_type: tuple
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 11
+  fix:
+    content:
+      - "{1, 2}"
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 11
+  parent: ~
+- kind:
+    UnnecessaryLiteralSet:
+      obj_type: list
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 7
+  fix:
+    content:
+      - set()
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 7
+  parent: ~
+- kind:
+    UnnecessaryLiteralSet:
+      obj_type: tuple
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 7
+  fix:
+    content:
+      - set()
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 7
+  parent: ~
+- kind:
+    UnnecessaryLiteralSet:
+      obj_type: tuple
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 9
+  fix:
+    content:
+      - "{1}"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 9
+  parent: ~
+- kind:
+    UnnecessaryLiteralSet:
+      obj_type: tuple
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 9
+    column: 2
+  fix:
+    content:
+      - "{"
+      - "    1,"
+      - "}"
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 9
+      column: 2
+  parent: ~
+- kind:
+    UnnecessaryLiteralSet:
+      obj_type: list
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 12
+    column: 2
+  fix:
+    content:
+      - "{"
+      - "    1,"
+      - "}"
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 12
+      column: 2
+  parent: ~
+- kind:
+    UnnecessaryLiteralSet:
+      obj_type: tuple
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 15
+    column: 1
+  fix:
+    content:
+      - "{1}"
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 15
+      column: 1
+  parent: ~
+- kind:
+    UnnecessaryLiteralSet:
+      obj_type: list
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 18
+    column: 1
+  fix:
+    content:
+      - "{1,}"
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 18
+      column: 1
+  parent: ~
+

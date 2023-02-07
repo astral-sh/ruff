@@ -1,0 +1,24 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadQuotesDocstring:
+      quote: single
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 49
+  fix:
+    content:
+      - "''' Double quotes singleline module docstring '''"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 49
+  parent: ~
+

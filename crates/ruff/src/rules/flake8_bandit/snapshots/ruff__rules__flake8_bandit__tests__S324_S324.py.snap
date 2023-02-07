@@ -1,0 +1,148 @@
+---
+source: src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    HashlibInsecureHashFunction:
+      string: md5
+  location:
+    row: 7
+    column: 12
+  end_location:
+    row: 7
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: md4
+  location:
+    row: 9
+    column: 12
+  end_location:
+    row: 9
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: md5
+  location:
+    row: 11
+    column: 17
+  end_location:
+    row: 11
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: MD4
+  location:
+    row: 13
+    column: 12
+  end_location:
+    row: 13
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: sha1
+  location:
+    row: 15
+    column: 12
+  end_location:
+    row: 15
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: sha1
+  location:
+    row: 17
+    column: 12
+  end_location:
+    row: 17
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: sha
+  location:
+    row: 19
+    column: 12
+  end_location:
+    row: 19
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: SHA
+  location:
+    row: 21
+    column: 17
+  end_location:
+    row: 21
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: sha
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 23
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: md5
+  location:
+    row: 25
+    column: 0
+  end_location:
+    row: 25
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: sha1
+  location:
+    row: 27
+    column: 12
+  end_location:
+    row: 27
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: sha1
+  location:
+    row: 29
+    column: 0
+  end_location:
+    row: 29
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    HashlibInsecureHashFunction:
+      string: sha1
+  location:
+    row: 32
+    column: 12
+  end_location:
+    row: 32
+    column: 18
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,41 @@
+---
+source: src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedImport:
+      name: models.Nut
+      ignore_init: false
+      multiple: false
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 7
+  fix:
+    content:
+      - from models import (
+      - "    Fruit,"
+      - )
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 9
+      column: 1
+  parent:
+    row: 6
+    column: 0
+- kind:
+    UndefinedName:
+      name: Bar
+  location:
+    row: 26
+    column: 18
+  end_location:
+    row: 26
+    column: 21
+  fix: ~
+  parent: ~
+

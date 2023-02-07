@@ -1,0 +1,115 @@
+---
+source: src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    JumpStatementInFinally:
+      name: return
+  location:
+    row: 5
+    column: 8
+  end_location:
+    row: 5
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: return
+  location:
+    row: 13
+    column: 12
+  end_location:
+    row: 13
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: return
+  location:
+    row: 21
+    column: 12
+  end_location:
+    row: 21
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: return
+  location:
+    row: 31
+    column: 12
+  end_location:
+    row: 31
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: return
+  location:
+    row: 44
+    column: 20
+  end_location:
+    row: 44
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: break
+  location:
+    row: 66
+    column: 12
+  end_location:
+    row: 66
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: continue
+  location:
+    row: 78
+    column: 12
+  end_location:
+    row: 78
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: return
+  location:
+    row: 94
+    column: 12
+  end_location:
+    row: 94
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: continue
+  location:
+    row: 101
+    column: 8
+  end_location:
+    row: 101
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: break
+  location:
+    row: 107
+    column: 8
+  end_location:
+    row: 107
+    column: 13
+  fix: ~
+  parent: ~
+

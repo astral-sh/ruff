@@ -1,13 +1,13 @@
 # playground
 
-In-browser playground for Ruff. Available [https://ruff.pages.dev/](https://ruff.pages.dev/).
+In-browser playground for Ruff. Available [https://play.ruff.rs/](https://play.ruff.rs/).
 
 ## Getting started
 
-- To build the WASM module, run `wasm-pack build --target web --out-dir playground/src/pkg` from the
-  root directory.
-- Install TypeScript dependencies with: `npm install`.
-- Start the development server with: `npm run dev`.
+* To build the WASM module, run `wasm-pack build ../crates/ruff --target web --out-dir ../../playground/src/pkg`
+  from the `./playground` directory.
+* Install TypeScript dependencies with: `npm install`.
+* Start the development server with: `npm run dev`.
 
 ## Implementation
 

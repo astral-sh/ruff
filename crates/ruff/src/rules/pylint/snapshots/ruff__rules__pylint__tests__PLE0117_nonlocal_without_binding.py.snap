@@ -1,0 +1,38 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    NonlocalWithoutBinding:
+      name: x
+  location:
+    row: 5
+    column: 13
+  end_location:
+    row: 5
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    NonlocalWithoutBinding:
+      name: y
+  location:
+    row: 9
+    column: 13
+  end_location:
+    row: 9
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    NonlocalWithoutBinding:
+      name: y
+  location:
+    row: 19
+    column: 17
+  end_location:
+    row: 19
+    column: 18
+  fix: ~
+  parent: ~
+

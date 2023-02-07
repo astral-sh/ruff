@@ -1,0 +1,26 @@
+---
+source: src/rules/flake8_quotes/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadQuotesMultilineString:
+      quote: double
+  location:
+    row: 1
+    column: 4
+  end_location:
+    row: 3
+    column: 12
+  fix:
+    content:
+      - "\"\"\" This 'should'"
+      - be
+      - "'linted' \"\"\""
+    location:
+      row: 1
+      column: 4
+    end_location:
+      row: 3
+      column: 12
+  parent: ~
+

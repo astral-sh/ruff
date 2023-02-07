@@ -1,0 +1,110 @@
+---
+source: src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    IncorrectMarkParenthesesStyle:
+      mark_name: foo
+      expected_parens: ()
+      actual_parens: ""
+  location:
+    row: 12
+    column: 1
+  end_location:
+    row: 12
+    column: 16
+  fix:
+    content:
+      - ()
+    location:
+      row: 12
+      column: 16
+    end_location:
+      row: 12
+      column: 16
+  parent: ~
+- kind:
+    IncorrectMarkParenthesesStyle:
+      mark_name: foo
+      expected_parens: ()
+      actual_parens: ""
+  location:
+    row: 17
+    column: 1
+  end_location:
+    row: 17
+    column: 16
+  fix:
+    content:
+      - ()
+    location:
+      row: 17
+      column: 16
+    end_location:
+      row: 17
+      column: 16
+  parent: ~
+- kind:
+    IncorrectMarkParenthesesStyle:
+      mark_name: foo
+      expected_parens: ()
+      actual_parens: ""
+  location:
+    row: 24
+    column: 5
+  end_location:
+    row: 24
+    column: 20
+  fix:
+    content:
+      - ()
+    location:
+      row: 24
+      column: 20
+    end_location:
+      row: 24
+      column: 20
+  parent: ~
+- kind:
+    IncorrectMarkParenthesesStyle:
+      mark_name: foo
+      expected_parens: ()
+      actual_parens: ""
+  location:
+    row: 30
+    column: 5
+  end_location:
+    row: 30
+    column: 20
+  fix:
+    content:
+      - ()
+    location:
+      row: 30
+      column: 20
+    end_location:
+      row: 30
+      column: 20
+  parent: ~
+- kind:
+    IncorrectMarkParenthesesStyle:
+      mark_name: foo
+      expected_parens: ()
+      actual_parens: ""
+  location:
+    row: 38
+    column: 9
+  end_location:
+    row: 38
+    column: 24
+  fix:
+    content:
+      - ()
+    location:
+      row: 38
+      column: 24
+    end_location:
+      row: 38
+      column: 24
+  parent: ~
+

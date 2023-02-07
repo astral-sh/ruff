@@ -1,0 +1,225 @@
+---
+source: src/rules/flake8_builtins/mod.rs
+expression: diagnostics
+---
+- kind:
+    BuiltinVariableShadowing:
+      name: sum
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: int
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: dir
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: print
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: copyright
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: complex
+  location:
+    row: 7
+    column: 1
+  end_location:
+    row: 7
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: float
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: object
+  location:
+    row: 8
+    column: 8
+  end_location:
+    row: 8
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: min
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: max
+  location:
+    row: 9
+    column: 5
+  end_location:
+    row: 9
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: id
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 2
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: bytes
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 14
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: slice
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 17
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: ValueError
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 22
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: memoryview
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 24
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: bytearray
+  location:
+    row: 24
+    column: 17
+  end_location:
+    row: 24
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: str
+  location:
+    row: 27
+    column: 21
+  end_location:
+    row: 27
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: all
+  location:
+    row: 27
+    column: 44
+  end_location:
+    row: 27
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: any
+  location:
+    row: 27
+    column: 49
+  end_location:
+    row: 27
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    BuiltinVariableShadowing:
+      name: sum
+  location:
+    row: 30
+    column: 7
+  end_location:
+    row: 30
+    column: 10
+  fix: ~
+  parent: ~
+
