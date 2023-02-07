@@ -1,7 +1,9 @@
+use std::collections::HashSet;
+
 use log::error;
 use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_ast::{Boolop, Constant, Expr, ExprKind, Keyword, Located, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{match_trailing_comment, unparse_expr};
@@ -65,6 +67,19 @@ impl Violation for NoUnnecessarySpread {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary spread `**`")
+    }
+}
+
+define_violation!(
+    pub struct SingleStartsEndsWith {
+        pub field: String,
+    }
+);
+impl Violation for SingleStartsEndsWith {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let SingleStartsEndsWith { field } = self;
+        format!("Call `{field}` once with a tuple instead of calling it multiple times with the same string.")
     }
 }
 
@@ -296,6 +311,46 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
                     let diagnostic =
                         Diagnostic::new(NoUnnecessaryDictKwargs, Range::from_located(expr));
                     checker.diagnostics.push(diagnostic);
+                }
+            }
+        }
+    }
+}
+
+/// PIE810
+pub fn single_starts_ends_with(
+    checker: &mut Checker,
+    expr: &Vec<Located<ExprKind>>,
+    node: &Boolop,
+) {
+    if *node != Boolop::Or {
+        return;
+    }
+
+    // (object_name, attribute) aka foo.startswith -> ("foo", "startswith")
+    let mut seen: HashSet<(String, String)> = HashSet::new();
+
+    for val in expr {
+        if let ExprKind::Call { func, args, .. } = &val.node {
+            if args.len() != 1 {
+                continue;
+            }
+            if let ExprKind::Attribute { value, attr, .. } = &func.node {
+                if attr != "startswith" && attr != "endswith" {
+                    continue;
+                }
+                match &value.node {
+                    ExprKind::Name { id, .. } => {
+                        let x = (id.into(), attr.into());
+
+                        if seen.contains(&x) {
+                            let diagnostic =
+                                Diagnostic::new(PreferListBuiltin, Range::from_located(&value));
+                            checker.diagnostics.push(diagnostic);
+                        }
+                        seen.insert(x);
+                    }
+                    _ => continue,
                 }
             }
         }
