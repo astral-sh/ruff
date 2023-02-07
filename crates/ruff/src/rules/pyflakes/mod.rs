@@ -207,6 +207,32 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn relative_typing_module() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/project/foo/bar.py"),
+            &settings::Settings {
+                typing_modules: vec!["foo.typical".to_string()],
+                ..settings::Settings::for_rules(vec![Rule::UndefinedName])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn nested_relative_typing_module() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/project/foo/bop/baz.py"),
+            &settings::Settings {
+                typing_modules: vec!["foo.typical".to_string()],
+                ..settings::Settings::for_rules(vec![Rule::UndefinedName])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
     /// A re-implementation of the Pyflakes test runner.
     /// Note that all tests marked with `#[ignore]` should be considered TODOs.
     fn flakes(contents: &str, expected: &[Rule]) {

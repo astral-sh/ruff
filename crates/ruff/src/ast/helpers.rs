@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use itertools::Itertools;
 use log::error;
 use once_cell::sync::Lazy;
@@ -10,7 +12,7 @@ use rustpython_ast::{
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 
 use crate::ast::types::{Binding, BindingKind, CallPath, Range};
 use crate::ast::visitor;
@@ -655,6 +657,38 @@ pub fn to_call_path(target: &str) -> CallPath {
     } else {
         smallvec!["", target]
     }
+}
+
+/// Create a module path from a (package, path) pair.
+///
+/// For example, if the package is `foo/bar` and the path is `foo/bar/baz.py`, the call path is
+/// `["baz"]`.
+pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
+    path.strip_prefix(package.parent()?)
+        .ok()?
+        .iter()
+        .map(Path::new)
+        .map(std::path::Path::file_stem)
+        .map(|path| path.and_then(|path| path.to_os_string().into_string().ok()))
+        .collect::<Option<Vec<String>>>()
+}
+
+/// Create a call path from a relative import.
+pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath<'a> {
+    let mut call_path: CallPath = SmallVec::with_capacity(module.len() + 1);
+
+    // Start with the module path.
+    call_path.extend(module.iter().map(String::as_str));
+
+    // Remove segments based on the number of dots.
+    for _ in 0..name.chars().take_while(|c| *c == '.').count() {
+        call_path.pop();
+    }
+
+    // Add the remaining segments.
+    call_path.extend(name.trim_start_matches('.').split('.'));
+
+    call_path
 }
 
 /// A [`Visitor`] that collects all return statements in a function or method.
