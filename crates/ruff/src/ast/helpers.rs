@@ -712,6 +712,23 @@ where
     }
 }
 
+/// A [`Visitor`] that collects all continue statements
+#[derive(Default)]
+pub struct ContinueStatementVisitor<'a> {
+    pub returns: Vec<&'a Stmt>,
+}
+
+impl<'a, 'b> Visitor<'b> for ContinueStatementVisitor<'a>
+where
+    'b: 'a,
+{
+    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        match &stmt.node {
+            StmtKind::Continue => self.returns.push(&stmt),
+            _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+}
 /// Convert a location within a file (relative to `base`) to an absolute
 /// position.
 pub fn to_absolute(relative: Location, base: Location) -> Location {

@@ -2,9 +2,8 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
+use crate::ast::helpers::ContinueStatementVisitor;
 use crate::violation::Violation;
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
 
 use ruff_macros::derive_message_formats;
 use rustpython_ast::Stmt;
@@ -24,12 +23,11 @@ pub fn continue_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
     if finalbody.is_empty() {
         return;
     }
-    let first = finalbody.first().unwrap();
-    let last = finalbody.last().unwrap();
-    let range = Range::new(first.location, last.end_location.unwrap());
-    let contents = checker.locator.slice_source_code_range(&range);
-    for (_, tok, _) in lexer::make_tokenizer(contents).flatten() {
-        if tok == Tok::Continue {
+    for stmt in finalbody {
+        let mut visitor = ContinueStatementVisitor::default();
+        let continues = visitor.visit_stmt(stmt);
+        if !continues.is_empty() {
+            let range = Range::from_located(stmt);
             let diagnostic = Diagnostic::new(ContinueInFinally, range);
             checker.diagnostics.push(diagnostic);
             return;
