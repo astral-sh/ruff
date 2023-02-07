@@ -1,86 +1,154 @@
-//! Different token definitions.
-//! Loosely based on token.h from CPython source:
+//! Token type for Python source code created by the lexer and consumed by the parser.
+//!
+//! This module defines the tokens that the lexer recognizes. The tokens are
+//! loosely based on the token definitions found in the [CPython source].
+//!
+//! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h
 use num_bigint::BigInt;
 use std::fmt;
 
-/// Python source code can be tokenized in a sequence of these tokens.
+/// The set of tokens the Python source code can be tokenized in.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Tok {
+    /// Token value for a name, commonly known as an identifier.
     Name {
+        /// The name value.
         name: String,
     },
+    /// Token value for an integer.
     Int {
+        /// The integer value.
         value: BigInt,
     },
+    /// Token value for a floating point number.
     Float {
+        /// The float value.
         value: f64,
     },
+    /// Token value for a complex number.
     Complex {
+        /// The real part of the complex number.
         real: f64,
+        /// The imaginary part of the complex number.
         imag: f64,
     },
+    /// Token value for a string.
     String {
+        /// The string value.
         value: String,
+        /// The kind of string.
         kind: StringKind,
+        /// Whether the string is triple quoted.
         triple_quoted: bool,
     },
-    Newline,
-    NonLogicalNewline,
-    Indent,
-    Dedent,
-    StartModule,
-    StartInteractive,
-    StartExpression,
-    EndOfFile,
-    Lpar,
-    Rpar,
-    Lsqb,
-    Rsqb,
-    Colon,
-    Comma,
+    /// Token value for a comment. These are filtered out of the token stream prior to parsing.
     Comment(String),
+    /// Token value for a newline.
+    Newline,
+    /// Token value for a newline that is not a logical line break. These are filtered out of
+    /// the token stream prior to parsing.
+    NonLogicalNewline,
+    /// Token value for an indent.
+    Indent,
+    /// Token value for a dedent.
+    Dedent,
+    EndOfFile,
+    /// Token value for a left parenthesis `(`.
+    Lpar,
+    /// Token value for a right parenthesis `)`.
+    Rpar,
+    /// Token value for a left square bracket `[`.
+    Lsqb,
+    /// Token value for a right square bracket `]`.
+    Rsqb,
+    /// Token value for a colon `:`.
+    Colon,
+    /// Token value for a comma `,`.
+    Comma,
+    /// Token value for a semicolon `;`.
     Semi,
+    /// Token value for plus `+`.
     Plus,
+    /// Token value for minus `-`.
     Minus,
+    /// Token value for star `*`.
     Star,
+    /// Token value for slash `/`.
     Slash,
-    Vbar,  // '|'
-    Amper, // '&'
+    /// Token value for vertical bar `|`.
+    Vbar,
+    /// Token value for ampersand `&`.
+    Amper,
+    /// Token value for less than `<`.
     Less,
+    /// Token value for greater than `>`.
     Greater,
+    /// Token value for equal `=`.
     Equal,
+    /// Token value for dot `.`.
     Dot,
+    /// Token value for percent `%`.
     Percent,
+    /// Token value for left bracket `{`.
     Lbrace,
+    /// Token value for right bracket `}`.
     Rbrace,
+    /// Token value for double equal `==`.
     EqEqual,
+    /// Token value for not equal `!=`.
     NotEqual,
+    /// Token value for less than or equal `<=`.
     LessEqual,
+    /// Token value for greater than or equal `>=`.
     GreaterEqual,
+    /// Token value for tilde `~`.
     Tilde,
+    /// Token value for caret `^`.
     CircumFlex,
+    /// Token value for left shift `<<`.
     LeftShift,
+    /// Token value for right shift `>>`.
     RightShift,
+    /// Token value for double star `**`.
     DoubleStar,
-    DoubleStarEqual, // '**='
+    /// Token value for double star equal `**=`.
+    DoubleStarEqual,
+    /// Token value for plus equal `+=`.
     PlusEqual,
+    /// Token value for minus equal `-=`.
     MinusEqual,
+    /// Token value for star equal `*=`.
     StarEqual,
+    /// Token value for slash equal `/=`.
     SlashEqual,
+    /// Token value for percent equal `%=`.
     PercentEqual,
-    AmperEqual, // '&='
+    /// Token value for ampersand equal `&=`.
+    AmperEqual,
+    /// Token value for vertical bar equal `|=`.
     VbarEqual,
-    CircumflexEqual, // '^='
+    /// Token value for caret equal `^=`.
+    CircumflexEqual,
+    /// Token value for left shift equal `<<=`.
     LeftShiftEqual,
+    /// Token value for right shift equal `>>=`.
     RightShiftEqual,
-    DoubleSlash, // '//'
+    /// Token value for double slash `//`.
+    DoubleSlash,
+    /// Token value for double slash equal `//=`.
     DoubleSlashEqual,
+    /// Token value for colon equal `:=`.
     ColonEqual,
+    /// Token value for at `@`.
     At,
+    /// Token value for at equal `@=`.
     AtEqual,
+    /// Token value for arrow `->`.
     Rarrow,
+    /// Token value for ellipsis `...`.
     Ellipsis,
 
+    // Self documenting.
     // Keywords (alphabetically):
     False,
     None,
@@ -118,6 +186,11 @@ pub enum Tok {
     While,
     With,
     Yield,
+
+    // RustPython specific.
+    StartModule,
+    StartInteractive,
+    StartExpression,
 }
 
 impl fmt::Display for Tok {
@@ -231,14 +304,25 @@ impl fmt::Display for Tok {
     }
 }
 
+/// The kind of string literal as described in the [String and Bytes literals]
+/// section of the Python reference.
+///
+/// [String and Bytes literals]: https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum StringKind {
+    /// A normal string literal with no prefix.
     String,
+    /// A f-string literal, with a `f` or `F` prefix.
     FString,
+    /// A byte string literal, with a `b` or `B` prefix.
     Bytes,
+    /// A raw string literal, with a `r` or `R` prefix.
     RawString,
+    /// A raw f-string literal, with a `rf`/`fr` or `rF`/`Fr` or `Rf`/`fR` or `RF`/`FR` prefix.
     RawFString,
+    /// A raw byte string literal, with a `rb`/`br` or `rB`/`Br` or `Rb`/`bR` or `RB`/`BR` prefix.
     RawBytes,
+    /// A unicode string literal, with a `u` or `U` prefix.
     Unicode,
 }
 
@@ -286,25 +370,33 @@ impl fmt::Display for StringKind {
 }
 
 impl StringKind {
+    /// Returns true if the string is a raw string, i,e one of
+    /// [`StringKind::RawString`] or [`StringKind::RawFString`] or [`StringKind::RawBytes`].
     pub fn is_raw(&self) -> bool {
         use StringKind::{RawBytes, RawFString, RawString};
         matches!(self, RawString | RawFString | RawBytes)
     }
 
+    /// Returns true if the string is an f-string, i,e one of
+    /// [`StringKind::FString`] or [`StringKind::RawFString`].
     pub fn is_fstring(&self) -> bool {
         use StringKind::{FString, RawFString};
         matches!(self, FString | RawFString)
     }
 
+    /// Returns true if the string is a byte string, i,e one of
+    /// [`StringKind::Bytes`] or [`StringKind::RawBytes`].
     pub fn is_bytes(&self) -> bool {
         use StringKind::{Bytes, RawBytes};
         matches!(self, Bytes | RawBytes)
     }
 
+    /// Returns true if the string is a unicode string, i,e [`StringKind::Unicode`].
     pub fn is_unicode(&self) -> bool {
         matches!(self, StringKind::Unicode)
     }
 
+    /// Returns the number of characters in the prefix.
     pub fn prefix_len(&self) -> usize {
         use StringKind::*;
         match self {

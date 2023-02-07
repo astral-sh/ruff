@@ -1,6 +1,6 @@
 use rustpython_ast::{Expr, ExprContext, ExprKind};
 
-pub fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
+pub(crate) fn set_context(expr: Expr, ctx: ExprContext) -> Expr {
     match expr.node {
         ExprKind::Name { id, .. } => Expr {
             node: ExprKind::Name { id, ctx },

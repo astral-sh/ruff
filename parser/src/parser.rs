@@ -1,9 +1,16 @@
-//! Python parsing.
+//! Contains the interface to the Python parser.
 //!
-//! Use this module to parse python code into an AST.
-//! There are three ways to parse python code. You could
-//! parse a whole program, a single statement, or a single
-//! expression.
+//! Functions in this module can be used to parse Python code into an [Abstract Syntax Tree]
+//! (AST) that is then transformed into bytecode.
+//!
+//! There are three ways to parse Python code corresponding to the different [`Mode`]s
+//! defined in the [`mode`] module.
+//!
+//! All functions return a [`Result`](std::result::Result) containing the parsed AST or
+//! a [`ParseError`] if parsing failed.
+//!
+//! [Abstract Syntax Tree]: https://en.wikipedia.org/wiki/Abstract_syntax_tree
+//! [`Mode`]: crate::mode
 
 use crate::lexer::{LexResult, Tok};
 pub use crate::mode::Mode;
@@ -12,13 +19,26 @@ use ast::Location;
 use itertools::Itertools;
 use std::iter;
 
-/*
- * Parse python code.
- * Grammar may be inspired by antlr grammar for python:
- * https://github.com/antlr/grammars-v4/tree/master/python3
- */
-
-/// Parse a full python program, containing usually multiple lines.
+/// Parse a full Python program usually consisting of multiple lines.
+///  
+/// This is a convenience function that can be used to parse a full Python program without having to
+/// specify the [`Mode`] or the location. It is probably what you want to use most of the time.
+///
+/// # Example
+///
+/// For example, parsing a simple function definition and a call to that function:
+///
+/// ```
+/// use rustpython_parser::parser;
+/// let source = r#"
+/// def foo():
+///    return 42
+///
+/// print(foo())
+/// "#;
+/// let program = parser::parse_program(source, "<embedded>");
+/// assert!(program.is_ok());
+/// ```
 pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, ParseError> {
     parse(source, Mode::Module, source_path).map(|top| match top {
         ast::Mod::Module { body, .. } => body,
@@ -26,49 +46,44 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
     })
 }
 
-/// Parses a python expression
+/// Parses a single Python expression.
+///
+/// This convenience function can be used to parse a single expression without having to
+/// specify the Mode or the location.
 ///
 /// # Example
-/// ```
+///
+/// For example, parsing a single expression denoting the addition of two numbers:
+///
+///  ```
 /// extern crate num_bigint;
 /// use rustpython_parser::{parser, ast};
-/// let expr = parser::parse_expression("1 + 2", "<embedded>").unwrap();
+/// let expr = parser::parse_expression("1 + 2", "<embedded>");
 ///
-/// assert_eq!(
-///     expr,
-///     ast::Expr {
-///         location: ast::Location::new(1, 0),
-///         end_location: Some(ast::Location::new(1, 5)),
-///         custom: (),
-///         node: ast::ExprKind::BinOp {
-///             left: Box::new(ast::Expr {
-///                 location: ast::Location::new(1, 0),
-///                 end_location: Some(ast::Location::new(1, 1)),
-///                 custom: (),
-///                 node: ast::ExprKind::Constant {
-///                     value: ast::Constant::Int(1.into()),
-///                     kind: None,
-///                 }
-///             }),
-///             op: ast::Operator::Add,
-///             right: Box::new(ast::Expr {
-///                 location: ast::Location::new(1, 4),
-///                 end_location: Some(ast::Location::new(1, 5)),
-///                 custom: (),
-///                 node: ast::ExprKind::Constant {
-///                     value: ast::Constant::Int(2.into()),
-///                     kind: None,
-///                 }
-///             })
-///         }
-///     },
-/// );
+/// assert!(expr.is_ok());
 ///
 /// ```
 pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseError> {
     parse_expression_located(source, path, Location::new(1, 0))
 }
 
+/// Parses a Python expression from a given location.
+///
+/// This function allows to specify the location of the expression in the source code, other than
+/// that, it behaves exactly like [`parse_expression`].
+///
+/// # Example
+///
+/// Parsing a single expression denoting the addition of two numbers, but this time specifying a different,
+/// somewhat silly, location:
+///
+/// ```
+/// use rustpython_parser::parser::parse_expression_located;
+/// use rustpython_parser::ast::Location;
+///
+/// let expr = parse_expression_located("1 + 2", "<embedded>", Location::new(5, 20));
+/// assert!(expr.is_ok());
+/// ```
 pub fn parse_expression_located(
     source: &str,
     path: &str,
@@ -80,12 +95,64 @@ pub fn parse_expression_located(
     })
 }
 
-// Parse a given source code
+/// Parse the given Python source code using the specified [`Mode`].
+///
+/// This function is the most general function to parse Python code. Based on the [`Mode`] supplied,
+/// it can be used to parse a single expression, a full Python program or an interactive expression.
+///
+/// # Example
+///
+/// If we want to parse a simple expression, we can use the [`Mode::Expression`] mode during
+/// parsing:
+///
+/// ```
+/// use rustpython_parser::parser::{parse, Mode};
+///
+/// let expr = parse("1 + 2", Mode::Expression, "<embedded>");
+/// assert!(expr.is_ok());
+/// ```
+///
+/// Alternatively, we can parse a full Python program consisting of multiple lines:
+///
+/// ```
+/// use rustpython_parser::parser::{parse, Mode};
+///
+/// let source = r#"
+/// class Greeter:
+///
+///   def greet(self):
+///    print("Hello, world!")
+/// "#;
+/// let program = parse(source, Mode::Module, "<embedded>");
+/// assert!(program.is_ok());
+/// ```
 pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
     parse_located(source, mode, source_path, Location::new(1, 0))
 }
 
-// Parse a given source code from a given location
+/// Parse the given Python source code using the specified [`Mode`] and [`Location`].
+///
+/// This function allows to specify the location of the the source code, other than
+/// that, it behaves exactly like [`parse`].
+///
+/// # Example
+///
+/// ```
+/// use rustpython_parser::parser::{parse_located, Mode};
+/// use rustpython_parser::ast::Location;
+///
+/// let source = r#"
+/// def fib(i):
+///    a, b = 0, 1
+///    for _ in range(i):
+///       a, b = b, a + b
+///    return a
+///
+/// print(fib(42))
+/// "#;
+/// let program = parse_located(source, Mode::Module, "<embedded>", Location::new(1, 0));
+/// assert!(program.is_ok());
+/// ```
 pub fn parse_located(
     source: &str,
     mode: Mode,
@@ -96,7 +163,22 @@ pub fn parse_located(
     parse_tokens(lxr, mode, source_path)
 }
 
-// Parse a given token iterator.
+/// Parse an iterator of [`LexResult`]s using the specified [`Mode`].
+///
+/// This could allow you to perform some preprocessing on the tokens before parsing them.
+///
+/// # Example
+///
+/// As an example, instead of parsing a string, we can parse a list of tokens after we generate
+/// them using the [`lexer::make_tokenizer`] function:
+///
+/// ```
+/// use rustpython_parser::parser::{parse_tokens, Mode};
+/// use rustpython_parser::lexer::make_tokenizer;
+///
+/// let expr = parse_tokens(make_tokenizer("1 + 2"), Mode::Expression, "<embedded>");
+/// assert!(expr.is_ok());
+/// ```
 pub fn parse_tokens(
     lxr: impl IntoIterator<Item = LexResult>,
     mode: Mode,
@@ -327,5 +409,14 @@ with (0 as a, 1 as b,): pass
     fn test_dict_unpacking() {
         let parse_ast = parse_expression(r#"{"a": "b", **c, "d": "e"}"#, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_modes() {
+        let source = "a[0][1][2][3][4]";
+
+        assert!(parse(&source, Mode::Expression, "<embedded>").is_ok());
+        assert!(parse(&source, Mode::Module, "<embedded>").is_ok());
+        assert!(parse(&source, Mode::Interactive, "<embedded>").is_ok());
     }
 }
