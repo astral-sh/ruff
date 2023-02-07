@@ -1,11 +1,12 @@
+use rustpython_ast::Expr;
+
+use ruff_macros::derive_message_formats;
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-
-use ruff_macros::derive_message_formats;
-use rustpython_ast::Expr;
 
 const BIDI_UNICODE: [char; 10] = [
     '\u{202A}', //{LEFT-TO-RIGHT EMBEDDING}
@@ -37,13 +38,12 @@ impl Violation for BidirectionalUnicode {
     }
 }
 
-/// E2502
+/// PLE2502
 pub fn bidirectional_unicode(checker: &mut Checker, expr: &Expr, value: &str) {
-    for item in value.chars() {
-        if BIDI_UNICODE.contains(&item) {
-            let diagnostic = Diagnostic::new(BidirectionalUnicode, Range::from_located(expr));
-            checker.diagnostics.push(diagnostic);
-            return;
-        }
+    if value.contains(BIDI_UNICODE) {
+        checker.diagnostics.push(Diagnostic::new(
+            BidirectionalUnicode,
+            Range::from_located(expr),
+        ));
     }
 }
