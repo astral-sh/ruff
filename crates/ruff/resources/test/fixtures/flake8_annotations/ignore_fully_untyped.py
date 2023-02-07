@@ -1,7 +1,5 @@
 """Test case expected to be run with `ignore_fully_untyped = True`."""
 
-from typing import Any, Type
-
 
 def ok_fully_untyped_1(a, b):
     pass

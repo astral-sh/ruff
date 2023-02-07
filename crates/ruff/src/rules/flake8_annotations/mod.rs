@@ -38,6 +38,7 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+
     #[test]
     fn ignore_fully_untyped() -> Result<()> {
         let diagnostics = test_path(
@@ -120,11 +121,17 @@ mod tests {
                     ..Default::default()
                 },
                 ..Settings::for_rules(vec![
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingTypeArgs,
+                    Rule::MissingTypeKwargs,
+                    Rule::MissingTypeSelf,
+                    Rule::MissingTypeCls,
                     Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
                     Rule::MissingReturnTypeClassMethod,
+                    Rule::DynamicallyTypedExpression,
                 ])
             },
         )?;
