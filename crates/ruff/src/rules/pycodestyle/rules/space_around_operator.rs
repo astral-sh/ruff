@@ -2,9 +2,8 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::define_violation;
 use crate::registry::DiagnosticKind;
 use crate::violation::Violation;
 

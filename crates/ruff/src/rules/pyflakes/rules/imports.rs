@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use ruff_python::future::ALL_FEATURE_NAMES;
 use rustpython_parser::ast::Alias;
 
@@ -7,7 +7,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::{Availability, Violation};
-use crate::{define_violation, AutofixKind};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct UnusedImport {

@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::StmtKind;
 
@@ -9,7 +9,6 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::ast::{cast, whitespace};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::docstrings::sections::{section_contexts, SectionContext};
 use crate::docstrings::styles::SectionStyle;

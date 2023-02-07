@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Alias, AliasData, Stmt};
 
 use crate::ast::types::Range;
@@ -11,7 +11,7 @@ use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
 use crate::source_code::{Locator, Stylist};
 use crate::violation::{Availability, Violation};
-use crate::{define_violation, AutofixKind};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct ImportReplacements {

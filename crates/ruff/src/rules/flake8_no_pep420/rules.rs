@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
+use crate::fs;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use crate::{define_violation, fs};
 
 define_violation!(
     pub struct ImplicitNamespacePackage(pub String);

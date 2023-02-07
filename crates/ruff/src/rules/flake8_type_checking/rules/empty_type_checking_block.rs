@@ -1,11 +1,10 @@
 use log::error;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Stmt, StmtKind};
 
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 

@@ -1,11 +1,10 @@
 //! This crate implements internal macros for the `ruff` library.
 
-use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput, ItemFn};
 
 mod config;
-mod declare_violation;
 mod define_rule_mapping;
+mod define_violation;
 mod derive_message_formats;
 mod rule_code_prefix;
 mod rule_namespace;
@@ -26,9 +25,10 @@ pub fn define_rule_mapping(item: proc_macro::TokenStream) -> proc_macro::TokenSt
 }
 
 #[proc_macro]
-pub fn declare_violation(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = parse_macro_input!(item as declare_violation::LintMeta);
-    declare_violation::declare_violation(item).into()
+pub fn define_violation(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let cloned = item.clone();
+    let meta = parse_macro_input!(cloned as define_violation::LintMeta);
+    define_violation::define_violation(&item.into(), meta).into()
 }
 
 #[proc_macro_derive(RuleNamespace, attributes(prefix))]
@@ -41,7 +41,10 @@ pub fn derive_rule_namespace(input: proc_macro::TokenStream) -> proc_macro::Toke
 }
 
 #[proc_macro_attribute]
-pub fn derive_message_formats(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn derive_message_formats(
+    _attr: proc_macro::TokenStream,
+    item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
     let func = parse_macro_input!(item as ItemFn);
     derive_message_formats::derive_message_formats(&func).into()
 }

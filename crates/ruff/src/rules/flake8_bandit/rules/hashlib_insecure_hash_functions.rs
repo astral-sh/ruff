@@ -1,11 +1,10 @@
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use super::super::helpers::string_literal;
 use crate::ast::helpers::SimpleCallArgs;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 

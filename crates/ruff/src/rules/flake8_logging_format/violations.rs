@@ -1,6 +1,5 @@
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::define_violation;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 define_violation!(

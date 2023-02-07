@@ -1,4 +1,4 @@
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind};
 
@@ -6,7 +6,6 @@ use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 

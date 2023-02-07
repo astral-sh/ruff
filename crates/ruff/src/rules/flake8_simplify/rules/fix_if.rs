@@ -31,7 +31,7 @@ fn parenthesize_and_operand(expr: Expression) -> Expression {
 pub(crate) fn fix_nested_if_statements(
     locator: &Locator,
     stylist: &Stylist,
-    stmt: &rustpython_ast::Stmt,
+    stmt: &rustpython_parser::ast::Stmt,
 ) -> Result<Fix> {
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator, stmt) else {

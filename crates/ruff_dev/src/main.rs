@@ -2,6 +2,9 @@
 //!
 //! Within the ruff repository you can run it with `cargo dev`.
 
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+
 mod generate_all;
 mod generate_cli_help;
 mod generate_docs;
@@ -13,9 +16,6 @@ mod print_cst;
 mod print_tokens;
 mod round_trip;
 mod utils;
-
-use anyhow::Result;
-use clap::{Parser, Subcommand};
 
 const ROOT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
 

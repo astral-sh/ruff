@@ -1,7 +1,7 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, Attribute, Error, Ident, Lit, LitStr, Meta, Result, Token};
+use syn::{Attribute, Error, Ident, Lit, LitStr, Meta, Result, Token};
 
 fn parse_attr<const LEN: usize>(path: [&'static str; LEN], attr: &Attribute) -> Option<LitStr> {
     if let Meta::NameValue(name_value) = attr.parse_meta().ok()? {
@@ -36,7 +36,6 @@ impl Parse for LintMeta {
             if let Some(lit) = parse_attr(["doc"], attr) {
                 let value = lit.value();
                 let line = value.strip_prefix(' ').unwrap_or(&value);
-
                 if line.starts_with("```") {
                     explanation += "```\n";
                     in_code = !in_code;
@@ -53,54 +52,24 @@ impl Parse for LintMeta {
         input.parse::<Token![struct]>()?;
         let name = input.parse()?;
 
+        // Ignore the rest of the input.
+        input.parse::<TokenStream>()?;
+
         Ok(Self { explanation, name })
     }
 }
 
-pub fn declare_violation(input: TokenStream) -> TokenStream {
-    // let x: proc_macro::TokenStream = input.into();
-    // let LintMeta { explanation, name } = parse_macro_input!(x as LintMeta);
-
-    // let mut category = category.to_string();
-    //
-    // let level = format_ident!(
-    //     "{}",
-    //     match category.as_str() {
-    //         "correctness" => "Deny",
-    //         "style" | "suspicious" | "complexity" | "perf" | "internal_warn" => "Warn",
-    //         "pedantic" | "restriction" | "cargo" | "nursery" | "internal" => "Allow",
-    //         _ => panic!("unknown category {category}"),
-    //     },
-    // );
-    //
-    // let info = if category == "internal_warn" {
-    //     None
-    // } else {
-    //     let info_name = format_ident!("{name}_INFO");
-    //
-    //     (&mut category[0..1]).make_ascii_uppercase();
-    //     let category_variant = format_ident!("{category}");
-    //
-    //     Some(quote! {
-    //         pub(crate) static #info_name: &'static crate::LintInfo = &crate::LintInfo {
-    //             lint: &#name,
-    //             category: crate::LintCategory::#category_variant,
-    //             explanation: #explanation,
-    //         };
-    //     })
-    // };
-
-    // Just add derives to the struct.
+pub fn define_violation(input: &TokenStream, meta: LintMeta) -> TokenStream {
+    let LintMeta { explanation, name } = meta;
     let output = quote! {
         #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
         #input
 
-        // impl #name {
-        //     pub fn explanation() -> Option<String> {
-        //         Some(#explanation.to_string())
-        //     }
-        // }
+        impl #name {
+            pub fn explanation() -> Option<&'static str> {
+                Some(#explanation)
+            }
+        }
     };
-
-    TokenStream::from(output)
+    output
 }

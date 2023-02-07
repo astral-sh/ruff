@@ -644,7 +644,7 @@ impl<'a> Generator<'a> {
                 let (op, prec) = opprec!(
                     un,
                     op,
-                    rustpython_ast::Unaryop,
+                    rustpython_parser::ast::Unaryop,
                     Invert("~", FACTOR),
                     Not("not ", NOT),
                     UAdd("+", FACTOR),

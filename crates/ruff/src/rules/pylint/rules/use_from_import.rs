@@ -1,4 +1,4 @@
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Alias, Stmt};
 
 use crate::ast::types::Range;
@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::{Availability, Violation};
-use crate::{define_violation, AutofixKind};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct ConsiderUsingFromImport {

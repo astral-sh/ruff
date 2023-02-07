@@ -1,37 +1,12 @@
-<<<<<<< HEAD
-//! Checks for `self.assertRaises(Exception)`.
-//!
-//! ## Why is this bad?
-//!
-//! `assertRaises(Exception)` should be considered evil. It can lead to your
-//! test passing even if the code being tested is never executed due to a
-//! typo. Either assert for a more specific exception (builtin or
-//! custom), use `assertRaisesRegex`, or use the context manager form of
-//! `assertRaises`.
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{ExprKind, Stmt, Withitem};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::{declare_violation, derive_message_formats};
-use rustpython_ast::{ExprKind, Stmt, Withitem};
 
-// define_violation!(
-//     /// ### What it does
-//     /// Checks for `self.assertRaises(Exception)`.
-//     ///
-//     /// ## Why is this bad?
-//     /// `assertRaises(Exception)` can lead to your test passing even if the
-//     /// code being tested is never executed due to a typo.
-//     ///
-//     /// Either assert for a more specific exception (builtin or custom), use
-//     /// `assertRaisesRegex` or the context manager form of `assertRaises`.
-//     pub struct NoAssertRaisesException;
-// );
-declare_violation!(
+define_violation!(
     /// ### What it does
     /// Checks for `self.assertRaises(Exception)`.
     ///

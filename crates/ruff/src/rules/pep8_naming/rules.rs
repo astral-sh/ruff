@@ -1,4 +1,4 @@
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use ruff_python::string::{self};
 use rustpython_parser::ast::{Arg, Arguments, Expr, ExprKind, Stmt};
 
@@ -7,7 +7,6 @@ use crate::ast::function_type;
 use crate::ast::helpers::identifier_range;
 use crate::ast::types::{Range, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::Violation;

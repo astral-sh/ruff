@@ -1,5 +1,5 @@
 use log::error;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use ruff_python::identifiers::is_identifier;
 use ruff_python::keyword::KWLIST;
 use rustc_hash::FxHashSet;
@@ -10,7 +10,6 @@ use crate::ast::helpers::{match_trailing_comment, unparse_expr};
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;

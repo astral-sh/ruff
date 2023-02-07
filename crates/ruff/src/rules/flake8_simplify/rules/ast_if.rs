@@ -1,5 +1,5 @@
 use log::error;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
@@ -13,7 +13,7 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violation::{AlwaysAutofixableViolation, Availability, Violation};
-use crate::{define_violation, AutofixKind};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct NestedIfStatements;

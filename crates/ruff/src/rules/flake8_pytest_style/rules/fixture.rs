@@ -1,6 +1,6 @@
 use anyhow::Result;
 use log::error;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt, StmtKind};
 
 use super::helpers::{
@@ -13,7 +13,6 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::autofix::helpers::remove_argument;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
