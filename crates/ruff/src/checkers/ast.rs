@@ -3702,8 +3702,11 @@ where
         }
 
         if self.settings.rules.enabled(&Rule::InvalidArgumentName) {
-            if let Some(diagnostic) = pep8_naming::rules::invalid_argument_name(&arg.node.arg, arg)
-            {
+            if let Some(diagnostic) = pep8_naming::rules::invalid_argument_name(
+                &arg.node.arg,
+                arg,
+                &self.settings.pep8_naming.ignore_names,
+            ) {
                 self.diagnostics.push(diagnostic);
             }
         }
