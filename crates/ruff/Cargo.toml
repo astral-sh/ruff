@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.242"
+version = "0.0.243"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -39,8 +39,8 @@ num-traits = "0.2.15"
 once_cell = { version = "1.16.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 regex = { version = "1.6.0" }
-ruff_macros = { version = "0.0.242", path = "../ruff_macros" }
-ruff_python = { version = "0.0.242", path = "../ruff_python" }
+ruff_macros = { version = "0.0.243", path = "../ruff_macros" }
+ruff_python = { version = "0.0.243", path = "../ruff_python" }
 rustc-hash = { version = "1.1.0" }
 rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
