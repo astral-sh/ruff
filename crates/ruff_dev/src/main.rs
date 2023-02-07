@@ -4,6 +4,7 @@
 
 mod generate_all;
 mod generate_cli_help;
+mod generate_docs;
 mod generate_json_schema;
 mod generate_options;
 mod generate_rules_table;

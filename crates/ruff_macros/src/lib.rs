@@ -4,6 +4,7 @@ use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput, ItemFn};
 
 mod config;
+mod declare_violation;
 mod define_rule_mapping;
 mod derive_message_formats;
 mod rule_code_prefix;
@@ -22,6 +23,12 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 pub fn define_rule_mapping(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mapping = parse_macro_input!(item as define_rule_mapping::Mapping);
     define_rule_mapping::define_rule_mapping(&mapping).into()
+}
+
+#[proc_macro]
+pub fn declare_violation(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(item as declare_violation::LintMeta);
+    declare_violation::declare_violation(item).into()
 }
 
 #[proc_macro_derive(RuleNamespace, attributes(prefix))]

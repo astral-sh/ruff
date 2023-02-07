@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 //! Checks for `self.assertRaises(Exception)`.
 //!
 //! ## Why is this bad?
@@ -15,8 +16,31 @@ use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
+use ruff_macros::{declare_violation, derive_message_formats};
+use rustpython_ast::{ExprKind, Stmt, Withitem};
 
-define_violation!(
+// define_violation!(
+//     /// ### What it does
+//     /// Checks for `self.assertRaises(Exception)`.
+//     ///
+//     /// ## Why is this bad?
+//     /// `assertRaises(Exception)` can lead to your test passing even if the
+//     /// code being tested is never executed due to a typo.
+//     ///
+//     /// Either assert for a more specific exception (builtin or custom), use
+//     /// `assertRaisesRegex` or the context manager form of `assertRaises`.
+//     pub struct NoAssertRaisesException;
+// );
+declare_violation!(
+    /// ### What it does
+    /// Checks for `self.assertRaises(Exception)`.
+    ///
+    /// ## Why is this bad?
+    /// `assertRaises(Exception)` can lead to your test passing even if the
+    /// code being tested is never executed due to a typo.
+    ///
+    /// Either assert for a more specific exception (builtin or custom), use
+    /// `assertRaisesRegex` or the context manager form of `assertRaises`.
     pub struct NoAssertRaisesException;
 );
 impl Violation for NoAssertRaisesException {
