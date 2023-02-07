@@ -1,9 +1,9 @@
-use std::collections::HashSet;
-
 use log::error;
-use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Boolop, Constant, Expr, ExprKind, Keyword, Located, Stmt, StmtKind};
+use rustpython_ast::{Boolop, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+
+use ruff_macros::derive_message_formats;
+use ruff_python::identifiers::is_identifier;
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{match_trailing_comment, unparse_expr};
@@ -15,7 +15,6 @@ use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use ruff_python::identifiers::is_identifier;
 
 define_violation!(
     pub struct NoUnnecessaryPass;
@@ -72,14 +71,14 @@ impl Violation for NoUnnecessarySpread {
 
 define_violation!(
     pub struct SingleStartsEndsWith {
-        pub field: String,
+        pub attr: String,
     }
 );
 impl Violation for SingleStartsEndsWith {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SingleStartsEndsWith { field } = self;
-        format!("Call `{field}` once with a tuple instead of calling it multiple times with the same string.")
+        let SingleStartsEndsWith { attr } = self;
+        format!("Call `{attr}` once with a `tuple`")
     }
 }
 
@@ -318,39 +317,37 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
 }
 
 /// PIE810
-pub fn single_starts_ends_with(
-    checker: &mut Checker,
-    expr: &Vec<Located<ExprKind>>,
-    node: &Boolop,
-) {
+pub fn single_starts_ends_with(checker: &mut Checker, values: &[Expr], node: &Boolop) {
     if *node != Boolop::Or {
         return;
     }
 
-    // (object_name, attribute) aka foo.startswith -> ("foo", "startswith")
-    let mut seen: HashSet<(String, String)> = HashSet::new();
-
-    for val in expr {
-        if let ExprKind::Call { func, args, .. } = &val.node {
-            if args.len() != 1 {
+    // Given `foo.startswith`, insert ("foo", "startswith") into the set.
+    let mut seen = FxHashSet::default();
+    for expr in values {
+        if let ExprKind::Call {
+            func,
+            args,
+            keywords,
+            ..
+        } = &expr.node
+        {
+            if !(args.len() == 1 && keywords.is_empty()) {
                 continue;
             }
             if let ExprKind::Attribute { value, attr, .. } = &func.node {
                 if attr != "startswith" && attr != "endswith" {
                     continue;
                 }
-                match &value.node {
-                    ExprKind::Name { id, .. } => {
-                        let x = (id.into(), attr.into());
-
-                        if seen.contains(&x) {
-                            let diagnostic =
-                                Diagnostic::new(PreferListBuiltin, Range::from_located(value));
-                            checker.diagnostics.push(diagnostic);
-                        }
-                        seen.insert(x);
+                if let ExprKind::Name { id, .. } = &value.node {
+                    if !seen.insert((id, attr)) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            SingleStartsEndsWith {
+                                attr: attr.to_string(),
+                            },
+                            Range::from_located(value),
+                        ));
                     }
-                    _ => continue,
                 }
             }
         }

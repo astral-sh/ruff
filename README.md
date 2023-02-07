@@ -1113,7 +1113,7 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 | PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
 | PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
 | PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
-| PIE810 | single-starts-ends-with | Call `{field}` once with a tuple instead of calling it multiple times with the same string. |  |
+| PIE810 | single-starts-ends-with | Call `{attr}` once with a `tuple` |  |
 
 ### flake8-print (T20)
 

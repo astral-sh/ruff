@@ -1,9 +1,10 @@
 ---
-source: src/rules/flake8_pie/mod.rs
+source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PreferListBuiltin: ~
+    SingleStartsEndsWith:
+      attr: startswith
   location:
     row: 2
     column: 25
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferListBuiltin: ~
+    SingleStartsEndsWith:
+      attr: endswith
   location:
     row: 4
     column: 23
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferListBuiltin: ~
+    SingleStartsEndsWith:
+      attr: startswith
   location:
     row: 6
     column: 23
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferListBuiltin: ~
+    SingleStartsEndsWith:
+      attr: startswith
   location:
     row: 8
     column: 23
