@@ -13,6 +13,13 @@ def f():
 
 
 def f():
+    from .. import typical
+
+    # OK
+    x: typical.Literal["foo"]
+
+
+def f():
     from .typical import Literal
 
     # F821
