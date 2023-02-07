@@ -26,12 +26,11 @@ pub fn continue_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
     }
     let first = finalbody.first().unwrap();
     let last = finalbody.last().unwrap();
-    let contents = checker
-        .locator
-        .slice_source_code_range(&Range::new(first.location, last.end_location.unwrap()));
-    for (start, tok, end) in lexer::make_tokenizer(contents).flatten() {
+    let range = Range::new(first.location, last.end_location.unwrap());
+    let contents = checker.locator.slice_source_code_range(&range);
+    for (_, tok, _) in lexer::make_tokenizer(contents).flatten() {
         if tok == Tok::Continue {
-            let diagnostic = Diagnostic::new(ContinueInFinally, Range::new(start, end));
+            let diagnostic = Diagnostic::new(ContinueInFinally, range);
             checker.diagnostics.push(diagnostic);
             return;
         }
