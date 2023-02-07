@@ -8,13 +8,13 @@ from pathlib import Path
 from sphinx.ext.intersphinx import fetch_inventory
 
 URL = "https://docs.python.org/{}/objects.inv"
-PATH = Path("src") / "python" / "sys.rs"
-VERSIONS = [
-    ("3", "7"),
-    ("3", "8"),
-    ("3", "9"),
-    ("3", "10"),
-    ("3", "11"),
+PATH = Path("crates") / "ruff_python" / "src" / "sys.rs"
+VERSIONS: list[tuple[int, int]] = [
+    (3, 7),
+    (3, 8),
+    (3, 9),
+    (3, 10),
+    (3, 11),
 ]
 
 
@@ -36,16 +36,14 @@ with PATH.open("w") as f:
 use once_cell::sync::Lazy;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::settings::types::PythonVersion;
-
 // See: https://pycqa.github.io/isort/docs/configuration/options.html#known-standard-library
-pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<PythonVersion, FxHashSet<&'static str>>> =
+pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<(u32, u32), FxHashSet<&'static str>>> =
     Lazy::new(|| {
         FxHashMap::from_iter([
 """,
     )
-    for version_info in VERSIONS:
-        version = ".".join(version_info)
+    for (major, minor) in VERSIONS:
+        version = f"{major}.{minor}"
         url = URL.format(version)
         invdata = fetch_inventory(FakeApp(), "", url)
 
@@ -67,7 +65,7 @@ pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<PythonVersion, FxHashSet<&'sta
         f.write(
             f"""\
             (
-                PythonVersion::Py{"".join(version_info)},
+                ({major}, {minor}),
                 FxHashSet::from_iter([
 """,
         )

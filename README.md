@@ -230,7 +230,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.241'
+  rev: 'v0.0.243'
   hooks:
     - id: ruff
 ```
@@ -1113,6 +1113,7 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 | PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
 | PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
 | PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
+| PIE810 | single-starts-ends-with | Call `{attr}` once with a `tuple` |  |
 
 ### flake8-print (T20)
 
@@ -1232,7 +1233,7 @@ For more, see [flake8-type-checking](https://pypi.org/project/flake8-type-checki
 | TCH002 | typing-only-third-party-import | Move third-party import `{}` into a type-checking block |  |
 | TCH003 | typing-only-standard-library-import | Move standard library import `{}` into a type-checking block |  |
 | TCH004 | runtime-import-in-type-checking-block | Move import `{}` out of type-checking block. Import is used for more than type hinting. |  |
-| TCH005 | empty-type-checking-block | Found empty type-checking block |  |
+| TCH005 | empty-type-checking-block | Found empty type-checking block | 🛠 |
 
 ### flake8-unused-arguments (ARG)
 
@@ -1337,6 +1338,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
 | PLE1307 | bad-string-format-type | Format type does not match argument type |  |
+| PLE1310 | bad-str-strip-call | String `{strip}` call contains duplicate characters (did you mean `{removal}`?) |  |
 
 #### Refactor (PLR)
 
@@ -1381,7 +1383,7 @@ For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception |  |
+| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception | 🛠 |
 
 ### flake8-self (SLF)
 

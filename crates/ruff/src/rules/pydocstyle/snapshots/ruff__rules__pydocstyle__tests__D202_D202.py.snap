@@ -1,0 +1,62 @@
+---
+source: crates/ruff/src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoBlankLineAfterFunction:
+      num_lines: 2
+  location:
+    row: 57
+    column: 4
+  end_location:
+    row: 57
+    column: 30
+  fix:
+    content:
+      - ""
+    location:
+      row: 58
+      column: 0
+    end_location:
+      row: 60
+      column: 0
+  parent: ~
+- kind:
+    NoBlankLineAfterFunction:
+      num_lines: 2
+  location:
+    row: 68
+    column: 4
+  end_location:
+    row: 68
+    column: 30
+  fix:
+    content:
+      - ""
+    location:
+      row: 69
+      column: 0
+    end_location:
+      row: 71
+      column: 0
+  parent: ~
+- kind:
+    NoBlankLineAfterFunction:
+      num_lines: 1
+  location:
+    row: 80
+    column: 4
+  end_location:
+    row: 80
+    column: 30
+  fix:
+    content:
+      - ""
+    location:
+      row: 81
+      column: 0
+    end_location:
+      row: 82
+      column: 0
+  parent: ~
+
