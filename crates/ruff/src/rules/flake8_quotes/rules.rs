@@ -1,10 +1,9 @@
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use super::settings::Quote;
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};

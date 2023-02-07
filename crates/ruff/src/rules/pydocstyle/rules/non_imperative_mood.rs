@@ -1,11 +1,10 @@
 use imperative::Mood;
 use once_cell::sync::Lazy;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::cast;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;

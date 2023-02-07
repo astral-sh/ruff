@@ -1,8 +1,7 @@
 use itertools::Itertools;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use serde::{Deserialize, Serialize};
 
-use crate::define_violation;
 use crate::violation::AlwaysAutofixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

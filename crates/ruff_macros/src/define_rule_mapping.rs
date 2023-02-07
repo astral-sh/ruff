@@ -10,6 +10,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut diagnostic_kind_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_autofixable_match_arms = quote!();
+    let mut rule_explanation_match_arms = quote!();
     let mut rule_code_match_arms = quote!();
     let mut rule_from_code_match_arms = quote!();
     let mut diagnostic_kind_code_match_arms = quote!();
@@ -32,6 +33,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             .extend(quote! {#(#attr)* Self::#name => <#path as Violation>::message_formats(),});
         rule_autofixable_match_arms
             .extend(quote! {#(#attr)* Self::#name => <#path as Violation>::AUTOFIX,});
+        rule_explanation_match_arms.extend(quote! {#(#attr)* Self::#name => #path::explanation(),});
         rule_code_match_arms.extend(quote! {#(#attr)* Self::#name => #code_str,});
         rule_from_code_match_arms.extend(quote! {#(#attr)* #code_str => Ok(Rule::#name), });
         diagnostic_kind_code_match_arms
@@ -95,6 +97,10 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             /// Returns the format strings used to report violations of this rule.
             pub fn message_formats(&self) -> &'static [&'static str] {
                 match self { #rule_message_formats_match_arms }
+            }
+
+            pub fn explanation(&self) -> Option<&'static str> {
+                match self { #rule_explanation_match_arms }
             }
 
             pub fn autofixable(&self) -> Option<crate::violation::AutofixKind> {

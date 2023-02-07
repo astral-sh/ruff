@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
     Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location,
@@ -9,7 +9,6 @@ use crate::ast::helpers;
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::{CallPath, Range};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};

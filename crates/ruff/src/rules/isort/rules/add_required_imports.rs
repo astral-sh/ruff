@@ -1,14 +1,13 @@
 use std::fmt;
 
 use log::error;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Location, StmtKind, Suite};
 
 use super::super::helpers;
 use super::super::track::Block;
 use crate::ast::helpers::is_docstring_stmt;
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};

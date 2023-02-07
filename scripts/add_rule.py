@@ -75,7 +75,7 @@ def main(*, name: str, code: str, linter: str) -> None:  # noqa: PLR0915
         fp.write(
             """use ruff_macros::derive_message_formats;
 
-use crate::define_violation;
+use ruff_macros::define_violation;
 use crate::violation::Violation;
 use crate::checkers::ast::Checker;
 

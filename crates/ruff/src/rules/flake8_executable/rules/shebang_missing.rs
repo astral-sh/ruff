@@ -2,11 +2,10 @@ use std::path::Path;
 
 #[cfg(not(target_family = "wasm"))]
 use is_executable::IsExecutable;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 

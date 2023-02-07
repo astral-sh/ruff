@@ -1,7 +1,7 @@
 use std::iter;
 
 use regex::Regex;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arg, Arguments};
 
@@ -13,7 +13,7 @@ use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeK
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use crate::{define_violation, visibility};
+use crate::visibility;
 
 define_violation!(
     pub struct UnusedFunctionArgument {

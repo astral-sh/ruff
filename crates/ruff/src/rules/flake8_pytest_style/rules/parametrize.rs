@@ -1,4 +1,4 @@
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 
 use super::super::types;
@@ -6,7 +6,6 @@ use super::helpers::{is_pytest_parametrize, split_names};
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Generator;

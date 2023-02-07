@@ -7,12 +7,11 @@
 //! by the unpacked sequence, and this change of ordering can surprise and
 //! mislead readers.
 
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 

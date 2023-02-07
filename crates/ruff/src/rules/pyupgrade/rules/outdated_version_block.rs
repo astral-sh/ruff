@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use log::error;
 use num_bigint::{BigInt, Sign};
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -11,7 +11,6 @@ use crate::ast::types::{Range, RefEquality};
 use crate::ast::whitespace::indentation;
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyupgrade::fixes::adjust_indentation;

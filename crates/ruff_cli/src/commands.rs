@@ -281,6 +281,15 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
             writeln!(stdout, "{}\n", rule.as_ref())?;
             writeln!(stdout, "Code: {} ({})\n", rule.code(), linter.name())?;
 
+            if let Some(explanation) = rule.explanation() {
+                writeln!(stdout, "{}\n", explanation)?;
+            } else {
+                writeln!(stdout, "Message formats:\n")?;
+                for format in rule.message_formats() {
+                    writeln!(stdout, "* {format}")?;
+                }
+            }
+
             if let Some(autofix) = rule.autofixable() {
                 writeln!(
                     stdout,
@@ -290,12 +299,6 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
                         AutofixAvailability::Always => "Autofix is always available.\n",
                     }
                 )?;
-            }
-
-            writeln!(stdout, "Message formats:\n")?;
-
-            for format in rule.message_formats() {
-                writeln!(stdout, "* {format}")?;
             }
         }
         HelpFormat::Json => {

@@ -1,5 +1,5 @@
 use log::error;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
 
 use super::fixes;
@@ -12,8 +12,8 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::visibility;
 use crate::visibility::Visibility;
-use crate::{define_violation, visibility};
 
 define_violation!(
     pub struct MissingTypeFunctionArgument {

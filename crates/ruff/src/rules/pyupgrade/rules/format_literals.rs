@@ -2,13 +2,12 @@ use anyhow::{anyhow, bail, Result};
 use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call, match_expression};
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pyflakes::format::FormatSummary;
