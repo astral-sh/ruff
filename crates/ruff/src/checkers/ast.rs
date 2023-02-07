@@ -1563,7 +1563,7 @@ where
                 }
             }
             StmtKind::With { items, body, .. } => {
-                if self.settings.rules.enabled(&Rule::NoAssertRaisesException) {
+                if self.settings.rules.enabled(&Rule::AssertRaisesException) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
                 if self

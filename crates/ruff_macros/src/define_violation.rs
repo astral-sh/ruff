@@ -37,7 +37,8 @@ impl Parse for LintMeta {
                 let value = lit.value();
                 let line = value.strip_prefix(' ').unwrap_or(&value);
                 if line.starts_with("```") {
-                    explanation += "```\n";
+                    explanation += line;
+                    explanation.push('\n');
                     in_code = !in_code;
                 } else if !(in_code && line.starts_with("# ")) {
                     explanation += line;
@@ -61,15 +62,21 @@ impl Parse for LintMeta {
 
 pub fn define_violation(input: &TokenStream, meta: LintMeta) -> TokenStream {
     let LintMeta { explanation, name } = meta;
-    let output = quote! {
-        #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-        #input
+    if explanation.is_empty() {
+        quote! {
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            #input
+        }
+    } else {
+        quote! {
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            #input
 
-        impl #name {
-            pub fn explanation() -> Option<&'static str> {
-                Some(#explanation)
+            impl #name {
+                pub fn explanation() -> Option<&'static str> {
+                    Some(#explanation)
+                }
             }
         }
-    };
-    output
+    }
 }

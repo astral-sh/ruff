@@ -957,7 +957,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
 | B015 | useless-comparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
 | B016 | cannot-raise-literal | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
-| B017 | no-assert-raises-exception | `assertRaises(Exception)` should be considered evil |  |
+| [B017](https://github.com/charliermarsh/ruff/blob/main/docs/rules/assert-raises-exception.md) | [assert-raises-exception](https://github.com/charliermarsh/ruff/blob/main/docs/rules/assert-raises-exception.md) | `assertRaises(Exception)` should be considered evil |  |
 | B018 | useless-expression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B019 | cached-instance-method | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
 | B020 | loop-variable-overrides-iterator | Loop control variable `{name}` overrides iterable it iterates |  |
