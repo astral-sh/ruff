@@ -7,16 +7,16 @@ use syn::{Attribute, Ident, LitStr, Path, Token};
 
 pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
     let mut rule_variants = quote!();
-    let mut diagkind_variants = quote!();
+    let mut diagnostic_kind_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_autofixable_match_arms = quote!();
     let mut rule_code_match_arms = quote!();
     let mut rule_from_code_match_arms = quote!();
-    let mut diagkind_code_match_arms = quote!();
-    let mut diagkind_body_match_arms = quote!();
-    let mut diagkind_fixable_match_arms = quote!();
-    let mut diagkind_commit_match_arms = quote!();
-    let mut from_impls_for_diagkind = quote!();
+    let mut diagnostic_kind_code_match_arms = quote!();
+    let mut diagnostic_kind_body_match_arms = quote!();
+    let mut diagnostic_kind_fixable_match_arms = quote!();
+    let mut diagnostic_kind_commit_match_arms = quote!();
+    let mut from_impls_for_diagnostic_kind = quote!();
 
     for (code, path, name, attr) in &mapping.entries {
         let code_str = LitStr::new(&code.to_string(), Span::call_site());
@@ -25,7 +25,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             #(#attr)*
             #name,
         });
-        diagkind_variants.extend(quote! {#(#attr)* #name(#path),});
+        diagnostic_kind_variants.extend(quote! {#(#attr)* #name(#path),});
 
         // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
         rule_message_formats_match_arms
@@ -34,15 +34,16 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             .extend(quote! {#(#attr)* Self::#name => <#path as Violation>::AUTOFIX,});
         rule_code_match_arms.extend(quote! {#(#attr)* Self::#name => #code_str,});
         rule_from_code_match_arms.extend(quote! {#(#attr)* #code_str => Ok(Rule::#name), });
-        diagkind_code_match_arms.extend(quote! {#(#attr)* Self::#name(..) => &Rule::#name, });
-        diagkind_body_match_arms
+        diagnostic_kind_code_match_arms
+            .extend(quote! {#(#attr)* Self::#name(..) => &Rule::#name, });
+        diagnostic_kind_body_match_arms
             .extend(quote! {#(#attr)* Self::#name(x) => Violation::message(x), });
-        diagkind_fixable_match_arms
+        diagnostic_kind_fixable_match_arms
             .extend(quote! {#(#attr)* Self::#name(x) => x.autofix_title_formatter().is_some(),});
-        diagkind_commit_match_arms.extend(
+        diagnostic_kind_commit_match_arms.extend(
             quote! {#(#attr)* Self::#name(x) => x.autofix_title_formatter().map(|f| f(x)), },
         );
-        from_impls_for_diagkind.extend(quote! {
+        from_impls_for_diagnostic_kind.extend(quote! {
             #(#attr)*
             impl From<#path> for DiagnosticKind {
                 fn from(x: #path) -> Self {
@@ -58,7 +59,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         .map(|(code, _, name, _)| (code.to_string(), name))
         .collect();
 
-    let rulecodeprefix = super::rule_code_prefix::expand(
+    let rule_code_prefix = super::rule_code_prefix::expand(
         &Ident::new("Rule", Span::call_site()),
         &Ident::new("RuleCodePrefix", Span::call_site()),
         mapping.entries.iter().map(|(code, ..)| code),
@@ -82,7 +83,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         pub enum Rule { #rule_variants }
 
         #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
-        pub enum DiagnosticKind { #diagkind_variants }
+        pub enum DiagnosticKind { #diagnostic_kind_variants }
 
         #[derive(thiserror::Error, Debug)]
         pub enum FromCodeError {
@@ -115,28 +116,28 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         impl DiagnosticKind {
             /// The rule of the diagnostic.
             pub fn rule(&self) -> &'static Rule {
-                match self { #diagkind_code_match_arms }
+                match self { #diagnostic_kind_code_match_arms }
             }
 
             /// The body text for the diagnostic.
             pub fn body(&self) -> String {
-                match self { #diagkind_body_match_arms }
+                match self { #diagnostic_kind_body_match_arms }
             }
 
             /// Whether the diagnostic is (potentially) fixable.
             pub fn fixable(&self) -> bool {
-                match self { #diagkind_fixable_match_arms }
+                match self { #diagnostic_kind_fixable_match_arms }
             }
 
             /// The message used to describe the fix action for a given `DiagnosticKind`.
             pub fn commit(&self) -> Option<String> {
-                match self { #diagkind_commit_match_arms }
+                match self { #diagnostic_kind_commit_match_arms }
             }
         }
 
-        #from_impls_for_diagkind
+        #from_impls_for_diagnostic_kind
 
-        #rulecodeprefix
+        #rule_code_prefix
     }
 }
 
