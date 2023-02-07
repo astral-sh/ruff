@@ -144,7 +144,8 @@ fn generate_impls<'a>(
     }
 }
 
-/// If all values in an iterator are the same, return that value. Otherwise, return `None`.
+/// If all values in an iterator are the same, return that value. Otherwise,
+/// return `None`.
 fn if_all_same<T: PartialEq>(iter: impl Iterator<Item = T>) -> Option<T> {
     let mut iter = iter.peekable();
     let first = iter.next()?;

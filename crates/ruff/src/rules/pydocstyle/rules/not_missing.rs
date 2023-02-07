@@ -1,15 +1,15 @@
+use ruff_macros::derive_message_formats;
+
 use crate::ast::cast;
 use crate::ast::helpers::identifier_range;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
-
-use crate::define_violation;
 use crate::visibility::{is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility};
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct PublicModule;

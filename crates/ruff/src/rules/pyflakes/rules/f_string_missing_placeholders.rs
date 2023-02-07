@@ -1,9 +1,9 @@
-use crate::define_violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::helpers::find_useless_f_strings;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;

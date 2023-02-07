@@ -1,3 +1,6 @@
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
+
 use super::mutable_argument_default::is_mutable_func;
 use crate::ast::helpers::{compose_call_path, to_call_path};
 use crate::ast::types::{CallPath, Range};
@@ -7,8 +10,6 @@ use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Arguments, Constant, Expr, ExprKind};
 
 define_violation!(
     pub struct FunctionCallArgumentDefault {

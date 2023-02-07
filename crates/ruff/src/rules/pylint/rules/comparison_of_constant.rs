@@ -1,14 +1,15 @@
+use std::fmt;
+
 use itertools::Itertools;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Cmpop, Expr, ExprKind, Located};
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ViolationsCmpop {

@@ -1,3 +1,5 @@
+use ruff_macros::derive_message_formats;
+use ruff_python::string::{self};
 use rustpython_ast::{Arg, Arguments, Expr, ExprKind, Stmt};
 
 use super::helpers;
@@ -9,8 +11,6 @@ use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use ruff_python::string::{self};
 
 define_violation!(
     pub struct InvalidClassName {

@@ -1,5 +1,3 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
@@ -7,8 +5,10 @@ use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 use crate::ast::helpers::compose_call_path;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct OSErrorAlias {

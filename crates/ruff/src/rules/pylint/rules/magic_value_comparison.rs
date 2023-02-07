@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -7,7 +8,6 @@ use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::rules::pylint::settings::ConstantType;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct MagicValueComparison {

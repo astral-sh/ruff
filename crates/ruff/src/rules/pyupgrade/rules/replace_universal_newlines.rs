@@ -1,13 +1,13 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, Keyword, Location};
 
 use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct ReplaceUniversalNewlines;

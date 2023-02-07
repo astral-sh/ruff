@@ -1,16 +1,16 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use once_cell::sync::Lazy;
 use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
 
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::rules::ruff::rules::Context;
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct AmbiguousUnicodeCharacterString {

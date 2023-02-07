@@ -4,9 +4,10 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use anyhow::Result;
     use regex::Regex;
-    use std::path::Path;
     use test_case::test_case;
 
     use crate::assert_yaml_snapshot;

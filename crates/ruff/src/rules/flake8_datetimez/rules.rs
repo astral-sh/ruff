@@ -1,6 +1,5 @@
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
-
 use ruff_macros::derive_message_formats;
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::helpers::{has_non_none_keyword, is_const_none};
 use crate::ast::types::Range;

@@ -27,8 +27,9 @@ use crate::{directives, fs, rustpython_helpers};
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
-/// A [`Result`]-like type that returns both data and an error. Used to return diagnostics even in
-/// the face of parse errors, since many diagnostics can be generated without a full AST.
+/// A [`Result`]-like type that returns both data and an error. Used to return
+/// diagnostics even in the face of parse errors, since many diagnostics can be
+/// generated without a full AST.
 pub struct LinterResult<T> {
     pub data: T,
     pub error: Option<ParseError>,
@@ -270,7 +271,8 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
     )
 }
 
-/// Generate a [`Message`] for each [`Diagnostic`] triggered by the given source code.
+/// Generate a [`Message`] for each [`Diagnostic`] triggered by the given source
+/// code.
 pub fn lint_only(
     contents: &str,
     path: &Path,

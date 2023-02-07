@@ -1,11 +1,11 @@
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
+
 use crate::ast::helpers::identifier_range;
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::Violation;
-
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{ExcepthandlerKind, Stmt, StmtKind};
 
 define_violation!(
     pub struct TooManyBranches {

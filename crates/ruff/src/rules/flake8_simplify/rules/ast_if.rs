@@ -1,5 +1,3 @@
-use crate::violation::{AlwaysAutofixableViolation, Availability, Violation};
-use crate::{define_violation, AutofixKind};
 use log::error;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
@@ -14,6 +12,8 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
+use crate::violation::{AlwaysAutofixableViolation, Availability, Violation};
+use crate::{define_violation, AutofixKind};
 
 define_violation!(
     pub struct NestedIfStatements;
@@ -240,7 +240,8 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         return;
     };
 
-    // If the branches have the same condition, abort (although the code could be simplified).
+    // If the branches have the same condition, abort (although the code could be
+    // simplified).
     if if_return == else_return {
         return;
     }

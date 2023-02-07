@@ -1,10 +1,9 @@
 use itertools::izip;
 use log::error;
 use once_cell::unsync::Lazy;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Cmpop, Expr};
 use serde::{Deserialize, Serialize};
-
-use ruff_macros::derive_message_formats;
 
 use crate::ast::helpers;
 use crate::ast::operations::locate_cmpops;

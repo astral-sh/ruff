@@ -1,4 +1,3 @@
-use crate::define_violation;
 use itertools::Itertools;
 use log::error;
 use ruff_macros::derive_message_formats;
@@ -10,6 +9,7 @@ use crate::ast::helpers::contains_effect;
 use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;

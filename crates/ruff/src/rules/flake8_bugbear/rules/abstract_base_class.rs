@@ -1,11 +1,12 @@
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 use crate::visibility::{is_abstract, is_overload};
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 define_violation!(
     pub struct AbstractBaseClassWithoutAbstractMethod {

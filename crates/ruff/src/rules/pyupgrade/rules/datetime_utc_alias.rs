@@ -1,5 +1,3 @@
-use crate::violation::{Availability, Violation};
-use crate::{define_violation, AutofixKind};
 use ruff_macros::derive_message_formats;
 use rustpython_ast::Expr;
 
@@ -8,6 +6,8 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
+use crate::violation::{Availability, Violation};
+use crate::{define_violation, AutofixKind};
 
 define_violation!(
     pub struct DatetimeTimezoneUTC {

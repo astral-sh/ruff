@@ -9,6 +9,8 @@ use globset::Glob;
 use rustc_hash::{FxHashMap, FxHashSet};
 use strum::IntoEnumIterator;
 
+use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
+use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
 use crate::registry::{Rule, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
@@ -21,9 +23,6 @@ use crate::rules::{
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::warn_user_once;
-
-use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
-use self::rule_table::RuleTable;
 
 pub mod configuration;
 pub mod defaults;
@@ -380,8 +379,8 @@ impl From<&Configuration> for RuleTable {
             }
         }
 
-        // Validate that we didn't enable any incompatible rules. Use this awkward approach to
-        // give each pair it's own `warn_user_once`.
+        // Validate that we didn't enable any incompatible rules. Use this awkward
+        // approach to give each pair it's own `warn_user_once`.
         let [pair1, pair2] = INCOMPATIBLE_CODES;
         let (preferred, expendable, message) = pair1;
         if rules.enabled(preferred) && rules.enabled(expendable) {
@@ -427,11 +426,10 @@ pub fn resolve_per_file_ignores(
 mod tests {
     use rustc_hash::FxHashSet;
 
+    use super::configuration::RuleSelection;
     use crate::registry::{Rule, RuleCodePrefix};
     use crate::settings::configuration::Configuration;
     use crate::settings::rule_table::RuleTable;
-
-    use super::configuration::RuleSelection;
 
     #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(selections: impl IntoIterator<Item = RuleSelection>) -> FxHashSet<Rule> {

@@ -667,8 +667,8 @@ pub fn to_call_path(target: &str) -> CallPath {
 
 /// Create a module path from a (package, path) pair.
 ///
-/// For example, if the package is `foo/bar` and the path is `foo/bar/baz.py`, the call path is
-/// `["baz"]`.
+/// For example, if the package is `foo/bar` and the path is `foo/bar/baz.py`,
+/// the call path is `["baz"]`.
 pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
     path.strip_prefix(package.parent()?)
         .ok()?

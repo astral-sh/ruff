@@ -2,7 +2,6 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-
 use ruff_macros::derive_message_formats;
 
 use crate::define_violation;

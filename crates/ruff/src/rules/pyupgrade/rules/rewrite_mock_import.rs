@@ -1,5 +1,3 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use anyhow::Result;
 use libcst_native::{
     AsName, AssignTargetExpression, Attribute, Codegen, CodegenState, Dot, Expression, Import,
@@ -15,9 +13,11 @@ use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::{Locator, Stylist};
+use crate::violation::AlwaysAutofixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MockReference {

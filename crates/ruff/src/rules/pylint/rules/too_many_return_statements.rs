@@ -1,12 +1,12 @@
+use ruff_macros::derive_message_formats;
+use rustpython_ast::Stmt;
+
 use crate::ast::helpers::{identifier_range, ReturnStatementVisitor};
 use crate::ast::visitor::Visitor;
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::Violation;
-
-use ruff_macros::derive_message_formats;
-use rustpython_ast::Stmt;
 
 define_violation!(
     pub struct TooManyReturnStatements {

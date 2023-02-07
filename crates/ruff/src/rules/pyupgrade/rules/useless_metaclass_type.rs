@@ -1,5 +1,3 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use log::error;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind, Stmt};
@@ -7,7 +5,9 @@ use rustpython_ast::{Expr, ExprKind, Stmt};
 use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct UselessMetaclassType;
