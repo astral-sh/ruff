@@ -1,3 +1,4 @@
+use crate::ast::helpers::unparse_constant;
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
@@ -65,7 +66,7 @@ pub fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(
                     MagicValueComparison {
-                        value: value.to_string(),
+                        value: unparse_constant(value, checker.stylist),
                     },
                     Range::from_located(comparison_expr),
                 ));

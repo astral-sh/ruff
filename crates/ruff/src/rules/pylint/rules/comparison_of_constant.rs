@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::ast::helpers::unparse_constant;
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Located};
@@ -108,9 +109,9 @@ pub fn comparison_of_constant(
         {
             let diagnostic = Diagnostic::new(
                 ComparisonOfConstant {
-                    left_constant: left_constant.to_string(),
+                    left_constant: unparse_constant(left_constant, checker.stylist),
                     op: op.into(),
-                    right_constant: right_constant.to_string(),
+                    right_constant: unparse_constant(right_constant, checker.stylist),
                 },
                 Range::from_located(left),
             );
