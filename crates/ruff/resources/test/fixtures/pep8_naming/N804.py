@@ -46,6 +46,10 @@ class MetaClass(ABCMeta):
     def good_method(cls):
         pass
 
+    @staticmethod
+    def static_method(not_cls) -> bool:
+        return False
+
 
 def func(x):
     return x
