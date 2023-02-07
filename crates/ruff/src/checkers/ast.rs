@@ -3226,7 +3226,7 @@ where
                 args,
                 keywords,
             } => {
-                let callable = self.resolve_call_path(func).and_then(|call_path| {
+                let callable = self.resolve_call_path(expr).and_then(|call_path| {
                     if self.match_typing_call_path(&call_path, "ForwardRef") {
                         Some(Callable::ForwardRef)
                     } else if self.match_typing_call_path(&call_path, "cast") {
