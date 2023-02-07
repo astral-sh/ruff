@@ -1686,6 +1686,9 @@ where
                 if self.settings.rules.enabled(&Rule::ErrorInsteadOfException) {
                     tryceratops::rules::error_instead_of_exception(self, handlers);
                 }
+                if self.settings.rules.enabled(&Rule::ContinueInFinally) {
+                    pylint::rules::continue_in_finally(self, finalbody);
+                }
             }
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.rules.enabled(&Rule::DoNotAssignLambda) {

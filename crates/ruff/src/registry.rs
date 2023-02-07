@@ -105,6 +105,7 @@ ruff_macros::define_rule_mapping!(
     F842 => rules::pyflakes::rules::UnusedAnnotation,
     F901 => rules::pyflakes::rules::RaiseNotImplemented,
     // pylint
+    PLE0116 => rules::pylint::rules::ContinueInFinally,
     PLE0604 => rules::pylint::rules::InvalidAllObject,
     PLE0605 => rules::pylint::rules::InvalidAllFormat,
     PLE1310 => rules::pylint::rules::BadStrStripCall,
