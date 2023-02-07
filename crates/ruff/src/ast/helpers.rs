@@ -30,17 +30,24 @@ pub fn create_stmt(node: StmtKind) -> Stmt {
     Stmt::new(Location::default(), Location::default(), node)
 }
 
-/// Generate source code from an `Expr`.
+/// Generate source code from an [`Expr`].
 pub fn unparse_expr(expr: &Expr, stylist: &Stylist) -> String {
     let mut generator: Generator = stylist.into();
     generator.unparse_expr(expr, 0);
     generator.generate()
 }
 
-/// Generate source code from an `Stmt`.
+/// Generate source code from a [`Stmt`].
 pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
     let mut generator: Generator = stylist.into();
     generator.unparse_stmt(stmt);
+    generator.generate()
+}
+
+/// Generate source code from an [`Constant`].
+pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
+    let mut generator: Generator = stylist.into();
+    generator.unparse_constant(constant);
     generator.generate()
 }
 

@@ -12,7 +12,7 @@ use crate::source_code::{Locator, Stylist};
 pub(crate) fn fix_multiple_with_statements(
     locator: &Locator,
     stylist: &Stylist,
-    stmt: &rustpython_ast::Stmt,
+    stmt: &rustpython_parser::ast::Stmt,
 ) -> Result<Fix> {
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator, stmt) else {

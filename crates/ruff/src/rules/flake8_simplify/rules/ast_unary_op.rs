@@ -189,7 +189,7 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
 
     let mut diagnostic = Diagnostic::new(
         DoubleNegation {
-            expr: operand.to_string(),
+            expr: unparse_expr(operand, checker.stylist),
         },
         Range::from_located(expr),
     );

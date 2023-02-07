@@ -1,7 +1,7 @@
 use ruff_macros::derive_message_formats;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::SimpleCallArgs;
+use crate::ast::helpers::{unparse_constant, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
@@ -46,7 +46,7 @@ pub fn request_without_timeout(
                 ExprKind::Constant {
                     value: value @ Constant::None,
                     ..
-                } => Some(value.to_string()),
+                } => Some(unparse_constant(value, checker.stylist)),
                 _ => None,
             } {
                 checker.diagnostics.push(Diagnostic::new(
