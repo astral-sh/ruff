@@ -696,6 +696,24 @@ where
                     flake8_pytest_style::rules::marks(self, decorator_list);
                 }
 
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
+                {
+                    flake8_boolean_trap::rules::check_positional_boolean_in_def(self, name, args);
+                }
+
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
+                {
+                    flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
+                        self, name, args,
+                    );
+                }
+
                 self.check_builtin_shadowing(name, stmt, true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be
@@ -3653,24 +3671,6 @@ where
             .enabled(&Rule::FunctionCallArgumentDefault)
         {
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
-        }
-
-        // flake8-boolean-trap
-        if self
-            .settings
-            .rules
-            .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
-        {
-            flake8_boolean_trap::rules::check_positional_boolean_in_def(self, arguments);
-        }
-        if self
-            .settings
-            .rules
-            .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
-        {
-            flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
-                self, arguments,
-            );
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
