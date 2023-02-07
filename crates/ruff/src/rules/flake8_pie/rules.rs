@@ -345,7 +345,7 @@ pub fn single_starts_ends_with(
 
                         if seen.contains(&x) {
                             let diagnostic =
-                                Diagnostic::new(PreferListBuiltin, Range::from_located(&value));
+                                Diagnostic::new(PreferListBuiltin, Range::from_located(value));
                             checker.diagnostics.push(diagnostic);
                         }
                         seen.insert(x);
