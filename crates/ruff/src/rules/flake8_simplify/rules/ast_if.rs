@@ -369,6 +369,21 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         }
     }
 
+    // Avoid suggesting ternary for `if (yield ...)`-style checks.
+    // TODO(charlie): Fix precedence handling for yields in generator.
+    if matches!(
+        body_value.node,
+        ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. }
+    ) {
+        return;
+    }
+    if matches!(
+        orelse_value.node,
+        ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. }
+    ) {
+        return;
+    }
+
     let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
     let contents = unparse_stmt(&ternary, checker.stylist);
