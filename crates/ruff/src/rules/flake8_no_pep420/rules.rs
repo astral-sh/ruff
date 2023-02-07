@@ -26,8 +26,8 @@ pub fn implicit_namespace_package(
     src: &[PathBuf],
 ) -> Option<Diagnostic> {
     if package.is_none()
-        // Ignore `.pyi` files, which don't require an `__init__.py`.
-        && path.extension().map_or(true, |ext| ext != "pyi")
+        // Ignore non-`.py` files, which don't require an `__init__.py`.
+        && path.extension().map_or(false, |ext| ext == "py")
         // Ignore any files that are direct children of the project root.
         && !path
             .parent()
