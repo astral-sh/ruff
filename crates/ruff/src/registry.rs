@@ -453,6 +453,7 @@ ruff_macros::define_rule_mapping!(
     PIE800 => rules::flake8_pie::rules::NoUnnecessarySpread,
     PIE804 => rules::flake8_pie::rules::NoUnnecessaryDictKwargs,
     PIE807 => rules::flake8_pie::rules::PreferListBuiltin,
+    PIE810 => rules::flake8_pie::rules::SingleStartsEndsWith,
     // flake8-commas
     COM812 => rules::flake8_commas::rules::TrailingCommaMissing,
     COM818 => rules::flake8_commas::rules::TrailingCommaOnBareTupleProhibited,
