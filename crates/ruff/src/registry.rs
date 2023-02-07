@@ -107,6 +107,7 @@ ruff_macros::define_rule_mapping!(
     // pylint
     PLE0604 => rules::pylint::rules::InvalidAllObject,
     PLE0605 => rules::pylint::rules::InvalidAllFormat,
+    PLE2502 => rules::pylint::rules::BidirectionalUnicode,
     PLE1310 => rules::pylint::rules::BadStrStripCall,
     PLC0414 => rules::pylint::rules::UselessImportAlias,
     PLC3002 => rules::pylint::rules::UnnecessaryDirectLambdaCall,

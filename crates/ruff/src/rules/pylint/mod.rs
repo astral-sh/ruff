@@ -40,6 +40,7 @@ mod tests {
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
+    #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"); "PLE2502")]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());

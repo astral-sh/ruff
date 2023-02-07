@@ -3107,6 +3107,9 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteUnicodeLiteral) {
                     pyupgrade::rules::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
+                if self.settings.rules.enabled(&Rule::BidirectionalUnicode) {
+                    pylint::rules::bidirectional_unicode(self, expr, value);
+                }
             }
             ExprKind::Lambda { args, body, .. } => {
                 if self.settings.rules.enabled(&Rule::PreferListBuiltin) {

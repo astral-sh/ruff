@@ -1,0 +1,55 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    BidirectionalUnicode: ~
+  location:
+    row: 2
+    column: 6
+  end_location:
+    row: 2
+    column: 50
+  fix: ~
+  parent: ~
+- kind:
+    BidirectionalUnicode: ~
+  location:
+    row: 5
+    column: 6
+  end_location:
+    row: 5
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    BidirectionalUnicode: ~
+  location:
+    row: 8
+    column: 10
+  end_location:
+    row: 8
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    BidirectionalUnicode: ~
+  location:
+    row: 11
+    column: 19
+  end_location:
+    row: 11
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    BidirectionalUnicode: ~
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 49
+  fix: ~
+  parent: ~
+
