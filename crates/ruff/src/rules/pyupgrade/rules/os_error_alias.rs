@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
 use crate::ast::helpers::compose_call_path;
 use crate::ast::types::Range;

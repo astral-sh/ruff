@@ -2,7 +2,7 @@ use std::fmt;
 
 use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind};
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;

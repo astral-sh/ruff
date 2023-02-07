@@ -2,7 +2,7 @@ use std::hash::{BuildHasherDefault, Hash};
 
 use ruff_macros::derive_message_formats;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, ExprKind};
 
 use crate::ast::comparable::{ComparableConstant, ComparableExpr};
 use crate::ast::helpers::unparse_expr;

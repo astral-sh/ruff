@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use super::branch::Branch;
 use super::helpers::result_exists;

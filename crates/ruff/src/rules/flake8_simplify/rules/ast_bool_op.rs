@@ -3,7 +3,7 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
+use rustpython_parser::ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
 use crate::ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
 use crate::ast::types::Range;

@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use libcst_native::{Codegen, CodegenState, CompoundStatement, Statement, Suite, With};
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace;

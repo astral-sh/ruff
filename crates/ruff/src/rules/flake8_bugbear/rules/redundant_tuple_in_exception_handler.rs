@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, ExprKind};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;

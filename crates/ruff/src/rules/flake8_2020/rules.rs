@@ -1,6 +1,6 @@
 use num_bigint::BigInt;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Located};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

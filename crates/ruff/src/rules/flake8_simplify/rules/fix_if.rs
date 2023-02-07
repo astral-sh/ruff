@@ -4,7 +4,7 @@ use libcst_native::{
     LeftParen, ParenthesizableWhitespace, ParenthesizedNode, RightParen, SimpleWhitespace,
     Statement, Suite,
 };
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace;

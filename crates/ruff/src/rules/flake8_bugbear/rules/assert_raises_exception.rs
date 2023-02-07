@@ -8,7 +8,7 @@
 //! custom), use `assertRaisesRegex`, or use the context manager form of
 //! `assertRaises`.
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{ExprKind, Stmt, Withitem};
+use rustpython_parser::ast::{ExprKind, Stmt, Withitem};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

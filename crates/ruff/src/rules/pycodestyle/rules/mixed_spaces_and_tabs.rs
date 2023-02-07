@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;

@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Boolop, Expr, ExprKind};
+use rustpython_parser::ast::{Boolop, Expr, ExprKind};
 
 use crate::ast::hashable::HashableExpr;
 use crate::ast::helpers::unparse_expr;

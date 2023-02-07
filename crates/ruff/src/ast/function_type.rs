@@ -1,4 +1,4 @@
-use rustpython_ast::Expr;
+use rustpython_parser::ast::Expr;
 
 use crate::ast::helpers::to_call_path;
 use crate::ast::types::{Scope, ScopeKind};

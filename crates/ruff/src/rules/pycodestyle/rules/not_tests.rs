@@ -1,6 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::Unaryop;
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

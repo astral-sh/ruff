@@ -1,6 +1,6 @@
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
 
 use super::fixes;
 use super::helpers::match_function_def;

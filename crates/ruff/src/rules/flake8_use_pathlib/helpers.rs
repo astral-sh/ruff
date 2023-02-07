@@ -1,4 +1,4 @@
-use rustpython_ast::Expr;
+use rustpython_parser::ast::Expr;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

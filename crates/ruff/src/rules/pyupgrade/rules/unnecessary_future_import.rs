@@ -1,8 +1,7 @@
 use itertools::Itertools;
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Alias, AliasData, Located};
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Alias, AliasData, Located, Stmt};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

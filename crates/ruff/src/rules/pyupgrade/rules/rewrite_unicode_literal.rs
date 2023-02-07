@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, Location};
+use rustpython_parser::ast::{Expr, Location};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

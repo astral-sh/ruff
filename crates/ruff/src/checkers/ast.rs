@@ -9,11 +9,10 @@ use nohash_hasher::IntMap;
 use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python::typing::TYPING_EXTENSIONS;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Comprehension, Located, Location};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
-    KeywordData, Operator, Stmt, StmtKind, Suite,
+    Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
+    ExprKind, KeywordData, Located, Location, Operator, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
 use smallvec::smallvec;

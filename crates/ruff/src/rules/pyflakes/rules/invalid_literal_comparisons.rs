@@ -2,7 +2,7 @@ use itertools::izip;
 use log::error;
 use once_cell::unsync::Lazy;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Cmpop, Expr};
+use rustpython_parser::ast::{Cmpop, Expr};
 use serde::{Deserialize, Serialize};
 
 use crate::ast::helpers;

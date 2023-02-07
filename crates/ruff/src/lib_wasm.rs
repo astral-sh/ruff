@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use serde::Serialize;
 use wasm_bindgen::prelude::*;

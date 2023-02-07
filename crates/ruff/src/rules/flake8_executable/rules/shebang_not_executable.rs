@@ -4,7 +4,7 @@ use std::path::Path;
 use is_executable::IsExecutable;
 use ruff_macros::derive_message_formats;
 #[cfg(not(target_family = "wasm"))]
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ast::types::Range;

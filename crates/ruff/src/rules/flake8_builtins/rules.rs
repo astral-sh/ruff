@@ -1,6 +1,6 @@
 use ruff_macros::derive_message_formats;
 use ruff_python::builtins::BUILTINS;
-use rustpython_ast::Located;
+use rustpython_parser::ast::Located;
 
 use super::types::ShadowingType;
 use crate::ast::types::Range;

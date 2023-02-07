@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use rustpython_ast::{Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 
 use crate::ast::helpers::collect_call_path;
 use crate::checkers::ast::Checker;

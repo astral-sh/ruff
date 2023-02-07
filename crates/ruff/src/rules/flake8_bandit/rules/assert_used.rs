@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Located, StmtKind};
+use rustpython_parser::ast::{Located, StmtKind};
 
 use crate::ast::types::Range;
 use crate::define_violation;

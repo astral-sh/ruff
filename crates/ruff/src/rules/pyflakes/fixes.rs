@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use libcst_native::{Call, Codegen, CodegenState, Dict, DictElement, Expression};
 use ruff_python::string::strip_quotes_and_prefixes;
-use rustpython_ast::{Excepthandler, Expr};
+use rustpython_parser::ast::{Excepthandler, Expr};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 

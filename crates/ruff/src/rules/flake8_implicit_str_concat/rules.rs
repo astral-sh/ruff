@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::types::Range;

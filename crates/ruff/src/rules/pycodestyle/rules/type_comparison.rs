@@ -1,7 +1,6 @@
 use itertools::izip;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::Constant;
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::define_violation;

@@ -1,9 +1,8 @@
 use std::cmp::Ordering;
 
 use rustc_hash::FxHashMap;
-use rustpython_ast::ExcepthandlerKind::ExceptHandler;
-use rustpython_ast::Stmt;
-use rustpython_parser::ast::StmtKind;
+use rustpython_parser::ast::ExcepthandlerKind::ExceptHandler;
+use rustpython_parser::ast::{Stmt, StmtKind};
 
 use crate::ast::types::RefEquality;
 

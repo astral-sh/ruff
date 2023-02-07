@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 use super::detection::comment_contains_code;
 use crate::ast::types::Range;

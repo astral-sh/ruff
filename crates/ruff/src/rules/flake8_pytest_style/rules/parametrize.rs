@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};

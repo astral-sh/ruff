@@ -1,6 +1,6 @@
 use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
-use rustpython_ast::Stmt;
+use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
 use crate::define_violation;

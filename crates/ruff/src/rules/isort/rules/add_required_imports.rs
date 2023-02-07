@@ -2,7 +2,7 @@ use std::fmt;
 
 use log::error;
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Location, StmtKind, Suite};
+use rustpython_parser::ast::{Location, StmtKind, Suite};
 
 use super::super::helpers;
 use super::super::track::Block;

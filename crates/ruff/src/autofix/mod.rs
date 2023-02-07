@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;

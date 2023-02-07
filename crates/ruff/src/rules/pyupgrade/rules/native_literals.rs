@@ -1,7 +1,7 @@
 use std::fmt;
 
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use serde::{Deserialize, Serialize};

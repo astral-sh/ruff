@@ -22,7 +22,7 @@ use std::iter;
 
 use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::{BindingKind, Range, RefEquality};

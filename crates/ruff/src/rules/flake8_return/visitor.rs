@@ -1,5 +1,5 @@
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Expr, ExprKind, Location, Stmt, StmtKind};
+use rustpython_parser::ast::{Expr, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;

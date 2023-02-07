@@ -5,7 +5,7 @@ use log::error;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{
+use rustpython_parser::ast::{
     Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
     Located, Location, Stmt, StmtKind,
 };
@@ -1138,7 +1138,7 @@ pub fn is_logger_candidate(func: &Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_ast::Location;
+    use rustpython_parser::ast::Location;
     use rustpython_parser::parser;
 
     use crate::ast::helpers::{

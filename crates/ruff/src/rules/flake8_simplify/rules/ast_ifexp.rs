@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;

@@ -1,5 +1,5 @@
 use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, Stmt};
+use rustpython_parser::ast::{Expr, Stmt};
 
 use super::types::DebuggerUsingType;
 use crate::ast::helpers::format_call_path;

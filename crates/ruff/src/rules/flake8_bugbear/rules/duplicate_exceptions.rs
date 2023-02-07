@@ -1,7 +1,9 @@
 use itertools::Itertools;
 use ruff_macros::derive_message_formats;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
+use rustpython_parser::ast::{
+    Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location,
+};
 
 use crate::ast::helpers;
 use crate::ast::helpers::unparse_expr;
