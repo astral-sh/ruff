@@ -1115,8 +1115,6 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 | PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
 | PIE810 | single-starts-ends-with | Call `{field}` once with a tuple instead of calling it multiple times with the same string. |  |
 
-
-
 ### flake8-print (T20)
 
 For more, see [flake8-print](https://pypi.org/project/flake8-print/) on PyPI.
