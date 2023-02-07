@@ -46,7 +46,6 @@ pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
 
 fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool {
     match &expr.node {
-        ExprKind::Call { func, .. } => collect_call_path_inner(func, parts),
         ExprKind::Attribute { value, attr, .. } => {
             if collect_call_path_inner(value, parts) {
                 parts.push(attr);
@@ -66,7 +65,14 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool
 /// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
 pub fn collect_call_path(expr: &Expr) -> CallPath {
     let mut segments = smallvec![];
-    collect_call_path_inner(expr, &mut segments);
+    collect_call_path_inner(
+        if let ExprKind::Call { func, .. } = &expr.node {
+            func
+        } else {
+            expr
+        },
+        &mut segments,
+    );
     segments
 }
 

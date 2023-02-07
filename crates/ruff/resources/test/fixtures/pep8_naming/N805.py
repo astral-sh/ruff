@@ -51,3 +51,11 @@ class MetaClass(ABCMeta):
 
 def func(x):
     return x
+
+
+class PosOnlyClass:
+    def good_method_pos_only(self, blah, /, something: str):
+        pass
+
+    def bad_method_pos_only(this, blah, /, self, something: str):
+        pass

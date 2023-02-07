@@ -4,6 +4,7 @@ use rustpython_ast::{Boolop, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use ruff_macros::derive_message_formats;
 use ruff_python::identifiers::is_identifier;
+use ruff_python::keyword::KWLIST;
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{match_trailing_comment, unparse_expr};
@@ -290,7 +291,7 @@ fn is_valid_kwarg_name(key: &Expr) -> bool {
         ..
     } = &key.node
     {
-        is_identifier(value)
+        is_identifier(value) && !KWLIST.contains(&value.as_str())
     } else {
         false
     }
