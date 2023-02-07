@@ -3,12 +3,11 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use itertools::Either::{Left, Right};
-
 use annotate::annotate_imports;
 use categorize::categorize_imports;
 pub use categorize::{categorize, ImportType};
 use comments::Comment;
+use itertools::Either::{Left, Right};
 use normalize::normalize_imports;
 use order::order_imports;
 use settings::RelativeImportsOrder;
@@ -312,13 +311,12 @@ mod tests {
     use anyhow::Result;
     use test_case::test_case;
 
+    use super::categorize::ImportType;
+    use super::settings::RelativeImportsOrder;
     use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
-
-    use super::categorize::ImportType;
-    use super::settings::RelativeImportsOrder;
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]

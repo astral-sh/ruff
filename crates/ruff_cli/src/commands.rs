@@ -1,6 +1,5 @@
 use std::fs::remove_dir_all;
-use std::io::Write;
-use std::io::{self, BufWriter, Read};
+use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -12,9 +11,6 @@ use log::{debug, error};
 use path_absolutize::path_dedot;
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use serde::Serialize;
-use walkdir::WalkDir;
-
 use ruff::cache::CACHE_DIR_NAME;
 use ruff::linter::add_noqa_to_path;
 use ruff::logging::LogLevel;
@@ -23,6 +19,8 @@ use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
+use serde::Serialize;
+use walkdir::WalkDir;
 
 use crate::args::{HelpFormat, Overrides};
 use crate::cache;

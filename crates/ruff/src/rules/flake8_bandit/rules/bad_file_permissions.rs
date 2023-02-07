@@ -1,5 +1,3 @@
-use crate::define_violation;
-use crate::violation::Violation;
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
 use ruff_macros::derive_message_formats;
@@ -9,7 +7,9 @@ use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Operator};
 use crate::ast::helpers::{compose_call_path, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::registry::Diagnostic;
+use crate::violation::Violation;
 
 define_violation!(
     pub struct BadFilePermissions {

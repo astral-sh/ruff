@@ -1,3 +1,8 @@
+use itertools::Itertools;
+use ruff_macros::derive_message_formats;
+use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
+
 use crate::ast::helpers;
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::{CallPath, Range};
@@ -6,10 +11,6 @@ use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use itertools::Itertools;
-use ruff_macros::derive_message_formats;
-use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location};
 
 define_violation!(
     pub struct DuplicateTryBlockException {

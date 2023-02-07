@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use super::branch::Branch;
@@ -13,7 +14,6 @@ use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct UnnecessaryReturnNone;

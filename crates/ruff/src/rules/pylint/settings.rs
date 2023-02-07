@@ -1,11 +1,12 @@
 //! Settings for the `pylint` plugin.
 
+use std::hash::Hash;
+
 use anyhow::anyhow;
 use ruff_macros::ConfigurationOptions;
 use rustpython_ast::Constant;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ConstantType {
@@ -54,16 +55,20 @@ pub struct Options {
     /// Constant types to ignore when used as "magic values" (see: `PLR2004`).
     pub allow_magic_value_types: Option<Vec<ConstantType>>,
     #[option(default = r"12", value_type = "int", example = r"max-branches = 12")]
-    /// Maximum number of branches allowed for a function or method body (see: `PLR0912`).
+    /// Maximum number of branches allowed for a function or method body (see:
+    /// `PLR0912`).
     pub max_branches: Option<usize>,
     #[option(default = r"6", value_type = "int", example = r"max-returns = 6")]
-    /// Maximum number of return statements allowed for a function or method body (see `PLR0911`)
+    /// Maximum number of return statements allowed for a function or method
+    /// body (see `PLR0911`)
     pub max_returns: Option<usize>,
     #[option(default = r"5", value_type = "int", example = r"max-args = 5")]
-    /// Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).
+    /// Maximum number of arguments allowed for a function or method definition
+    /// (see: `PLR0913`).
     pub max_args: Option<usize>,
     #[option(default = r"50", value_type = "int", example = r"max-statements = 50")]
-    /// Maximum number of statements allowed for a function or method body (see: `PLR0915`).
+    /// Maximum number of statements allowed for a function or method body (see:
+    /// `PLR0915`).
     pub max_statements: Option<usize>,
 }
 

@@ -1,3 +1,6 @@
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Expr, ExprKind, Location};
+
 use super::helpers::{get_mark_decorators, get_mark_name};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -5,8 +8,6 @@ use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Location};
 
 define_violation!(
     pub struct IncorrectMarkParenthesesStyle {

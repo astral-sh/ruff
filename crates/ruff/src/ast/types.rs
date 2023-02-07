@@ -89,8 +89,9 @@ pub struct Scope<'a> {
     pub uses_locals: bool,
     /// A map from bound name to binding index, for live bindings.
     pub bindings: FxHashMap<&'a str, usize>,
-    /// A map from bound name to binding index, for bindings that were created in the scope but
-    /// rebound (and thus overridden) later on in the same scope.
+    /// A map from bound name to binding index, for bindings that were created
+    /// in the scope but rebound (and thus overridden) later on in the same
+    /// scope.
     pub rebounds: FxHashMap<&'a str, Vec<usize>>,
 }
 

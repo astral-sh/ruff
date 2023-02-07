@@ -1,7 +1,7 @@
-use crate::define_violation;
-
-use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
+
+use crate::define_violation;
+use crate::violation::Violation;
 
 define_violation!(
     pub struct RedefinedWhileUnused {

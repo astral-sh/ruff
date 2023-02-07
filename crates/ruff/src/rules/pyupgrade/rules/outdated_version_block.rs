@@ -1,9 +1,8 @@
-use ruff_macros::derive_message_formats;
-
 use std::cmp::Ordering;
 
 use log::error;
 use num_bigint::{BigInt, Sign};
+use ruff_macros::derive_message_formats;
 use rustpython_ast::Location;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt};
 use rustpython_parser::lexer;
@@ -58,8 +57,8 @@ impl BlockMetadata {
 fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata> {
     indentation(locator, located)?;
 
-    // Start the selection at the start-of-line. This ensures consistent indentation in the
-    // token stream, in the event that the entire block is indented.
+    // Start the selection at the start-of-line. This ensures consistent indentation
+    // in the token stream, in the event that the entire block is indented.
     let text = locator.slice_source_code_range(&Range::new(
         Location::new(located.location.row(), 0),
         located.end_location.unwrap(),
@@ -163,9 +162,9 @@ fn fix_py2_block(
     block: &BlockMetadata,
 ) -> Option<Fix> {
     if orelse.is_empty() {
-        // Delete the entire statement. If this is an `elif`, know it's the only child of its
-        // parent, so avoid passing in the parent at all. Otherwise, `delete_stmt` will erroneously
-        // include a `pass`.
+        // Delete the entire statement. If this is an `elif`, know it's the only child
+        // of its parent, so avoid passing in the parent at all. Otherwise,
+        // `delete_stmt` will erroneously include a `pass`.
         let deleted: Vec<&Stmt> = checker
             .deletions
             .iter()
@@ -263,7 +262,8 @@ fn fix_py3_block(
 ) -> Option<Fix> {
     match block.starter {
         Tok::If => {
-            // If the first statement is an if, use the body of this statement, and ignore the rest.
+            // If the first statement is an if, use the body of this statement, and ignore
+            // the rest.
             let start = body.first().unwrap();
             let end = body.last().unwrap();
 
@@ -304,7 +304,8 @@ fn fix_py3_block(
             }
         }
         Tok::Elif => {
-            // Replace the `elif` with an `else, preserve the body of the elif, and remove the rest.
+            // Replace the `elif` with an `else, preserve the body of the elif, and remove
+            // the rest.
             let end = body.last().unwrap();
             let text = checker.locator.slice_source_code_range(&Range::new(
                 test.end_location.unwrap(),

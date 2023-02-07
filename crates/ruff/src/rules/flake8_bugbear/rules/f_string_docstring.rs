@@ -1,10 +1,11 @@
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{ExprKind, Stmt, StmtKind};
+
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{ExprKind, Stmt, StmtKind};
 
 define_violation!(
     pub struct FStringDocstring;

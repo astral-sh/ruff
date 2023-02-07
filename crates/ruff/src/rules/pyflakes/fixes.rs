@@ -1,5 +1,6 @@
 use anyhow::{bail, Result};
 use libcst_native::{Call, Codegen, CodegenState, Dict, DictElement, Expression};
+use ruff_python::string::strip_quotes_and_prefixes;
 use rustpython_ast::{Excepthandler, Expr};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -8,7 +9,6 @@ use crate::ast::types::Range;
 use crate::cst::matchers::{match_expr, match_module};
 use crate::fix::Fix;
 use crate::source_code::{Locator, Stylist};
-use ruff_python::string::strip_quotes_and_prefixes;
 
 /// Generate a [`Fix`] to remove unused keys from format dict.
 pub fn remove_unused_format_arguments_from_dict(

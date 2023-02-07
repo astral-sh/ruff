@@ -7,13 +7,14 @@
 //! typo. Either assert for a more specific exception (builtin or
 //! custom), use `assertRaisesRegex`, or use the context manager form of
 //! `assertRaises`.
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{ExprKind, Stmt, Withitem};
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{ExprKind, Stmt, Withitem};
 
 define_violation!(
     pub struct NoAssertRaisesException;

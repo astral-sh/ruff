@@ -1,6 +1,9 @@
+use ruff_macros::derive_message_formats;
+
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::docstrings::constants;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;
@@ -8,9 +11,6 @@ use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::helpers::leading_quote;
 use crate::violation::AlwaysAutofixableViolation;
-
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct MultiLineSummaryFirstLine;

@@ -376,8 +376,8 @@ impl<'a> Printer<'a> {
         let mut stdout = BufWriter::new(io::stdout().lock());
         match self.format {
             SerializationFormat::Text => {
-                // Compute the maximum number of digits in the count and code, for all messages, to enable
-                // pretty-printing.
+                // Compute the maximum number of digits in the count and code, for all messages,
+                // to enable pretty-printing.
                 let count_width = num_digits(
                     statistics
                         .iter()

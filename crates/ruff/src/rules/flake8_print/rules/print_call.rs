@@ -1,7 +1,6 @@
 use log::error;
-use rustpython_ast::{Expr, Keyword, Stmt, StmtKind};
-
 use ruff_macros::derive_message_formats;
+use rustpython_ast::{Expr, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::is_const_none;
 use crate::ast::types::Range;

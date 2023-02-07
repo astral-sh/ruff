@@ -1,3 +1,4 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{Expr, ExprKind};
 
 use crate::ast::types::{BindingKind, Range};
@@ -6,7 +7,6 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::{Availability, Violation};
 use crate::{define_violation, AutofixKind};
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct ConsiderUsingSysExit {

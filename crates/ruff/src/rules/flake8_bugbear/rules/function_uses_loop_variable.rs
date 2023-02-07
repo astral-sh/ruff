@@ -1,3 +1,7 @@
+use ruff_macros::derive_message_formats;
+use rustc_hash::FxHashSet;
+use rustpython_ast::{Comprehension, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+
 use crate::ast::helpers::collect_arg_names;
 use crate::ast::types::{Node, Range};
 use crate::ast::visitor;
@@ -6,9 +10,6 @@ use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustc_hash::FxHashSet;
-use rustpython_ast::{Comprehension, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 define_violation!(
     pub struct FunctionUsesLoopVariable {

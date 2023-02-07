@@ -1,3 +1,7 @@
+use ruff_macros::derive_message_formats;
+use rustpython_ast::Location;
+use rustpython_parser::lexer::{LexResult, Tok};
+
 use super::settings::Quote;
 use crate::ast::types::Range;
 use crate::define_violation;
@@ -7,10 +11,6 @@ use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
-
-use ruff_macros::derive_message_formats;
-use rustpython_ast::Location;
-use rustpython_parser::lexer::{LexResult, Tok};
 
 define_violation!(
     pub struct BadQuotesInlineString {
@@ -231,8 +231,8 @@ fn strings(
         })
         .collect::<Vec<_>>();
 
-    // Return `true` if any of the strings are inline strings that contain the quote character in
-    // the body.
+    // Return `true` if any of the strings are inline strings that contain the quote
+    // character in the body.
     let relax_quote = trivia.iter().any(|trivia| {
         if trivia.is_multiline {
             return false;
@@ -393,15 +393,15 @@ pub fn from_tokens(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    // Keep track of sequences of strings, which represent implicit string concatenation, and
-    // should thus be handled as a single unit.
+    // Keep track of sequences of strings, which represent implicit string
+    // concatenation, and should thus be handled as a single unit.
     let mut sequence = vec![];
     let mut state_machine = StateMachine::default();
     for &(start, ref tok, end) in lxr.iter().flatten() {
         let is_docstring = state_machine.consume(tok);
 
-        // If this is a docstring, consume the existing sequence, then consume the docstring, then
-        // move on.
+        // If this is a docstring, consume the existing sequence, then consume the
+        // docstring, then move on.
         if is_docstring {
             if !sequence.is_empty() {
                 diagnostics.extend(strings(locator, &sequence, settings, autofix));

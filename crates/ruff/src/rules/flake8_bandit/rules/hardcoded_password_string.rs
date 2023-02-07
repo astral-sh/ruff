@@ -1,11 +1,11 @@
-use crate::define_violation;
-use crate::violation::Violation;
 use ruff_macros::derive_message_formats;
 use rustpython_ast::{Constant, Expr, ExprKind};
 
 use super::super::helpers::{matches_password_name, string_literal};
 use crate::ast::types::Range;
+use crate::define_violation;
 use crate::registry::Diagnostic;
+use crate::violation::Violation;
 
 define_violation!(
     pub struct HardcodedPasswordString {

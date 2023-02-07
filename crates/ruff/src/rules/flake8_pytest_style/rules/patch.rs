@@ -1,3 +1,4 @@
+use ruff_macros::derive_message_formats;
 use rustc_hash::FxHashSet;
 use rustpython_ast::{Expr, ExprKind, Keyword};
 
@@ -8,7 +9,6 @@ use crate::ast::visitor::Visitor;
 use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct PatchWithLambda;

@@ -1,12 +1,12 @@
+use ruff_macros::derive_message_formats;
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::docstrings::definition::Docstring;
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::violation::Violation;
-
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct NoThisPrefix;

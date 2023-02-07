@@ -1,3 +1,6 @@
+use ruff_macros::derive_message_formats;
+use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
+
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
 use crate::ast::helpers::{create_expr, unparse_expr};
@@ -8,8 +11,6 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Generator;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 
 define_violation!(
     pub struct ParametrizeNamesWrongType {

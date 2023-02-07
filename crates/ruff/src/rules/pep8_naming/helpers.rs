@@ -1,8 +1,8 @@
 use itertools::Itertools;
+use ruff_python::string::{is_lower, is_upper};
 use rustpython_ast::{Stmt, StmtKind};
 
 use crate::checkers::ast::Checker;
-use ruff_python::string::{is_lower, is_upper};
 
 pub fn is_camelcase(name: &str) -> bool {
     !is_lower(name) && !is_upper(name) && !name.contains('_')

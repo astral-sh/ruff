@@ -1,9 +1,8 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
-use ruff_macros::derive_message_formats;
-
 use std::str::FromStr;
 
+use ruff_macros::derive_message_formats;
+use ruff_python::identifiers::is_identifier;
+use ruff_python::keyword::KWLIST;
 use rustpython_ast::Location;
 use rustpython_common::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
@@ -15,12 +14,12 @@ use rustpython_parser::lexer::Tok;
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
+use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyupgrade::helpers::curly_escape;
-use ruff_python::identifiers::is_identifier;
-use ruff_python::keyword::KWLIST;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct PrintfStringFormatting;

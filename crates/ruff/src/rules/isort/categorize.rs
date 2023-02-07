@@ -3,14 +3,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use log::debug;
+use ruff_python::sys::KNOWN_STANDARD_LIBRARY;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use ruff_python::sys::KNOWN_STANDARD_LIBRARY;
-
-use crate::settings::types::PythonVersion;
-
 use super::types::{ImportBlock, Importable};
+use crate::settings::types::PythonVersion;
 
 #[derive(
     Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash,

@@ -6,6 +6,8 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
+use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python::typing::TYPING_EXTENSIONS;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_ast::{Comprehension, Located, Location};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
@@ -15,9 +17,6 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 use smallvec::smallvec;
-
-use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python::typing::TYPING_EXTENSIONS;
 
 use crate::ast::helpers::{
     binding_range, collect_call_path, extract_handler_names, from_relative_import, to_module_path,
@@ -3955,8 +3954,8 @@ impl<'a> Checker<'a> {
                 // Avoid overriding builtins.
                 binding
             } else if matches!(self.bindings[*index].kind, BindingKind::Global) {
-                // If the original binding was a global, and the new binding conflicts within the
-                // current scope, then the new binding is also a global.
+                // If the original binding was a global, and the new binding conflicts within
+                // the current scope, then the new binding is also a global.
                 Binding {
                     runtime_usage: self.bindings[*index].runtime_usage,
                     synthetic_usage: self.bindings[*index].synthetic_usage,
@@ -3965,8 +3964,8 @@ impl<'a> Checker<'a> {
                     ..binding
                 }
             } else if matches!(self.bindings[*index].kind, BindingKind::Nonlocal) {
-                // If the original binding was a nonlocal, and the new binding conflicts within the
-                // current scope, then the new binding is also a nonlocal.
+                // If the original binding was a nonlocal, and the new binding conflicts within
+                // the current scope, then the new binding is also a nonlocal.
                 Binding {
                     runtime_usage: self.bindings[*index].runtime_usage,
                     synthetic_usage: self.bindings[*index].synthetic_usage,

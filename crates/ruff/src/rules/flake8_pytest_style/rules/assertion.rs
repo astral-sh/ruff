@@ -1,3 +1,4 @@
+use ruff_macros::derive_message_formats;
 use rustpython_ast::{
     Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
 };
@@ -13,7 +14,6 @@ use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct CompositeAssertion;
