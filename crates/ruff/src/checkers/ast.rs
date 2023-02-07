@@ -5079,7 +5079,12 @@ impl<'a> Checker<'a> {
                         &overloaded_name,
                     )
                 }) {
-                    flake8_annotations::rules::definition(self, &definition, &visibility);
+                    self.diagnostics
+                        .extend(flake8_annotations::rules::definition(
+                            self,
+                            &definition,
+                            &visibility,
+                        ));
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
