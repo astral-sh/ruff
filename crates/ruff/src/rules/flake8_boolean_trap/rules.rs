@@ -38,7 +38,7 @@ impl Violation for BooleanPositionalValueInFunctionCall {
     }
 }
 
-const FUNC_NAME_ALLOWLIST: &[&str] = &[
+const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "assertEqual",
     "assertEquals",
     "assertNotEqual",
@@ -54,16 +54,18 @@ const FUNC_NAME_ALLOWLIST: &[&str] = &[
     "setdefault",
 ];
 
+const FUNC_DEF_NAME_ALLOWLIST: &[&str] = &["__setitem__"];
+
 /// Returns `true` if an argument is allowed to use a boolean trap. To return
 /// `true`, the function name must be explicitly allowed, and the argument must
 /// be either the first or second argument in the call.
 fn allow_boolean_trap(func: &Expr) -> bool {
     if let ExprKind::Attribute { attr, .. } = &func.node {
-        return FUNC_NAME_ALLOWLIST.contains(&attr.as_ref());
+        return FUNC_CALL_NAME_ALLOWLIST.contains(&attr.as_ref());
     }
 
     if let ExprKind::Name { id, .. } = &func.node {
-        return FUNC_NAME_ALLOWLIST.contains(&id.as_ref());
+        return FUNC_CALL_NAME_ALLOWLIST.contains(&id.as_ref());
     }
 
     false
@@ -87,7 +89,10 @@ fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
     }
 }
 
-pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Arguments) {
+pub fn check_positional_boolean_in_def(checker: &mut Checker, name: &str, arguments: &Arguments) {
+    if FUNC_DEF_NAME_ALLOWLIST.contains(&name) {
+        return;
+    }
     for arg in arguments.posonlyargs.iter().chain(arguments.args.iter()) {
         if arg.node.annotation.is_none() {
             continue;
@@ -117,8 +122,12 @@ pub fn check_positional_boolean_in_def(checker: &mut Checker, arguments: &Argume
 
 pub fn check_boolean_default_value_in_function_definition(
     checker: &mut Checker,
+    name: &str,
     arguments: &Arguments,
 ) {
+    if FUNC_DEF_NAME_ALLOWLIST.contains(&name) {
+        return;
+    }
     for arg in &arguments.defaults {
         add_if_boolean(checker, arg, BooleanDefaultValueInFunctionDefinition.into());
     }
@@ -129,10 +138,10 @@ pub fn check_boolean_positional_value_in_function_call(
     args: &[Expr],
     func: &Expr,
 ) {
+    if allow_boolean_trap(func) {
+        return;
+    }
     for arg in args {
-        if allow_boolean_trap(func) {
-            continue;
-        }
         add_if_boolean(checker, arg, BooleanPositionalValueInFunctionCall.into());
     }
 }
