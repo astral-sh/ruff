@@ -213,16 +213,16 @@ apk add ruff
 To run Ruff, try any of the following:
 
 ```shell
-ruff .                        # Lint all files in the current directory (and any subdirectories)
-ruff path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories)
-ruff path/to/code/*.py        # Lint all `.py` files in `/path/to/code`
-ruff path/to/code/to/file.py  # Lint `file.py`
+ruff check .                        # Lint all files in the current directory (and any subdirectories)
+ruff check path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories)
+ruff check path/to/code/*.py        # Lint all `.py` files in `/path/to/code`
+ruff check path/to/code/to/file.py  # Lint `file.py`
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
 
 ```shell
-ruff path/to/code/ --watch
+ruff check path/to/code/ --watch
 ```
 
 Ruff also works with [pre-commit](https://pre-commit.com):
@@ -377,7 +377,7 @@ Some configuration settings can be provided via the command-line, such as those 
 rule enablement and disablement, file discovery, logging level, and more:
 
 ```shell
-ruff path/to/code/ --select F401 --select F403 --quiet
+ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
 See `ruff help` for more on Ruff's top-level commands:
@@ -533,7 +533,7 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 `.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](#respect-gitignore)).
 
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
-For example, `ruff /path/to/excluded/file.py` will always lint `file.py`.
+For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Rule resolution
 
@@ -557,9 +557,9 @@ select = ["E", "F"]
 ignore = ["F401"]
 ```
 
-Running `ruff --select F401` would result in Ruff enforcing `F401`, and no other rules.
+Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no other rules.
 
-Running `ruff --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules, with
+Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules, with
 the exception of `F401`.
 
 ### Suppressing errors
@@ -604,15 +604,15 @@ Ruff supports several workflows to aid in `noqa` management.
 
 First, Ruff provides a special rule code, `RUF100`, to enforce that your `noqa` directives are
 "valid", in that the violations they _say_ they ignore are actually being triggered on that line (and
-thus suppressed). You can run `ruff /path/to/file.py --extend-select RUF100` to flag unused `noqa`
+thus suppressed). You can run `ruff check /path/to/file.py --extend-select RUF100` to flag unused `noqa`
 directives.
 
 Second, Ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
-You can run `ruff /path/to/file.py --extend-select RUF100 --fix` to automatically remove unused
+You can run `ruff check /path/to/file.py --extend-select RUF100 --fix` to automatically remove unused
 `noqa` directives.
 
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
-migrating a new codebase to Ruff. You can run `ruff /path/to/file.py --add-noqa` to automatically
+migrating a new codebase to Ruff. You can run `ruff check /path/to/file.py --add-noqa` to automatically
 add `noqa` directives to all failing lines, with the appropriate rule codes.
 
 #### Action comments
@@ -1562,11 +1562,11 @@ let g:ale_fixers = {
 ```yaml
 tools:
   python-ruff: &python-ruff
-    lint-command: "ruff --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}"
+    lint-command: "ruff check --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}"
     lint-stdin: true
     lint-formats:
       - "%f:%l:%c: %m"
-    format-command: "ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -"
+    format-command: "ruff check --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -"
     format-stdin: true
 ```
 
@@ -1628,7 +1628,7 @@ jobs:
           pip install ruff
       # Include `--format=github` to enable automatic inline annotations.
       - name: Run Ruff
-        run: ruff --format=github .
+        run: ruff check --format=github .
 ```
 
 <!-- End section: Editor Integrations -->
@@ -1894,7 +1894,7 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 
 ### How can I tell what settings Ruff is using to check my code?
 
-Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
+Run `ruff check /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
 ### I want to use Ruff, but I don't want to use `pyproject.toml`. Is that possible?
 
