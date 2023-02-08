@@ -48,6 +48,7 @@ struct ExpandedStatistics<'a> {
     count: usize,
     code: &'a str,
     message: String,
+    fixable: bool,
 }
 
 struct SerializeRuleAsCode<'a>(&'a Rule);
@@ -371,6 +372,12 @@ impl<'a> Printer<'a> {
                     .find(|message| message.kind.rule() == *rule)
                     .map(|message| message.kind.body())
                     .unwrap(),
+                fixable: diagnostics
+                    .messages
+                    .iter()
+                    .find(|message| message.kind.rule() == *rule)
+                    .iter()
+                    .any(|message| message.kind.fixable()),
             })
             .collect::<Vec<_>>();
 
@@ -396,8 +403,11 @@ impl<'a> Printer<'a> {
                 for msg in statistics {
                     writeln!(
                         stdout,
-                        "{:>count_width$}\t{:<code_width$}\t{}",
-                        msg.count, msg.code, msg.message
+                        "{:>count_width$}\t{:<code_width$}\t{}\t{}",
+                        msg.count,
+                        msg.code,
+                        if msg.fixable { "[*]" } else { "[]" },
+                        msg.message
                     )?;
                 }
                 return Ok(());
