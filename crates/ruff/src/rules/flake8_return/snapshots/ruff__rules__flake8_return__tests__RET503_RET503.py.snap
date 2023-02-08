@@ -223,4 +223,21 @@ expression: diagnostics
       row: 261
       column: 20
   parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 277
+    column: 12
+  end_location:
+    row: 277
+    column: 19
+  fix:
+    content: "\n            return None"
+    location:
+      row: 277
+      column: 19
+    end_location:
+      row: 277
+      column: 19
+  parent: ~
 

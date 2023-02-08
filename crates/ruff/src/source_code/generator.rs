@@ -4,7 +4,8 @@ use std::ops::Deref;
 
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Excepthandler,
-    ExcepthandlerKind, Expr, ExprKind, Operator, Stmt, StmtKind, Suite, Withitem,
+    ExcepthandlerKind, Expr, ExprKind, MatchCase, Operator, Pattern, PatternKind, Stmt, StmtKind,
+    Suite, Withitem,
 };
 
 use crate::source_code::stylist::{Indentation, LineEnding, Quote, Stylist};
@@ -456,7 +457,20 @@ impl<'a> Generator<'a> {
                 });
                 self.body(body);
             }
-            StmtKind::Match { .. } => {}
+            StmtKind::Match { subject, cases } => {
+                statement!({
+                    self.p("match ");
+                    self.unparse_expr(subject, precedence::MAX);
+                    self.p(":");
+                });
+                for case in cases {
+                    self.indent_depth += 1;
+                    statement!({
+                        self.unparse_match_case(case);
+                    });
+                    self.indent_depth -= 1;
+                }
+            }
             StmtKind::Raise { exc, cause } => {
                 statement!({
                     self.p("raise");
@@ -633,6 +647,84 @@ impl<'a> Generator<'a> {
                 self.body(body);
             }
         }
+    }
+
+    fn unparse_pattern<U>(&mut self, ast: &Pattern<U>) {
+        match &ast.node {
+            PatternKind::MatchValue { value } => {
+                self.unparse_expr(value, precedence::MAX);
+            }
+            PatternKind::MatchSingleton { value } => {
+                self.unparse_constant(value);
+            }
+            PatternKind::MatchSequence { patterns } => {
+                self.p("[");
+                let mut first = true;
+                for pattern in patterns {
+                    self.p_delim(&mut first, ", ");
+                    self.unparse_pattern(pattern);
+                }
+                self.p("]");
+            }
+            PatternKind::MatchMapping {
+                keys,
+                patterns,
+                rest,
+            } => {
+                self.p("{");
+                let mut first = true;
+                for (key, pattern) in keys.iter().zip(patterns) {
+                    self.p_delim(&mut first, ", ");
+                    self.unparse_expr(key, precedence::MAX);
+                    self.p(": ");
+                    self.unparse_pattern(pattern);
+                }
+                if let Some(rest) = rest {
+                    self.p_delim(&mut first, ", ");
+                    self.p("**");
+                    self.p(rest);
+                }
+                self.p("}");
+            }
+            PatternKind::MatchClass { .. } => {}
+            PatternKind::MatchStar { name } => {
+                self.p("*");
+                if let Some(name) = name {
+                    self.p(name);
+                } else {
+                    self.p("_");
+                }
+            }
+            PatternKind::MatchAs { pattern, name } => {
+                if let Some(pattern) = pattern {
+                    self.unparse_pattern(pattern);
+                    self.p(" as ");
+                }
+                if let Some(name) = name {
+                    self.p(name);
+                } else {
+                    self.p("_");
+                }
+            }
+            PatternKind::MatchOr { patterns } => {
+                let mut first = true;
+                for pattern in patterns {
+                    self.p_delim(&mut first, " | ");
+                    self.unparse_pattern(pattern);
+                }
+            }
+        }
+    }
+
+    fn unparse_match_case<U>(&mut self, ast: &MatchCase<U>) {
+        self.p("case ");
+        self.unparse_pattern(&ast.pattern);
+        if let Some(guard) = &ast.guard {
+            self.p(" if ");
+            self.unparse_expr(guard, precedence::MAX);
+        }
+        self.p(":");
+        self.body(&ast.body);
     }
 
     pub fn unparse_expr<U>(&mut self, ast: &Expr<U>, level: u8) {
@@ -1310,6 +1402,13 @@ except Exception as e:
     pass
 except* Exception as e:
     pass"#
+        );
+        assert_round_trip!(
+            r#"match x:
+    case [1, 2, 3]:
+        return 2
+    case 4 as y:
+        return y"#
         );
         assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
         assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);

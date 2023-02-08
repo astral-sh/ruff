@@ -7,7 +7,7 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
     Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
-    Located, Location, Stmt, StmtKind,
+    Located, Location, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
 };
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
@@ -249,6 +249,46 @@ where
     }
 }
 
+pub fn any_over_pattern<F>(pattern: &Pattern, func: &F) -> bool
+where
+    F: Fn(&Expr) -> bool,
+{
+    match &pattern.node {
+        PatternKind::MatchValue { value } => any_over_expr(value, func),
+        PatternKind::MatchSingleton { .. } => false,
+        PatternKind::MatchSequence { patterns } => patterns
+            .iter()
+            .any(|pattern| any_over_pattern(pattern, func)),
+        PatternKind::MatchMapping { keys, patterns, .. } => {
+            keys.iter().any(|key| any_over_expr(key, func))
+                || patterns
+                    .iter()
+                    .any(|pattern| any_over_pattern(pattern, func))
+        }
+        PatternKind::MatchClass {
+            cls,
+            patterns,
+            kwd_patterns,
+            ..
+        } => {
+            any_over_expr(cls, func)
+                || patterns
+                    .iter()
+                    .any(|pattern| any_over_pattern(pattern, func))
+                || kwd_patterns
+                    .iter()
+                    .any(|pattern| any_over_pattern(pattern, func))
+        }
+        PatternKind::MatchStar { .. } => false,
+        PatternKind::MatchAs { pattern, .. } => pattern
+            .as_ref()
+            .map_or(false, |pattern| any_over_pattern(pattern, func)),
+        PatternKind::MatchOr { patterns } => patterns
+            .iter()
+            .any(|pattern| any_over_pattern(pattern, func)),
+    }
+}
+
 pub fn any_over_stmt<F>(stmt: &Stmt, func: &F) -> bool
 where
     F: Fn(&Expr) -> bool,
@@ -415,8 +455,21 @@ where
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
         }
-        // TODO(charlie): Handle match statements.
-        StmtKind::Match { .. } => false,
+        StmtKind::Match { subject, cases } => {
+            any_over_expr(subject, func)
+                || cases.iter().any(|case| {
+                    let MatchCase {
+                        pattern,
+                        guard,
+                        body,
+                    } = case;
+                    any_over_pattern(pattern, func)
+                        || guard
+                            .as_ref()
+                            .map_or(false, |expr| any_over_expr(expr, func))
+                        || any_over_body(body, func)
+                })
+        }
         StmtKind::Import { .. } => false,
         StmtKind::ImportFrom { .. } => false,
         StmtKind::Global { .. } => false,

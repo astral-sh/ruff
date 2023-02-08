@@ -114,6 +114,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
                 }
                 StmtKind::If { .. }
                 | StmtKind::For { .. }
+                | StmtKind::Match { .. }
                 | StmtKind::AsyncFor { .. }
                 | StmtKind::While { .. }
                 | StmtKind::Try { .. }

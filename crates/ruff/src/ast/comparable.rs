@@ -4,8 +4,8 @@
 use num_bigint::BigInt;
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
-    ExcepthandlerKind, Expr, ExprContext, ExprKind, Keyword, Operator, Stmt, StmtKind, Unaryop,
-    Withitem,
+    ExcepthandlerKind, Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern,
+    PatternKind, Stmt, StmtKind, Unaryop, Withitem,
 };
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -153,6 +153,110 @@ impl<'a> From<&'a Withitem> for ComparableWithitem<'a> {
         Self {
             context_expr: (&withitem.context_expr).into(),
             optional_vars: withitem.optional_vars.as_ref().map(Into::into),
+        }
+    }
+}
+
+#[allow(clippy::enum_variant_names)]
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum ComparablePattern<'a> {
+    MatchValue {
+        value: ComparableExpr<'a>,
+    },
+    MatchSingleton {
+        value: ComparableConstant<'a>,
+    },
+    MatchSequence {
+        patterns: Vec<ComparablePattern<'a>>,
+    },
+    MatchMapping {
+        keys: Vec<ComparableExpr<'a>>,
+        patterns: Vec<ComparablePattern<'a>>,
+        rest: Option<&'a str>,
+    },
+    MatchClass {
+        cls: ComparableExpr<'a>,
+        patterns: Vec<ComparablePattern<'a>>,
+        kwd_attrs: Vec<&'a str>,
+        kwd_patterns: Vec<ComparablePattern<'a>>,
+    },
+    MatchStar {
+        name: Option<&'a str>,
+    },
+    MatchAs {
+        pattern: Option<Box<ComparablePattern<'a>>>,
+        name: Option<&'a str>,
+    },
+    MatchOr {
+        patterns: Vec<ComparablePattern<'a>>,
+    },
+}
+
+impl<'a> From<&'a Pattern> for ComparablePattern<'a> {
+    fn from(pattern: &'a Pattern) -> Self {
+        match &pattern.node {
+            PatternKind::MatchValue { value } => Self::MatchValue {
+                value: value.into(),
+            },
+            PatternKind::MatchSingleton { value } => Self::MatchSingleton {
+                value: value.into(),
+            },
+            PatternKind::MatchSequence { patterns } => Self::MatchSequence {
+                patterns: patterns.iter().map(Into::into).collect(),
+            },
+            PatternKind::MatchMapping {
+                keys,
+                patterns,
+                rest,
+            } => Self::MatchMapping {
+                keys: keys.iter().map(Into::into).collect(),
+                patterns: patterns.iter().map(Into::into).collect(),
+                rest: rest.as_deref(),
+            },
+            PatternKind::MatchClass {
+                cls,
+                patterns,
+                kwd_attrs,
+                kwd_patterns,
+            } => Self::MatchClass {
+                cls: cls.into(),
+                patterns: patterns.iter().map(Into::into).collect(),
+                kwd_attrs: kwd_attrs.iter().map(String::as_str).collect(),
+                kwd_patterns: kwd_patterns.iter().map(Into::into).collect(),
+            },
+            PatternKind::MatchStar { name } => Self::MatchStar {
+                name: name.as_deref(),
+            },
+            PatternKind::MatchAs { pattern, name } => Self::MatchAs {
+                pattern: pattern.as_ref().map(Into::into),
+                name: name.as_deref(),
+            },
+            PatternKind::MatchOr { patterns } => Self::MatchOr {
+                patterns: patterns.iter().map(Into::into).collect(),
+            },
+        }
+    }
+}
+
+impl<'a> From<&'a Box<Pattern>> for Box<ComparablePattern<'a>> {
+    fn from(pattern: &'a Box<Pattern>) -> Self {
+        Box::new((&**pattern).into())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ComparableMatchCase<'a> {
+    pub pattern: ComparablePattern<'a>,
+    pub guard: Option<ComparableExpr<'a>>,
+    pub body: Vec<ComparableStmt<'a>>,
+}
+
+impl<'a> From<&'a MatchCase> for ComparableMatchCase<'a> {
+    fn from(match_case: &'a MatchCase) -> Self {
+        Self {
+            pattern: (&match_case.pattern).into(),
+            guard: match_case.guard.as_ref().map(Into::into),
+            body: match_case.body.iter().map(Into::into).collect(),
         }
     }
 }
@@ -644,6 +748,10 @@ pub enum ComparableStmt<'a> {
         body: Vec<ComparableStmt<'a>>,
         type_comment: Option<&'a str>,
     },
+    Match {
+        subject: ComparableExpr<'a>,
+        cases: Vec<ComparableMatchCase<'a>>,
+    },
     Raise {
         exc: Option<ComparableExpr<'a>>,
         cause: Option<ComparableExpr<'a>>,
@@ -817,7 +925,10 @@ impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
                 body: body.iter().map(Into::into).collect(),
                 type_comment: type_comment.as_ref().map(String::as_str),
             },
-            StmtKind::Match { .. } => unreachable!("StmtKind::Match is not supported"),
+            StmtKind::Match { subject, cases } => Self::Match {
+                subject: subject.into(),
+                cases: cases.iter().map(Into::into).collect(),
+            },
             StmtKind::Raise { exc, cause } => Self::Raise {
                 exc: exc.as_ref().map(Into::into),
                 cause: cause.as_ref().map(Into::into),

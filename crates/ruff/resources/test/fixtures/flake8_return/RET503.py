@@ -266,3 +266,12 @@ def while_true():
         if y > 0:
             return 1
         y += 1
+
+
+# match
+def x(y):
+    match y:
+        case 0:
+            return 1
+        case 1:
+            print()  # error

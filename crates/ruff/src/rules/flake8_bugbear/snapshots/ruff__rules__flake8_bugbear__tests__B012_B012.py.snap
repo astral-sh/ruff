@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -110,6 +110,17 @@ expression: diagnostics
   end_location:
     row: 107
     column: 13
+  fix: ~
+  parent: ~
+- kind:
+    JumpStatementInFinally:
+      name: break
+  location:
+    row: 118
+    column: 16
+  end_location:
+    row: 118
+    column: 21
   fix: ~
   parent: ~
 
