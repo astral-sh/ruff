@@ -127,6 +127,7 @@ pub fn organize_imports(
         settings.isort.force_wrap_aliases,
         &settings.isort.known_first_party,
         &settings.isort.known_third_party,
+        &settings.isort.known_local_folder,
         settings.isort.order_by_type,
         settings.isort.relative_imports_order,
         &settings.isort.single_line_exclusions,

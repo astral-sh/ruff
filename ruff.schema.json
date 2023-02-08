@@ -964,6 +964,16 @@
             "type": "string"
           }
         },
+        "known-local-folder": {
+          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (from . import module).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "known-third-party": {
           "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
           "type": [
