@@ -20,9 +20,9 @@ impl Violation for UselessContextlibSuppress {
 }
 
 /// B005
-pub fn useless_contextlib_suppress(checker: &mut Checker, expr: &Expr, args: &[Expr]) {
+pub fn useless_contextlib_suppress(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if args.is_empty()
-        && checker.resolve_call_path(expr).map_or(false, |call_path| {
+        && checker.resolve_call_path(func).map_or(false, |call_path| {
             call_path.as_slice() == ["contextlib", "suppress"]
         })
     {

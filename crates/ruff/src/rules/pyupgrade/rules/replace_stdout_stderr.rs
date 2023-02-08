@@ -104,8 +104,8 @@ fn generate_fix(
 }
 
 /// UP022
-pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
-    if checker.resolve_call_path(expr).map_or(false, |call_path| {
+pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, func: &Expr, kwargs: &[Keyword]) {
+    if checker.resolve_call_path(func).map_or(false, |call_path| {
         call_path.as_slice() == ["subprocess", "run"]
     }) {
         // Find `stdout` and `stderr` kwargs.

@@ -27,12 +27,12 @@ impl AlwaysAutofixableViolation for TypeOfPrimitive {
 }
 
 /// UP003
-pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, args: &[Expr]) {
+pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if args.len() != 1 {
         return;
     }
     if !checker
-        .resolve_call_path(expr)
+        .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["", "type"])
     {
         return;
