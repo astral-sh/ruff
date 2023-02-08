@@ -41,6 +41,14 @@ ruff_macros::define_rule_mapping!(
     E223 => rules::pycodestyle::rules::TabBeforeOperator,
     #[cfg(feature = "logical_lines")]
     E224 => rules::pycodestyle::rules::TabAfterOperator,
+    #[cfg(feature = "logical_lines")]
+    E271 => rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    E272 => rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
+    #[cfg(feature = "logical_lines")]
+    E273 => rules::pycodestyle::rules::TabAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    E274 => rules::pycodestyle::rules::TabBeforeKeyword,
     E401 => rules::pycodestyle::rules::MultipleImportsOnOneLine,
     E402 => rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
     E501 => rules::pycodestyle::rules::LineTooLong,
@@ -760,7 +768,11 @@ impl Rule {
             | Rule::UnexpectedIndentationComment
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
-            | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
+            | Rule::WhitespaceBeforePunctuation
+            | Rule::MultipleSpacesAfterKeyword
+            | Rule::MultipleSpacesBeforeKeyword
+            | Rule::TabAfterKeyword
+            | Rule::TabBeforeKeyword => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }
     }
