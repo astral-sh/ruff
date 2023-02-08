@@ -388,7 +388,7 @@ ruff_macros::define_rule_mapping!(
     ARG004 => rules::flake8_unused_arguments::rules::UnusedStaticMethodArgument,
     ARG005 => rules::flake8_unused_arguments::rules::UnusedLambdaArgument,
     // flake8-import-conventions
-    ICN001 => rules::flake8_import_conventions::rules::ImportAliasIsNotConventional,
+    ICN001 => rules::flake8_import_conventions::rules::UnconventionalImportAlias,
     // flake8-datetimez
     DTZ001 => rules::flake8_datetimez::rules::CallDatetimeWithoutTzinfo,
     DTZ002 => rules::flake8_datetimez::rules::CallDatetimeToday,

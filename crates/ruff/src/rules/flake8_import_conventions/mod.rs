@@ -18,7 +18,7 @@ mod tests {
     fn defaults() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_import_conventions/defaults.py"),
-            &Settings::for_rule(Rule::ImportAliasIsNotConventional),
+            &Settings::for_rule(Rule::UnconventionalImportAlias),
         )?;
         assert_yaml_snapshot!("defaults", diagnostics);
         Ok(())
@@ -37,7 +37,7 @@ mod tests {
                     ])),
                 }
                 .into(),
-                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
+                ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
         assert_yaml_snapshot!("custom", diagnostics);
@@ -59,7 +59,7 @@ mod tests {
                     extend_aliases: None,
                 }
                 .into(),
-                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
+                ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
         assert_yaml_snapshot!("remove_default", diagnostics);
@@ -79,7 +79,7 @@ mod tests {
                     )])),
                 }
                 .into(),
-                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
+                ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
         assert_yaml_snapshot!("override_default", diagnostics);
@@ -102,7 +102,7 @@ mod tests {
                     ])),
                 }
                 .into(),
-                ..Settings::for_rule(Rule::ImportAliasIsNotConventional)
+                ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
         assert_yaml_snapshot!("from_imports", diagnostics);
