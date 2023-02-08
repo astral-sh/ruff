@@ -8,7 +8,7 @@ use crate::violation::Violation;
 
 define_violation!(
     pub struct DuplicateArgumentName {
-        name: String
+        name: String,
     }
 );
 
