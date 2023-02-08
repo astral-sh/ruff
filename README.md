@@ -627,6 +627,25 @@ configuration.
 See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
 
+#### Exit codes
+
+By default, Ruff exits with the following status codes:
+
+- `0` if no violations were found, or if all present violations were fixed automatically.
+- `1` if violations were found.
+- `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error.
+
+This convention mirrors that of tools like ESLint, Prettier, and RuboCop.
+
+Ruff supports two command-line flags that alter its exit code behavior:
+
+- `--exit-zero` will cause Ruff to exit with a status code of `0` even if violations were found.
+  Note that Ruff will still exit with a status code of `2` if it terminates abnormally.
+- `--exit-non-zero-on-fix` will cause Ruff to exit with a status code of `1` if violations were
+  found, _even if_ all such violations were fixed automatically. Note that the use of
+  `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
+  autofixing.
+
 <!-- End section: Configuration -->
 
 ## Supported Rules
