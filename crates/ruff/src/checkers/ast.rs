@@ -2280,7 +2280,7 @@ where
 
                 // pyupgrade
                 if self.settings.rules.enabled(&Rule::TypeOfPrimitive) {
-                    pyupgrade::rules::type_of_primitive(self, expr, func, args);
+                    pyupgrade::rules::type_of_primitive(self, expr, args);
                 }
                 if self.settings.rules.enabled(&Rule::DeprecatedUnittestAlias) {
                     pyupgrade::rules::deprecated_unittest_alias(self, func);
