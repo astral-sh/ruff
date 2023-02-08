@@ -1,0 +1,55 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoSpaceAfterInlineComment: ~
+  location:
+    row: 4
+    column: 11
+  end_location:
+    row: 4
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    NoSpaceAfterInlineComment: ~
+  location:
+    row: 6
+    column: 11
+  end_location:
+    row: 6
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    NoSpaceAfterInlineComment: ~
+  location:
+    row: 8
+    column: 11
+  end_location:
+    row: 8
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    NoSpaceAfterInlineComment: ~
+  location:
+    row: 63
+    column: 8
+  end_location:
+    row: 63
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    NoSpaceAfterInlineComment: ~
+  location:
+    row: 66
+    column: 8
+  end_location:
+    row: 66
+    column: 23
+  fix: ~
+  parent: ~
+
