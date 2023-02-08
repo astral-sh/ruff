@@ -8,6 +8,7 @@ use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
 use crate::rules::pycodestyle::rules::{
     extraneous_whitespace, indentation, space_around_operator, whitespace_around_keywords,
+    whitespace_before_comment,
 };
 use crate::settings::Settings;
 use crate::source_code::{Locator, Stylist};
@@ -101,6 +102,19 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
+                        fix: None,
+                        parent: None,
+                    });
+                }
+            }
+        }
+        if line.flags.contains(TokenFlags::COMMENT) {
+            for (range, kind) in whitespace_before_comment(&line.tokens, locator) {
+                if settings.rules.enabled(kind.rule()) {
+                    diagnostics.push(Diagnostic {
+                        kind,
+                        location: range.location,
+                        end_location: range.end_location,
                         fix: None,
                         parent: None,
                     });

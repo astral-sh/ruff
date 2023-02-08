@@ -42,6 +42,14 @@ ruff_macros::define_rule_mapping!(
     #[cfg(feature = "logical_lines")]
     E224 => rules::pycodestyle::rules::TabAfterOperator,
     #[cfg(feature = "logical_lines")]
+    E261 => rules::pycodestyle::rules::TooFewSpacesBeforeInlineComment,
+    #[cfg(feature = "logical_lines")]
+    E262 => rules::pycodestyle::rules::NoSpaceAfterInlineComment,
+    #[cfg(feature = "logical_lines")]
+    E265 => rules::pycodestyle::rules::NoSpaceAfterBlockComment,
+    #[cfg(feature = "logical_lines")]
+    E266 => rules::pycodestyle::rules::MultipleLeadingHashesForBlockComment,
+    #[cfg(feature = "logical_lines")]
     E271 => rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
     #[cfg(feature = "logical_lines")]
     E272 => rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
@@ -757,22 +765,26 @@ impl Rule {
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MultipleLeadingHashesForBlockComment
+            | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
+            | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
+            | Rule::NoSpaceAfterBlockComment
+            | Rule::NoSpaceAfterInlineComment
             | Rule::OverIndented
+            | Rule::TabAfterKeyword
             | Rule::TabAfterOperator
+            | Rule::TabBeforeKeyword
             | Rule::TabBeforeOperator
+            | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
-            | Rule::WhitespaceBeforePunctuation
-            | Rule::MultipleSpacesAfterKeyword
-            | Rule::MultipleSpacesBeforeKeyword
-            | Rule::TabAfterKeyword
-            | Rule::TabBeforeKeyword => &LintSource::LogicalLines,
+            | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }
     }

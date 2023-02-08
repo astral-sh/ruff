@@ -16,29 +16,35 @@ bitflags! {
         const PUNCTUATION = 0b0000_0100;
         /// Whether the logical line contains a keyword.
         const KEYWORD = 0b0000_1000;
+        /// Whether the logical line contains a comment.
+        const COMMENT = 0b0001_0000;
     }
 }
 
 #[derive(Debug)]
-pub struct LogicalLine {
+pub struct LogicalLine<'a> {
     pub text: String,
     pub mapping: Vec<(usize, Location)>,
     pub flags: TokenFlags,
+    pub tokens: Vec<(Location, &'a Tok, Location)>,
 }
 
-impl LogicalLine {
+impl<'a> LogicalLine<'a> {
     pub fn is_comment(&self) -> bool {
         self.text.is_empty()
     }
 }
 
-fn build_line(tokens: &[(Location, &Tok, Location)], locator: &Locator) -> LogicalLine {
+fn build_line<'a>(
+    tokens: Vec<(Location, &'a Tok, Location)>,
+    locator: &Locator,
+) -> LogicalLine<'a> {
     let mut logical = String::with_capacity(88);
     let mut mapping = Vec::new();
     let mut flags = TokenFlags::empty();
     let mut prev: Option<&Location> = None;
     let mut length = 0;
-    for (start, tok, end) in tokens {
+    for (start, tok, end) in &tokens {
         if matches!(
             tok,
             Tok::Newline | Tok::NonLogicalNewline | Tok::Indent | Tok::Dedent
@@ -51,6 +57,7 @@ fn build_line(tokens: &[(Location, &Tok, Location)], locator: &Locator) -> Logic
         }
 
         if matches!(tok, Tok::Comment { .. }) {
+            flags.insert(TokenFlags::COMMENT);
             continue;
         }
 
@@ -181,10 +188,11 @@ fn build_line(tokens: &[(Location, &Tok, Location)], locator: &Locator) -> Logic
         text: logical,
         mapping,
         flags,
+        tokens,
     }
 }
 
-pub fn iter_logical_lines(tokens: &[LexResult], locator: &Locator) -> Vec<LogicalLine> {
+pub fn iter_logical_lines<'a>(tokens: &'a [LexResult], locator: &Locator) -> Vec<LogicalLine<'a>> {
     let mut parens = 0;
     let mut accumulator = Vec::with_capacity(32);
     let mut lines = Vec::with_capacity(128);
@@ -200,19 +208,19 @@ pub fn iter_logical_lines(tokens: &[LexResult], locator: &Locator) -> Vec<Logica
                 Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(..)
             ) {
                 if matches!(tok, Tok::Newline) {
-                    lines.push(build_line(&accumulator, locator));
-                    accumulator.drain(..);
+                    lines.push(build_line(accumulator, locator));
+                    accumulator = Vec::with_capacity(32);
                 } else if tokens.len() == 1 {
                     accumulator.remove(0);
                 } else {
-                    lines.push(build_line(&accumulator, locator));
-                    accumulator.drain(..);
+                    lines.push(build_line(accumulator, locator));
+                    accumulator = Vec::with_capacity(32);
                 }
             }
         }
     }
     if !accumulator.is_empty() {
-        lines.push(build_line(&accumulator, locator));
+        lines.push(build_line(accumulator, locator));
     }
     lines
 }
