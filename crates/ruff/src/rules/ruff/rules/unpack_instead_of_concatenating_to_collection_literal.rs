@@ -6,18 +6,35 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use crate::violation::{Availability, Violation};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct UnpackInsteadOfConcatenatingToCollectionLiteral {
         pub expr: String,
+        pub fixable: bool,
     }
 );
 impl Violation for UnpackInsteadOfConcatenatingToCollectionLiteral {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnpackInsteadOfConcatenatingToCollectionLiteral { expr } = self;
+        let UnpackInsteadOfConcatenatingToCollectionLiteral { expr, .. } = self;
         format!("Consider `{expr}` instead of concatenation")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let UnpackInsteadOfConcatenatingToCollectionLiteral { fixable, .. } = self;
+        if *fixable {
+            Some(
+                |UnpackInsteadOfConcatenatingToCollectionLiteral { expr, .. }| {
+                    format!("Replace with `{expr}`")
+                },
+            )
+        } else {
+            None
+        }
     }
 }
 
@@ -86,24 +103,24 @@ pub fn unpack_instead_of_concatenating_to_collection_literal(checker: &mut Check
         }),
     };
 
-    let mut new_expr_string = unparse_expr(&new_expr, checker.stylist);
-
-    new_expr_string = match kind {
+    let contents = match kind {
         // Wrap the new expression in parentheses if it was a tuple
-        Kind::Tuple => format!("({new_expr_string})"),
-        Kind::List => new_expr_string,
+        Kind::Tuple => format!("({})", unparse_expr(&new_expr, checker.stylist)),
+        Kind::List => unparse_expr(&new_expr, checker.stylist),
     };
+    let fixable = !has_comments(expr, checker.locator);
 
     let mut diagnostic = Diagnostic::new(
         UnpackInsteadOfConcatenatingToCollectionLiteral {
-            expr: new_expr_string.clone(),
+            expr: contents.clone(),
+            fixable,
         },
         Range::from_located(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if !has_comments(expr, checker.locator) {
+        if fixable {
             diagnostic.amend(Fix::replacement(
-                new_expr_string,
+                contents,
                 expr.location,
                 expr.end_location.unwrap(),
             ));
