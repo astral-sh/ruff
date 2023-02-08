@@ -1,5 +1,7 @@
 # assert-raises-exception (B017)
+
 Derived from the **flake8-bugbear** linter.
+
 ### What it does
 Checks for `self.assertRaises(Exception)`.
 

@@ -1064,7 +1064,7 @@ where
                     if self
                         .settings
                         .rules
-                        .enabled(&Rule::ImportAliasIsNotConventional)
+                        .enabled(&Rule::UnconventionalImportAlias)
                     {
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::check_conventional_import(
@@ -1323,7 +1323,7 @@ where
                     if self
                         .settings
                         .rules
-                        .enabled(&Rule::ImportAliasIsNotConventional)
+                        .enabled(&Rule::UnconventionalImportAlias)
                     {
                         let full_name = helpers::format_import_from_member(
                             level.as_ref(),
@@ -1948,7 +1948,21 @@ where
                 value,
                 ..
             } => {
-                self.visit_annotation(annotation);
+                // If we're in a class or module scope, then the annotation needs to be available
+                // at runtime.
+                // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
+                if !self.annotations_future_enabled
+                    && matches!(
+                        self.current_scope().kind,
+                        ScopeKind::Class(..) | ScopeKind::Module
+                    )
+                {
+                    self.in_type_definition = true;
+                    self.visit_expr(annotation);
+                    self.in_type_definition = false;
+                } else {
+                    self.visit_annotation(annotation);
+                }
                 if let Some(expr) = value {
                     if self.match_typing_expr(annotation, "TypeAlias") {
                         self.in_type_definition = true;
@@ -2304,10 +2318,10 @@ where
                     pyupgrade::rules::open_alias(self, expr, func);
                 }
                 if self.settings.rules.enabled(&Rule::ReplaceUniversalNewlines) {
-                    pyupgrade::rules::replace_universal_newlines(self, expr, keywords);
+                    pyupgrade::rules::replace_universal_newlines(self, func, keywords);
                 }
                 if self.settings.rules.enabled(&Rule::ReplaceStdoutStderr) {
-                    pyupgrade::rules::replace_stdout_stderr(self, expr, keywords);
+                    pyupgrade::rules::replace_stdout_stderr(self, expr, func, keywords);
                 }
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias(self, &expr);
@@ -2338,7 +2352,7 @@ where
                     .rules
                     .enabled(&Rule::UselessContextlibSuppress)
                 {
-                    flake8_bugbear::rules::useless_contextlib_suppress(self, expr, args);
+                    flake8_bugbear::rules::useless_contextlib_suppress(self, expr, func, args);
                 }
                 if self
                     .settings
@@ -3245,7 +3259,7 @@ where
                 args,
                 keywords,
             } => {
-                let callable = self.resolve_call_path(expr).and_then(|call_path| {
+                let callable = self.resolve_call_path(func).and_then(|call_path| {
                     if self.match_typing_call_path(&call_path, "ForwardRef") {
                         Some(Callable::ForwardRef)
                     } else if self.match_typing_call_path(&call_path, "cast") {

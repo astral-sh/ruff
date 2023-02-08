@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
+use log::error;
 use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
 
@@ -247,17 +248,12 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
 
     // Log any parse errors.
     if let Some(err) = error {
-        #[allow(clippy::print_stderr)]
-        {
-            eprintln!(
-                "{}{} {}{}{} {err:?}",
-                "error".red().bold(),
-                ":".bold(),
-                "Failed to parse ".bold(),
-                fs::relativize_path(path).bold(),
-                ":".bold()
-            );
-        }
+        error!(
+            "{}{}{} {err:?}",
+            "Failed to parse ".bold(),
+            fs::relativize_path(path).bold(),
+            ":".bold()
+        );
     }
 
     // Add any missing `# noqa` pragmas.

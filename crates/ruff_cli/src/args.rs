@@ -209,8 +209,17 @@ pub struct CheckArgs {
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
     /// Exit with status code "0", even upon detecting lint violations.
-    #[arg(short, long, help_heading = "Miscellaneous")]
+    #[arg(
+        short,
+        long,
+        help_heading = "Miscellaneous",
+        conflicts_with = "exit_non_zero_on_fix"
+    )]
     pub exit_zero: bool,
+    /// Exit with a non-zero status code if any files were modified via
+    /// autofix, even if no lint violations remain.
+    #[arg(long, help_heading = "Miscellaneous", conflicts_with = "exit_zero")]
+    pub exit_non_zero_on_fix: bool,
     /// Does nothing and will be removed in the future.
     #[arg(
         long,
@@ -334,6 +343,7 @@ impl CheckArgs {
                 config: self.config,
                 diff: self.diff,
                 exit_zero: self.exit_zero,
+                exit_non_zero_on_fix: self.exit_non_zero_on_fix,
                 files: self.files,
                 isolated: self.isolated,
                 no_cache: self.no_cache,
@@ -390,6 +400,7 @@ pub struct Arguments {
     pub config: Option<PathBuf>,
     pub diff: bool,
     pub exit_zero: bool,
+    pub exit_non_zero_on_fix: bool,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
     pub no_cache: bool,

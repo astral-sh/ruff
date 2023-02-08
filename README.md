@@ -9,7 +9,7 @@
 [![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
 [![image](https://img.shields.io/date/1676394000?label=Jetbrains%20Ruff%20Webinar&logo=jetbrains)](https://info.jetbrains.com/PyCharm-Webinar-February14-2023.html)
 
-[**Discord**](https://discord.gg/Z8KbeK24) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
+[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
 
 An extremely fast Python linter, written in Rust.
 
@@ -213,16 +213,16 @@ apk add ruff
 To run Ruff, try any of the following:
 
 ```shell
-ruff .                        # Lint all files in the current directory (and any subdirectories)
-ruff path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories)
-ruff path/to/code/*.py        # Lint all `.py` files in `/path/to/code`
-ruff path/to/code/to/file.py  # Lint `file.py`
+ruff check .                        # Lint all files in the current directory (and any subdirectories)
+ruff check path/to/code/            # Lint all files in `/path/to/code` (and any subdirectories)
+ruff check path/to/code/*.py        # Lint all `.py` files in `/path/to/code`
+ruff check path/to/code/to/file.py  # Lint `file.py`
 ```
 
 You can run Ruff in `--watch` mode to automatically re-run on-change:
 
 ```shell
-ruff path/to/code/ --watch
+ruff check path/to/code/ --watch
 ```
 
 Ruff also works with [pre-commit](https://pre-commit.com):
@@ -377,7 +377,7 @@ Some configuration settings can be provided via the command-line, such as those 
 rule enablement and disablement, file discovery, logging level, and more:
 
 ```shell
-ruff path/to/code/ --select F401 --select F403 --quiet
+ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
 See `ruff help` for more on Ruff's top-level commands:
@@ -475,6 +475,8 @@ Miscellaneous:
           The name of the file when passing it through stdin
   -e, --exit-zero
           Exit with status code "0", even upon detecting lint violations
+      --exit-non-zero-on-fix
+          Exit with a non-zero status code if any files were modified via autofix, even if no lint violations remain
 
 Log levels:
   -v, --verbose  Enable verbose logging
@@ -533,7 +535,7 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 `.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](#respect-gitignore)).
 
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
-For example, `ruff /path/to/excluded/file.py` will always lint `file.py`.
+For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Rule resolution
 
@@ -557,9 +559,9 @@ select = ["E", "F"]
 ignore = ["F401"]
 ```
 
-Running `ruff --select F401` would result in Ruff enforcing `F401`, and no other rules.
+Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no other rules.
 
-Running `ruff --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules, with
+Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules, with
 the exception of `F401`.
 
 ### Suppressing errors
@@ -604,15 +606,15 @@ Ruff supports several workflows to aid in `noqa` management.
 
 First, Ruff provides a special rule code, `RUF100`, to enforce that your `noqa` directives are
 "valid", in that the violations they _say_ they ignore are actually being triggered on that line (and
-thus suppressed). You can run `ruff /path/to/file.py --extend-select RUF100` to flag unused `noqa`
+thus suppressed). You can run `ruff check /path/to/file.py --extend-select RUF100` to flag unused `noqa`
 directives.
 
 Second, Ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
-You can run `ruff /path/to/file.py --extend-select RUF100 --fix` to automatically remove unused
+You can run `ruff check /path/to/file.py --extend-select RUF100 --fix` to automatically remove unused
 `noqa` directives.
 
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
-migrating a new codebase to Ruff. You can run `ruff /path/to/file.py --add-noqa` to automatically
+migrating a new codebase to Ruff. You can run `ruff check /path/to/file.py --add-noqa` to automatically
 add `noqa` directives to all failing lines, with the appropriate rule codes.
 
 #### Action comments
@@ -624,6 +626,25 @@ configuration.
 
 See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
+
+#### Exit codes
+
+By default, Ruff exits with the following status codes:
+
+- `0` if no violations were found, or if all present violations were fixed automatically.
+- `1` if violations were found.
+- `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error.
+
+This convention mirrors that of tools like ESLint, Prettier, and RuboCop.
+
+Ruff supports two command-line flags that alter its exit code behavior:
+
+- `--exit-zero` will cause Ruff to exit with a status code of `0` even if violations were found.
+  Note that Ruff will still exit with a status code of `2` if it terminates abnormally.
+- `--exit-non-zero-on-fix` will cause Ruff to exit with a status code of `1` if violations were
+  found, _even if_ all such violations were fixed automatically. Note that the use of
+  `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
+  autofixing.
 
 <!-- End section: Configuration -->
 
@@ -1076,7 +1097,7 @@ For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ICN001 | import-alias-is-not-conventional | `{name}` should be imported as `{asname}` |  |
+| [ICN001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unconventional-import-alias.md) | [unconventional-import-alias](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unconventional-import-alias.md) | `{name}` should be imported as `{asname}` |  |
 
 ### flake8-logging-format (G)
 
@@ -1099,7 +1120,7 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
+| [INP001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/implicit-namespace-package.md) | [implicit-namespace-package](https://github.com/charliermarsh/ruff/blob/main/docs/rules/implicit-namespace-package.md) | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
 
 ### flake8-pie (PIE)
 
@@ -1121,8 +1142,8 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| T201 | print-found | `print` found | 🛠 |
-| T203 | p-print-found | `pprint` found | 🛠 |
+| T201 | print-found | `print` found |  |
+| T203 | p-print-found | `pprint` found |  |
 
 ### flake8-pytest-style (PT)
 
@@ -1162,10 +1183,10 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| Q000 | bad-quotes-inline-string | Double quotes found but single quotes preferred | 🛠 |
-| Q001 | bad-quotes-multiline-string | Double quote multiline found but single quotes preferred | 🛠 |
-| Q002 | bad-quotes-docstring | Double quote docstring found but single quotes preferred | 🛠 |
-| Q003 | avoid-quote-escape | Change outer quotes to avoid escaping inner quotes | 🛠 |
+| [Q000](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | [bad-quotes-inline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | Double quotes found but single quotes preferred | 🛠 |
+| [Q001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | [bad-quotes-multiline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | Double quote multiline found but single quotes preferred | 🛠 |
+| [Q002](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | [bad-quotes-docstring](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | Double quote docstring found but single quotes preferred | 🛠 |
+| [Q003](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoid-quote-escape.md) | [avoid-quote-escape](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoid-quote-escape.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
 
 ### flake8-return (RET)
 
@@ -1285,7 +1306,7 @@ For more, see [eradicate](https://pypi.org/project/eradicate/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ERA001 | commented-out-code | Found commented-out code | 🛠 |
+| [ERA001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/commented-out-code.md) | [commented-out-code](https://github.com/charliermarsh/ruff/blob/main/docs/rules/commented-out-code.md) | Found commented-out code | 🛠 |
 
 ### pandas-vet (PD)
 
@@ -1369,7 +1390,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TRY002 | raise-vanilla-class | Create your own exception |  |
+| [TRY002](https://github.com/charliermarsh/ruff/blob/main/docs/rules/raise-vanilla-class.md) | [raise-vanilla-class](https://github.com/charliermarsh/ruff/blob/main/docs/rules/raise-vanilla-class.md) | Create your own exception |  |
 | TRY003 | raise-vanilla-args | Avoid specifying long messages outside the exception class |  |
 | TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
 | TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |
@@ -1563,11 +1584,11 @@ let g:ale_fixers = {
 ```yaml
 tools:
   python-ruff: &python-ruff
-    lint-command: "ruff --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}"
+    lint-command: "ruff check --config ~/myconfigs/linters/ruff.toml --quiet ${INPUT}"
     lint-stdin: true
     lint-formats:
       - "%f:%l:%c: %m"
-    format-command: "ruff --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -"
+    format-command: "ruff check --stdin-filename ${INPUT} --config ~/myconfigs/linters/ruff.toml --fix --exit-zero --quiet -"
     format-stdin: true
 ```
 
@@ -1629,7 +1650,7 @@ jobs:
           pip install ruff
       # Include `--format=github` to enable automatic inline annotations.
       - name: Run Ruff
-        run: ruff --format=github .
+        run: ruff check --format=github .
 ```
 
 <!-- End section: Editor Integrations -->
@@ -1895,7 +1916,7 @@ matter how they're provided, which avoids accidental incompatibilities and simpl
 
 ### How can I tell what settings Ruff is using to check my code?
 
-Run `ruff /path/to/code.py --show-settings` to view the resolved settings for a given file.
+Run `ruff check /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
 ### I want to use Ruff, but I don't want to use `pyproject.toml`. Is that possible?
 
@@ -1961,14 +1982,14 @@ If you find a case where Ruff's autofix breaks your code, please file an Issue!
 
 Contributions are welcome and highly appreciated. To get started, check out the
 [**contributing guidelines**](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md). You
-can also join us on [**Discord**](https://discord.gg/Z8KbeK24).
+can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
 ## Support
 
 Having trouble? Check out the existing issues on [**GitHub**](https://github.com/charliermarsh/ruff/issues),
 or feel free to [**open a new one**](https://github.com/charliermarsh/ruff/issues/new).
 
-You can also ask for help on [**Discord**](https://discord.gg/Z8KbeK24).
+You can also ask for help on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
 ## Reference
 

@@ -4,10 +4,9 @@
 use std::fs;
 
 use anyhow::Result;
+use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::AutofixAvailability;
 use strum::IntoEnumIterator;
-
-use ruff::registry::{Linter, Rule, RuleNamespace};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -22,9 +21,11 @@ pub fn main(args: &Args) -> Result<()> {
             let mut output = String::new();
             output.push_str(&format!("# {} ({})", rule.as_ref(), rule.code()));
             output.push('\n');
+            output.push('\n');
 
             let (linter, _) = Linter::parse_code(rule.code()).unwrap();
             output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+            output.push('\n');
             output.push('\n');
 
             if let Some(autofix) = rule.autofixable() {
@@ -32,6 +33,7 @@ pub fn main(args: &Args) -> Result<()> {
                     AutofixAvailability::Sometimes => "Autofix is sometimes available.",
                     AutofixAvailability::Always => "Autofix is always available.",
                 });
+                output.push('\n');
                 output.push('\n');
             }
 

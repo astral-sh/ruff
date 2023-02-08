@@ -84,7 +84,7 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
             .iter()
             .all(|expr| check_type_check_test(checker, expr)),
         ExprKind::UnaryOp { operand, .. } => check_type_check_test(checker, operand),
-        ExprKind::Call { .. } => check_type_check_call(checker, test),
+        ExprKind::Call { func, .. } => check_type_check_call(checker, func),
         _ => false,
     }
 }

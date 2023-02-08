@@ -29,6 +29,14 @@ pub use space_around_operator::{
     TabAfterOperator, TabBeforeOperator,
 };
 pub use type_comparison::{type_comparison, TypeComparison};
+pub use whitespace_around_keywords::{
+    whitespace_around_keywords, MultipleSpacesAfterKeyword, MultipleSpacesBeforeKeyword,
+    TabAfterKeyword, TabBeforeKeyword,
+};
+pub use whitespace_before_comment::{
+    whitespace_before_comment, MultipleLeadingHashesForBlockComment, NoSpaceAfterBlockComment,
+    NoSpaceAfterInlineComment, TooFewSpacesBeforeInlineComment,
+};
 
 mod ambiguous_class_name;
 mod ambiguous_function_name;
@@ -48,3 +56,5 @@ mod no_newline_at_end_of_file;
 mod not_tests;
 mod space_around_operator;
 mod type_comparison;
+mod whitespace_around_keywords;
+mod whitespace_before_comment;

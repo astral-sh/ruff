@@ -35,14 +35,8 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    // check `os.environ.get('foo')` and `os.getenv('foo')``
-    if !checker.resolve_call_path(expr).map_or(false, |call_path| {
-        call_path.as_slice() == ["os", "environ", "get"] || call_path.as_slice() == ["os", "getenv"]
-    }) {
-        return;
-    }
-
-    let ExprKind::Call { args, .. } = &expr.node else {
+    // check `os.environ.get('foo')` and `os.getenv('foo')`.
+    let ExprKind::Call { func, args, .. } = &expr.node else {
         return;
     };
     let Some(arg) = args.get(0) else {
@@ -51,6 +45,12 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Constant { value: Constant::Str(env_var), kind } = &arg.node else {
         return;
     };
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["os", "environ", "get"] || call_path.as_slice() == ["os", "getenv"]
+    }) {
+        return;
+    }
+
     let capital_env_var = env_var.to_ascii_uppercase();
     if &capital_env_var == env_var {
         return;

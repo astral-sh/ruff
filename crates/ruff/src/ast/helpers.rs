@@ -72,14 +72,7 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool
 /// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
 pub fn collect_call_path(expr: &Expr) -> CallPath {
     let mut segments = smallvec![];
-    collect_call_path_inner(
-        if let ExprKind::Call { func, .. } = &expr.node {
-            func
-        } else {
-            expr
-        },
-        &mut segments,
-    );
+    collect_call_path_inner(expr, &mut segments);
     segments
 }
 

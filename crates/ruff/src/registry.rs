@@ -41,6 +41,22 @@ ruff_macros::define_rule_mapping!(
     E223 => rules::pycodestyle::rules::TabBeforeOperator,
     #[cfg(feature = "logical_lines")]
     E224 => rules::pycodestyle::rules::TabAfterOperator,
+    #[cfg(feature = "logical_lines")]
+    E261 => rules::pycodestyle::rules::TooFewSpacesBeforeInlineComment,
+    #[cfg(feature = "logical_lines")]
+    E262 => rules::pycodestyle::rules::NoSpaceAfterInlineComment,
+    #[cfg(feature = "logical_lines")]
+    E265 => rules::pycodestyle::rules::NoSpaceAfterBlockComment,
+    #[cfg(feature = "logical_lines")]
+    E266 => rules::pycodestyle::rules::MultipleLeadingHashesForBlockComment,
+    #[cfg(feature = "logical_lines")]
+    E271 => rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    E272 => rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
+    #[cfg(feature = "logical_lines")]
+    E273 => rules::pycodestyle::rules::TabAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    E274 => rules::pycodestyle::rules::TabBeforeKeyword,
     E401 => rules::pycodestyle::rules::MultipleImportsOnOneLine,
     E402 => rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
     E501 => rules::pycodestyle::rules::LineTooLong,
@@ -389,7 +405,7 @@ ruff_macros::define_rule_mapping!(
     ARG004 => rules::flake8_unused_arguments::rules::UnusedStaticMethodArgument,
     ARG005 => rules::flake8_unused_arguments::rules::UnusedLambdaArgument,
     // flake8-import-conventions
-    ICN001 => rules::flake8_import_conventions::rules::ImportAliasIsNotConventional,
+    ICN001 => rules::flake8_import_conventions::rules::UnconventionalImportAlias,
     // flake8-datetimez
     DTZ001 => rules::flake8_datetimez::rules::CallDatetimeWithoutTzinfo,
     DTZ002 => rules::flake8_datetimez::rules::CallDatetimeToday,
@@ -750,13 +766,21 @@ impl Rule {
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MultipleLeadingHashesForBlockComment
+            | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
+            | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
+            | Rule::NoSpaceAfterBlockComment
+            | Rule::NoSpaceAfterInlineComment
             | Rule::OverIndented
+            | Rule::TabAfterKeyword
             | Rule::TabAfterOperator
+            | Rule::TabBeforeKeyword
             | Rule::TabBeforeOperator
+            | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
             | Rule::WhitespaceAfterOpenBracket
