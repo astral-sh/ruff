@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_pytest_style/mod.rs
+source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -108,6 +108,42 @@ expression: diagnostics
   end_location:
     row: 74
     column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 80
+    column: 30
+  end_location:
+    row: 80
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 81
+    column: 38
+  end_location:
+    row: 81
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 81
+    column: 46
+  end_location:
+    row: 81
+    column: 52
   fix: ~
   parent: ~
 
