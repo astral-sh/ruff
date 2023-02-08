@@ -43,12 +43,6 @@ impl Violation for ParametrizeValuesWrongType {
     }
 }
 
-fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
-    decorators
-        .iter()
-        .find(|decorator| is_pytest_parametrize(decorator, checker))
-}
-
 fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
     let all_literals = elts.iter().all(|e| {
         matches!(
@@ -377,26 +371,27 @@ fn handle_value_rows(
 }
 
 pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
-    let decorator = get_parametrize_decorator(checker, decorators);
-    if let Some(decorator) = decorator {
-        if let ExprKind::Call { args, .. } = &decorator.node {
-            if checker
-                .settings
-                .rules
-                .enabled(&Rule::ParametrizeNamesWrongType)
-            {
-                if let Some(names) = args.get(0) {
-                    check_names(checker, names);
+    for decorator in decorators {
+        if is_pytest_parametrize(decorator, checker) {
+            if let ExprKind::Call { args, .. } = &decorator.node {
+                if checker
+                    .settings
+                    .rules
+                    .enabled(&Rule::ParametrizeNamesWrongType)
+                {
+                    if let Some(names) = args.get(0) {
+                        check_names(checker, names);
+                    }
                 }
-            }
-            if checker
-                .settings
-                .rules
-                .enabled(&Rule::ParametrizeValuesWrongType)
-            {
-                if let Some(names) = args.get(0) {
-                    if let Some(values) = args.get(1) {
-                        check_values(checker, names, values);
+                if checker
+                    .settings
+                    .rules
+                    .enabled(&Rule::ParametrizeValuesWrongType)
+                {
+                    if let Some(names) = args.get(0) {
+                        if let Some(values) = args.get(1) {
+                            check_values(checker, names, values);
+                        }
                     }
                 }
             }
