@@ -1368,7 +1368,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TRY002 | raise-vanilla-class | Create your own exception |  |
+| [TRY002](https://github.com/charliermarsh/ruff/blob/main/docs/rules/raise-vanilla-class.md) | [raise-vanilla-class](https://github.com/charliermarsh/ruff/blob/main/docs/rules/raise-vanilla-class.md) | Create your own exception |  |
 | TRY003 | raise-vanilla-args | Avoid specifying long messages outside the exception class |  |
 | TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
 | TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |

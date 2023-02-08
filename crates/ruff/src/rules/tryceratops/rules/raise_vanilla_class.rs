@@ -8,13 +8,19 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ### What it does
-    /// Checks for bare exceptions.
+    /// Checks for code that raises `Exception` directly.
     ///
-    /// ## Why is this bad?
-    /// It's hard to capture generic exceptions making it hard for handling specific scenarios.
+    /// ### Why is this bad?
+    /// Handling such exceptions requires the use of `except Exception`, which
+    /// captures _any_ raised exception, including failed assertions,
+    /// division by zero, and more.
     ///
-    ///## Example
-    ///```py
+    /// Prefer to raise your own exception, or a more specific built-in
+    /// exception, so that you can avoid over-capturing exceptions that you
+    /// don't intend to handle.
+    ///
+    /// ### Example
+    /// ```py
     /// def main_function():
     ///     if not cond:
     ///         raise Exception()
@@ -24,10 +30,11 @@ define_violation!(
     ///         prepare()
     ///         main_function()
     ///     except Exception:
-    ///         logger.error("I have no idea what went wrong!!")
-    ///```
-    ///## How it should be
-    ///```py
+    ///         logger.error("Oops")
+    /// ```
+    ///
+    /// Use instead:
+    /// ```py
     /// def main_function():
     ///     if not cond:
     ///         raise CustomException()
@@ -39,7 +46,7 @@ define_violation!(
     ///     except CustomException:
     ///         logger.error("Main function failed")
     ///     except Exception:
-    ///         logger.error("I have no idea what went wrong!!")
+    ///         logger.error("Oops")
     pub struct RaiseVanillaClass;
 );
 impl Violation for RaiseVanillaClass {
