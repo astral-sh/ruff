@@ -1162,10 +1162,10 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| Q000 | bad-quotes-inline-string | Double quotes found but single quotes preferred | 🛠 |
-| Q001 | bad-quotes-multiline-string | Double quote multiline found but single quotes preferred | 🛠 |
-| Q002 | bad-quotes-docstring | Double quote docstring found but single quotes preferred | 🛠 |
-| Q003 | avoid-quote-escape | Change outer quotes to avoid escaping inner quotes | 🛠 |
+| [Q000](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | [bad-quotes-inline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | Double quotes found but single quotes preferred | 🛠 |
+| [Q001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | [bad-quotes-multiline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | Double quote multiline found but single quotes preferred | 🛠 |
+| [Q002](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | [bad-quotes-docstring](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | Double quote docstring found but single quotes preferred | 🛠 |
+| [Q003](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoid-quote-escape.md) | [avoid-quote-escape](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoid-quote-escape.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
 
 ### flake8-return (RET)
 
