@@ -24,7 +24,26 @@ mod iterators;
 mod printer;
 mod resolve;
 
-fn inner_main() -> Result<ExitCode> {
+enum ExitStatus {
+    /// Linting was successful and there were no linting errors.
+    Success,
+    /// Linting was successful but there were linting errors.
+    Failure,
+    /// Linting failed.
+    Error,
+}
+
+impl From<ExitStatus> for ExitCode {
+    fn from(status: ExitStatus) -> Self {
+        match status {
+            ExitStatus::Success => ExitCode::from(0),
+            ExitStatus::Failure => ExitCode::from(1),
+            ExitStatus::Error => ExitCode::from(2),
+        }
+    }
+}
+
+fn inner_main() -> Result<ExitStatus> {
     let mut args: Vec<_> = std::env::args_os().collect();
 
     // Clap doesn't support default subcommands but we want to run `check` by
@@ -82,10 +101,10 @@ quoting the executed command, along with the relevant file contents and `pyproje
         Command::Check(args) => return check(args, log_level),
     }
 
-    Ok(ExitCode::SUCCESS)
+    Ok(ExitStatus::Success)
 }
 
-fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
+fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -99,11 +118,11 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
 
     if cli.show_settings {
         commands::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
-        return Ok(ExitCode::SUCCESS);
+        return Ok(ExitStatus::Success);
     }
     if cli.show_files {
         commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
-        return Ok(ExitCode::SUCCESS);
+        return Ok(ExitStatus::Success);
     }
 
     // Extract options that are included in `Settings`, but only apply at the top
@@ -163,7 +182,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
                 eprintln!("Added {modifications} noqa directives.");
             }
         }
-        return Ok(ExitCode::SUCCESS);
+        return Ok(ExitStatus::Success);
     }
 
     let printer = Printer::new(&format, &log_level, &autofix, &violations);
@@ -264,20 +283,20 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
         if !cli.exit_zero {
             if cli.diff || fix_only {
                 if diagnostics.fixed > 0 {
-                    return Ok(ExitCode::FAILURE);
+                    return Ok(ExitStatus::Failure);
                 }
             } else if cli.exit_non_zero_on_fix {
                 if diagnostics.fixed > 0 || !diagnostics.messages.is_empty() {
-                    return Ok(ExitCode::FAILURE);
+                    return Ok(ExitStatus::Failure);
                 }
             } else {
                 if !diagnostics.messages.is_empty() {
-                    return Ok(ExitCode::FAILURE);
+                    return Ok(ExitStatus::Failure);
                 }
             }
         }
     }
-    Ok(ExitCode::SUCCESS)
+    Ok(ExitStatus::Success)
 }
 
 fn rewrite_legacy_subcommand(cmd: &str) -> &str {
@@ -292,13 +311,13 @@ fn rewrite_legacy_subcommand(cmd: &str) -> &str {
 #[must_use]
 pub fn main() -> ExitCode {
     match inner_main() {
-        Ok(code) => code,
+        Ok(code) => code.into(),
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
                 eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
             }
-            ExitCode::FAILURE
+            ExitStatus::Error.into()
         }
     }
 }
