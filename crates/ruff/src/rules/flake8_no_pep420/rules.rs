@@ -8,6 +8,23 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
+    /// ### What it does
+    /// Checks for packages that are missing an `__init__.py` file.
+    ///
+    /// ### Why is this bad?
+    /// Python packages are directories that contain a file named `__init__.py`.
+    /// The existence of this file indicates that the directory is a Python
+    /// package, and so it can be imported the same way a module can be
+    /// imported.
+    ///
+    /// Directories that lack an `__init__.py` file can still be imported, but
+    /// they're indicative of a special kind of package, known as a namespace
+    /// package (see: [PEP 420](https://www.python.org/dev/peps/pep-0420/)).
+    ///
+    /// Namespace packages are a relatively new feature of Python, and they're
+    /// not widely used. So a package that lacks an `__init__.py` file is
+    /// typically meant to be a regular package, and the absence of the
+    /// `__init__.py` file is probably an oversight.
     pub struct ImplicitNamespacePackage(pub String);
 );
 impl Violation for ImplicitNamespacePackage {

@@ -1,9 +1,9 @@
 ---
-source: src/rules/flake8_import_conventions/mod.rs
+source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - altair
       - alt
   location:
@@ -15,7 +15,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - dask.array
       - da
   location:
@@ -27,7 +27,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - dask.dataframe
       - dd
   location:
@@ -39,7 +39,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - matplotlib.pyplot
       - plt
   location:
@@ -51,7 +51,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - numpy
       - np
   location:
@@ -63,7 +63,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - pandas
       - pd
   location:
@@ -75,7 +75,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - seaborn
       - sns
   location:
@@ -87,7 +87,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - tensorflow
       - tf
   location:
@@ -99,7 +99,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - holoviews
       - hv
   location:
@@ -111,7 +111,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - panel
       - pn
   location:
@@ -123,7 +123,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - plotly.express
       - px
   location:
@@ -135,7 +135,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - matplotlib
       - mpl
   location:
@@ -147,7 +147,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - polars
       - pl
   location:
@@ -159,7 +159,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - pyarrow
       - pa
   location:
@@ -171,7 +171,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - altair
       - alt
   location:
@@ -183,7 +183,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - matplotlib.pyplot
       - plt
   location:
@@ -195,7 +195,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - dask.array
       - da
   location:
@@ -207,7 +207,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - dask.dataframe
       - dd
   location:
@@ -219,7 +219,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - numpy
       - np
   location:
@@ -231,7 +231,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - pandas
       - pd
   location:
@@ -243,7 +243,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - seaborn
       - sns
   location:
@@ -255,7 +255,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - tensorflow
       - tf
   location:
@@ -267,7 +267,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - holoviews
       - hv
   location:
@@ -279,7 +279,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - panel
       - pn
   location:
@@ -291,7 +291,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - plotly.express
       - px
   location:
@@ -303,7 +303,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - matplotlib
       - mpl
   location:
@@ -315,7 +315,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - polars
       - pl
   location:
@@ -327,7 +327,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportAliasIsNotConventional:
+    UnconventionalImportAlias:
       - pyarrow
       - pa
   location:

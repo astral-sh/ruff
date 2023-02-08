@@ -1064,7 +1064,7 @@ where
                     if self
                         .settings
                         .rules
-                        .enabled(&Rule::ImportAliasIsNotConventional)
+                        .enabled(&Rule::UnconventionalImportAlias)
                     {
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::check_conventional_import(
@@ -1323,7 +1323,7 @@ where
                     if self
                         .settings
                         .rules
-                        .enabled(&Rule::ImportAliasIsNotConventional)
+                        .enabled(&Rule::UnconventionalImportAlias)
                     {
                         let full_name = helpers::format_import_from_member(
                             level.as_ref(),

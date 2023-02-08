@@ -1076,7 +1076,7 @@ For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ICN001 | import-alias-is-not-conventional | `{name}` should be imported as `{asname}` |  |
+| [ICN001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unconventional-import-alias.md) | [unconventional-import-alias](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unconventional-import-alias.md) | `{name}` should be imported as `{asname}` |  |
 
 ### flake8-logging-format (G)
 
@@ -1099,7 +1099,7 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| INP001 | implicit-namespace-package | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
+| [INP001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/implicit-namespace-package.md) | [implicit-namespace-package](https://github.com/charliermarsh/ruff/blob/main/docs/rules/implicit-namespace-package.md) | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
 
 ### flake8-pie (PIE)
 
@@ -1285,7 +1285,7 @@ For more, see [eradicate](https://pypi.org/project/eradicate/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ERA001 | commented-out-code | Found commented-out code | 🛠 |
+| [ERA001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/commented-out-code.md) | [commented-out-code](https://github.com/charliermarsh/ruff/blob/main/docs/rules/commented-out-code.md) | Found commented-out code | 🛠 |
 
 ### pandas-vet (PD)
 
