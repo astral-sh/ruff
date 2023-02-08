@@ -50,7 +50,8 @@ macro_rules! notify_user {
 pub enum LogLevel {
     /// No output ([`log::LevelFilter::Off`]).
     Silent,
-    /// Only show lint violations, with no decorative output ([`log::LevelFilter::Off`]).
+    /// Only show lint violations, with no decorative output
+    /// ([`log::LevelFilter::Off`]).
     Quiet,
     /// All user-facing output ([`log::LevelFilter::Info`]).
     #[default]

@@ -1,11 +1,9 @@
-use crate::define_violation;
-use crate::violation::{AlwaysAutofixableViolation, Violation};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashSet;
-use rustpython_ast::StmtKind;
+use rustpython_parser::ast::StmtKind;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
@@ -18,7 +16,7 @@ use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::settings::Convention;
-
+use crate::violation::{AlwaysAutofixableViolation, Violation};
 use crate::visibility::is_staticmethod;
 
 define_violation!(

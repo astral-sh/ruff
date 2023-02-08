@@ -5,7 +5,7 @@ use log::error;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{
+use rustpython_parser::ast::{
     Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
     Located, Location, Stmt, StmtKind,
 };
@@ -30,23 +30,29 @@ pub fn create_stmt(node: StmtKind) -> Stmt {
     Stmt::new(Location::default(), Location::default(), node)
 }
 
-/// Generate source code from an `Expr`.
+/// Generate source code from an [`Expr`].
 pub fn unparse_expr(expr: &Expr, stylist: &Stylist) -> String {
     let mut generator: Generator = stylist.into();
     generator.unparse_expr(expr, 0);
     generator.generate()
 }
 
-/// Generate source code from an `Stmt`.
+/// Generate source code from a [`Stmt`].
 pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
     let mut generator: Generator = stylist.into();
     generator.unparse_stmt(stmt);
     generator.generate()
 }
 
+/// Generate source code from an [`Constant`].
+pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
+    let mut generator: Generator = stylist.into();
+    generator.unparse_constant(constant);
+    generator.generate()
+}
+
 fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool {
     match &expr.node {
-        ExprKind::Call { func, .. } => collect_call_path_inner(func, parts),
         ExprKind::Attribute { value, attr, .. } => {
             if collect_call_path_inner(value, parts) {
                 parts.push(attr);
@@ -66,7 +72,14 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool
 /// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
 pub fn collect_call_path(expr: &Expr) -> CallPath {
     let mut segments = smallvec![];
-    collect_call_path_inner(expr, &mut segments);
+    collect_call_path_inner(
+        if let ExprKind::Call { func, .. } = &expr.node {
+            func
+        } else {
+            expr
+        },
+        &mut segments,
+    );
     segments
 }
 
@@ -661,8 +674,8 @@ pub fn to_call_path(target: &str) -> CallPath {
 
 /// Create a module path from a (package, path) pair.
 ///
-/// For example, if the package is `foo/bar` and the path is `foo/bar/baz.py`, the call path is
-/// `["baz"]`.
+/// For example, if the package is `foo/bar` and the path is `foo/bar/baz.py`,
+/// the call path is `["baz"]`.
 pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
     path.strip_prefix(package.parent()?)
         .ok()?
@@ -1132,7 +1145,7 @@ pub fn is_logger_candidate(func: &Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_ast::Location;
+    use rustpython_parser::ast::Location;
     use rustpython_parser::parser;
 
     use crate::ast::helpers::{

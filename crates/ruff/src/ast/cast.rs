@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 
 pub fn name(stmt: &Stmt) -> &str {
     match &stmt.node {

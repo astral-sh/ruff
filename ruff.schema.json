@@ -541,6 +541,13 @@
             "null"
           ]
         },
+        "ignore-fully-untyped": {
+          "description": "Whether to suppress `ANN*` rules for any declaration that hasn't been typed at all. This makes it easier to gradually add types to a codebase.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "mypy-init-return": {
           "description": "Whether to allow the omission of a return type hint for `__init__` if at least one argument is annotated.",
           "type": [
@@ -1681,6 +1688,10 @@
         "PLE1307",
         "PLE131",
         "PLE1310",
+        "PLE2",
+        "PLE25",
+        "PLE250",
+        "PLE2502",
         "PLR",
         "PLR0",
         "PLR01",

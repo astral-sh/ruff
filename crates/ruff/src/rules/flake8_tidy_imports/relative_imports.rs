@@ -1,10 +1,9 @@
-use ruff_macros::derive_message_formats;
-use rustpython_ast::Stmt;
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::Stmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 

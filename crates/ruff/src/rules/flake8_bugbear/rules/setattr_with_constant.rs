@@ -1,15 +1,15 @@
+use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::identifiers::{is_identifier, is_mangled_private};
+use ruff_python::keyword::KWLIST;
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
+
 use crate::ast::helpers::unparse_stmt;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
 use crate::violation::AlwaysAutofixableViolation;
-use ruff_macros::derive_message_formats;
-use ruff_python::identifiers::{is_identifier, is_mangled_private};
-use ruff_python::keyword::KWLIST;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
 define_violation!(
     pub struct SetAttrWithConstant;

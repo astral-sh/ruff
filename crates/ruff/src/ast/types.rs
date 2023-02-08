@@ -2,8 +2,7 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Arguments, Expr, Keyword, Stmt};
-use rustpython_parser::ast::{Located, Location};
+use rustpython_parser::ast::{Arguments, Expr, Keyword, Located, Location, Stmt};
 
 fn id() -> usize {
     static COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -89,8 +88,9 @@ pub struct Scope<'a> {
     pub uses_locals: bool,
     /// A map from bound name to binding index, for live bindings.
     pub bindings: FxHashMap<&'a str, usize>,
-    /// A map from bound name to binding index, for bindings that were created in the scope but
-    /// rebound (and thus overridden) later on in the same scope.
+    /// A map from bound name to binding index, for bindings that were created
+    /// in the scope but rebound (and thus overridden) later on in the same
+    /// scope.
     pub rebounds: FxHashMap<&'a str, Vec<usize>>,
 }
 

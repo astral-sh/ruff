@@ -1,8 +1,7 @@
 use itertools::Itertools;
+use ruff::registry::{Linter, RuleNamespace, UpstreamCategory};
 use serde::Serialize;
 use strum::IntoEnumIterator;
-
-use ruff::registry::{Linter, RuleNamespace, UpstreamCategory};
 
 use crate::args::HelpFormat;
 

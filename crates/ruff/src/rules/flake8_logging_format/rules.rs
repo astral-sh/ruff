@@ -1,5 +1,4 @@
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Operator};
-use rustpython_parser::ast::Location;
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location, Operator};
 
 use crate::ast::helpers::{find_keyword, is_logger_candidate, SimpleCallArgs};
 use crate::ast::types::Range;

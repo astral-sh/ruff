@@ -42,7 +42,6 @@ regex = { version = "1.6.0" }
 ruff_macros = { version = "0.0.243", path = "../ruff_macros" }
 ruff_python = { version = "0.0.243", path = "../ruff_python" }
 rustc-hash = { version = "1.1.0" }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
 schemars = { version = "0.8.11" }

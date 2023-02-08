@@ -1,4 +1,4 @@
-use rustpython_ast::{Constant, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind};
 
 use crate::ast::helpers::is_docstring_stmt;
 

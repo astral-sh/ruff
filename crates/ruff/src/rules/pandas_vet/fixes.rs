@@ -1,6 +1,6 @@
-use crate::ast::helpers;
-use rustpython_ast::{Expr, ExprKind, Keyword, Location};
+use rustpython_parser::ast::{Expr, ExprKind, Keyword, Location};
 
+use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::apply_fix;
 use crate::autofix::helpers::remove_argument;

@@ -1,6 +1,6 @@
 use itertools::Itertools;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Alias, AliasData, Stmt};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Alias, AliasData, Stmt};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
@@ -11,7 +11,7 @@ use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
 use crate::source_code::{Locator, Stylist};
 use crate::violation::{Availability, Violation};
-use crate::{define_violation, AutofixKind};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct ImportReplacements {
@@ -342,9 +342,9 @@ impl<'a> ImportReplacer<'a> {
         } else {
             let indentation = indentation(self.locator, self.stmt);
 
-            // If we have matched _and_ unmatched names, but the import is not on its own line, we
-            // can't add a statement after it. For example, if we have `if True: import foo`, we can't
-            // add a statement to the next line.
+            // If we have matched _and_ unmatched names, but the import is not on its own
+            // line, we can't add a statement after it. For example, if we have
+            // `if True: import foo`, we can't add a statement to the next line.
             let Some(indentation) = indentation else {
                 return Some(Replacement {
                     module: target,
@@ -389,7 +389,8 @@ impl<'a> ImportReplacer<'a> {
         (matched_names, unmatched_names)
     }
 
-    /// Converts a list of names and a module into an `import from`-style import.
+    /// Converts a list of names and a module into an `import from`-style
+    /// import.
     fn format_import_from(names: &[&AliasData], module: &str) -> String {
         // Construct the whitespace strings.
         // Generate the formatted names.

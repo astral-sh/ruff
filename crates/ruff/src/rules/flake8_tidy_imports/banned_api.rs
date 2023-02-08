@@ -1,12 +1,11 @@
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Alias, Expr, Located};
+use rustpython_parser::ast::{Alias, Expr, Located};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::{CallPath, Range};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::settings::hashable::HashableHashMap;
 use crate::violation::Violation;

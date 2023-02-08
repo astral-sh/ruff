@@ -1,5 +1,6 @@
 use itertools::Itertools;
-use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use super::branch::Branch;
 use super::helpers::result_exists;
@@ -9,11 +10,9 @@ use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct UnnecessaryReturnNone;

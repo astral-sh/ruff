@@ -27,7 +27,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         let prefixes: Result<Vec<_>, _> = variant
             .attrs
             .iter()
-            .filter(|a| a.path.is_ident("prefix"))
+            .filter(|attr| attr.path.is_ident("prefix"))
             .map(|attr| {
                 let Ok(Meta::NameValue(MetaNameValue{lit: Lit::Str(lit), ..})) = attr.parse_meta() else {
                     return Err(Error::new(attr.span(), r#"expected attribute to be in the form of [#prefix = "..."]"#));
@@ -54,7 +54,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
             ));
         }
 
-        let Some(doc_attr) = variant.attrs.iter().find(|a| a.path.is_ident("doc")) else {
+        let Some(doc_attr) = variant.attrs.iter().find(|attr| attr.path.is_ident("doc")) else {
             return Err(Error::new(variant.span(), r#"expected a doc comment"#))
         };
 

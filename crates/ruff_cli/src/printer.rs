@@ -122,7 +122,8 @@ impl<'a> Printer<'a> {
                         if num_fixable > 0 {
                             writeln!(
                                 stdout,
-                                "[*] {num_fixable} potentially fixable with the --fix option."
+                                "[{}] {num_fixable} potentially fixable with the --fix option.",
+                                "*".cyan(),
                             )?;
                         }
                     }
@@ -376,8 +377,8 @@ impl<'a> Printer<'a> {
         let mut stdout = BufWriter::new(io::stdout().lock());
         match self.format {
             SerializationFormat::Text => {
-                // Compute the maximum number of digits in the count and code, for all messages, to enable
-                // pretty-printing.
+                // Compute the maximum number of digits in the count and code, for all messages,
+                // to enable pretty-printing.
                 let count_width = num_digits(
                     statistics
                         .iter()
@@ -477,7 +478,7 @@ fn num_digits(n: usize) -> usize {
 fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
     let label = if message.kind.fixable() {
         format!(
-            "{}{}{}{}{}{} {} [*] {}",
+            "{}{}{}{}{}{} {} [{}] {}",
             relativize_path(Path::new(&message.filename)).bold(),
             ":".cyan(),
             message.location.row(),
@@ -485,6 +486,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
             message.location.column(),
             ":".cyan(),
             message.kind.rule().code().red().bold(),
+            "*".cyan(),
             message.kind.body(),
         )
     } else {
@@ -556,13 +558,14 @@ fn print_grouped_message<T: Write>(
 ) -> Result<()> {
     let label = if message.kind.fixable() {
         format!(
-            "  {}{}{}{}{}  {}  [*] {}",
+            "  {}{}{}{}{}  {}  [{}] {}",
             " ".repeat(row_length - num_digits(message.location.row())),
             message.location.row(),
             ":".cyan(),
             message.location.column(),
             " ".repeat(column_length - num_digits(message.location.column())),
             message.kind.rule().code().red().bold(),
+            "*".cyan(),
             message.kind.body(),
         )
     } else {

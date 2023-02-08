@@ -53,3 +53,8 @@ def foo():
         return True
     else:
         return
+
+
+# Error (on the argument, but not the return type)
+def foo(a):
+    a = 2 + 2

@@ -21,10 +21,15 @@ def snake_case(name: str) -> str:
     ).lstrip("_")
 
 
-def main(*, name: str, code: str, linter: str) -> None:  # noqa: PLR0915
+def main(*, name: str, code: str, linter: str) -> None:
     """Generate boilerplate for a new rule."""
     # Create a test fixture.
-    with (ROOT_DIR / "crates/ruff/resources/test/fixtures" / dir_name(linter) / f"{code}.py").open(
+    with (
+        ROOT_DIR
+        / "crates/ruff/resources/test/fixtures"
+        / dir_name(linter)
+        / f"{code}.py"
+    ).open(
         "a",
     ):
         pass
@@ -75,7 +80,7 @@ def main(*, name: str, code: str, linter: str) -> None:  # noqa: PLR0915
         fp.write(
             """use ruff_macros::derive_message_formats;
 
-use crate::define_violation;
+use ruff_macros::define_violation;
 use crate::violation::Violation;
 use crate::checkers::ast::Checker;
 

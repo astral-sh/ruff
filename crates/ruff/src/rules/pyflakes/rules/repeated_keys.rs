@@ -1,7 +1,8 @@
 use std::hash::{BuildHasherDefault, Hash};
 
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, ExprKind};
 
 use crate::ast::comparable::{ComparableConstant, ComparableExpr};
 use crate::ast::helpers::unparse_expr;
@@ -9,10 +10,8 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::{define_violation, AutofixKind};
-
 use crate::violation::{Availability, Violation};
-use ruff_macros::derive_message_formats;
+use crate::AutofixKind;
 
 define_violation!(
     pub struct MultiValueRepeatedKeyLiteral {

@@ -1,5 +1,5 @@
 ---
-source: src/rules/pylint/mod.rs
+source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -108,9 +108,9 @@ expression: diagnostics
   parent: ~
 - kind:
     ComparisonOfConstant:
-      left_constant: "'hello'"
+      left_constant: "\"hello\""
       op: Eq
-      right_constant: "''"
+      right_constant: "\"\""
   location:
     row: 51
     column: 3

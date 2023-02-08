@@ -13,3 +13,4 @@ proc-macro2 = { version = "1.0.47" }
 quote = { version = "1.0.21" }
 syn = { version = "1.0.103", features = ["derive", "parsing", "extra-traits"] }
 textwrap = { version = "0.16.0" }
+itertools = { version = "0.10.5" }

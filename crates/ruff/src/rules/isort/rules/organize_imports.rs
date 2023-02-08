@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Location, Stmt};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Location, Stmt};
 use textwrap::indent;
 
 use super::super::track::Block;
@@ -12,7 +12,6 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};

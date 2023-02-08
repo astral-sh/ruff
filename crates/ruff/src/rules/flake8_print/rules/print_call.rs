@@ -1,13 +1,11 @@
 use log::error;
-use rustpython_ast::{Expr, Keyword, Stmt, StmtKind};
-
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Expr, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::is_const_none;
 use crate::ast::types::Range;
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 

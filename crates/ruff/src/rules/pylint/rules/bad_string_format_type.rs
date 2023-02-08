@@ -1,11 +1,9 @@
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 
 use std::str::FromStr;
 
-use rustpython_ast::Location;
 use rustpython_common::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
