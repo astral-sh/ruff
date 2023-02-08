@@ -1,8 +1,9 @@
+use crate::ast::helpers::ContinueStatementVisitor;
 use crate::ast::types::Range;
+use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::define_violation;
 use crate::registry::Diagnostic;
-use crate::ast::helpers::ContinueStatementVisitor;
 use crate::violation::Violation;
 
 use ruff_macros::derive_message_formats;
@@ -25,9 +26,11 @@ pub fn continue_in_finally(checker: &mut Checker, finalbody: &[Stmt]) {
     }
     for stmt in finalbody {
         let mut visitor = ContinueStatementVisitor::default();
-        let continues = visitor.visit_stmt(stmt);
+        visitor.visit_stmt(stmt);
+        let continues = visitor.returns;
         if !continues.is_empty() {
-            let range = Range::from_located(stmt);
+            let the_continue = continues.first().unwrap();
+            let range = Range::from_located(the_continue);
             let diagnostic = Diagnostic::new(ContinueInFinally, range);
             checker.diagnostics.push(diagnostic);
             return;

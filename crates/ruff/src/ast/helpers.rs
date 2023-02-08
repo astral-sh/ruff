@@ -724,11 +724,12 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match &stmt.node {
-            StmtKind::Continue => self.returns.push(&stmt),
+            StmtKind::Continue => self.returns.push(stmt),
             _ => visitor::walk_stmt(self, stmt),
         }
     }
 }
+
 /// Convert a location within a file (relative to `base`) to an absolute
 /// position.
 pub fn to_absolute(relative: Location, base: Location) -> Location {
