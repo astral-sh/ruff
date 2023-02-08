@@ -1945,7 +1945,21 @@ where
                 value,
                 ..
             } => {
-                self.visit_annotation(annotation);
+                // If we're in a class or module scope, then the annotation needs to be available
+                // at runtime.
+                // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
+                if !self.annotations_future_enabled
+                    && matches!(
+                        self.current_scope().kind,
+                        ScopeKind::Class(..) | ScopeKind::Module
+                    )
+                {
+                    self.in_type_definition = true;
+                    self.visit_expr(annotation);
+                    self.in_type_definition = false;
+                } else {
+                    self.visit_annotation(annotation);
+                }
                 if let Some(expr) = value {
                     if self.match_typing_expr(annotation, "TypeAlias") {
                         self.in_type_definition = true;

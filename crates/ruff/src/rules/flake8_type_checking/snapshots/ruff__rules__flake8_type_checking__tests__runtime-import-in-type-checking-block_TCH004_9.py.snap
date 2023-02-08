@@ -4,13 +4,24 @@ expression: diagnostics
 ---
 - kind:
     RuntimeImportInTypeCheckingBlock:
-      full_name: typing.Any
+      full_name: typing.Tuple
   location:
     row: 4
     column: 23
   end_location:
     row: 4
-    column: 26
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    RuntimeImportInTypeCheckingBlock:
+      full_name: typing.List
+  location:
+    row: 4
+    column: 30
+  end_location:
+    row: 4
+    column: 34
   fix: ~
   parent: ~
 
