@@ -1121,8 +1121,8 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| T201 | print-found | `print` found | 🛠 |
-| T203 | p-print-found | `pprint` found | 🛠 |
+| T201 | print-found | `print` found |  |
+| T203 | p-print-found | `pprint` found |  |
 
 ### flake8-pytest-style (PT)
 
