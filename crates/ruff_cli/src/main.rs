@@ -3,16 +3,17 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
+use anyhow::Result;
+use clap::{CommandFactory, Parser, Subcommand};
+use colored::Colorize;
+use notify::{recommended_watcher, RecursiveMode, Watcher};
+
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::resolver::PyprojectDiscovery;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::CliSettings;
 use ::ruff::{fix, fs, warn_user_once};
-use anyhow::Result;
 use args::{Args, CheckArgs, Command};
-use clap::{CommandFactory, Parser, Subcommand};
-use colored::Colorize;
-use notify::{recommended_watcher, RecursiveMode, Watcher};
 use printer::{Printer, Violations};
 
 pub(crate) mod args;
