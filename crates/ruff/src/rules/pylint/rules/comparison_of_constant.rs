@@ -1,11 +1,11 @@
 use std::fmt;
 
-use crate::ast::helpers::unparse_constant;
 use itertools::Itertools;
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Located};
 use serde::{Deserialize, Serialize};
 
+use crate::ast::helpers::unparse_constant;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
