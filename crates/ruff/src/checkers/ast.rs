@@ -633,6 +633,11 @@ where
                     }
                 }
 
+
+                if self.settings.rules.enabled(&Rule::DuplicateArgumentName) {
+                    pylint::rules::duplicate_argument_name(self, &args);
+                }
+
                 if self
                     .settings
                     .rules
