@@ -278,34 +278,36 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let mut stdout = BufWriter::new(io::stdout().lock());
     match format {
         HelpFormat::Text => {
-            writeln!(
-                stdout,
-                "[{}] {} ({})",
-                linter.name(),
-                rule.as_ref(),
-                rule.code(),
-            )?;
-            writeln!(stdout)?;
+            let mut output = String::new();
+            output.push_str(&format!("# {} ({})", rule.as_ref(), rule.code()));
+            output.push('\n');
+            output.push('\n');
+
+            let (linter, _) = Linter::parse_code(rule.code()).unwrap();
+            output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+            output.push('\n');
+            output.push('\n');
+
+            if let Some(autofix) = rule.autofixable() {
+                output.push_str(match autofix.available {
+                    AutofixAvailability::Sometimes => "Autofix is sometimes available.",
+                    AutofixAvailability::Always => "Autofix is always available.",
+                });
+                output.push('\n');
+                output.push('\n');
+            }
+
             if let Some(explanation) = rule.explanation() {
-                writeln!(stdout, "{}", explanation.trim())?;
+                output.push_str(explanation.trim());
             } else {
-                writeln!(stdout, "Message formats:")?;
+                output.push_str("Message formats:");
                 for format in rule.message_formats() {
-                    writeln!(stdout, "* {format}")?;
+                    output.push('\n');
+                    output.push_str(&format!("* {}", format));
                 }
             }
 
-            if let Some(autofix) = rule.autofixable() {
-                writeln!(stdout)?;
-                writeln!(
-                    stdout,
-                    "{}",
-                    match autofix.available {
-                        AutofixAvailability::Sometimes => "Autofix is sometimes available.",
-                        AutofixAvailability::Always => "Autofix is always available.",
-                    }
-                )?;
-            }
+            writeln!(stdout, "{}", output)?;
         }
         HelpFormat::Json => {
             writeln!(

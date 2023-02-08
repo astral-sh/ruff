@@ -4,9 +4,10 @@
 use std::fs;
 
 use anyhow::Result;
+use ruff::AutofixAvailability;
 use strum::IntoEnumIterator;
 
-use ruff::registry::Rule;
+use ruff::registry::{Linter, Rule, RuleNamespace};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -18,13 +19,29 @@ pub struct Args {
 pub fn main(args: &Args) -> Result<()> {
     for rule in Rule::iter() {
         if let Some(explanation) = rule.explanation() {
-            let explanation = format!("# {} ({})\n\n{}", rule.as_ref(), rule.code(), explanation);
+            let mut output = String::new();
+            output.push_str(&format!("# {} ({})", rule.as_ref(), rule.code()));
+            output.push('\n');
+
+            let (linter, _) = Linter::parse_code(rule.code()).unwrap();
+            output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+            output.push('\n');
+
+            if let Some(autofix) = rule.autofixable() {
+                output.push_str(match autofix.available {
+                    AutofixAvailability::Sometimes => "Autofix is sometimes available.",
+                    AutofixAvailability::Always => "Autofix is always available.",
+                });
+                output.push('\n');
+            }
+
+            output.push_str(explanation.trim());
 
             if args.dry_run {
-                println!("{}", explanation);
+                println!("{}", output);
             } else {
                 fs::create_dir_all("docs/rules")?;
-                fs::write(format!("docs/rules/{}.md", rule.as_ref()), explanation)?;
+                fs::write(format!("docs/rules/{}.md", rule.as_ref()), output)?;
             }
         }
     }
