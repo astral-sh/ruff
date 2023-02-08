@@ -10,7 +10,7 @@ For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
 creating an [**issue**](https://github.com/charliermarsh/ruff/issues) outlining your proposed
-change. You can also join us on [**Discord**](https://discord.gg/Z8KbeK24) to discuss your idea with
+change. You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with
 the community.
 
 If you're looking for a place to start, we recommend implementing a new lint rule (see:

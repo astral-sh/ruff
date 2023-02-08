@@ -9,7 +9,7 @@
 [![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
 [![image](https://img.shields.io/date/1676394000?label=Jetbrains%20Ruff%20Webinar&logo=jetbrains)](https://info.jetbrains.com/PyCharm-Webinar-February14-2023.html)
 
-[**Discord**](https://discord.gg/Z8KbeK24) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
+[**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
 
 An extremely fast Python linter, written in Rust.
 
@@ -1960,14 +1960,14 @@ If you find a case where Ruff's autofix breaks your code, please file an Issue!
 
 Contributions are welcome and highly appreciated. To get started, check out the
 [**contributing guidelines**](https://github.com/charliermarsh/ruff/blob/main/CONTRIBUTING.md). You
-can also join us on [**Discord**](https://discord.gg/Z8KbeK24).
+can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
 ## Support
 
 Having trouble? Check out the existing issues on [**GitHub**](https://github.com/charliermarsh/ruff/issues),
 or feel free to [**open a new one**](https://github.com/charliermarsh/ruff/issues/new).
 
-You can also ask for help on [**Discord**](https://discord.gg/Z8KbeK24).
+You can also ask for help on [**Discord**](https://discord.gg/c9MhzV8aU5).
 
 ## Reference
 
