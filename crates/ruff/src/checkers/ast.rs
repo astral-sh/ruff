@@ -2280,7 +2280,7 @@ where
 
                 // pyupgrade
                 if self.settings.rules.enabled(&Rule::TypeOfPrimitive) {
-                    pyupgrade::rules::type_of_primitive(self, expr, args);
+                    pyupgrade::rules::type_of_primitive(self, expr, func, args);
                 }
                 if self.settings.rules.enabled(&Rule::DeprecatedUnittestAlias) {
                     pyupgrade::rules::deprecated_unittest_alias(self, func);
@@ -2301,10 +2301,10 @@ where
                     pyupgrade::rules::open_alias(self, expr, func);
                 }
                 if self.settings.rules.enabled(&Rule::ReplaceUniversalNewlines) {
-                    pyupgrade::rules::replace_universal_newlines(self, expr, keywords);
+                    pyupgrade::rules::replace_universal_newlines(self, func, keywords);
                 }
                 if self.settings.rules.enabled(&Rule::ReplaceStdoutStderr) {
-                    pyupgrade::rules::replace_stdout_stderr(self, expr, keywords);
+                    pyupgrade::rules::replace_stdout_stderr(self, expr, func, keywords);
                 }
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias(self, &expr);
@@ -2335,7 +2335,7 @@ where
                     .rules
                     .enabled(&Rule::UselessContextlibSuppress)
                 {
-                    flake8_bugbear::rules::useless_contextlib_suppress(self, expr, args);
+                    flake8_bugbear::rules::useless_contextlib_suppress(self, expr, func, args);
                 }
                 if self
                     .settings
@@ -3242,7 +3242,7 @@ where
                 args,
                 keywords,
             } => {
-                let callable = self.resolve_call_path(expr).and_then(|call_path| {
+                let callable = self.resolve_call_path(func).and_then(|call_path| {
                     if self.match_typing_call_path(&call_path, "ForwardRef") {
                         Some(Callable::ForwardRef)
                     } else if self.match_typing_call_path(&call_path, "cast") {

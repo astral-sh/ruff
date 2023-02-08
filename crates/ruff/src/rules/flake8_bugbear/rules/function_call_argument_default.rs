@@ -37,8 +37,8 @@ const IMMUTABLE_FUNCS: &[&[&str]] = &[
     &["re", "compile"],
 ];
 
-fn is_immutable_func(checker: &Checker, expr: &Expr, extend_immutable_calls: &[CallPath]) -> bool {
-    checker.resolve_call_path(expr).map_or(false, |call_path| {
+fn is_immutable_func(checker: &Checker, func: &Expr, extend_immutable_calls: &[CallPath]) -> bool {
+    checker.resolve_call_path(func).map_or(false, |call_path| {
         IMMUTABLE_FUNCS
             .iter()
             .any(|target| call_path.as_slice() == *target)
@@ -67,7 +67,7 @@ where
                 {
                     self.diagnostics.push((
                         FunctionCallArgumentDefault {
-                            name: compose_call_path(expr),
+                            name: compose_call_path(func),
                         }
                         .into(),
                         Range::from_located(expr),
