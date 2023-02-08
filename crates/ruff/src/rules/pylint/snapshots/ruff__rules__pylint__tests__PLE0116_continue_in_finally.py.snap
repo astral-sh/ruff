@@ -15,8 +15,8 @@ expression: diagnostics
 - kind:
     ContinueInFinally: ~
   location:
-    row: 12
-    column: 8
+    row: 13
+    column: 12
   end_location:
     row: 13
     column: 20
