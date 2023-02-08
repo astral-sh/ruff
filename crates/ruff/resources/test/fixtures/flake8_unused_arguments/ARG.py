@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import overload
+from typing import overload, cast
 from typing_extensions import override
 
 
@@ -195,3 +195,10 @@ class C:
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         print("Hello, world!")
+
+
+###
+# Used arguments on chained cast.
+###
+def f(x: None) -> None:
+    _ = cast(Any, _identity)(x=x)

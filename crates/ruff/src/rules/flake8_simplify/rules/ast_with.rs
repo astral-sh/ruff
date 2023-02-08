@@ -1,14 +1,13 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use log::error;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Located, Stmt, StmtKind, Withitem};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
 
 use super::fix_with;
 use crate::ast::helpers::{first_colon_range, has_comments_in};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct MultipleWithStatements;

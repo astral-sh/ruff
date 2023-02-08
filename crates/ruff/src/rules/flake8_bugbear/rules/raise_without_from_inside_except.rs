@@ -1,12 +1,12 @@
+use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::string::is_lower;
+use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
+
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use ruff_python::string::is_lower;
-use rustpython_ast::{ExprKind, Stmt, StmtKind};
 
 define_violation!(
     pub struct RaiseWithoutFromInsideExcept;

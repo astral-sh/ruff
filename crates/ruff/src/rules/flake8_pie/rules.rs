@@ -1,19 +1,19 @@
 use log::error;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::identifiers::is_identifier;
+use ruff_python::keyword::KWLIST;
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{Boolop, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{match_trailing_comment, unparse_expr};
 use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use ruff_python::identifiers::is_identifier;
 
 define_violation!(
     pub struct NoUnnecessaryPass;
@@ -65,6 +65,19 @@ impl Violation for NoUnnecessarySpread {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary spread `**`")
+    }
+}
+
+define_violation!(
+    pub struct SingleStartsEndsWith {
+        pub attr: String,
+    }
+);
+impl Violation for SingleStartsEndsWith {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let SingleStartsEndsWith { attr } = self;
+        format!("Call `{attr}` once with a `tuple`")
     }
 }
 
@@ -276,7 +289,7 @@ fn is_valid_kwarg_name(key: &Expr) -> bool {
         ..
     } = &key.node
     {
-        is_identifier(value)
+        is_identifier(value) && !KWLIST.contains(&value.as_str())
     } else {
         false
     }
@@ -296,6 +309,44 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
                     let diagnostic =
                         Diagnostic::new(NoUnnecessaryDictKwargs, Range::from_located(expr));
                     checker.diagnostics.push(diagnostic);
+                }
+            }
+        }
+    }
+}
+
+/// PIE810
+pub fn single_starts_ends_with(checker: &mut Checker, values: &[Expr], node: &Boolop) {
+    if *node != Boolop::Or {
+        return;
+    }
+
+    // Given `foo.startswith`, insert ("foo", "startswith") into the set.
+    let mut seen = FxHashSet::default();
+    for expr in values {
+        if let ExprKind::Call {
+            func,
+            args,
+            keywords,
+            ..
+        } = &expr.node
+        {
+            if !(args.len() == 1 && keywords.is_empty()) {
+                continue;
+            }
+            if let ExprKind::Attribute { value, attr, .. } = &func.node {
+                if attr != "startswith" && attr != "endswith" {
+                    continue;
+                }
+                if let ExprKind::Name { id, .. } = &value.node {
+                    if !seen.insert((id, attr)) {
+                        checker.diagnostics.push(Diagnostic::new(
+                            SingleStartsEndsWith {
+                                attr: attr.to_string(),
+                            },
+                            Range::from_located(value),
+                        ));
+                    }
                 }
             }
         }

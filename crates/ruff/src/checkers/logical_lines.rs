@@ -1,6 +1,6 @@
 use bisection::bisect_left;
 use itertools::Itertools;
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
 use crate::ast::types::Range;

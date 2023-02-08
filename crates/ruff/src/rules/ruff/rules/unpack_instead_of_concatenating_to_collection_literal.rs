@@ -1,13 +1,12 @@
-use crate::define_violation;
-use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprContext, ExprKind, Operator};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Operator};
 
 use crate::ast::helpers::{create_expr, has_comments, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
+use crate::violation::Violation;
 
 define_violation!(
     pub struct UnpackInsteadOfConcatenatingToCollectionLiteral {

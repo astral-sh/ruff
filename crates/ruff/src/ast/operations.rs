@@ -1,7 +1,6 @@
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Cmpop, Located};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
@@ -340,7 +339,7 @@ pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_ast::{Cmpop, Location};
+    use rustpython_parser::ast::{Cmpop, Location};
 
     use crate::ast::operations::{locate_cmpops, LocatedCmpop};
 

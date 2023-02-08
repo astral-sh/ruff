@@ -2,7 +2,8 @@ use crate::rules::isort::types::{ImportBlock, Importable};
 
 /// Find the index of the block that the import should be placed in.
 /// The index is the position of the pattern in `forced_separate` plus one.
-/// If the import is not matched by any of the patterns, return 0 (the first block).
+/// If the import is not matched by any of the patterns, return 0 (the first
+/// block).
 fn find_block_index(forced_separate: &[String], imp: &dyn Importable) -> usize {
     forced_separate
         .iter()
@@ -10,10 +11,12 @@ fn find_block_index(forced_separate: &[String], imp: &dyn Importable) -> usize {
         .map_or(0, |position| position + 1)
 }
 
-/// Split the import block into multiple blocks, where the first block is the imports that are not
-/// matched by any of the patterns in `forced_separate`, and the rest of the blocks are the imports
-/// that _are_ matched by the patterns in `forced_separate`, in the order they appear in the
-/// `forced_separate` set. Empty blocks are retained for patterns that do not match any imports.
+/// Split the import block into multiple blocks, where the first block is the
+/// imports that are not matched by any of the patterns in `forced_separate`,
+/// and the rest of the blocks are the imports that _are_ matched by the
+/// patterns in `forced_separate`, in the order they appear in the
+/// `forced_separate` set. Empty blocks are retained for patterns that do not
+/// match any imports.
 pub fn split_by_forced_separate<'a>(
     block: ImportBlock<'a>,
     forced_separate: &[String],

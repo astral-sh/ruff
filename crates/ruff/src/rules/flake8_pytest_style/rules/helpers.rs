@@ -1,5 +1,5 @@
 use num_traits::identities::Zero;
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::helpers::collect_call_path;
 use crate::checkers::ast::Checker;

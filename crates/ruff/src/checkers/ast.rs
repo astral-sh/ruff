@@ -6,18 +6,16 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
+use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python::typing::TYPING_EXTENSIONS;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Comprehension, Located, Location};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
-    KeywordData, Operator, Stmt, StmtKind, Suite,
+    Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
+    ExprKind, KeywordData, Located, Location, Operator, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
 use smallvec::smallvec;
-
-use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python::typing::TYPING_EXTENSIONS;
 
 use crate::ast::helpers::{
     binding_range, collect_call_path, extract_handler_names, from_relative_import, to_module_path,
@@ -694,6 +692,24 @@ where
                         .enabled(&Rule::UseFixturesWithoutParameters)
                 {
                     flake8_pytest_style::rules::marks(self, decorator_list);
+                }
+
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
+                {
+                    flake8_boolean_trap::rules::check_positional_boolean_in_def(self, name, args);
+                }
+
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
+                {
+                    flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
+                        self, name, args,
+                    );
                 }
 
                 self.check_builtin_shadowing(name, stmt, true);
@@ -1547,7 +1563,7 @@ where
                 }
             }
             StmtKind::With { items, body, .. } => {
-                if self.settings.rules.enabled(&Rule::NoAssertRaisesException) {
+                if self.settings.rules.enabled(&Rule::AssertRaisesException) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
                 if self
@@ -3110,6 +3126,9 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteUnicodeLiteral) {
                     pyupgrade::rules::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
+                if self.settings.rules.enabled(&Rule::BidirectionalUnicode) {
+                    pylint::rules::bidirectional_unicode(self, expr, value);
+                }
             }
             ExprKind::Lambda { args, body, .. } => {
                 if self.settings.rules.enabled(&Rule::PreferListBuiltin) {
@@ -3190,6 +3209,9 @@ where
                 {
                     pylint::rules::merge_isinstance(self, expr, op, values);
                 }
+                if self.settings.rules.enabled(&Rule::SingleStartsEndsWith) {
+                    flake8_pie::rules::single_starts_ends_with(self, values, op);
+                }
                 if self.settings.rules.enabled(&Rule::DuplicateIsinstanceCall) {
                     flake8_simplify::rules::duplicate_isinstance_call(self, expr);
                 }
@@ -3223,7 +3245,7 @@ where
                 args,
                 keywords,
             } => {
-                let callable = self.resolve_call_path(func).and_then(|call_path| {
+                let callable = self.resolve_call_path(expr).and_then(|call_path| {
                     if self.match_typing_call_path(&call_path, "ForwardRef") {
                         Some(Callable::ForwardRef)
                     } else if self.match_typing_call_path(&call_path, "cast") {
@@ -3652,24 +3674,6 @@ where
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
         }
 
-        // flake8-boolean-trap
-        if self
-            .settings
-            .rules
-            .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
-        {
-            flake8_boolean_trap::rules::check_positional_boolean_in_def(self, arguments);
-        }
-        if self
-            .settings
-            .rules
-            .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
-        {
-            flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
-                self, arguments,
-            );
-        }
-
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for arg in &arguments.posonlyargs {
@@ -3714,8 +3718,11 @@ where
         }
 
         if self.settings.rules.enabled(&Rule::InvalidArgumentName) {
-            if let Some(diagnostic) = pep8_naming::rules::invalid_argument_name(&arg.node.arg, arg)
-            {
+            if let Some(diagnostic) = pep8_naming::rules::invalid_argument_name(
+                &arg.node.arg,
+                arg,
+                &self.settings.pep8_naming.ignore_names,
+            ) {
                 self.diagnostics.push(diagnostic);
             }
         }
@@ -3949,8 +3956,8 @@ impl<'a> Checker<'a> {
                 // Avoid overriding builtins.
                 binding
             } else if matches!(self.bindings[*index].kind, BindingKind::Global) {
-                // If the original binding was a global, and the new binding conflicts within the
-                // current scope, then the new binding is also a global.
+                // If the original binding was a global, and the new binding conflicts within
+                // the current scope, then the new binding is also a global.
                 Binding {
                     runtime_usage: self.bindings[*index].runtime_usage,
                     synthetic_usage: self.bindings[*index].synthetic_usage,
@@ -3959,8 +3966,8 @@ impl<'a> Checker<'a> {
                     ..binding
                 }
             } else if matches!(self.bindings[*index].kind, BindingKind::Nonlocal) {
-                // If the original binding was a nonlocal, and the new binding conflicts within the
-                // current scope, then the new binding is also a nonlocal.
+                // If the original binding was a nonlocal, and the new binding conflicts within
+                // the current scope, then the new binding is also a nonlocal.
                 Binding {
                     runtime_usage: self.bindings[*index].runtime_usage,
                     synthetic_usage: self.bindings[*index].synthetic_usage,
@@ -5073,7 +5080,12 @@ impl<'a> Checker<'a> {
                         &overloaded_name,
                     )
                 }) {
-                    flake8_annotations::rules::definition(self, &definition, &visibility);
+                    self.diagnostics
+                        .extend(flake8_annotations::rules::definition(
+                            self,
+                            &definition,
+                            &visibility,
+                        ));
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }

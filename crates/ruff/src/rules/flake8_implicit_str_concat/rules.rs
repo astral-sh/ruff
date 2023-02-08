@@ -1,11 +1,9 @@
 use itertools::Itertools;
-use rustpython_ast::{Constant, Expr, ExprKind, Operator};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
 use rustpython_parser::lexer::{LexResult, Tok};
 
-use ruff_macros::derive_message_formats;
-
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_implicit_str_concat::settings::Settings;
 use crate::violation::Violation;

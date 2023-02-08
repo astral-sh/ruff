@@ -6,10 +6,10 @@ expression: diagnostics
     UndefinedName:
       name: foo
   location:
-    row: 19
+    row: 26
     column: 15
   end_location:
-    row: 19
+    row: 26
     column: 20
   fix: ~
   parent: ~
@@ -17,10 +17,10 @@ expression: diagnostics
     UndefinedName:
       name: foo
   location:
-    row: 26
+    row: 33
     column: 15
   end_location:
-    row: 26
+    row: 33
     column: 20
   fix: ~
   parent: ~

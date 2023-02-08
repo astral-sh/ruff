@@ -1,13 +1,12 @@
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::cast;
 use crate::ast::helpers::identifier_range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-
-use crate::define_violation;
 use crate::visibility::is_overload;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct SkipDocstring;

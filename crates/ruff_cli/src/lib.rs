@@ -16,8 +16,8 @@ pub fn command_help() -> String {
 pub fn subcommand_help() -> String {
     let mut cmd = args::Args::command();
 
-    // The build call is necessary for the help output to contain `Usage: ruff check` instead of `Usage: check`
-    // see https://github.com/clap-rs/clap/issues/4685
+    // The build call is necessary for the help output to contain `Usage: ruff
+    // check` instead of `Usage: check` see https://github.com/clap-rs/clap/issues/4685
     cmd.build();
 
     cmd.find_subcommand_mut("check")

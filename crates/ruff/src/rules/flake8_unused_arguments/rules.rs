@@ -1,22 +1,19 @@
 use std::iter;
 
 use regex::Regex;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
-use rustpython_ast::{Arg, Arguments};
+use rustpython_parser::ast::{Arg, Arguments};
 
-use ruff_macros::derive_message_formats;
-
+use super::helpers;
+use super::types::Argumentable;
 use crate::ast::function_type;
 use crate::ast::function_type::FunctionType;
 use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use crate::visibility;
-
-use super::helpers;
-use super::types::Argumentable;
 
 define_violation!(
     pub struct UnusedFunctionArgument {

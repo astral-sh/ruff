@@ -1,3 +1,9 @@
+use anyhow::Result;
+use libcst_native::{Codegen, CodegenState, CompOp};
+use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::string::{self};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
@@ -5,13 +11,7 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::{Locator, Stylist};
 use crate::violation::{Availability, Violation};
-use crate::{define_violation, AutofixKind};
-use ruff_python::string::{self};
-
-use anyhow::Result;
-use libcst_native::{Codegen, CodegenState, CompOp};
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Cmpop, Expr, ExprKind};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct YodaConditions {

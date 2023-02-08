@@ -1,12 +1,13 @@
+use std::fmt;
+
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Expr, ExprKind};
+use serde::{Deserialize, Serialize};
+
 use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind};
-use serde::{Deserialize, Serialize};
-use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeferralKeyword {

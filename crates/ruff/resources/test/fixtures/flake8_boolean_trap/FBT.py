@@ -57,3 +57,12 @@ dict.fromkeys(("world",), True)
 {}.deploy(True, False)
 getattr(someobj, attrname, False)
 mylist.index(True)
+
+
+class Registry:
+    def __init__(self) -> None:
+        self._switches = [False] * len(Switch)
+
+    # FBT001: Boolean positional arg in function definition
+    def __setitem__(self, switch: Switch, value: bool) -> None:
+        self._switches[switch.value] = value

@@ -1,9 +1,8 @@
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{ExprKind, Located};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{ExprKind, Located};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
 use crate::violation::Violation;

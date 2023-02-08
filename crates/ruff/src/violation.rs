@@ -11,6 +11,11 @@ pub trait Violation: Debug + PartialEq + Eq + Serialize + DeserializeOwned {
     /// The message used to describe the violation.
     fn message(&self) -> String;
 
+    /// The explanation used in documentation and elsewhere.
+    fn explanation() -> Option<&'static str> {
+        None
+    }
+
     /// If autofix is (potentially) available for this violation returns another
     /// function that in turn can be used to obtain a string describing the
     /// autofix.
@@ -45,6 +50,11 @@ pub trait AlwaysAutofixableViolation:
     /// The message used to describe the violation.
     fn message(&self) -> String;
 
+    /// The explanation used in documentation and elsewhere.
+    fn explanation() -> Option<&'static str> {
+        None
+    }
+
     /// The title displayed for the available autofix.
     fn autofix_title(&self) -> String;
 
@@ -61,6 +71,10 @@ impl<VA: AlwaysAutofixableViolation> Violation for VA {
         <Self as AlwaysAutofixableViolation>::message(self)
     }
 
+    fn explanation() -> Option<&'static str> {
+        <Self as AlwaysAutofixableViolation>::explanation()
+    }
+
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         Some(Self::autofix_title)
     }
@@ -68,15 +82,4 @@ impl<VA: AlwaysAutofixableViolation> Violation for VA {
     fn message_formats() -> &'static [&'static str] {
         <Self as AlwaysAutofixableViolation>::message_formats()
     }
-}
-
-/// This macro just exists so that you don't have to add the `#[derive]`
-/// attribute every time you define a new violation.  And so that new traits can
-/// be easily derived everywhere by just changing a single line.
-#[macro_export]
-macro_rules! define_violation {
-    ($($struct:tt)*) => {
-        #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-        $($struct)*
-    };
 }

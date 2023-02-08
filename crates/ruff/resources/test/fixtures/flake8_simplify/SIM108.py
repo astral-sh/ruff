@@ -110,3 +110,11 @@ if True:  # Foo
     x = 3
 else:
     x = 5
+
+
+# OK
+def f():
+    if True:
+        x = yield 3
+    else:
+        x = yield 5

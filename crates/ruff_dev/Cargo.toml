@@ -1,6 +1,6 @@
 [package]
 name = "ruff_dev"
-version = "0.0.242"
+version = "0.0.243"
 edition = "2021"
 
 [dependencies]
@@ -11,7 +11,6 @@ libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a87
 once_cell = { version = "1.16.0" }
 ruff = { path = "../ruff" }
 ruff_cli = { path = "../ruff_cli" }
-rustpython-ast = { features = ["unparse"], git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
 rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "adc23253e4b58980b407ba2760dbe61681d752fc" }
 schemars = { version = "0.8.11" }

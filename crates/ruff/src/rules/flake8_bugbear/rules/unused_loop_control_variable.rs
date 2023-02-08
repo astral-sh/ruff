@@ -18,18 +18,17 @@
 //!     method()
 //! ```
 
-use rustc_hash::FxHashMap;
-use rustpython_ast::{Expr, ExprKind, Stmt};
-use serde::{Deserialize, Serialize};
 use std::iter;
 
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
+use rustc_hash::FxHashMap;
+use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+use serde::{Deserialize, Serialize};
 
 use crate::ast::types::{BindingKind, Range, RefEquality};
 use crate::ast::visitor::Visitor;
 use crate::ast::{helpers, visitor};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::{AutofixKind, Availability, Violation};
@@ -44,11 +43,13 @@ define_violation!(
     pub struct UnusedLoopControlVariable {
         /// The name of the loop control variable.
         pub name: String,
-        /// The name to which the variable should be renamed, if it can be safely renamed.
+        /// The name to which the variable should be renamed, if it can be
+        /// safely renamed.
         pub rename: Option<String>,
-        /// Whether the variable is certain to be unused in the loop body, or merely suspect.
-        /// A variable _may_ be used, but undetectably so, if the loop incorporates
-        /// by magic control flow (e.g., `locals()`).
+        /// Whether the variable is certain to be unused in the loop body, or
+        /// merely suspect. A variable _may_ be used, but undetectably
+        /// so, if the loop incorporates by magic control flow (e.g.,
+        /// `locals()`).
         pub certainty: Certainty,
     }
 );
@@ -147,8 +148,9 @@ pub fn unused_loop_control_variable(
             Certainty::Certain
         };
 
-        // Attempt to rename the variable by prepending an underscore, but avoid applying the fix
-        // if doing so wouldn't actually cause us to ignore the violation in the next pass.
+        // Attempt to rename the variable by prepending an underscore, but avoid
+        // applying the fix if doing so wouldn't actually cause us to ignore the
+        // violation in the next pass.
         let rename = format!("_{name}");
         let rename = if checker
             .settings

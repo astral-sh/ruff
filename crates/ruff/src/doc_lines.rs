@@ -1,7 +1,7 @@
 //! Doc line extraction. In this context, a doc line is a line consisting of a
 //! standalone comment or a constant string statement.
 
-use rustpython_ast::{Constant, ExprKind, Stmt, StmtKind, Suite};
+use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind, Suite};
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::visitor;

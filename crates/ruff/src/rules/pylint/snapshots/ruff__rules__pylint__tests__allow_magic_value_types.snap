@@ -1,10 +1,10 @@
 ---
-source: src/rules/pylint/mod.rs
+source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
     MagicValueComparison:
-      value: "'Hunter2'"
+      value: "\"Hunter2\""
   location:
     row: 50
     column: 21
@@ -26,7 +26,7 @@ expression: diagnostics
   parent: ~
 - kind:
     MagicValueComparison:
-      value: "b'something'"
+      value: "b\"something\""
   location:
     row: 65
     column: 17

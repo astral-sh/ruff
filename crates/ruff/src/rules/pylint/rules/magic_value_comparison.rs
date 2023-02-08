@@ -1,13 +1,13 @@
+use crate::ast::helpers::unparse_constant;
 use itertools::Itertools;
-use rustpython_ast::{Constant, Expr, ExprKind};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::rules::pylint::settings::ConstantType;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct MagicValueComparison {
@@ -65,7 +65,7 @@ pub fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(
                     MagicValueComparison {
-                        value: value.to_string(),
+                        value: unparse_constant(value, checker.stylist),
                     },
                     Range::from_located(comparison_expr),
                 ));

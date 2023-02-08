@@ -29,7 +29,7 @@ mod tests {
     #[test_case(Rule::DuplicateHandlerException, Path::new("B014.py"); "B014")]
     #[test_case(Rule::UselessComparison, Path::new("B015.py"); "B015")]
     #[test_case(Rule::CannotRaiseLiteral, Path::new("B016.py"); "B016")]
-    #[test_case(Rule::NoAssertRaisesException, Path::new("B017.py"); "B017")]
+    #[test_case(Rule::AssertRaisesException, Path::new("B017.py"); "B017")]
     #[test_case(Rule::UselessExpression, Path::new("B018.py"); "B018")]
     #[test_case(Rule::CachedInstanceMethod, Path::new("B019.py"); "B019")]
     #[test_case(Rule::LoopVariableOverridesIterator, Path::new("B020.py"); "B020")]

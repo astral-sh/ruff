@@ -1,16 +1,16 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprKind, Keyword};
+use std::fmt;
+
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use serde::{Deserialize, Serialize};
-use std::fmt;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
+use crate::violation::AlwaysAutofixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LiteralType {

@@ -3,7 +3,7 @@ use libcst_native::{
     Codegen, CodegenState, CompoundStatement, Expression, ParenthesizableWhitespace,
     SmallStatement, Statement, Suite,
 };
-use rustpython_ast::{Expr, Keyword, Location};
+use rustpython_parser::ast::{Expr, Keyword, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
@@ -107,7 +107,8 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
     let mut commas: Vec<Range> = vec![];
     let mut removal_indices: Vec<usize> = vec![];
 
-    // Find all Tok::Name tokens that are not preceded by Tok::As, and all Tok::Comma tokens.
+    // Find all Tok::Name tokens that are not preceded by Tok::As, and all
+    // Tok::Comma tokens.
     let mut prev_tok = None;
     for (start, tok, end) in lexer::make_tokenizer(contents)
         .flatten()
@@ -147,8 +148,8 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
         };
 
         // Add all contents from `last_pos` to `fix.location`.
-        // It's possible that `last_pos` is after `fix.location`, if we're removing the first _two_
-        // members.
+        // It's possible that `last_pos` is after `fix.location`, if we're removing the
+        // first _two_ members.
         if start_location > last_pos {
             let slice = locator.slice_source_code_range(&Range::new(last_pos, start_location));
             output.push_str(slice);

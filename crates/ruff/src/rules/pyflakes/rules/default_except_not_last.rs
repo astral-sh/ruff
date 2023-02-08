@@ -1,11 +1,10 @@
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind};
+
 use crate::ast::helpers::except_range;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
-
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Excepthandler, ExcepthandlerKind};
 
 define_violation!(
     pub struct DefaultExceptNotLast;

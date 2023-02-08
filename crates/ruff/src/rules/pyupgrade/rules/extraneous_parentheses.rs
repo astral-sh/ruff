@@ -1,6 +1,4 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::ast::types::Range;
@@ -8,6 +6,7 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct ExtraneousParentheses;

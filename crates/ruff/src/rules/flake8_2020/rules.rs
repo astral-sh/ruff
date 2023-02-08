@@ -1,13 +1,11 @@
 use num_bigint::BigInt;
-use rustpython_ast::{Cmpop, Constant, Expr, ExprKind, Located};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
-
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct SysVersionSlice3Referenced;

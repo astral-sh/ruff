@@ -1,14 +1,12 @@
 use std::fmt;
 
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind};
 use serde::{Deserialize, Serialize};
-
-use ruff_macros::derive_message_formats;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::settings::types::PythonVersion;
 use crate::violation::Violation;
@@ -88,7 +86,8 @@ impl fmt::Display for RemovalKind {
     }
 }
 
-/// Return `true` if a string contains duplicate characters, taking into account escapes.
+/// Return `true` if a string contains duplicate characters, taking into account
+/// escapes.
 fn has_duplicates(s: &str) -> bool {
     let mut escaped = false;
     let mut seen = FxHashSet::default();

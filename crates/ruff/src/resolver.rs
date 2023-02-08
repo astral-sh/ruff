@@ -587,15 +587,16 @@ mod tests {
             &Relativity::Parent,
             &NoOpProcessor,
         )?);
-        // src/app.py should not be excluded even if it lives in a hierarchy that should be
-        // excluded by virtue of the pyproject.toml having `resources/*` in it.
+        // src/app.py should not be excluded even if it lives in a hierarchy that should
+        // be excluded by virtue of the pyproject.toml having `resources/*` in
+        // it.
         assert!(!is_file_excluded(
             &package_root.join("src/app.py"),
             &resolver,
             &ppd,
         ));
-        // However, resources/ignored.py should be ignored, since that `resources` is beneath
-        // the package root.
+        // However, resources/ignored.py should be ignored, since that `resources` is
+        // beneath the package root.
         assert!(is_file_excluded(
             &package_root.join("resources/ignored.py"),
             &resolver,

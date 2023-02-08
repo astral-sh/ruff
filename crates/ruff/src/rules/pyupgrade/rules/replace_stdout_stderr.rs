@@ -1,7 +1,5 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, Keyword};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Expr, Keyword};
 
 use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
@@ -10,6 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::{Locator, Stylist};
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct ReplaceStdoutStderr;

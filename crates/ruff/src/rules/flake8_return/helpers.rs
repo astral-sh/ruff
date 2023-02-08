@@ -1,4 +1,4 @@
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
 
 /// Return `true` if a function's return statement include at least one
 /// non-`None` value.

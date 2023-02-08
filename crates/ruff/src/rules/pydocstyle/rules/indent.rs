@@ -1,3 +1,5 @@
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::types::Range;
 use crate::ast::whitespace;
 use crate::ast::whitespace::LinesWithTrailingNewline;
@@ -7,9 +9,6 @@ use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct IndentWithSpaces;

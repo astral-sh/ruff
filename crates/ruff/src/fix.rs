@@ -1,4 +1,4 @@
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Copy, Clone, Hash)]

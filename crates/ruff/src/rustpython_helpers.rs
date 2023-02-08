@@ -1,4 +1,4 @@
-use rustpython_ast::{Mod, Suite};
+use rustpython_parser::ast::{Mod, Suite};
 use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::mode::Mode;

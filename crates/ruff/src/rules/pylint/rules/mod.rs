@@ -1,5 +1,6 @@
 pub use await_outside_async::{await_outside_async, AwaitOutsideAsync};
 pub use bad_str_strip_call::{bad_str_strip_call, BadStrStripCall};
+pub use bidirectional_unicode::{bidirectional_unicode, BidirectionalUnicode};
 pub use comparison_of_constant::{comparison_of_constant, ComparisonOfConstant};
 pub use consider_using_sys_exit::{consider_using_sys_exit, ConsiderUsingSysExit};
 pub use continue_in_finally::{continue_in_finally, ContinueInFinally};
@@ -26,6 +27,7 @@ pub use useless_import_alias::{useless_import_alias, UselessImportAlias};
 
 mod await_outside_async;
 mod bad_str_strip_call;
+mod bidirectional_unicode;
 mod comparison_of_constant;
 mod consider_using_sys_exit;
 mod continue_in_finally;

@@ -1,6 +1,5 @@
 use std::fs::remove_dir_all;
-use std::io::Write;
-use std::io::{self, BufWriter, Read};
+use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -12,9 +11,6 @@ use log::{debug, error};
 use path_absolutize::path_dedot;
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use serde::Serialize;
-use walkdir::WalkDir;
-
 use ruff::cache::CACHE_DIR_NAME;
 use ruff::linter::add_noqa_to_path;
 use ruff::logging::LogLevel;
@@ -23,6 +19,8 @@ use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
+use serde::Serialize;
+use walkdir::WalkDir;
 
 use crate::args::{HelpFormat, Overrides};
 use crate::cache;
@@ -280,25 +278,36 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let mut stdout = BufWriter::new(io::stdout().lock());
     match format {
         HelpFormat::Text => {
-            writeln!(stdout, "{}\n", rule.as_ref())?;
-            writeln!(stdout, "Code: {} ({})\n", rule.code(), linter.name())?;
+            let mut output = String::new();
+            output.push_str(&format!("# {} ({})", rule.as_ref(), rule.code()));
+            output.push('\n');
+            output.push('\n');
+
+            let (linter, _) = Linter::parse_code(rule.code()).unwrap();
+            output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+            output.push('\n');
+            output.push('\n');
 
             if let Some(autofix) = rule.autofixable() {
-                writeln!(
-                    stdout,
-                    "{}",
-                    match autofix.available {
-                        AutofixAvailability::Sometimes => "Autofix is sometimes available.\n",
-                        AutofixAvailability::Always => "Autofix is always available.\n",
-                    }
-                )?;
+                output.push_str(match autofix.available {
+                    AutofixAvailability::Sometimes => "Autofix is sometimes available.",
+                    AutofixAvailability::Always => "Autofix is always available.",
+                });
+                output.push('\n');
+                output.push('\n');
             }
 
-            writeln!(stdout, "Message formats:\n")?;
-
-            for format in rule.message_formats() {
-                writeln!(stdout, "* {format}")?;
+            if let Some(explanation) = rule.explanation() {
+                output.push_str(explanation.trim());
+            } else {
+                output.push_str("Message formats:");
+                for format in rule.message_formats() {
+                    output.push('\n');
+                    output.push_str(&format!("* {}", format));
+                }
             }
+
+            writeln!(stdout, "{}", output)?;
         }
         HelpFormat::Json => {
             writeln!(

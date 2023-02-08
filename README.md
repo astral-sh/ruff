@@ -230,7 +230,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.242'
+  rev: 'v0.0.243'
   hooks:
     - id: ruff
 ```
@@ -957,7 +957,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
 | B015 | useless-comparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
 | B016 | cannot-raise-literal | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
-| B017 | no-assert-raises-exception | `assertRaises(Exception)` should be considered evil |  |
+| [B017](https://github.com/charliermarsh/ruff/blob/main/docs/rules/assert-raises-exception.md) | [assert-raises-exception](https://github.com/charliermarsh/ruff/blob/main/docs/rules/assert-raises-exception.md) | `assertRaises(Exception)` should be considered evil |  |
 | B018 | useless-expression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B019 | cached-instance-method | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
 | B020 | loop-variable-overrides-iterator | Loop control variable `{name}` overrides iterable it iterates |  |
@@ -1113,6 +1113,7 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 | PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
 | PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
 | PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
+| PIE810 | single-starts-ends-with | Call `{attr}` once with a `tuple` |  |
 
 ### flake8-print (T20)
 
@@ -1338,6 +1339,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
 | PLE1310 | bad-str-strip-call | String `{strip}` call contains duplicate characters (did you mean `{removal}`?) |  |
+| PLE2502 | bidirectional-unicode | Avoid using bidirectional unicode |  |
 
 #### Refactor (PLR)
 
@@ -2250,8 +2252,8 @@ fix-only = true
 
 #### [`fixable`](#fixable)
 
-A list of rule codes or prefixes to consider autofixable. By default, all rules are
-considered autofixable.
+A list of rule codes or prefixes to consider autofixable. By default,
+all rules are considered autofixable.
 
 **Default value**: `["A", "ANN", "ARG", "B", "BLE", "C", "COM", "D", "DTZ", "E", "EM", "ERA", "EXE", "F", "FBT", "G", "I", "ICN", "INP", "ISC", "N", "PD", "PGH", "PIE", "PL", "PT", "PTH", "Q", "RET", "RUF", "S", "SIM", "T", "TCH", "TID", "TRY", "UP", "W", "YTT"]`
 
@@ -2662,6 +2664,25 @@ allow-star-arg-any = true
 
 ---
 
+#### [`ignore-fully-untyped`](#ignore-fully-untyped)
+
+Whether to suppress `ANN*` rules for any declaration
+that hasn't been typed at all.
+This makes it easier to gradually add types to a codebase.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff.flake8-annotations]
+ignore-fully-untyped = true
+```
+
+---
+
 #### [`mypy-init-return`](#mypy-init-return)
 
 Whether to allow the omission of a return type hint for `__init__` if at
@@ -2724,8 +2745,9 @@ suppress-none-returning = true
 
 #### [`check-typed-exception`](#check-typed-exception)
 
-Whether to disallow `try`-`except`-`pass` (`S110`) for specific exception types. By default,
-`try`-`except`-`pass` is only disallowed for `Exception` and `BaseException`.
+Whether to disallow `try`-`except`-`pass` (`S110`) for specific
+exception types. By default, `try`-`except`-`pass` is only
+disallowed for `Exception` and `BaseException`.
 
 **Default value**: `false`
 
@@ -2959,8 +2981,8 @@ The following values are supported:
 
 * `csv` — a comma-separated list, e.g.
   `@pytest.mark.parametrize('name1,name2', ...)`
-* `tuple` (default) — e.g.
-  `@pytest.mark.parametrize(('name1', 'name2'), ...)`
+* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+  ...)`
 * `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
 
 **Default value**: `tuple`
@@ -2981,10 +3003,10 @@ parametrize-names-type = "list"
 Expected type for each row of values in `@pytest.mark.parametrize` in
 case of multiple parameters. The following values are supported:
 
-* `tuple` (default) — e.g.
-  `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])`
-* `list` — e.g.
-  `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`
+* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
+  [(1, 2), (3, 4)])`
+* `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2],
+  [3, 4]])`
 
 **Default value**: `tuple`
 
@@ -3747,7 +3769,8 @@ allow-magic-value-types = ["int"]
 
 #### [`max-args`](#max-args)
 
-Maximum number of arguments allowed for a function or method definition (see: `PLR0913`).
+Maximum number of arguments allowed for a function or method definition
+(see: `PLR0913`).
 
 **Default value**: `5`
 
@@ -3764,7 +3787,8 @@ max-args = 5
 
 #### [`max-branches`](#max-branches)
 
-Maximum number of branches allowed for a function or method body (see: `PLR0912`).
+Maximum number of branches allowed for a function or method body (see:
+`PLR0912`).
 
 **Default value**: `12`
 
@@ -3781,7 +3805,8 @@ max-branches = 12
 
 #### [`max-returns`](#max-returns)
 
-Maximum number of return statements allowed for a function or method body (see `PLR0911`)
+Maximum number of return statements allowed for a function or method
+body (see `PLR0911`)
 
 **Default value**: `6`
 
@@ -3798,7 +3823,8 @@ max-returns = 6
 
 #### [`max-statements`](#max-statements)
 
-Maximum number of statements allowed for a function or method body (see: `PLR0915`).
+Maximum number of statements allowed for a function or method body (see:
+`PLR0915`).
 
 **Default value**: `50`
 
