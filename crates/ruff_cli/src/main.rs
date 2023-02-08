@@ -78,7 +78,6 @@ quoting the executed command, along with the relevant file contents and `pyproje
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut io::stdout());
         }
-
         Command::Check(args) => return check(args, log_level),
     }
 
@@ -266,8 +265,14 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
                 if diagnostics.fixed > 0 {
                     return Ok(ExitCode::FAILURE);
                 }
-            } else if !diagnostics.messages.is_empty() {
-                return Ok(ExitCode::FAILURE);
+            } else if cli.exit_non_zero_on_fix {
+                if diagnostics.fixed > 0 || !diagnostics.messages.is_empty() {
+                    return Ok(ExitCode::FAILURE);
+                }
+            } else {
+                if !diagnostics.messages.is_empty() {
+                    return Ok(ExitCode::FAILURE);
+                }
             }
         }
     }
