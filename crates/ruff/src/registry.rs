@@ -60,6 +60,10 @@ ruff_macros::define_rule_mapping!(
     E401 => rules::pycodestyle::rules::MultipleImportsOnOneLine,
     E402 => rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
     E501 => rules::pycodestyle::rules::LineTooLong,
+    E701 => rules::pycodestyle::rules::MultipleStatementsOnOneLineColon,
+    E702 => rules::pycodestyle::rules::MultipleStatementsOnOneLineSemicolon,
+    E703 => rules::pycodestyle::rules::UselessSemicolon,
+    E704 => rules::pycodestyle::rules::MultipleStatementsOnOneLineDef,
     E711 => rules::pycodestyle::rules::NoneComparison,
     E712 => rules::pycodestyle::rules::TrueFalseComparison,
     E713 => rules::pycodestyle::rules::NotInTest,
@@ -759,6 +763,10 @@ impl Rule {
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TrailingCommaMissing
             | Rule::TrailingCommaOnBareTupleProhibited
+            | Rule::MultipleStatementsOnOneLineColon
+            | Rule::UselessSemicolon
+            | Rule::MultipleStatementsOnOneLineDef
+            | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::TrailingCommaProhibited => &LintSource::Tokens,
             Rule::IOError => &LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,

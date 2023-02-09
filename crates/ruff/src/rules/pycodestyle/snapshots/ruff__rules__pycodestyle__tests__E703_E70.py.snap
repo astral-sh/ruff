@@ -1,0 +1,35 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    UselessSemicolon: ~
+  location:
+    row: 10
+    column: 12
+  end_location:
+    row: 10
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    UselessSemicolon: ~
+  location:
+    row: 12
+    column: 22
+  end_location:
+    row: 12
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    UselessSemicolon: ~
+  location:
+    row: 25
+    column: 13
+  end_location:
+    row: 25
+    column: 14
+  fix: ~
+  parent: ~
+

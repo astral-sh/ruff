@@ -34,6 +34,16 @@ pub fn check_tokens(
         || settings.rules.enabled(&Rule::BadQuotesDocstring)
         || settings.rules.enabled(&Rule::AvoidQuoteEscape);
     let enforce_commented_out_code = settings.rules.enabled(&Rule::CommentedOutCode);
+    let enforce_compound_statements = settings
+        .rules
+        .enabled(&Rule::MultipleStatementsOnOneLineColon)
+        || settings
+            .rules
+            .enabled(&Rule::MultipleStatementsOnOneLineSemicolon)
+        || settings.rules.enabled(&Rule::UselessSemicolon)
+        || settings
+            .rules
+            .enabled(&Rule::MultipleStatementsOnOneLineDef);
     let enforce_invalid_escape_sequence = settings.rules.enabled(&Rule::InvalidEscapeSequence);
     let enforce_implicit_string_concatenation = settings
         .rules
@@ -106,6 +116,15 @@ pub fn check_tokens(
                 }
             }
         }
+    }
+
+    // E701, E702, E703, E704
+    if enforce_compound_statements {
+        diagnostics.extend(
+            pycodestyle::rules::compound_statements(tokens)
+                .into_iter()
+                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+        );
     }
 
     // Q001, Q002, Q003
