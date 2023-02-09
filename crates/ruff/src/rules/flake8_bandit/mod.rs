@@ -32,6 +32,7 @@ mod tests {
     #[test_case(Rule::LoggingConfigInsecureListen, Path::new("S612.py"); "S612")]
     #[test_case(Rule::Jinja2AutoescapeFalse, Path::new("S701.py"); "S701")]
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"); "S110")]
+    #[test_case(Rule::TryExceptContinue, Path::new("S112.py"); "S112")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
