@@ -1,10 +1,11 @@
 ---
-source: src/rules/flake8_simplify/mod.rs
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
     UseTernaryOperator:
       contents: b = c if a else d
+      fixable: true
   location:
     row: 2
     column: 0
@@ -24,6 +25,7 @@ expression: diagnostics
 - kind:
     UseTernaryOperator:
       contents: abc = x if x > 0 else -x
+      fixable: false
   location:
     row: 58
     column: 0
@@ -35,6 +37,7 @@ expression: diagnostics
 - kind:
     UseTernaryOperator:
       contents: b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
+      fixable: true
   location:
     row: 82
     column: 0
@@ -54,6 +57,7 @@ expression: diagnostics
 - kind:
     UseTernaryOperator:
       contents: exitcode = 0 if True else 1
+      fixable: false
   location:
     row: 97
     column: 0
@@ -65,6 +69,7 @@ expression: diagnostics
 - kind:
     UseTernaryOperator:
       contents: x = 3 if True else 5
+      fixable: false
   location:
     row: 104
     column: 0
@@ -76,6 +81,7 @@ expression: diagnostics
 - kind:
     UseTernaryOperator:
       contents: x = 3 if True else 5
+      fixable: false
   location:
     row: 109
     column: 0
