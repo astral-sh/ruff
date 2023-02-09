@@ -15,7 +15,7 @@ expression: diagnostics
   parent: ~
 - kind:
     PrefixPrivateTypes:
-      kind: TypeVar
+      kind: TypeVarTuple
   location:
     row: 5
     column: 9
@@ -26,7 +26,7 @@ expression: diagnostics
   parent: ~
 - kind:
     PrefixPrivateTypes:
-      kind: TypeVar
+      kind: ParamSpec
   location:
     row: 7
     column: 4

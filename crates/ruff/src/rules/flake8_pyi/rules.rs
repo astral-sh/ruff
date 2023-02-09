@@ -32,27 +32,23 @@ pub fn prefix_private_types(
     if targets.len() != 1 {
         return;
     }
-
-    let is_prefixed = if let ExprKind::Name { id, .. } = &targets[0].node {
-        id.starts_with('_')
-    } else {
-        false
-    };
-
-    let is_generic_type_param = if let ExprKind::Call { func, .. } = &value.node {
-        if let ExprKind::Name { id, .. } = &func.node {
-            id == "TypeVar" || id == "ParamSpec" || id == "TypeVarTuple"
-        } else {
-            false
+    if let ExprKind::Name { id, .. } = &targets[0].node {
+        if id.starts_with('_') {
+            return;
         }
-    } else {
-        false
     };
 
-    if !is_prefixed && is_generic_type_param {
+    let mut type_param_name: Option<&str> = None;
+    if let ExprKind::Call { func, .. } = &value.node {
+        if let ExprKind::Name { id, .. } = &func.node {
+            type_param_name = Some(id)
+        }
+    }
+
+    if let Some(type_param_name) = type_param_name {
         let diagnostic = Diagnostic::new(
             PrefixPrivateTypes {
-                kind: "TypeVar".to_string(),
+                kind: type_param_name.into(),
             },
             Range::from_located(value),
         );
