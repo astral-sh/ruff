@@ -1,14 +1,13 @@
 from typing import ParamSpec, TypeVar, TypeVarTuple
 
-T = TypeVar("T")  # error, TypeVars in stubs must start with _
+T = TypeVar("T")  # Error: TypeVars in stubs must start with _
 
-TTuple = TypeVarTuple("TTuple") # error, TypeVarTuples must also start with _
+TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
 
-P = ParamSpec("P")  # error, ParamSpecs must start with _
+P = ParamSpec("P")  # Error: ParamSpecs must start with _
 
+_T = TypeVar("_T")  # OK
 
-_T = TypeVar("_T")  # ok
+_TTuple = TypeVarTuple("_TTuple")  # OK
 
-_TTuple = TypeVarTuple("_TTuple") # ok
-
-_P = ParamSpec("_P")  # ok
+_P = ParamSpec("_P")  # OK

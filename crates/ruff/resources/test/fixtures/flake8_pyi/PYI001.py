@@ -1,14 +1,13 @@
 from typing import ParamSpec, TypeVar, TypeVarTuple
 
-T = TypeVar("T")  # ok
+T = TypeVar("T")  # OK
 
-TTuple = TypeVarTuple("TTuple") # ok
+TTuple = TypeVarTuple("TTuple")  # OK
 
-P = ParamSpec("P")  # ok
+P = ParamSpec("P")  # OK
 
+_T = TypeVar("_T")  # OK
 
-_T = TypeVar("_T")  # ok
+_TTuple = TypeVarTuple("_TTuple")  # OK
 
-_TTuple = TypeVarTuple("_TTuple") # ok
-
-_P = ParamSpec("_P")  # ok
+_P = ParamSpec("_P")  # OK
