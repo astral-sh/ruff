@@ -187,14 +187,14 @@ pub struct CheckArgs {
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
     /// The minimum Python version that should be supported.
-    #[arg(long, help_heading = "Rule configuration")]
+    #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub target_version: Option<PythonVersion>,
     /// Set the line-length for length-associated rules and automatic
     /// formatting.
-    #[arg(long, help_heading = "Rule configuration")]
+    #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub line_length: Option<usize>,
     /// Regular expression matching the name of dummy variables.
-    #[arg(long, help_heading = "Rule configuration")]
+    #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
     /// Disable cache reads.
     #[arg(short, long, help_heading = "Miscellaneous")]

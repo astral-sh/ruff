@@ -456,14 +456,6 @@ File selection:
       --respect-gitignore              Respect file exclusions via `.gitignore` and other standard ignore files
       --force-exclude                  Enforce exclusions, even for paths passed to Ruff directly on the command-line
 
-Rule configuration:
-      --target-version <TARGET_VERSION>
-          The minimum Python version that should be supported
-      --line-length <LINE_LENGTH>
-          Set the line-length for length-associated rules and automatic formatting
-      --dummy-variable-rgx <DUMMY_VARIABLE_RGX>
-          Regular expression matching the name of dummy variables
-
 Miscellaneous:
   -n, --no-cache
           Disable cache reads
