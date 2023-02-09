@@ -385,6 +385,7 @@ ruff_macros::define_rule_mapping!(
     S107 => rules::flake8_bandit::rules::HardcodedPasswordDefault,
     S108 => rules::flake8_bandit::rules::HardcodedTempFile,
     S110 => rules::flake8_bandit::rules::TryExceptPass,
+    S112 => rules::flake8_bandit::rules::TryExceptContinue,
     S113 => rules::flake8_bandit::rules::RequestWithoutTimeout,
     S324 => rules::flake8_bandit::rules::HashlibInsecureHashFunction,
     S501 => rules::flake8_bandit::rules::RequestWithNoCertValidation,

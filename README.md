@@ -631,17 +631,17 @@ for more.
 
 By default, Ruff exits with the following status codes:
 
-- `0` if no violations were found, or if all present violations were fixed automatically.
-- `1` if violations were found.
-- `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error.
+* `0` if no violations were found, or if all present violations were fixed automatically.
+* `1` if violations were found.
+* `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error.
 
 This convention mirrors that of tools like ESLint, Prettier, and RuboCop.
 
 Ruff supports two command-line flags that alter its exit code behavior:
 
-- `--exit-zero` will cause Ruff to exit with a status code of `0` even if violations were found.
+* `--exit-zero` will cause Ruff to exit with a status code of `0` even if violations were found.
   Note that Ruff will still exit with a status code of `2` if it terminates abnormally.
-- `--exit-non-zero-on-fix` will cause Ruff to exit with a status code of `1` if violations were
+* `--exit-non-zero-on-fix` will cause Ruff to exit with a status code of `1` if violations were
   found, _even if_ all such violations were fixed automatically. Note that the use of
   `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
   autofixing.
@@ -930,6 +930,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S107 | hardcoded-password-default | Possible hardcoded password: "{}" |  |
 | S108 | hardcoded-temp-file | Probable insecure usage of temporary file or directory: "{}" |  |
 | S110 | try-except-pass | `try`-`except`-`pass` detected, consider logging the exception |  |
+| S112 | try-except-continue | `try`-`except`-`continue` detected, consider logging the exception |  |
 | S113 | request-without-timeout | Probable use of requests call with timeout set to `{value}` |  |
 | S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: "{}" |  |
 | S501 | request-with-no-cert-validation | Probable use of `{string}` call with `verify=False` disabling SSL certificate checks |  |

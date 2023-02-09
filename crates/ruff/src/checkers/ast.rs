@@ -3555,6 +3555,15 @@ where
                         self.settings.flake8_bandit.check_typed_exception,
                     );
                 }
+                if self.settings.rules.enabled(&Rule::TryExceptContinue) {
+                    flake8_bandit::rules::try_except_continue(
+                        self,
+                        type_.as_deref(),
+                        name.as_deref(),
+                        body,
+                        self.settings.flake8_bandit.check_typed_exception,
+                    );
+                }
                 if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
