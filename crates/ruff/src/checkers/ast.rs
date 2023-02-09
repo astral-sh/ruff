@@ -4312,17 +4312,33 @@ impl<'a> Checker<'a> {
                 _ => false,
             } {
                 let (all_names, all_names_flags) = extract_all_names(self, parent, current);
+                let all_bindings: Vec<usize> = all_names
+                    .iter()
+                    .filter_map(|name| current.bindings.get(name.as_str()))
+                    .copied()
+                    .collect();
 
-                if self.settings.rules.enabled(&Rule::InvalidAllFormat)
-                    && matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT)
-                {
-                    pylint::rules::invalid_all_format(self, expr);
+                if self.settings.rules.enabled(&Rule::InvalidAllFormat) {
+                    if matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT) {
+                        self.diagnostics
+                            .push(pylint::rules::invalid_all_format(expr));
+                    }
                 }
 
-                if self.settings.rules.enabled(&Rule::InvalidAllObject)
-                    && matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT)
-                {
-                    pylint::rules::invalid_all_object(self, expr);
+                if self.settings.rules.enabled(&Rule::InvalidAllObject) {
+                    if matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT) {
+                        self.diagnostics
+                            .push(pylint::rules::invalid_all_object(expr));
+                    }
+                }
+
+                // Mark all exported names as used-at-runtime.
+                for index in all_bindings {
+                    self.bindings[index].mark_used(
+                        GLOBAL_SCOPE_INDEX,
+                        Range::from_located(expr),
+                        ExecutionContext::Runtime,
+                    );
                 }
 
                 self.add_binding(
@@ -4701,13 +4717,7 @@ impl<'a> Checker<'a> {
                             | BindingKind::StarImportation(..)
                             | BindingKind::FutureImportation
                     ) {
-                        // Skip used exports from `__all__`
-                        if binding.used()
-                            || all_names
-                                .as_ref()
-                                .map(|names| names.contains(name))
-                                .unwrap_or_default()
-                        {
+                        if binding.used() {
                             continue;
                         }
 
@@ -4829,7 +4839,7 @@ impl<'a> Checker<'a> {
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
                     FxHashMap::default();
 
-                for (name, index) in &scope.bindings {
+                for index in scope.bindings.values() {
                     let binding = &self.bindings[*index];
 
                     let full_name = match &binding.kind {
@@ -4839,13 +4849,7 @@ impl<'a> Checker<'a> {
                         _ => continue,
                     };
 
-                    // Skip used exports from `__all__`
-                    if binding.used()
-                        || all_names
-                            .as_ref()
-                            .map(|names| names.contains(name))
-                            .unwrap_or_default()
-                    {
+                    if binding.used() {
                         continue;
                     }
 
