@@ -34,7 +34,7 @@ pub fn prefix_private_types(
     }
 
     let is_prefixed = if let ExprKind::Name { id, .. } = &targets[0].node {
-        id.starts_with("_")
+        id.starts_with('_')
     } else {
         false
     };
