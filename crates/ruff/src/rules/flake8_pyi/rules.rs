@@ -41,7 +41,7 @@ pub fn prefix_type_params(
     let mut type_param_name: Option<&str> = None;
     if let ExprKind::Call { func, .. } = &value.node {
         if let ExprKind::Name { id, .. } = &func.node {
-            type_param_name = Some(id)
+            type_param_name = Some(id);
         }
     }
 
