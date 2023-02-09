@@ -6,8 +6,6 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
-use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python::typing::TYPING_EXTENSIONS;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
@@ -16,6 +14,9 @@ use rustpython_parser::ast::{
 };
 use rustpython_parser::parser;
 use smallvec::smallvec;
+
+use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python::typing::TYPING_EXTENSIONS;
 
 use crate::ast::helpers::{
     binding_range, collect_call_path, extract_handler_names, from_relative_import, to_module_path,
@@ -30,7 +31,6 @@ use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
-use crate::noqa::Directive;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
@@ -282,7 +282,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Return `true` if a `Rule` is disabled by a `noqa` directive.
-    pub fn is_ignored(&self, code: &Rule, lineno: usize) -> bool {
+    pub fn rule_is_ignored(&self, code: &Rule, lineno: usize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
@@ -293,16 +293,7 @@ impl<'a> Checker<'a> {
         if matches!(self.noqa, flags::Noqa::Disabled) {
             return false;
         }
-        let noqa_lineno = self.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-        let line = self.locator.slice_source_code_range(&Range::new(
-            Location::new(*noqa_lineno, 0),
-            Location::new(noqa_lineno + 1, 0),
-        ));
-        match noqa::extract_noqa_directive(line) {
-            Directive::None => false,
-            Directive::All(..) => true,
-            Directive::Codes(.., codes) => noqa::includes(code, &codes),
-        }
+        noqa::rule_is_ignored(code, lineno, self.noqa_line_for, self.locator)
     }
 }
 
@@ -4866,9 +4857,9 @@ impl<'a> Checker<'a> {
                         None
                     };
 
-                    if self.is_ignored(&Rule::UnusedImport, diagnostic_lineno)
+                    if self.rule_is_ignored(&Rule::UnusedImport, diagnostic_lineno)
                         || parent_lineno.map_or(false, |parent_lineno| {
-                            self.is_ignored(&Rule::UnusedImport, parent_lineno)
+                            self.rule_is_ignored(&Rule::UnusedImport, parent_lineno)
                         })
                     {
                         ignored
