@@ -145,7 +145,7 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-print (T20)](#flake8-print-t20)
-   1. [flake8-pyi (Y)](#flake8-pyi-y)
+   1. [flake8-pyi (PYI)](#flake8-pyi-pyi)
    1. [flake8-pytest-style (PT)](#flake8-pytest-style-pt)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
@@ -1146,13 +1146,13 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/) on PyPI.
 | T201 | print-found | `print` found |  |
 | T203 | p-print-found | `pprint` found |  |
 
-### flake8-pyi (Y)
+### flake8-pyi (PYI)
 
 For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| Y001 | prefix-type-params | Name of private `{kind}` must start with _ |  |
+| PYI001 | prefix-type-params | Name of private `{kind}` must start with _ |  |
 
 ### flake8-pytest-style (PT)
 

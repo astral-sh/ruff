@@ -12,8 +12,8 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
-    #[test_case(Rule::PrefixTypeParams, Path::new("Y001.pyi"))]
-    #[test_case(Rule::PrefixTypeParams, Path::new("Y001.py"))]
+    #[test_case(Rule::PrefixTypeParams, Path::new("PYI001.pyi"))]
+    #[test_case(Rule::PrefixTypeParams, Path::new("PYI001.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

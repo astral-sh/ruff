@@ -19,7 +19,7 @@ impl Violation for PrefixTypeParams {
     }
 }
 
-/// Y001
+/// PYI001
 pub fn prefix_type_params(
     checker: &mut Checker,
     value: &Expr,
