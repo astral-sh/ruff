@@ -1723,7 +1723,7 @@ where
                 }
 
                 if self.settings.rules.enabled(&Rule::PrefixPrivateTypes) {
-                    let is_type_stub = self.path.ends_with(".pyi");
+                    let is_type_stub = self.path.extension().map_or(false, |x| x == "pyi");
                     flake8_pyi::rules::prefix_private_types(self, value, targets, is_type_stub);
                 }
 
