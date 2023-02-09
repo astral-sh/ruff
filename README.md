@@ -979,7 +979,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
 | B015 | useless-comparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
 | B016 | cannot-raise-literal | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
-| [B017](https://github.com/charliermarsh/ruff/blob/main/docs/rules/assert-raises-exception.md) | [assert-raises-exception](https://github.com/charliermarsh/ruff/blob/main/docs/rules/assert-raises-exception.md) | `assertRaises(Exception)` should be considered evil |  |
+| B017 | [assert-raises-exception](https://github.com/charliermarsh/ruff/blob/main/docs/rules/assert-raises-exception.md) | `assertRaises(Exception)` should be considered evil |  |
 | B018 | useless-expression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B019 | cached-instance-method | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
 | B020 | loop-variable-overrides-iterator | Loop control variable `{name}` overrides iterable it iterates |  |
@@ -1098,7 +1098,7 @@ For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| [ICN001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unconventional-import-alias.md) | [unconventional-import-alias](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unconventional-import-alias.md) | `{name}` should be imported as `{asname}` |  |
+| ICN001 | [unconventional-import-alias](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unconventional-import-alias.md) | `{name}` should be imported as `{asname}` |  |
 
 ### flake8-logging-format (G)
 
@@ -1121,7 +1121,7 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| [INP001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/implicit-namespace-package.md) | [implicit-namespace-package](https://github.com/charliermarsh/ruff/blob/main/docs/rules/implicit-namespace-package.md) | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
+| INP001 | [implicit-namespace-package](https://github.com/charliermarsh/ruff/blob/main/docs/rules/implicit-namespace-package.md) | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
 
 ### flake8-pie (PIE)
 
@@ -1184,10 +1184,10 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| [Q000](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | [bad-quotes-inline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | Double quotes found but single quotes preferred | 🛠 |
-| [Q001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | [bad-quotes-multiline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | Double quote multiline found but single quotes preferred | 🛠 |
-| [Q002](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | [bad-quotes-docstring](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | Double quote docstring found but single quotes preferred | 🛠 |
-| [Q003](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoid-quote-escape.md) | [avoid-quote-escape](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoid-quote-escape.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
+| Q000 | [bad-quotes-inline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | Double quotes found but single quotes preferred | 🛠 |
+| Q001 | [bad-quotes-multiline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | Double quote multiline found but single quotes preferred | 🛠 |
+| Q002 | [bad-quotes-docstring](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | Double quote docstring found but single quotes preferred | 🛠 |
+| Q003 | [avoid-quote-escape](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoid-quote-escape.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
 
 ### flake8-return (RET)
 
@@ -1307,7 +1307,7 @@ For more, see [eradicate](https://pypi.org/project/eradicate/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| [ERA001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/commented-out-code.md) | [commented-out-code](https://github.com/charliermarsh/ruff/blob/main/docs/rules/commented-out-code.md) | Found commented-out code | 🛠 |
+| ERA001 | [commented-out-code](https://github.com/charliermarsh/ruff/blob/main/docs/rules/commented-out-code.md) | Found commented-out code | 🛠 |
 
 ### pandas-vet (PD)
 
@@ -1390,7 +1390,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| [TRY002](https://github.com/charliermarsh/ruff/blob/main/docs/rules/raise-vanilla-class.md) | [raise-vanilla-class](https://github.com/charliermarsh/ruff/blob/main/docs/rules/raise-vanilla-class.md) | Create your own exception |  |
+| TRY002 | [raise-vanilla-class](https://github.com/charliermarsh/ruff/blob/main/docs/rules/raise-vanilla-class.md) | Create your own exception |  |
 | TRY003 | raise-vanilla-args | Avoid specifying long messages outside the exception class |  |
 | TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
 | TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |
