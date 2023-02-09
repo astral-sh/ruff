@@ -748,7 +748,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C901 | function-is-too-complex | `{name}` is too complex ({complexity}) |  |
+| C901 | [function-is-too-complex](https://github.com/charliermarsh/ruff/blob/main/docs/rules/function-is-too-complex.md) | `{name}` is too complex ({complexity}) |  |
 
 ### isort (I)
 
@@ -756,8 +756,8 @@ For more, see [isort](https://pypi.org/project/isort/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| I001 | unsorted-imports | Import block is un-sorted or un-formatted | 🛠 |
-| I002 | missing-required-import | Missing required import: `{name}` | 🛠 |
+| I001 | [unsorted-imports](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unsorted-imports.md) | Import block is un-sorted or un-formatted | 🛠 |
+| I002 | [missing-required-import](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-required-import.md) | Missing required import: `{name}` | 🛠 |
 
 ### pep8-naming (N)
 
@@ -899,17 +899,17 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ANN001 | missing-type-function-argument | Missing type annotation for function argument `{name}` |  |
-| ANN002 | missing-type-args | Missing type annotation for `*{name}` |  |
-| ANN003 | missing-type-kwargs | Missing type annotation for `**{name}` |  |
-| ANN101 | missing-type-self | Missing type annotation for `{name}` in method |  |
-| ANN102 | missing-type-cls | Missing type annotation for `{name}` in classmethod |  |
-| ANN201 | missing-return-type-public-function | Missing return type annotation for public function `{name}` |  |
-| ANN202 | missing-return-type-private-function | Missing return type annotation for private function `{name}` |  |
-| ANN204 | missing-return-type-special-method | Missing return type annotation for special method `{name}` | 🛠 |
-| ANN205 | missing-return-type-static-method | Missing return type annotation for staticmethod `{name}` |  |
-| ANN206 | missing-return-type-class-method | Missing return type annotation for classmethod `{name}` |  |
-| ANN401 | dynamically-typed-expression | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
+| ANN001 | [missing-type-function-argument](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-function-argument.md) | Missing type annotation for function argument `{name}` |  |
+| ANN002 | [missing-type-args](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-args.md) | Missing type annotation for `*{name}` |  |
+| ANN003 | [missing-type-kwargs](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-kwargs.md) | Missing type annotation for `**{name}` |  |
+| ANN101 | [missing-type-self](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-self.md) | Missing type annotation for `{name}` in method |  |
+| ANN102 | [missing-type-cls](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-cls.md) | Missing type annotation for `{name}` in classmethod |  |
+| ANN201 | [missing-return-type-public-function](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-public-function.md) | Missing return type annotation for public function `{name}` |  |
+| ANN202 | [missing-return-type-private-function](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-private-function.md) | Missing return type annotation for private function `{name}` |  |
+| ANN204 | [missing-return-type-special-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-special-method.md) | Missing return type annotation for special method `{name}` | 🛠 |
+| ANN205 | [missing-return-type-static-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-static-method.md) | Missing return type annotation for staticmethod `{name}` |  |
+| ANN206 | [missing-return-type-class-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-class-method.md) | Missing return type annotation for classmethod `{name}` |  |
+| ANN401 | [dynamically-typed-expression](https://github.com/charliermarsh/ruff/blob/main/docs/rules/dynamically-typed-expression.md) | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
 
 ### flake8-bandit (S)
 
