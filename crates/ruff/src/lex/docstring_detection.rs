@@ -6,9 +6,10 @@
 
 use rustpython_parser::lexer::Tok;
 
-#[derive(Debug)]
+#[derive(Default)]
 enum State {
     // Start of the module: first string gets marked as a docstring.
+    #[default]
     ExpectModuleDocstring,
     // After seeing a class definition, we're waiting for the block colon (and do bracket
     // counting).
@@ -23,25 +24,13 @@ enum State {
     Other,
 }
 
+#[derive(Default)]
 pub struct StateMachine {
     state: State,
     bracket_count: usize,
 }
 
-impl Default for StateMachine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl StateMachine {
-    pub const fn new() -> Self {
-        Self {
-            state: State::ExpectModuleDocstring,
-            bracket_count: 0,
-        }
-    }
-
     pub fn consume(&mut self, tok: &Tok) -> bool {
         if matches!(
             tok,
