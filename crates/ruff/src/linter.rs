@@ -18,7 +18,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
-use crate::noqa::add_noqa;
+use crate::noqa::{add_noqa, rule_is_ignored};
 use crate::registry::{Diagnostic, LintSource, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
@@ -149,7 +149,17 @@ pub fn check_path(
                 if settings.rules.enabled(&Rule::SyntaxError) {
                     pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
                 }
-                error = Some(parse_error);
+
+                // If the syntax error is ignored, suppress it (regardless of whether
+                // `Rule::SyntaxError` is enabled).
+                if !rule_is_ignored(
+                    &Rule::SyntaxError,
+                    parse_error.location.row(),
+                    &directives.noqa_line_for,
+                    locator,
+                ) {
+                    error = Some(parse_error);
+                }
             }
         }
     }

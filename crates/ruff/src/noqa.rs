@@ -7,10 +7,12 @@ use nohash_hasher::IntMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_parser::ast::Location;
 
+use crate::ast::types::Range;
 use crate::registry::{Diagnostic, Rule};
 use crate::rule_redirects::get_redirect_target;
-use crate::source_code::LineEnding;
+use crate::source_code::{LineEnding, Locator};
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -74,6 +76,25 @@ pub fn includes(needle: &Rule, haystack: &[&str]) -> bool {
     haystack
         .iter()
         .any(|candidate| needle == get_redirect_target(candidate).unwrap_or(candidate))
+}
+
+/// Returns `true` if the given [`Rule`] is ignored at the specified `lineno`.
+pub fn rule_is_ignored(
+    code: &Rule,
+    lineno: usize,
+    noqa_line_for: &IntMap<usize, usize>,
+    locator: &Locator,
+) -> bool {
+    let noqa_lineno = noqa_line_for.get(&lineno).unwrap_or(&lineno);
+    let line = locator.slice_source_code_range(&Range::new(
+        Location::new(*noqa_lineno, 0),
+        Location::new(noqa_lineno + 1, 0),
+    ));
+    match extract_noqa_directive(line) {
+        Directive::None => false,
+        Directive::All(..) => true,
+        Directive::Codes(.., codes) => includes(code, &codes),
+    }
 }
 
 pub fn add_noqa(
