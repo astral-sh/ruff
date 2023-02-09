@@ -1,20 +1,10 @@
 use num_traits::identities::Zero;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::collect_call_path;
+use crate::ast::helpers::{collect_call_path, map_callable};
 use crate::checkers::ast::Checker;
 
 const ITERABLE_INITIALIZERS: &[&str] = &["dict", "frozenset", "list", "tuple", "set"];
-
-/// Given a decorators that can be used with or without explicit call syntax, return
-/// the underlying callable.
-fn callable_decorator(decorator: &Expr) -> &Expr {
-    if let ExprKind::Call { func, .. } = &decorator.node {
-        func
-    } else {
-        decorator
-    }
-}
 
 pub fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = &Expr> {
     decorators
@@ -23,9 +13,7 @@ pub fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = &Expr> {
 }
 
 pub fn get_mark_name(decorator: &Expr) -> &str {
-    collect_call_path(callable_decorator(decorator))
-        .last()
-        .unwrap()
+    collect_call_path(map_callable(decorator)).last().unwrap()
 }
 
 pub fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
@@ -47,7 +35,7 @@ pub fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
 }
 
 pub fn is_pytest_mark(decorator: &Expr) -> bool {
-    let segments = collect_call_path(callable_decorator(decorator));
+    let segments = collect_call_path(map_callable(decorator));
     if segments.len() > 2 {
         segments[0] == "pytest" && segments[1] == "mark"
     } else {
@@ -57,7 +45,7 @@ pub fn is_pytest_mark(decorator: &Expr) -> bool {
 
 pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
     checker
-        .resolve_call_path(callable_decorator(decorator))
+        .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "yield_fixture"]
         })
@@ -115,7 +103,7 @@ pub fn is_falsy_constant(expr: &Expr) -> bool {
 
 pub fn is_pytest_parametrize(decorator: &Expr, checker: &Checker) -> bool {
     checker
-        .resolve_call_path(callable_decorator(decorator))
+        .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "mark", "parametrize"]
         })

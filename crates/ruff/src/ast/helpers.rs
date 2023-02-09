@@ -568,6 +568,16 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
     arg_names
 }
 
+/// Given an [`Expr`] that can be callable or not (like a decorator, which could be used with or
+/// without explicit call syntax), return the underlying callable.
+pub fn map_callable(decorator: &Expr) -> &Expr {
+    if let ExprKind::Call { func, .. } = &decorator.node {
+        func
+    } else {
+        decorator
+    }
+}
+
 /// Returns `true` if a statement or expression includes at least one comment.
 pub fn has_comments<T>(located: &Located<T>, locator: &Locator) -> bool {
     let start = if match_leading_content(located, locator) {
