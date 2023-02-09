@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PrefixPrivateTypes:
+    PrefixTypeParams:
       kind: TypeVar
   location:
     row: 3
@@ -14,7 +14,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PrefixPrivateTypes:
+    PrefixTypeParams:
       kind: TypeVarTuple
   location:
     row: 5
@@ -25,7 +25,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PrefixPrivateTypes:
+    PrefixTypeParams:
       kind: ParamSpec
   location:
     row: 7

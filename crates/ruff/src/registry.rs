@@ -438,7 +438,7 @@ ruff_macros::define_rule_mapping!(
     EM102 => rules::flake8_errmsg::rules::FStringInException,
     EM103 => rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pyi
-    Y001 => rules::flake8_pyi::rules::PrefixPrivateTypes,
+    Y001 => rules::flake8_pyi::rules::PrefixTypeParams,
     // flake8-pytest-style
     PT001 => rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     PT002 => rules::flake8_pytest_style::rules::FixturePositionalArgs,

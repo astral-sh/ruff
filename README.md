@@ -1152,7 +1152,7 @@ For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| Y001 | prefix-private-types | Name of private `{kind}` must start with _ |  |
+| Y001 | prefix-type-params | Name of private `{kind}` must start with _ |  |
 
 ### flake8-pytest-style (PT)
 

@@ -7,20 +7,20 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct PrefixPrivateTypes {
+    pub struct PrefixTypeParams {
         pub kind: String,
     }
 );
-impl Violation for PrefixPrivateTypes {
+impl Violation for PrefixTypeParams {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PrefixPrivateTypes { kind } = self;
+        let PrefixTypeParams { kind } = self;
         format!("Name of private `{kind}` must start with _")
     }
 }
 
 /// Y001
-pub fn prefix_private_types(
+pub fn prefix_type_params(
     checker: &mut Checker,
     value: &Expr,
     targets: &[Expr],
@@ -47,7 +47,7 @@ pub fn prefix_private_types(
 
     if let Some(type_param_name) = type_param_name {
         let diagnostic = Diagnostic::new(
-            PrefixPrivateTypes {
+            PrefixTypeParams {
                 kind: type_param_name.into(),
             },
             Range::from_located(value),
