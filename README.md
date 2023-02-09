@@ -1145,6 +1145,14 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/) on PyPI.
 | T201 | print-found | `print` found |  |
 | T203 | p-print-found | `pprint` found |  |
 
+### flake8-pyi (Y)
+
+For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| Y001 | prefix-private-types | Name of private `{type}` must start with _ |  |
+
 ### flake8-pytest-style (PT)
 
 For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/) on PyPI.
@@ -1704,6 +1712,7 @@ natively, including:
 * [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
 * [flake8-pie](https://pypi.org/project/flake8-pie/)
 * [flake8-print](https://pypi.org/project/flake8-print/)
+* [flake8-pyi](https://pypi.org/project/flake8-pyi/)
 * [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
 * [flake8-quotes](https://pypi.org/project/flake8-quotes/)
 * [flake8-raise](https://pypi.org/project/flake8-raise/)
