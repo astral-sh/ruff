@@ -91,3 +91,7 @@ default = []
 schemars = ["dep:schemars"]
 # Enables the UnreachableCode rule
 unreachable-code = []
+
+[[bench]]
+name = "benchmark"
+harness = false
