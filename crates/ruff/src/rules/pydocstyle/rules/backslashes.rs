@@ -65,6 +65,7 @@ pub(crate) fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     let bytes = body.as_bytes();
     if memchr_iter(b'\\', bytes).any(|position| {
         let escaped_char = bytes.get(position.saturating_add(1));
+        // Allow continuations (backslashes followed by newlines) and Unicode escapes.
         !matches!(escaped_char, Some(b'\r' | b'\n' | b'u' | b'N'))
     }) {
         checker.diagnostics.push(Diagnostic::new(
