@@ -33,8 +33,7 @@ pub enum TriviaTokenKind {
     InlineComment,
     MagicTrailingComma,
     EmptyLine,
-    LeftParen,
-    RightParen,
+    Parentheses,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -50,8 +49,7 @@ pub enum TriviaKind {
     InlineComment(Range),
     MagicTrailingComma,
     EmptyLine,
-    LeftParen,
-    RightParen,
+    Parentheses,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,6 +57,16 @@ pub enum Relationship {
     Leading,
     Trailing,
     Dangling,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Parenthesize {
+    /// Always parenthesize the statement or expression.
+    Always,
+    /// Never parenthesize the statement or expression.
+    Never,
+    /// Parenthesize the statement or expression if it expands.
+    IfExpanded,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -86,12 +94,8 @@ impl Trivia {
                 kind: TriviaKind::InlineComment(Range::new(token.start, token.end)),
                 relationship,
             },
-            TriviaTokenKind::LeftParen => Self {
-                kind: TriviaKind::LeftParen,
-                relationship,
-            },
-            TriviaTokenKind::RightParen => Self {
-                kind: TriviaKind::RightParen,
+            TriviaTokenKind::Parentheses => Self {
+                kind: TriviaKind::Parentheses,
                 relationship,
             },
         }
@@ -101,11 +105,12 @@ impl Trivia {
 pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
     let mut tokens = vec![];
     let mut prev_tok: Option<(&Location, &Tok, &Location)> = None;
+    let mut prev_non_newline_tok: Option<(&Location, &Tok, &Location)> = None;
     let mut prev_semantic_tok: Option<(&Location, &Tok, &Location)> = None;
     let mut parens = vec![];
     for (start, tok, end) in lxr.iter().flatten() {
         // Add empty lines.
-        if let Some((prev, ..)) = prev_tok {
+        if let Some((prev, ..)) = prev_non_newline_tok {
             for row in prev.row() + 1..start.row() {
                 tokens.push(TriviaToken {
                     start: Location::new(row, 0),
@@ -120,7 +125,7 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
             tokens.push(TriviaToken {
                 start: *start,
                 end: *end,
-                kind: if prev_tok.map_or(true, |(prev, ..)| prev.row() < start.row()) {
+                kind: if prev_non_newline_tok.map_or(true, |(prev, ..)| prev.row() < start.row()) {
                     TriviaTokenKind::StandaloneComment
                 } else {
                     TriviaTokenKind::InlineComment
@@ -129,7 +134,10 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
         }
 
         // Add magic trailing commas.
-        if matches!(tok, Tok::Rpar | Tok::Rsqb | Tok::Rbrace) {
+        if matches!(
+            tok,
+            Tok::Rpar | Tok::Rsqb | Tok::Rbrace | Tok::Equal | Tok::Newline
+        ) {
             if let Some((prev_start, prev_tok, prev_end)) = prev_semantic_tok {
                 if prev_tok == &Tok::Comma {
                     tokens.push(TriviaToken {
@@ -142,15 +150,10 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
         }
 
         if matches!(tok, Tok::Lpar) {
-            if prev_semantic_tok.map_or(true, |(_, prev_tok, _)| {
+            if prev_tok.map_or(true, |(_, prev_tok, _)| {
                 !matches!(prev_tok, Tok::Name { .. })
             }) {
                 parens.push((start, true));
-                // tokens.push(TriviaToken {
-                //     start: *start,
-                //     end: *end,
-                //     kind: TriviaTokenKind::LeftParen,
-                // });
             } else {
                 parens.push((start, false));
             }
@@ -160,14 +163,16 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
                 tokens.push(TriviaToken {
                     start: *start,
                     end: *end,
-                    kind: TriviaTokenKind::LeftParen,
+                    kind: TriviaTokenKind::Parentheses,
                 });
             }
         }
 
+        prev_tok = Some((start, tok, end));
+
         // Track the most recent non-whitespace token.
         if !matches!(tok, Tok::Newline | Tok::NonLogicalNewline,) {
-            prev_tok = Some((start, tok, end));
+            prev_non_newline_tok = Some((start, tok, end));
         }
 
         // Track the most recent semantic token.
@@ -426,13 +431,19 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             ExprKind::UnaryOp { operand, .. } => {
                 result.push(Node::Expr(operand));
             }
-            ExprKind::Lambda { body, .. } => {
+            ExprKind::Lambda { body, args, .. } => {
                 // TODO(charlie): Arguments.
+                for expr in &args.defaults {
+                    result.push(Node::Expr(expr));
+                }
+                for expr in &args.kw_defaults {
+                    result.push(Node::Expr(expr));
+                }
                 result.push(Node::Expr(body));
             }
             ExprKind::IfExp { test, body, orelse } => {
-                result.push(Node::Expr(test));
                 result.push(Node::Expr(body));
+                result.push(Node::Expr(test));
                 result.push(Node::Expr(orelse));
             }
             ExprKind::Dict { keys, values } => {
@@ -597,6 +608,7 @@ pub fn decorate_token<'a>(
     token: &TriviaToken,
     node: &Node<'a>,
     enclosing_node: Option<Node<'a>>,
+    enclosed_node: Option<Node<'a>>,
     cache: &mut FxHashMap<usize, Vec<Node<'a>>>,
 ) -> (
     Option<Node<'a>>,
@@ -610,6 +622,7 @@ pub fn decorate_token<'a>(
 
     let mut preceding_node = None;
     let mut following_node = None;
+    let mut enclosed_node = enclosed_node;
 
     let mut left = 0;
     let mut right = child_nodes.len();
@@ -632,9 +645,41 @@ pub fn decorate_token<'a>(
             Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
         };
 
+        if let Some(existing) = &enclosed_node {
+            // Special-case: if we're dealing with a statement that's a single expression,
+            // we want to treat the expression as the enclosed node.
+            let existing_start = match &existing {
+                Node::Stmt(node) => node.location,
+                Node::Expr(node) => node.location,
+                Node::Alias(node) => node.location,
+                Node::Excepthandler(node) => node.location,
+                Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
+            };
+            let existing_end = match &existing {
+                Node::Stmt(node) => node.end_location.unwrap(),
+                Node::Expr(node) => node.end_location.unwrap(),
+                Node::Alias(node) => node.end_location.unwrap(),
+                Node::Excepthandler(node) => node.end_location.unwrap(),
+                Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
+            };
+            if start == existing_start && end == existing_end {
+                enclosed_node = Some(child.clone());
+            }
+        } else {
+            if token.start <= start && token.end >= end {
+                enclosed_node = Some(child.clone());
+            }
+        }
+
         // The comment is completely contained by this child node.
         if token.start >= start && token.end <= end {
-            return decorate_token(token, &child.clone(), Some(child.clone()), cache);
+            return decorate_token(
+                token,
+                &child.clone(),
+                Some(child.clone()),
+                enclosed_node,
+                cache,
+            );
         }
 
         if end <= token.start {
@@ -657,11 +702,15 @@ pub fn decorate_token<'a>(
             continue;
         }
 
-        // Return the enclosed node.
-        return (None, None, None, Some(child.clone()));
+        return (None, None, None, enclosed_node);
     }
 
-    (preceding_node, following_node, enclosing_node, None)
+    (
+        preceding_node,
+        following_node,
+        enclosing_node,
+        enclosed_node,
+    )
 }
 
 #[derive(Debug, Default)]
@@ -712,7 +761,8 @@ pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaI
     let mut cache = FxHashMap::default();
     for token in &tokens {
         let (preceding_node, following_node, enclosing_node, enclosed_node) =
-            decorate_token(token, &Node::Mod(python_ast), None, &mut cache);
+            decorate_token(token, &Node::Mod(python_ast), None, None, &mut cache);
+
         stack.push((
             preceding_node,
             following_node,
@@ -724,7 +774,7 @@ pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaI
     let mut trivia_index = TriviaIndex::default();
 
     for (index, token) in tokens.into_iter().enumerate() {
-        let (preceding_node, following_node, enclosing_node, ..) = &stack[index];
+        let (preceding_node, following_node, enclosing_node, enclosed_node) = &stack[index];
         match token.kind {
             TriviaTokenKind::EmptyLine | TriviaTokenKind::StandaloneComment => {
                 if let Some(following_node) = following_node {
@@ -788,27 +838,16 @@ pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaI
                     unreachable!("Attach token to the ast: {:?}", token);
                 }
             }
-            TriviaTokenKind::LeftParen => {
-                // if let Some(enclosed_node) = enclosed_node {
-                //     add_comment(
-                //         Trivia::from_token(&token, Relationship::Leading),
-                //         enclosed_node,
-                //         &mut trivia_index,
-                //     );
-                // } else {
-                //     unreachable!("Attach token to the ast: {:?}", token);
-                // }
-            }
-            TriviaTokenKind::RightParen => {
-                // if let Some(preceding) = preceding {
-                //     add_comment(
-                //         Trivia::from_token(&token, Relationship::Trailing),
-                //         preceding,
-                //         &mut trivia_index,
-                //     );
-                // } else {
-                //     unreachable!("Attach token to the ast: {:?}", token);
-                // }
+            TriviaTokenKind::Parentheses => {
+                if let Some(enclosed_node) = enclosed_node {
+                    add_comment(
+                        Trivia::from_token(&token, Relationship::Leading),
+                        enclosed_node,
+                        &mut trivia_index,
+                    );
+                } else {
+                    unreachable!("Attach token to the ast: {:?}", token);
+                }
             }
         }
     }

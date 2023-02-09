@@ -1,6 +1,6 @@
 ---
-source: ruff_fmt/src/lib.rs
-assertion_line: 75
+source: crates/ruff_fmt/src/lib.rs
+assertion_line: 89
 expression: printed.as_code()
 ---
 """Docstring."""

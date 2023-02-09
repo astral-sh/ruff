@@ -11,9 +11,9 @@ use crate::core::types::Range;
 use crate::cst::{
     Arguments, Boolop, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, Unaryop,
 };
-use crate::format::helpers::{is_self_closing, is_simple};
+use crate::format::helpers::{is_self_closing, is_simple_power, is_simple_slice};
 use crate::shared_traits::AsFormat;
-use crate::trivia::{Relationship, TriviaKind};
+use crate::trivia::{Parenthesize, Relationship, TriviaKind};
 
 pub struct FormatExpr<'a> {
     item: &'a Expr,
@@ -79,7 +79,7 @@ fn format_name(
 
 fn format_subscript(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     value: &Expr,
     slice: &Expr,
 ) -> FormatResult<()> {
@@ -88,9 +88,7 @@ fn format_subscript(
         [
             value.format(),
             text("["),
-            group(&format_args![soft_block_indent(&format_args![
-                slice.format()
-            ])]),
+            group(&format_args![soft_block_indent(&slice.format())]),
             text("]")
         ]
     )?;
@@ -102,7 +100,10 @@ fn format_tuple(
     expr: &Expr,
     elts: &[Expr],
 ) -> FormatResult<()> {
-    write!(f, [text("(")])?;
+    // If we're already parenthesized, avoid adding any "mandatory" parentheses.
+    // TODO(charlie): We also need to parenthesize tuples on the right-hand side of an
+    // assignment if the target is exploded. And sometimes the tuple gets exploded, like
+    // if the LHS is an exploded list? Lots of edge cases here.
     if elts.len() == 1 {
         write!(
             f,
@@ -113,44 +114,83 @@ fn format_tuple(
             }))])]
         )?;
     } else if !elts.is_empty() {
-        // TODO(charlie): DRY.
         write!(
             f,
-            [group(&format_args![soft_block_indent(&format_with(|f| {
-                if expr
-                    .trivia
-                    .iter()
-                    .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma))
-                {
-                    write!(f, [expand_parent()])?;
+            [group(&format_with(|f| {
+                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                    write!(f, [if_group_breaks(&text("("))])?;
                 }
-                for (i, elt) in elts.iter().enumerate() {
-                    write!(f, [elt.format()])?;
-                    if i < elts.len() - 1 {
-                        write!(f, [text(",")])?;
-                        write!(f, [soft_line_break_or_space()])?;
-                    } else {
-                        write!(f, [if_group_breaks(&text(","))])?;
+                if matches!(
+                    expr.parentheses,
+                    Parenthesize::IfExpanded | Parenthesize::Always
+                ) {
+                    write!(
+                        f,
+                        [soft_block_indent(&format_with(|f| {
+                            // TODO(charlie): If the magic trailing comma isn't present, and the
+                            // tuple is _already_ expanded, we're not supposed to add this.
+                            let magic_trailing_comma = expr
+                                .trivia
+                                .iter()
+                                .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+                            if magic_trailing_comma {
+                                write!(f, [expand_parent()])?;
+                            }
+                            for (i, elt) in elts.iter().enumerate() {
+                                write!(f, [elt.format()])?;
+                                if i < elts.len() - 1 {
+                                    write!(f, [text(",")])?;
+                                    write!(f, [soft_line_break_or_space()])?;
+                                } else {
+                                    if magic_trailing_comma {
+                                        write!(f, [if_group_breaks(&text(","))])?;
+                                    }
+                                }
+                            }
+                            Ok(())
+                        }))]
+                    )?;
+                } else {
+                    let magic_trailing_comma = expr
+                        .trivia
+                        .iter()
+                        .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+                    if magic_trailing_comma {
+                        write!(f, [expand_parent()])?;
+                    }
+                    for (i, elt) in elts.iter().enumerate() {
+                        write!(f, [elt.format()])?;
+                        if i < elts.len() - 1 {
+                            write!(f, [text(",")])?;
+                            write!(f, [soft_line_break_or_space()])?;
+                        } else {
+                            if magic_trailing_comma {
+                                write!(f, [if_group_breaks(&text(","))])?;
+                            }
+                        }
                     }
                 }
+                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                    write!(f, [if_group_breaks(&text(")"))])?;
+                }
                 Ok(())
-            }))])]
+            }))]
         )?;
     }
-    write!(f, [text(")")])?;
     Ok(())
 }
 
 fn format_slice(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     lower: Option<&Expr>,
     upper: Option<&Expr>,
     step: Option<&Expr>,
 ) -> FormatResult<()> {
-    let is_simple = lower.map_or(true, is_simple)
-        && upper.map_or(true, is_simple)
-        && step.map_or(true, is_simple);
+    // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
+    let is_simple = lower.map_or(true, is_simple_slice)
+        && upper.map_or(true, is_simple_slice)
+        && step.map_or(true, is_simple_slice);
 
     if let Some(lower) = lower {
         write!(f, [lower.format()])?;
@@ -164,7 +204,7 @@ fn format_slice(
             write!(f, [space()])?;
         }
         write!(f, [upper.format()])?;
-        if !is_simple {
+        if !is_simple && step.is_some() {
             write!(f, [space()])?;
         }
     }
@@ -219,7 +259,7 @@ fn format_list(
 
 fn format_set(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     elts: &[Expr],
 ) -> FormatResult<()> {
     if elts.is_empty() {
@@ -233,7 +273,7 @@ fn format_set(
                 f,
                 [group(&format_args![soft_block_indent(&format_with(|f| {
                     for (i, elt) in elts.iter().enumerate() {
-                        write!(f, [elt.format()])?;
+                        write!(f, [group(&format_args![elt.format()])])?;
                         if i < elts.len() - 1 {
                             write!(f, [text(",")])?;
                             write!(f, [soft_line_break_or_space()])?;
@@ -332,7 +372,7 @@ fn format_call(
 
 fn format_list_comp(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
 ) -> FormatResult<()> {
@@ -353,7 +393,7 @@ fn format_list_comp(
 
 fn format_set_comp(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
 ) -> FormatResult<()> {
@@ -374,7 +414,7 @@ fn format_set_comp(
 
 fn format_dict_comp(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     key: &Expr,
     value: &Expr,
     generators: &[Comprehension],
@@ -399,11 +439,10 @@ fn format_dict_comp(
 
 fn format_generator_exp(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     elt: &Expr,
     generators: &[Comprehension],
 ) -> FormatResult<()> {
-    write!(f, [text("(")])?;
     write!(
         f,
         [group(&format_args![soft_block_indent(&format_with(|f| {
@@ -414,7 +453,6 @@ fn format_generator_exp(
             Ok(())
         }))])]
     )?;
-    write!(f, [text(")")])?;
     Ok(())
 }
 
@@ -426,7 +464,7 @@ fn format_await(
     write!(f, [text("await")])?;
     write!(f, [space()])?;
     if is_self_closing(value) {
-        write!(f, [value.format()])?;
+        write!(f, [group(&format_args![value.format()])])?;
     } else {
         write!(
             f,
@@ -445,13 +483,11 @@ fn format_yield(
     expr: &Expr,
     value: Option<&Expr>,
 ) -> FormatResult<()> {
-    // TODO(charlie): We need to insert these conditionally.
-    write!(f, [text("(")])?;
     write!(f, [text("yield")])?;
     if let Some(value) = value {
         write!(f, [space()])?;
         if is_self_closing(value) {
-            write!(f, [value.format()])?;
+            write!(f, [group(&format_args![value.format()])])?;
         } else {
             write!(
                 f,
@@ -463,7 +499,6 @@ fn format_yield(
             )?;
         }
     }
-    write!(f, [text(")")])?;
     Ok(())
 }
 
@@ -472,9 +507,6 @@ fn format_yield_from(
     expr: &Expr,
     value: &Expr,
 ) -> FormatResult<()> {
-    // TODO(charlie): We need to insert these conditionally.
-    write!(f, [text("(")])?;
-
     write!(
         f,
         [group(&format_args![soft_block_indent(&format_with(|f| {
@@ -497,7 +529,6 @@ fn format_yield_from(
             Ok(())
         })),])]
     )?;
-    write!(f, [text(")")])?;
     Ok(())
 }
 
@@ -508,12 +539,12 @@ fn format_compare(
     ops: &[Cmpop],
     comparators: &[Expr],
 ) -> FormatResult<()> {
-    write!(f, [left.format()])?;
+    write!(f, [group(&format_args![left.format()])])?;
     for (i, op) in ops.iter().enumerate() {
-        write!(f, [space()])?;
+        write!(f, [soft_line_break_or_space()])?;
         write!(f, [op.format()])?;
         write!(f, [space()])?;
-        write!(f, [comparators[i].format()])?;
+        write!(f, [group(&format_args![comparators[i].format()])])?;
     }
     Ok(())
 }
@@ -539,7 +570,7 @@ fn format_constant(
 
 fn format_dict(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     keys: &[Option<Expr>],
     values: &[Expr],
 ) -> FormatResult<()> {
@@ -548,7 +579,7 @@ fn format_dict(
         // TODO(charlie): DRY.
         write!(
             f,
-            [group(&format_args![soft_block_indent(&format_with(|f| {
+            [soft_block_indent(&format_with(|f| {
                 for (i, (k, v)) in keys.iter().zip(values).enumerate() {
                     if let Some(k) = k {
                         write!(f, [k.format()])?;
@@ -589,7 +620,7 @@ fn format_dict(
                     }
                 }
                 Ok(())
-            }))])]
+            }))]
         )?;
     }
     write!(f, [text("}")])?;
@@ -637,12 +668,12 @@ fn format_bool_op(
     let mut first = true;
     for value in values {
         if std::mem::take(&mut first) {
-            write!(f, [value.format()])?;
+            write!(f, [group(&format_args![value.format()])])?;
         } else {
             write!(f, [soft_line_break_or_space()])?;
             write!(f, [op.format()])?;
             write!(f, [space()])?;
-            write!(f, [value.format()])?;
+            write!(f, [group(&format_args![value.format()])])?;
         }
     }
 
@@ -675,11 +706,19 @@ fn format_bin_op(
     op: &Operator,
     right: &Expr,
 ) -> FormatResult<()> {
-    write!(f, [left.format()])?;
-    write!(f, [soft_line_break_or_space()])?;
+    // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators
+    let is_simple =
+        matches!(op, Operator::Pow) && (is_simple_power(left) && is_simple_power(right));
+
+    write!(f, [group(&format_args![left.format()])])?;
+    if !is_simple {
+        write!(f, [soft_line_break_or_space()])?;
+    }
     write!(f, [op.format()])?;
-    write!(f, [space()])?;
-    write!(f, [right.format()])?;
+    if !is_simple {
+        write!(f, [space()])?;
+    }
+    write!(f, [group(&format_args![right.format()])])?;
 
     // Apply any inline comments.
     let mut first = true;
@@ -705,18 +744,35 @@ fn format_bin_op(
 
 fn format_unary_op(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     op: &Unaryop,
     operand: &Expr,
 ) -> FormatResult<()> {
     write!(f, [op.format()])?;
-    write!(f, [operand.format()])?;
+    // TODO(charlie): Do this in the normalization pass.
+    if !matches!(op, Unaryop::Not)
+        && matches!(
+            operand.node,
+            ExprKind::BoolOp { .. } | ExprKind::Compare { .. } | ExprKind::BinOp { .. }
+        )
+    {
+        let parenthesized = matches!(operand.parentheses, Parenthesize::Always);
+        if !parenthesized {
+            write!(f, [text("(")])?;
+        }
+        write!(f, [operand.format()])?;
+        if !parenthesized {
+            write!(f, [text(")")])?;
+        }
+    } else {
+        write!(f, [operand.format()])?;
+    }
     Ok(())
 }
 
 fn format_lambda(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     args: &Arguments,
     body: &Expr,
 ) -> FormatResult<()> {
@@ -733,36 +789,26 @@ fn format_lambda(
 
 fn format_if_exp(
     f: &mut Formatter<ASTFormatContext<'_>>,
-    _expr: &Expr,
+    expr: &Expr,
     test: &Expr,
     body: &Expr,
     orelse: &Expr,
 ) -> FormatResult<()> {
-    write!(f, [body.format()])?;
+    write!(f, [group(&format_args![body.format()])])?;
     write!(f, [soft_line_break_or_space()])?;
     write!(f, [text("if")])?;
     write!(f, [space()])?;
-    write!(f, [test.format()])?;
+    write!(f, [group(&format_args![test.format()])])?;
     write!(f, [soft_line_break_or_space()])?;
     write!(f, [text("else")])?;
     write!(f, [space()])?;
-    write!(f, [orelse.format()])?;
+    write!(f, [group(&format_args![orelse.format()])])?;
     Ok(())
 }
 
 impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let parenthesize = !matches!(
-            self.item.node,
-            ExprKind::Tuple { .. } | ExprKind::GeneratorExp { .. }
-        ) && self.item.trivia.iter().any(|trivia| {
-            matches!(
-                (trivia.relationship, trivia.kind),
-                (Relationship::Leading, TriviaKind::LeftParen)
-            )
-        });
-
-        if parenthesize {
+        if matches!(self.item.parentheses, Parenthesize::Always) {
             write!(f, [text("(")])?;
         }
 
@@ -851,7 +897,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             }
         }
 
-        if parenthesize {
+        if matches!(self.item.parentheses, Parenthesize::Always) {
             write!(f, [text(")")])?;
         }
 

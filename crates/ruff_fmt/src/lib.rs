@@ -8,6 +8,7 @@ use crate::core::locator::Locator;
 use crate::core::rustpython_helpers;
 use crate::cst::Stmt;
 use crate::newlines::normalize_newlines;
+use crate::parentheses::normalize_parentheses;
 
 mod attachment;
 pub mod builders;
@@ -17,6 +18,7 @@ mod core;
 mod cst;
 mod format;
 mod newlines;
+mod parentheses;
 pub mod shared_traits;
 #[cfg(test)]
 mod test;
@@ -38,6 +40,7 @@ pub fn fmt(contents: &str) -> Result<Printed> {
     // Attach trivia.
     attach(&mut python_cst, trivia);
     normalize_newlines(&mut python_cst);
+    normalize_parentheses(&mut python_cst);
 
     let elements = format!(
         ASTFormatContext::new(
@@ -62,7 +65,6 @@ mod tests {
     use crate::fmt;
     use crate::test::test_resource_path;
 
-    #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
     #[test_case(Path::new("simple_cases/class_blank_parentheses.py"); "class_blank_parentheses")]
     #[test_case(Path::new("simple_cases/class_methods_new_line.py"); "class_methods_new_line")]
     #[test_case(Path::new("simple_cases/beginning_backslash.py"); "beginning_backslash")]
@@ -76,10 +78,13 @@ mod tests {
         Ok(())
     }
 
+    // Passing apart from one deviation in RHS tuple assignment.
+    #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
+    // Lots of deviations, _mostly_ related to string normalization and wrapping.
+    #[test_case(Path::new("simple_cases/expression.py"); "expression")]
     // #[test_case(Path::new("simple_cases/comments.py"); "comments")]
     // #[test_case(Path::new("simple_cases/function.py"); "function")]
     // #[test_case(Path::new("simple_cases/empty_lines.py"); "empty_lines")]
-    // #[test_case(Path::new("simple_cases/expression.py"); "expression")]
     fn failing(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.display());
         let content = std::fs::read_to_string(test_resource_path(

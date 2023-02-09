@@ -2,7 +2,7 @@
 
 use rustpython_ast::{Constant, Location};
 
-use crate::trivia::Trivia;
+use crate::trivia::{Parenthesize, Trivia};
 
 type Ident = String;
 
@@ -12,6 +12,7 @@ pub struct Located<T> {
     pub end_location: Option<Location>,
     pub node: T,
     pub trivia: Vec<Trivia>,
+    pub parentheses: Parenthesize,
 }
 
 impl<T> Located<T> {
@@ -21,6 +22,7 @@ impl<T> Located<T> {
             end_location: Some(end_location),
             node,
             trivia: Vec::new(),
+            parentheses: Parenthesize::Never,
         }
     }
 
@@ -508,6 +510,7 @@ impl From<rustpython_ast::Alias> for Alias {
                 asname: alias.node.asname,
             },
             trivia: vec![],
+            parentheses: Parenthesize::Never,
         }
     }
 }
@@ -534,6 +537,7 @@ impl From<rustpython_ast::Excepthandler> for Excepthandler {
                 body: body.into_iter().map(Into::into).collect(),
             },
             trivia: vec![],
+            parentheses: Parenthesize::Never,
         }
     }
 }
@@ -548,12 +552,14 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     value: Box::new((*value).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Pass => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Pass,
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Return { value } => Stmt {
                 location: stmt.location,
@@ -562,6 +568,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     value: value.map(|v| (*v).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Assign {
                 targets,
@@ -576,6 +583,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     type_comment,
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::ClassDef {
                 name,
@@ -594,6 +602,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     decorator_list: decorator_list.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::FunctionDef {
                 name,
@@ -616,6 +625,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     type_comment,
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::If { test, body, orelse } => Stmt {
                 location: stmt.location,
@@ -626,6 +636,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     orelse: orelse.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Assert { test, msg } => Stmt {
                 location: stmt.location,
@@ -635,6 +646,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     msg: msg.map(|msg| Box::new((*msg).into())),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::AsyncFunctionDef {
                 name,
@@ -655,6 +667,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     type_comment,
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Delete { targets } => Stmt {
                 location: stmt.location,
@@ -663,6 +676,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     targets: targets.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::AugAssign { target, op, value } => Stmt {
                 location: stmt.location,
@@ -673,6 +687,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     value: Box::new((*value).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::AnnAssign {
                 target,
@@ -689,6 +704,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     simple,
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::For {
                 target,
@@ -707,6 +723,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     type_comment,
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::AsyncFor {
                 target,
@@ -725,6 +742,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     type_comment,
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::While { test, body, orelse } => Stmt {
                 location: stmt.location,
@@ -735,6 +753,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     orelse: orelse.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::With {
                 items,
@@ -749,6 +768,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     type_comment,
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::AsyncWith {
                 items,
@@ -763,6 +783,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     type_comment,
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Match { .. } => {
                 todo!("match statement");
@@ -775,6 +796,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     cause: cause.map(|cause| Box::new((*cause).into())),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Try {
                 body,
@@ -791,6 +813,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     finalbody: finalbody.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Import { names } => Stmt {
                 location: stmt.location,
@@ -799,6 +822,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     names: names.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::ImportFrom {
                 module,
@@ -813,30 +837,35 @@ impl From<rustpython_ast::Stmt> for Stmt {
                     level,
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Global { names } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Global { names },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Nonlocal { names } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Nonlocal { names },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Break => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Break,
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::StmtKind::Continue => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Continue,
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
         }
     }
@@ -852,6 +881,7 @@ impl From<rustpython_ast::Keyword> for Keyword {
                 value: keyword.node.value.into(),
             },
             trivia: vec![],
+            parentheses: Parenthesize::Never,
         }
     }
 }
@@ -867,6 +897,7 @@ impl From<rustpython_ast::Arg> for Arg {
                 type_comment: arg.node.type_comment,
             },
             trivia: vec![],
+            parentheses: Parenthesize::Never,
         }
     }
 }
@@ -907,6 +938,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::BoolOp { op, values } => Expr {
                 location: expr.location,
@@ -916,6 +948,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     values: values.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::NamedExpr { target, value } => Expr {
                 location: expr.location,
@@ -925,6 +958,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     value: Box::new((*value).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::BinOp { left, op, right } => Expr {
                 location: expr.location,
@@ -935,6 +969,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     right: Box::new((*right).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::UnaryOp { op, operand } => Expr {
                 location: expr.location,
@@ -944,6 +979,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     operand: Box::new((*operand).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Lambda { args, body } => Expr {
                 location: expr.location,
@@ -953,6 +989,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     body: Box::new((*body).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::IfExp { test, body, orelse } => Expr {
                 location: expr.location,
@@ -963,6 +1000,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     orelse: Box::new((*orelse).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Dict { keys, values } => Expr {
                 location: expr.location,
@@ -972,6 +1010,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     values: values.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Set { elts } => Expr {
                 location: expr.location,
@@ -980,6 +1019,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     elts: elts.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::ListComp { elt, generators } => Expr {
                 location: expr.location,
@@ -989,6 +1029,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     generators: generators.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::SetComp { elt, generators } => Expr {
                 location: expr.location,
@@ -998,6 +1039,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     generators: generators.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::DictComp {
                 key,
@@ -1012,6 +1054,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     generators: generators.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::GeneratorExp { elt, generators } => Expr {
                 location: expr.location,
@@ -1021,6 +1064,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     generators: generators.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Await { value } => Expr {
                 location: expr.location,
@@ -1029,6 +1073,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     value: Box::new((*value).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Yield { value } => Expr {
                 location: expr.location,
@@ -1037,6 +1082,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     value: value.map(|v| Box::new((*v).into())),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::YieldFrom { value } => Expr {
                 location: expr.location,
@@ -1045,6 +1091,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     value: Box::new((*value).into()),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Compare {
                 left,
@@ -1059,6 +1106,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     comparators: comparators.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Call {
                 func,
@@ -1073,6 +1121,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     keywords: keywords.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::FormattedValue {
                 value,
@@ -1087,6 +1136,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     format_spec: format_spec.map(|f| Box::new((*f).into())),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::JoinedStr { values } => Expr {
                 location: expr.location,
@@ -1095,12 +1145,14 @@ impl From<rustpython_ast::Expr> for Expr {
                     values: values.into_iter().map(Into::into).collect(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Constant { value, kind } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Constant { value, kind },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Attribute { value, attr, ctx } => Expr {
                 location: expr.location,
@@ -1111,6 +1163,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Subscript { value, slice, ctx } => Expr {
                 location: expr.location,
@@ -1121,6 +1174,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Starred { value, ctx } => Expr {
                 location: expr.location,
@@ -1130,6 +1184,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::List { elts, ctx } => Expr {
                 location: expr.location,
@@ -1139,6 +1194,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Tuple { elts, ctx } => Expr {
                 location: expr.location,
@@ -1148,6 +1204,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
             rustpython_ast::ExprKind::Slice { lower, upper, step } => Expr {
                 location: expr.location,
@@ -1158,6 +1215,7 @@ impl From<rustpython_ast::Expr> for Expr {
                     step: step.map(|s| Box::new((*s).into())),
                 },
                 trivia: vec![],
+                parentheses: Parenthesize::Never,
             },
         }
     }
