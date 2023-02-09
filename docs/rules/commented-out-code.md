@@ -13,4 +13,5 @@ It should be removed.
 
 ### Example
 ```python
+# print('foo')
 ```
