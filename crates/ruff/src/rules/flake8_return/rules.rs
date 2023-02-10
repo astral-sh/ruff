@@ -168,11 +168,17 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
 const NORETURN_FUNCS: &[&[&str]] = &[
     // builtins
     &["", "exit"],
+    &["", "quit"],
     // stdlib
+    &["builtins", "exit"],
+    &["builtins", "quit"],
     &["os", "_exit"],
     &["os", "abort"],
+    &["posix", "_exit"],
     &["posix", "abort"],
     &["sys", "exit"],
+    &["_thread", "exit"],
+    &["_winapi", "ExitProcess"],
     // third-party modules
     &["pytest", "exit"],
     &["pytest", "fail"],
