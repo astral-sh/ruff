@@ -3884,6 +3884,14 @@ impl<'a> Checker<'a> {
         &self.scopes[*(self.scope_stack.last().expect("No current scope found"))]
     }
 
+    pub fn current_scope_parent(&self) -> Option<&Scope> {
+        self.scope_stack
+            .iter()
+            .rev()
+            .nth(1)
+            .map(|index| &self.scopes[*index])
+    }
+
     pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
         self.scope_stack
             .iter()
