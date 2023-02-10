@@ -165,51 +165,26 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     }
 }
 
-const NORETURN_FUNCS: [&str; 8] = [
+const NORETURN_FUNCS: &[&[&str]] = &[
     // stdlib
-    "os._exit",
-    "os.abort",
-    "posix.abort",
-    "sys.exit",
+    &["os", "_exit"],
+    &["os", "abort"],
+    &["posix", "abort"],
+    &["sys", "exit"],
     // third-party modules
-    "pytest.exit",
-    "pytest.fail",
-    "pytest.skip",
-    "pytest.xfail",
+    &["pytest", "exit"],
+    &["pytest", "fail"],
+    &["pytest", "skip"],
+    &["pytest", "xfail"],
 ];
 
 /// A helper for RET503
-fn noreturn_call(func: &ExprKind) -> bool {
-    // This is an extremely naive and incomplete implementation.
-    //
-    // Naive: it should probably somehow check that `value` is indeed
-    // the imported top-level module of the same name, or better yet,
-    // resolve `value` to an imported module's name and check that.
-    //
-    // Incomplete: it doesn't even attempt to handle `from pytest import xfail`.
-    match func {
-        ExprKind::Attribute {
-            ref value,
-            ref attr,
-            ..
-        } => {
-            if let ExprKind::Name { id, .. } = &value.node {
-                NORETURN_FUNCS.contains(&format!("{id}.{attr}").as_str())
-            } else {
-                false
-            }
-        }
-        ExprKind::Name {
-            /* id, */
-            ..
-        } => {
-            // Maybe try to resolve `id` to handle `from os import abort`.
-            false
-        }
-        _ => {
-            false
-        }
-    }
+fn is_noreturn_function(checker: &mut Checker, func: &Expr) -> bool {
+    checker.resolve_call_path(func).map_or(false, |call_path| {
+        NORETURN_FUNCS
+            .iter()
+            .any(|target| call_path.as_slice() == *target)
+    })
 }
 
 /// RET503
@@ -257,9 +232,9 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         | StmtKind::Try { .. } => {}
         StmtKind::Expr { value, .. }
             if matches!(
-            &value.node,
-            ExprKind::Call { func, ..  }
-                if noreturn_call(&func.node)
+                &value.node,
+                ExprKind::Call { func, ..  }
+                    if is_noreturn_function(checker, func)
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(last_stmt));

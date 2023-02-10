@@ -5,78 +5,116 @@ expression: diagnostics
 - kind:
     ImplicitReturn: ~
   location:
-    row: 18
+    row: 15
     column: 4
   end_location:
-    row: 19
+    row: 16
     column: 16
   fix: ~
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 25
+    row: 22
     column: 8
   end_location:
-    row: 25
+    row: 22
     column: 15
   fix:
     content:
       - "        return None"
       - ""
     location:
-      row: 26
+      row: 23
       column: 0
     end_location:
-      row: 26
+      row: 23
       column: 0
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 34
+    row: 31
     column: 4
   end_location:
-    row: 34
+    row: 31
     column: 11
   fix:
     content:
       - "    return None"
       - ""
     location:
-      row: 35
+      row: 32
       column: 0
     end_location:
-      row: 35
+      row: 32
       column: 0
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 40
+    row: 37
     column: 8
   end_location:
-    row: 41
+    row: 38
     column: 20
   fix: ~
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 50
+    row: 47
     column: 8
   end_location:
-    row: 50
+    row: 47
     column: 15
   fix:
     content:
       - "        return None"
       - ""
     location:
-      row: 51
+      row: 48
       column: 0
     end_location:
-      row: 51
+      row: 48
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 54
+    column: 4
+  end_location:
+    row: 54
+    column: 22
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 55
+      column: 0
+    end_location:
+      row: 55
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 61
+    column: 4
+  end_location:
+    row: 61
+    column: 21
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 62
+      column: 0
+    end_location:
+      row: 62
       column: 0
   parent: ~
 

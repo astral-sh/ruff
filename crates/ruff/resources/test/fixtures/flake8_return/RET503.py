@@ -1,13 +1,10 @@
 import os
 import posix
-import sys
-
-# todo: import sys as std_sys
-# todo: from sys import exit
+from posix import abort
+import sys as std_sys
 
 import pytest
-
-# todo: from pytest import xfail
+from pytest import xfail as py_xfail
 
 ###
 # Errors
@@ -48,6 +45,20 @@ def x(y):
             return i
     else:
         print()  # error
+
+
+# A nonexistent function
+def func_unknown(x):
+    if x > 0:
+        return False
+    no_such_function()  # error
+
+
+# A function that does return the control
+def func_no_noreturn(x):
+    if x > 0:
+        return False
+    print("", end="")  # error
 
 
 ###
@@ -152,13 +163,13 @@ def noreturn_abort(x):
 def noreturn_abort_2():
     if x > 0:
         return 1
-    posix.abort()
+    abort()
 
 
 def noreturn_exit():
     if x > 0:
         return 1
-    sys.exit(0)
+    std_sys.exit(0)
 
 
 def noreturn_pytest_exit():
@@ -182,4 +193,4 @@ def noreturn_pytest_skip():
 def noreturn_pytest_xfail():
     if x > 0:
         return 1
-    pytest.xfail("oof")
+    py_xfail("oof")
