@@ -65,8 +65,8 @@ mod tests {
     #[test_case(Rule::SectionUnderlineMatchesSectionLength, Path::new("sections.py"); "D409")]
     #[test_case(Rule::SectionUnderlineNotOverIndented, Path::new("sections.py"); "D215")]
     #[test_case(Rule::SkipDocstring, Path::new("D.py"); "D418")]
-    #[test_case(Rule::UsesRPrefixForBackslashedContent, Path::new("D.py"); "D301")]
-    #[test_case(Rule::UsesTripleQuotes, Path::new("D.py"); "D300")]
+    #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"); "D301")]
+    #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"); "D300")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

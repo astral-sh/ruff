@@ -812,8 +812,8 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line | 🛠 |
 | D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
 | D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
-| D300 | uses-triple-quotes | Use """triple double quotes""" |  |
-| D301 | uses-r-prefix-for-backslashed-content | Use r""" if any backslashes in a docstring |  |
+| D300 | triple-single-quotes | Use """triple double quotes""" |  |
+| D301 | escape-sequence-in-docstring | Use r""" if any backslashes in a docstring |  |
 | D400 | ends-in-period | First line should end with a period | 🛠 |
 | D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
