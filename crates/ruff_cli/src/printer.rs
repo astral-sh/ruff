@@ -498,32 +498,22 @@ fn num_digits(n: usize) -> usize {
 
 /// Print a single `Message` with full details.
 fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
-    let label = if message.kind.fixable() {
-        format!(
-            "{}{}{}{}{}{} {} [{}] {}",
-            relativize_path(Path::new(&message.filename)).bold(),
-            ":".cyan(),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            ":".cyan(),
-            message.kind.rule().code().red().bold(),
-            "*".cyan(),
-            message.kind.body(),
-        )
-    } else {
-        format!(
-            "{}{}{}{}{}{} {} {}",
-            relativize_path(Path::new(&message.filename)).bold(),
-            ":".cyan(),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            ":".cyan(),
-            message.kind.rule().code().red().bold(),
-            message.kind.body(),
-        )
-    };
+    let label = format!(
+        "{}{}{}{}{}{} {} {}{}",
+        relativize_path(Path::new(&message.filename)).bold(),
+        ":".cyan(),
+        message.location.row(),
+        ":".cyan(),
+        message.location.column(),
+        ":".cyan(),
+        message.kind.rule().code().red().bold(),
+        message
+            .kind
+            .fixable()
+            .then_some(format_args!("[{}] ", "*".cyan()))
+            .unwrap_or(format_args!("")),
+        message.kind.body(),
+    );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
         let commit = message.kind.commit();
@@ -578,30 +568,21 @@ fn print_grouped_message<T: Write>(
     row_length: usize,
     column_length: usize,
 ) -> Result<()> {
-    let label = if message.kind.fixable() {
-        format!(
-            "  {}{}{}{}{}  {}  [{}] {}",
-            " ".repeat(row_length - num_digits(message.location.row())),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            " ".repeat(column_length - num_digits(message.location.column())),
-            message.kind.rule().code().red().bold(),
-            "*".cyan(),
-            message.kind.body(),
-        )
-    } else {
-        format!(
-            "  {}{}{}{}{}  {}  {}",
-            " ".repeat(row_length - num_digits(message.location.row())),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            " ".repeat(column_length - num_digits(message.location.column())),
-            message.kind.rule().code().red().bold(),
-            message.kind.body(),
-        )
-    };
+    let label = format!(
+        "  {}{}{}{}{}  {}  {}{}",
+        " ".repeat(row_length - num_digits(message.location.row())),
+        message.location.row(),
+        ":".cyan(),
+        message.location.column(),
+        " ".repeat(column_length - num_digits(message.location.column())),
+        message.kind.rule().code().red().bold(),
+        message
+            .kind
+            .fixable()
+            .then_some(format_args!("[{}] ", "*".cyan()))
+            .unwrap_or(format_args!("")),
+        message.kind.body(),
+    );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
         let commit = message.kind.commit();
