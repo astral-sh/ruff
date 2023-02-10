@@ -1547,7 +1547,7 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::CompositeAssertion) {
                     if let Some(diagnostic) =
-                        flake8_pytest_style::rules::composite_condition(stmt, test)
+                        flake8_pytest_style::rules::composite_condition(self, stmt, test)
                     {
                         self.diagnostics.push(diagnostic);
                     }
