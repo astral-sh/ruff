@@ -1985,6 +1985,15 @@ unfixable = ["B", "SIM", "TRY", "RUF"]
 
 If you find a case where Ruff's autofix breaks your code, please file an Issue!
 
+### How can I disable Ruff's color output?
+
+Ruff's color output is powered by the [`colored`](https://crates.io/crates/colored) crate, which
+attempts to automatically detect whether the output stream supports color. However, you can force
+colors off by setting the `NO_COLOR` environment variable to any value (e.g., `NO_COLOR=1`).
+
+[`colored`](https://crates.io/crates/colored) also supports the the `CLICOLOR` and `CLICOLOR_FORCE`
+environment variables (see the [spec](https://bixense.com/clicolors/)).
+
 <!-- End section: FAQ -->
 
 ## Contributing
