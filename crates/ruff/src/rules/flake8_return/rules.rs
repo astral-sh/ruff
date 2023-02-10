@@ -179,7 +179,7 @@ const NORETURN_FUNCS: &[&[&str]] = &[
 ];
 
 /// A helper for RET503
-fn is_noreturn_function(checker: &mut Checker, func: &Expr) -> bool {
+fn is_noreturn_func(checker: &Checker, func: &Expr) -> bool {
     checker.resolve_call_path(func).map_or(false, |call_path| {
         NORETURN_FUNCS
             .iter()
@@ -234,7 +234,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
             if matches!(
                 &value.node,
                 ExprKind::Call { func, ..  }
-                    if is_noreturn_function(checker, func)
+                    if is_noreturn_func(checker, func)
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(last_stmt));
