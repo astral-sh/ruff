@@ -7,9 +7,8 @@ use syn::{Attribute, Ident};
 pub fn expand<'a>(
     rule_type: &Ident,
     prefix_ident: &Ident,
-    variants: impl Iterator<Item = &'a Ident>,
+    variants: impl Iterator<Item = (&'a Ident, &'a Vec<Attribute>)>,
     variant_name: impl Fn(&str) -> &'a Ident,
-    attr: impl Iterator<Item = &'a Vec<Attribute>>,
 ) -> proc_macro2::TokenStream {
     // Build up a map from prefix to matching RuleCodes.
     let mut prefix_to_codes: BTreeMap<String, BTreeMap<String, Vec<Attribute>>> =
@@ -17,7 +16,7 @@ pub fn expand<'a>(
 
     let mut pl_codes = BTreeMap::new();
 
-    for (variant, attr) in variants.zip(attr) {
+    for (variant, attr) in variants {
         let code_str = variant.to_string();
         let code_prefix_len = code_str
             .chars()
