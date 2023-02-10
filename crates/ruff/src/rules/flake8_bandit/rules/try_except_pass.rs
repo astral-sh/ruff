@@ -4,6 +4,7 @@ use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::rules::flake8_bandit::helpers::is_untyped_exception;
 use crate::violation::Violation;
 
 define_violation!(
@@ -26,13 +27,7 @@ pub fn try_except_pass(
 ) {
     if body.len() == 1
         && body[0].node == StmtKind::Pass
-        && (check_typed_exception
-            || type_.map_or(true, |type_| {
-                checker.resolve_call_path(type_).map_or(true, |call_path| {
-                    call_path.as_slice() == ["", "Exception"]
-                        || call_path.as_slice() == ["", "BaseException"]
-                })
-            }))
+        && (check_typed_exception || is_untyped_exception(type_, checker))
     {
         checker.diagnostics.push(Diagnostic::new(
             TryExceptPass,
