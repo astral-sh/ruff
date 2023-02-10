@@ -1,3 +1,11 @@
+import os
+import posix
+from posix import abort
+import sys as std_sys
+
+import pytest
+from pytest import xfail as py_xfail
+
 ###
 # Errors
 ###
@@ -37,6 +45,20 @@ def x(y):
             return i
     else:
         print()  # error
+
+
+# A nonexistent function
+def func_unknown(x):
+    if x > 0:
+        return False
+    no_such_function()  # error
+
+
+# A function that does return the control
+def func_no_noreturn(x):
+    if x > 0:
+        return False
+    print("", end="")  # error
 
 
 ###
@@ -123,3 +145,52 @@ def prompts(self, foo):
     for x in foo:
         yield x
         yield x + 1
+
+
+# Functions that never return
+def noreturn__exit(x):
+    if x > 0:
+        return 1
+    os._exit(0)
+
+
+def noreturn_abort(x):
+    if x > 0:
+        return 1
+    os.abort()
+
+
+def noreturn_abort_2():
+    if x > 0:
+        return 1
+    abort()
+
+
+def noreturn_exit():
+    if x > 0:
+        return 1
+    std_sys.exit(0)
+
+
+def noreturn_pytest_exit():
+    if x > 0:
+        return 1
+    pytest.exit("oof")
+
+
+def noreturn_pytest_fail():
+    if x > 0:
+        return 1
+    pytest.fail("oof")
+
+
+def noreturn_pytest_skip():
+    if x > 0:
+        return 1
+    pytest.skip("oof")
+
+
+def noreturn_pytest_xfail():
+    if x > 0:
+        return 1
+    py_xfail("oof")
