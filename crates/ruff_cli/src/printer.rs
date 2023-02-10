@@ -7,16 +7,18 @@ use std::path::Path;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use anyhow::Result;
+use colored::control::SHOULD_COLORIZE;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
+use serde::Serialize;
+use serde_json::json;
+
 use ruff::fs::relativize_path;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
 use ruff::registry::Rule;
 use ruff::settings::types::SerializationFormat;
 use ruff::{fix, notify_user};
-use serde::Serialize;
-use serde_json::json;
 
 use crate::diagnostics::Diagnostics;
 
@@ -560,7 +562,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
                 fold: false,
             }],
             opt: FormatOptions {
-                color: true,
+                color: SHOULD_COLORIZE.should_colorize(),
                 ..FormatOptions::default()
             },
         };
@@ -623,7 +625,7 @@ fn print_grouped_message<T: Write>(
                 fold: false,
             }],
             opt: FormatOptions {
-                color: true,
+                color: SHOULD_COLORIZE.should_colorize(),
                 ..FormatOptions::default()
             },
         };
