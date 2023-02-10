@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rome_formatter::{format, IndentStyle, Printed, SimpleFormatOptions};
+use rome_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
 use rustpython_parser::lexer::LexResult;
 
 use crate::attachment::attach;
@@ -24,7 +24,7 @@ pub mod shared_traits;
 mod test;
 pub mod trivia;
 
-pub fn fmt(contents: &str) -> Result<Printed> {
+pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
     // Tokenize once.
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
 
@@ -42,7 +42,7 @@ pub fn fmt(contents: &str) -> Result<Printed> {
     normalize_newlines(&mut python_cst);
     normalize_parentheses(&mut python_cst);
 
-    let elements = format!(
+    format!(
         ASTFormatContext::new(
             SimpleFormatOptions {
                 indent_style: IndentStyle::Space(4),
@@ -51,8 +51,8 @@ pub fn fmt(contents: &str) -> Result<Printed> {
             Locator::new(contents)
         ),
         [format::builders::block(&python_cst)]
-    )?;
-    elements.print().map_err(Into::into)
+    )
+    .map_err(Into::into)
 }
 
 #[cfg(test)]
@@ -73,8 +73,8 @@ mod tests {
         let content = std::fs::read_to_string(test_resource_path(
             Path::new("fixtures/black").join(path).as_path(),
         ))?;
-        let printed = fmt(&content)?;
-        insta::assert_display_snapshot!(snapshot, printed.as_code());
+        let formatted = fmt(&content)?;
+        insta::assert_display_snapshot!(snapshot, formatted.print()?.as_code());
         Ok(())
     }
 
@@ -90,8 +90,35 @@ mod tests {
         let content = std::fs::read_to_string(test_resource_path(
             Path::new("fixtures/black").join(path).as_path(),
         ))?;
-        let printed = fmt(&content)?;
-        insta::assert_display_snapshot!(snapshot, printed.as_code());
+        let formatted = fmt(&content)?;
+        insta::assert_display_snapshot!(snapshot, formatted.print()?.as_code());
         Ok(())
+    }
+
+    /// Use this test to debug the formatting of some snipped
+    #[ignore]
+    #[test]
+    fn quick_test() {
+        let src = r#"
+{
+    k: v for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
+}
+"#;
+        let formatted = fmt(&src).unwrap();
+
+        // Uncomment the `dbg` to print the IR.
+        // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR
+        // inside of a `Format` implementation
+        // dbg!(formatted.document());
+
+        let printed = formatted.print().unwrap();
+
+        assert_eq!(
+            printed.as_code(),
+            r#"{
+    k: v
+    for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
+}"#
+        );
     }
 }
