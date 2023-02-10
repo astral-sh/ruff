@@ -47,6 +47,30 @@ pub fn linter(format: HelpFormat) {
                 println!("{}", serde_json::to_string_pretty(&linters).unwrap());
             }
         }
+
+        HelpFormat::Markdown => {
+            #[allow(clippy::print_stdout)]
+            {
+                println!("| {:>6} | {:<27} |", "Prefix", "Name");
+                println!("| {:>6} | :{:<26} |", "-----:", "-".repeat(26));
+            }
+            for linter in Linter::iter() {
+                let prefix = match linter.common_prefix() {
+                    "" => linter
+                        .upstream_categories()
+                        .unwrap()
+                        .iter()
+                        .map(|UpstreamCategory(prefix, ..)| prefix.as_ref())
+                        .join("/"),
+                    prefix => prefix.to_string(),
+                };
+
+                #[allow(clippy::print_stdout)]
+                {
+                    println!("| {:>6} | {:<27} |", prefix, linter.name());
+                }
+            }
+        }
     }
 }
 

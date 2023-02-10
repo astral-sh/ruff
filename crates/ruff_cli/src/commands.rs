@@ -286,9 +286,10 @@ struct Explanation<'a> {
 pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let (linter, _) = Linter::parse_code(rule.code()).unwrap();
     let mut stdout = BufWriter::new(io::stdout().lock());
+    let mut output = String::new();
+
     match format {
-        HelpFormat::Text => {
-            let mut output = String::new();
+        HelpFormat::Text | HelpFormat::Markdown => {
             output.push_str(&format!("# {} ({})", rule.as_ref(), rule.code()));
             output.push('\n');
             output.push('\n');
@@ -316,7 +317,18 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
                     output.push_str(&format!("* {format}"));
                 }
             }
+        }
+        HelpFormat::Json => {
+            output.push_str(&serde_json::to_string_pretty(&Explanation {
+                code: rule.code(),
+                linter: linter.name(),
+                summary: rule.message_formats()[0],
+            })?);
+        }
+    };
 
+    match format {
+        HelpFormat::Text => {
             let parser = Parser::new_ext(
                 &output,
                 Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH,
@@ -340,16 +352,8 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
 
             mdcat::push_tty(settings, env, &mut stdout, parser)?;
         }
-        HelpFormat::Json => {
-            writeln!(
-                stdout,
-                "{}",
-                serde_json::to_string_pretty(&Explanation {
-                    code: rule.code(),
-                    linter: linter.name(),
-                    summary: rule.message_formats()[0],
-                })?
-            )?;
+        HelpFormat::Json | HelpFormat::Markdown => {
+            writeln!(stdout, "{output}")?;
         }
     };
     Ok(())

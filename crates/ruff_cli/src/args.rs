@@ -284,6 +284,7 @@ pub struct CheckArgs {
 pub enum HelpFormat {
     Text,
     Json,
+    Markdown,
 }
 
 #[allow(clippy::module_name_repetitions)]
