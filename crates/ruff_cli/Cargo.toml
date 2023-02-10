@@ -53,6 +53,9 @@ similar = { version = "2.2.1" }
 textwrap = { version = "0.16.0" }
 walkdir = { version = "2.3.2" }
 strum = "0.24.1"
+mdcat = "1.0.0"
+syntect = "5.0.0"
+pulldown-cmark = "0.9.2"
 
 [dev-dependencies]
 assert_cmd = { version = "2.0.4" }
