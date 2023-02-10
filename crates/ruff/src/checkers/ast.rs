@@ -5055,11 +5055,11 @@ impl<'a> Checker<'a> {
                 .settings
                 .rules
                 .enabled(&Rule::SectionUnderlineNotOverIndented)
-            || self.settings.rules.enabled(&Rule::UsesTripleQuotes)
+            || self.settings.rules.enabled(&Rule::TripleSingleQuotes)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::UsesRPrefixForBackslashedContent)
+                .enabled(&Rule::EscapeSequenceInDocstring)
             || self.settings.rules.enabled(&Rule::EndsInPeriod)
             || self.settings.rules.enabled(&Rule::NonImperativeMood)
             || self.settings.rules.enabled(&Rule::NoSignature)
@@ -5203,13 +5203,13 @@ impl<'a> Checker<'a> {
                 {
                     pydocstyle::rules::multi_line_summary_start(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::UsesTripleQuotes) {
+                if self.settings.rules.enabled(&Rule::TripleSingleQuotes) {
                     pydocstyle::rules::triple_quotes(self, &docstring);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UsesRPrefixForBackslashedContent)
+                    .enabled(&Rule::EscapeSequenceInDocstring)
                 {
                     pydocstyle::rules::backslashes(self, &docstring);
                 }
