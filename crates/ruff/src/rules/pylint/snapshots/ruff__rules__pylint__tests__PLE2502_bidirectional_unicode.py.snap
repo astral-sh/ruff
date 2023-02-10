@@ -6,40 +6,40 @@ expression: diagnostics
     BidirectionalUnicode: ~
   location:
     row: 2
-    column: 6
+    column: 0
   end_location:
-    row: 2
-    column: 13
+    row: 3
+    column: 0
   fix: ~
   parent: ~
 - kind:
     BidirectionalUnicode: ~
   location:
     row: 5
-    column: 10
+    column: 0
   end_location:
-    row: 5
-    column: 14
+    row: 6
+    column: 0
   fix: ~
   parent: ~
 - kind:
     BidirectionalUnicode: ~
   location:
     row: 8
-    column: 19
+    column: 0
   end_location:
-    row: 8
-    column: 27
+    row: 9
+    column: 0
   fix: ~
   parent: ~
 - kind:
     BidirectionalUnicode: ~
   location:
     row: 14
-    column: 4
+    column: 0
   end_location:
-    row: 14
-    column: 49
+    row: 15
+    column: 0
   fix: ~
   parent: ~
 

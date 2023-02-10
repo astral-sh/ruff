@@ -6,8 +6,8 @@ use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
-    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_quotes, pycodestyle, pylint,
-    pyupgrade, ruff,
+    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_quotes, pycodestyle, pyupgrade,
+    ruff,
 };
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
@@ -57,7 +57,6 @@ pub fn check_tokens(
             .enabled(&Rule::TrailingCommaOnBareTupleProhibited)
         || settings.rules.enabled(&Rule::TrailingCommaProhibited);
     let enforce_extraneous_parenthesis = settings.rules.enabled(&Rule::ExtraneousParentheses);
-    let enforce_bidirectional_unicode = settings.rules.enabled(&Rule::BidirectionalUnicode);
 
     // RUF001, RUF002, RUF003
     if enforce_ambiguous_unicode_character {
@@ -163,15 +162,6 @@ pub fn check_tokens(
             pyupgrade::rules::extraneous_parentheses(tokens, locator, settings, autofix)
                 .into_iter(),
         );
-    }
-
-    // PLE2502
-    if enforce_bidirectional_unicode {
-        for (start, tok, end) in tokens.iter().flatten() {
-            if matches!(tok, Tok::String { .. }) {
-                diagnostics.extend(pylint::rules::bidirectional_unicode(locator, *start, *end));
-            }
-        }
     }
 
     diagnostics

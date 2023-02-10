@@ -755,6 +755,7 @@ impl Rule {
             | Rule::ShebangMissingExecutableFile
             | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
+            | Rule::BidirectionalUnicode
             | Rule::ShebangPython
             | Rule::ShebangWhitespace => &LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
@@ -764,7 +765,6 @@ impl Rule {
             | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString
-            | Rule::BidirectionalUnicode
             | Rule::CommentedOutCode
             | Rule::MultiLineImplicitStringConcatenation
             | Rule::ExtraneousParentheses
