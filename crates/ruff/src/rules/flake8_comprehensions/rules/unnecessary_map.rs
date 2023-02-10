@@ -8,28 +8,31 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::rules::flake8_comprehensions::rules::helpers::function_name;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::violation::{AutofixKind, Availability, Violation};
 
 define_violation!(
     /// ### What it does
     /// Checks for unnecessary `map` usage.
     ///
-    /// ## Why is this bad?
+    /// ### Why is this bad?
     /// `map(func, iterable)` has great performance when func is a built-in function, and it
     /// makes sense if your function already has a name. But if your func is a lambda, it’s
     /// faster to use a generator expression or a comprehension, as it avoids the function call
-    /// overhead. For example:
+    /// overhead.
     ///
+    /// ### Examples
     /// Rewrite `map(lambda x: x + 1, iterable)` to `(x + 1 for x in iterable)`
     /// Rewrite `map(lambda item: get_id(item), items)` to `(get_id(item) for item in items)`
     /// Rewrite `list(map(lambda num: num * 2, nums))` to `[num * 2 for num in nums]`
     /// Rewrite `set(map(lambda num: num % 2 == 0, nums))` to `{num % 2 == 0 for num in nums}`
-    /// Rewrite `dict(map(lambda v: (v, v ** 2), values))` to `{v : v ** 2 for v in values}`
+    /// Rewrite `dict(map(lambda v: (v, v ** 2), values))` to `{v: v ** 2 for v in values}`
     pub struct UnnecessaryMap {
         pub obj_type: String,
     }
 );
-impl AlwaysAutofixableViolation for UnnecessaryMap {
+impl Violation for UnnecessaryMap {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UnnecessaryMap { obj_type } = self;
@@ -40,13 +43,14 @@ impl AlwaysAutofixableViolation for UnnecessaryMap {
         }
     }
 
-    fn autofix_title(&self) -> String {
-        let UnnecessaryMap { obj_type } = self;
-        if obj_type == "generator" {
-            format!("Replace `map` using a generator expression")
-        } else {
-            format!("Replace `map` using a `{obj_type}` comprehension")
-        }
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|UnnecessaryMap { obj_type }| {
+            if obj_type == "generator" {
+                format!("Replace `map` using a generator expression")
+            } else {
+                format!("Replace `map` using a `{obj_type}` comprehension")
+            }
+        })
     }
 }
 
@@ -79,11 +83,10 @@ pub fn unnecessary_map(
             // Exclude the parent if already matched by other arms
             if let Some(parent) = parent {
                 if let ExprKind::Call { func: f, .. } = &parent.node {
-                    let Some(id_parent) = function_name(f)  else {
-                        return;
-                    };
-                    if id_parent == "dict" || id_parent == "set" || id_parent == "list" {
-                        return;
+                    if let Some(id_parent) = function_name(f) {
+                        if id_parent == "dict" || id_parent == "set" || id_parent == "list" {
+                            return;
+                        }
                     }
                 };
             };

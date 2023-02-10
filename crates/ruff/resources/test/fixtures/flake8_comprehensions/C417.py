@@ -7,6 +7,10 @@ dict(map(lambda v: (v, v**2), nums))
 map(lambda: "const", nums)
 map(lambda _: 3.0, nums)
 
+_ = ''.join(map(lambda x: x in nums and '1' or '0', range(123)))
+all(map(lambda v: isinstance(v, dict), nums))
+filter(func, map(lambda v: v, nums))
+
 # valid, but no autofix
 # for simple expressions this could be `(x if x else 1 for x in nums)`
 # for more complex expressions this would be different e.g. `(x + 2 if x else 3 for x in nums)`

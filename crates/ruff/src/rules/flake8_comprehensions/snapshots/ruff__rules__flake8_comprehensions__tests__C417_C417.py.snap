@@ -139,10 +139,67 @@ expression: diagnostics
     UnnecessaryMap:
       obj_type: generator
   location:
-    row: 13
+    row: 10
+    column: 12
+  end_location:
+    row: 10
+    column: 63
+  fix:
+    content:
+      - "(x in nums and '1' or '0' for x in range(123))"
+    location:
+      row: 10
+      column: 12
+    end_location:
+      row: 10
+      column: 63
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 44
+  fix:
+    content:
+      - "(isinstance(v, dict) for v in nums)"
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 11
+      column: 44
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 12
+    column: 13
+  end_location:
+    row: 12
+    column: 35
+  fix:
+    content:
+      - (v for v in nums)
+    location:
+      row: 12
+      column: 13
+    end_location:
+      row: 12
+      column: 35
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 17
     column: 0
   end_location:
-    row: 13
+    row: 17
     column: 24
   fix: ~
   parent: ~
