@@ -233,23 +233,58 @@ pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic
         .collect()
 }
 
-/// Check if the test expression is a composite condition.
-/// For example, `a and b` or `not (a or b)`. The latter is equivalent
-/// to `not a and not b` by De Morgan's laws.
-const fn is_composite_condition(test: &Expr) -> bool {
+enum CompositionKind {
+    // E.g., `a or b or c`.
+    None,
+    // E.g., `a and b` or `not (a or b)`.
+    Simple,
+    // E.g., `not (a and b or c)`.
+    Mixed,
+}
+
+/// Check if the test expression is a composite condition, and whether it can
+/// be split into multiple independent conditions.
+///
+/// For example, `a and b` or `not (a or b)`. The latter is equivalent to
+/// `not a and not b` by De Morgan's laws.
+fn is_composite_condition(test: &Expr) -> CompositionKind {
     match &test.node {
         ExprKind::BoolOp {
             op: Boolop::And, ..
-        } => true,
+        } => {
+            return CompositionKind::Simple;
+        }
         ExprKind::UnaryOp {
             op: Unaryop::Not,
             operand,
-        } => matches!(&operand.node, ExprKind::BoolOp { op: Boolop::Or, .. }),
-        _ => false,
+        } => {
+            if let ExprKind::BoolOp {
+                op: Boolop::Or,
+                values,
+            } = &operand.node
+            {
+                // Only split cases without mixed `and` and `or`.
+                return if values.iter().all(|expr| {
+                    !matches!(
+                        expr.node,
+                        ExprKind::BoolOp {
+                            op: Boolop::And,
+                            ..
+                        }
+                    )
+                }) {
+                    CompositionKind::Simple
+                } else {
+                    CompositionKind::Mixed
+                };
+            }
+        }
+        _ => {}
     }
+    CompositionKind::None
 }
 
-/// Negate condition, i.e. `a` => `not a` and `not a` => `a`
+/// Negate a condition, i.e., `a` => `not a` and `not a` => `a`.
 fn negate(f: Expr) -> Expr {
     match f.node {
         ExprKind::UnaryOp {
@@ -263,37 +298,8 @@ fn negate(f: Expr) -> Expr {
     }
 }
 
-/// Return `true` if the condition appears to be a fixable composite condition.
-fn is_fixable_composite_condition(test: &Expr) -> bool {
-    let ExprKind::UnaryOp {
-        op: Unaryop::Not,
-        operand,
-    } = &test.node else {
-         return true;
-    };
-    let ExprKind::BoolOp {
-        op: Boolop::Or,
-        values,
-    } = &operand.node else {
-         return true;
-     };
-    // Only take cases without mixed `and` and `or`
-    values.iter().all(|expr| {
-        !matches!(
-            expr.node,
-            ExprKind::BoolOp {
-                op: Boolop::And,
-                ..
-            }
-        )
-    })
-}
-
 /// Replace composite condition `assert a == "hello" and b == "world"` with two statements
 /// `assert a == "hello"` and `assert b == "world"`.
-///
-/// It's assumed that the condition is fixable, i.e., that `is_fixable_composite_condition`
-/// returns `true`.
 fn fix_composite_condition(stylist: &Stylist, stmt: &Stmt, test: &Expr) -> Fix {
     let mut conditions: Vec<Expr> = vec![];
     match &test.node {
@@ -301,7 +307,7 @@ fn fix_composite_condition(stylist: &Stylist, stmt: &Stmt, test: &Expr) -> Fix {
             op: Boolop::And,
             values,
         } => {
-            // Compound, so split (Split)
+            // Compound, so split.
             conditions.extend(values.clone());
         }
         ExprKind::UnaryOp {
@@ -313,17 +319,11 @@ fn fix_composite_condition(stylist: &Stylist, stmt: &Stmt, test: &Expr) -> Fix {
                     op: Boolop::Or,
                     values,
                 } => {
-                    // `not (a or b)` equals `not a and not b`
-                    let vals = values
-                        .iter()
-                        .map(|f| negate(f.clone()))
-                        .collect::<Vec<Expr>>();
-
-                    // Compound, so split (Split)
-                    conditions.extend(vals);
+                    // Split via `not (a or b)` equals `not a and not b`.
+                    conditions.extend(values.iter().map(|f| negate(f.clone())));
                 }
                 _ => {
-                    // Do not split
+                    // Do not split.
                     conditions.push(*operand.clone());
                 }
             }
@@ -331,7 +331,7 @@ fn fix_composite_condition(stylist: &Stylist, stmt: &Stmt, test: &Expr) -> Fix {
         _ => {}
     };
 
-    // for each condition create `assert condition`
+    // For each condition, create an `assert condition` statement.
     let mut content: Vec<String> = Vec::with_capacity(conditions.len());
     for condition in conditions {
         content.push(unparse_stmt(
@@ -349,8 +349,9 @@ fn fix_composite_condition(stylist: &Stylist, stmt: &Stmt, test: &Expr) -> Fix {
 
 /// PT018
 pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
-    if is_composite_condition(test) {
-        let fixable = msg.is_none() && is_fixable_composite_condition(test);
+    let composite = is_composite_condition(test);
+    if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
+        let fixable = matches!(composite, CompositionKind::Simple) && msg.is_none();
         let mut diagnostic =
             Diagnostic::new(CompositeAssertion { fixable }, Range::from_located(stmt));
         if fixable && checker.patch(diagnostic.kind.rule()) {
