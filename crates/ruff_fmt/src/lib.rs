@@ -35,7 +35,7 @@ pub fn fmt(contents: &str) -> Result<Printed> {
     let python_ast = rustpython_helpers::parse_program_tokens(tokens, "<filename>")?;
 
     // Convert to a CST.
-    let mut python_cst: Vec<Stmt> = python_ast.into_iter().map(Into::into).collect::<Vec<_>>();
+    let mut python_cst: Vec<Stmt> = python_ast.into_iter().map(Into::into).collect();
 
     // Attach trivia.
     attach(&mut python_cst, trivia);

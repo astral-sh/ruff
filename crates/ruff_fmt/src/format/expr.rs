@@ -2,7 +2,7 @@
 
 use rome_formatter::prelude::*;
 use rome_formatter::{format_args, write};
-use rome_rowan::TextSize;
+use rome_text_size::TextSize;
 use rustpython_ast::Constant;
 
 use crate::builders::literal;

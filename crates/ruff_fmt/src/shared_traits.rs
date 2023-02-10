@@ -22,25 +22,6 @@ where
     }
 }
 
-/// Implement [`AsFormat`] for [`SyntaxResult`] where `T` implements
-/// [`AsFormat`].
-///
-/// Useful to format mandatory AST fields without having to unwrap the value
-/// first.
-impl<T, C> AsFormat<C> for rome_rowan::SyntaxResult<T>
-where
-    T: AsFormat<C>,
-{
-    type Format<'a> = rome_rowan::SyntaxResult<T::Format<'a>> where Self: 'a;
-
-    fn format(&self) -> Self::Format<'_> {
-        match self {
-            Ok(value) => Ok(value.format()),
-            Err(err) => Err(*err),
-        }
-    }
-}
-
 /// Implement [`AsFormat`] for [`Option`] when `T` implements [`AsFormat`]
 ///
 /// Allows to call format on optional AST fields without having to unwrap the
@@ -63,17 +44,6 @@ pub trait IntoFormat<Context> {
     type Format: rome_formatter::Format<Context>;
 
     fn into_format(self) -> Self::Format;
-}
-
-impl<T, Context> IntoFormat<Context> for rome_rowan::SyntaxResult<T>
-where
-    T: IntoFormat<Context>,
-{
-    type Format = rome_rowan::SyntaxResult<T::Format>;
-
-    fn into_format(self) -> Self::Format {
-        self.map(IntoFormat::into_format)
-    }
 }
 
 /// Implement [`IntoFormat`] for [`Option`] when `T` implements [`IntoFormat`]

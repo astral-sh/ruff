@@ -2,7 +2,7 @@
 
 use rome_formatter::prelude::*;
 use rome_formatter::{format_args, write};
-use rome_rowan::TextSize;
+use rome_text_size::TextSize;
 
 use crate::builders::literal;
 use crate::context::ASTFormatContext;

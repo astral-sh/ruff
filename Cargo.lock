@@ -2758,7 +2758,7 @@ dependencies = [
  "insta",
  "once_cell",
  "rome_formatter",
- "rome_rowan",
+ "rome_text_size",
  "rustc-hash",
  "rustpython-ast 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383)",
  "rustpython-common 0.2.0 (git+https://github.com/RustPython/RustPython.git?rev=4f38cb68e4a97aeea9eb19673803a0bd5f655383)",
