@@ -4326,11 +4326,6 @@ impl<'a> Checker<'a> {
                 _ => false,
             } {
                 let (all_names, all_names_flags) = extract_all_names(self, parent, current);
-                let all_bindings: Vec<usize> = all_names
-                    .iter()
-                    .filter_map(|name| current.bindings.get(name.as_str()))
-                    .copied()
-                    .collect();
 
                 if self.settings.rules.enabled(&Rule::InvalidAllFormat) {
                     if matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT) {
@@ -4344,15 +4339,6 @@ impl<'a> Checker<'a> {
                         self.diagnostics
                             .push(pylint::rules::invalid_all_object(expr));
                     }
-                }
-
-                // Mark all exported names as used-at-runtime.
-                for index in all_bindings {
-                    self.bindings[index].mark_used(
-                        GLOBAL_SCOPE_INDEX,
-                        Range::from_located(expr),
-                        ExecutionContext::Runtime,
-                    );
                 }
 
                 self.add_binding(
@@ -4617,6 +4603,47 @@ impl<'a> Checker<'a> {
             return;
         }
 
+        // Mark anything referenced in `__all__` as used.
+        let global_scope = &self.scopes[GLOBAL_SCOPE_INDEX];
+        let all_names: Option<(&Vec<String>, Range)> = global_scope
+            .bindings
+            .get("__all__")
+            .map(|index| &self.bindings[*index])
+            .and_then(|binding| match &binding.kind {
+                BindingKind::Export(names) => Some((names, binding.range)),
+                _ => None,
+            });
+        let all_bindings: Option<(Vec<usize>, Range)> = all_names.map(|(names, range)| {
+            (
+                names
+                    .iter()
+                    .filter_map(|name| global_scope.bindings.get(name.as_str()).copied())
+                    .collect(),
+                range,
+            )
+        });
+        if let Some((bindings, range)) = all_bindings {
+            for index in bindings {
+                self.bindings[index].mark_used(
+                    GLOBAL_SCOPE_INDEX,
+                    range,
+                    ExecutionContext::Runtime,
+                );
+            }
+        }
+
+        // Extract `__all__` names from the global scope.
+        let all_names: Option<(Vec<&str>, Range)> = global_scope
+            .bindings
+            .get("__all__")
+            .map(|index| &self.bindings[*index])
+            .and_then(|binding| match &binding.kind {
+                BindingKind::Export(names) => {
+                    Some((names.iter().map(String::as_str).collect(), binding.range))
+                }
+                _ => None,
+            });
+
         // Identify any valid runtime imports. If a module is imported at runtime, and
         // used at runtime, then by default, we avoid flagging any other
         // imports from that model as typing-only.
@@ -4687,29 +4714,17 @@ impl<'a> Checker<'a> {
                 continue;
             }
 
-            let all_binding: Option<&Binding> = scope
-                .bindings
-                .get("__all__")
-                .map(|index| &self.bindings[*index]);
-            let all_names: Option<Vec<&str>> =
-                all_binding.and_then(|binding| match &binding.kind {
-                    BindingKind::Export(names) => Some(names.iter().map(String::as_str).collect()),
-                    _ => None,
-                });
-
             if self.settings.rules.enabled(&Rule::UndefinedExport) {
                 if !scope.import_starred && !self.path.ends_with("__init__.py") {
-                    if let Some(all_binding) = all_binding {
-                        if let Some(names) = &all_names {
-                            for &name in names {
-                                if !scope.bindings.contains_key(name) {
-                                    diagnostics.push(Diagnostic::new(
-                                        pyflakes::rules::UndefinedExport {
-                                            name: name.to_string(),
-                                        },
-                                        all_binding.range,
-                                    ));
-                                }
+                    if let Some((names, range)) = &all_names {
+                        for &name in names {
+                            if !scope.bindings.contains_key(name) {
+                                diagnostics.push(Diagnostic::new(
+                                    pyflakes::rules::UndefinedExport {
+                                        name: name.to_string(),
+                                    },
+                                    *range,
+                                ));
                             }
                         }
                     }
@@ -4761,31 +4776,27 @@ impl<'a> Checker<'a> {
 
             if self.settings.rules.enabled(&Rule::ImportStarUsage) {
                 if scope.import_starred {
-                    if let Some(all_binding) = all_binding {
-                        if let Some(names) = &all_names {
-                            let mut from_list = vec![];
-                            for binding in
-                                scope.bindings.values().map(|index| &self.bindings[*index])
-                            {
-                                if let BindingKind::StarImportation(level, module) = &binding.kind {
-                                    from_list.push(helpers::format_import_from(
-                                        level.as_ref(),
-                                        module.as_deref(),
-                                    ));
-                                }
+                    if let Some((names, range)) = &all_names {
+                        let mut from_list = vec![];
+                        for binding in scope.bindings.values().map(|index| &self.bindings[*index]) {
+                            if let BindingKind::StarImportation(level, module) = &binding.kind {
+                                from_list.push(helpers::format_import_from(
+                                    level.as_ref(),
+                                    module.as_deref(),
+                                ));
                             }
-                            from_list.sort();
+                        }
+                        from_list.sort();
 
-                            for &name in names {
-                                if !scope.bindings.contains_key(name) {
-                                    diagnostics.push(Diagnostic::new(
-                                        pyflakes::rules::ImportStarUsage {
-                                            name: name.to_string(),
-                                            sources: from_list.clone(),
-                                        },
-                                        all_binding.range,
-                                    ));
-                                }
+                        for &name in names {
+                            if !scope.bindings.contains_key(name) {
+                                diagnostics.push(Diagnostic::new(
+                                    pyflakes::rules::ImportStarUsage {
+                                        name: name.to_string(),
+                                        sources: from_list.clone(),
+                                    },
+                                    *range,
+                                ));
                             }
                         }
                     }
