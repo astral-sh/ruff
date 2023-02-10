@@ -1,10 +1,15 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
 def function(**kwargs):
     t = a**2 + b**3
-    return t ** 2
+    return t**2
 
 
 def function_replace_spaces(**kwargs):
-    t = a **2 + b** 3 + c ** 4
+    t = a**2 + b**3 + c**4
 
 
 def function_dont_replace_spaces():
@@ -61,3 +66,4 @@ if hasattr(view, "sum_of_weights"):
 return np.divide(
     where=view.sum_of_weights_of_weight_long**2 > view.sum_of_weights_squared,  # type: ignore
 )
+

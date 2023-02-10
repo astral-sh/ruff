@@ -1,10 +1,13 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
 """The asyncio package, tracking PEP 3156."""
 
 # flake8: noqa
 
-from logging import (
-    WARNING
-)
+from logging import WARNING
 from logging import (
     ERROR,
 )
@@ -24,16 +27,33 @@ from ..queues import *
 from ..streams import *
 
 from some_library import (
-    Just, Enough, Libraries, To, Fit, In, This, Nice, Split, Which, We, No, Longer, Use
+    Just,
+    Enough,
+    Libraries,
+    To,
+    Fit,
+    In,
+    This,
+    Nice,
+    Split,
+    Which,
+    We,
+    No,
+    Longer,
+    Use,
 )
-from name_of_a_company.extremely_long_project_name.component.ttypes import CuteLittleServiceHandlerFactoryyy
+from name_of_a_company.extremely_long_project_name.component.ttypes import (
+    CuteLittleServiceHandlerFactoryyy,
+)
 from name_of_a_company.extremely_long_project_name.extremely_long_component_name.ttypes import *
 
 from .a.b.c.subprocess import *
-from . import (tasks)
-from . import (A, B, C)
-from . import SomeVeryLongNameAndAllOfItsAdditionalLetters1, \
-              SomeVeryLongNameAndAllOfItsAdditionalLetters2
+from . import tasks
+from . import A, B, C
+from . import (
+    SomeVeryLongNameAndAllOfItsAdditionalLetters1,
+    SomeVeryLongNameAndAllOfItsAdditionalLetters2,
+)
 
 __all__ = (
     base_events.__all__
@@ -47,3 +67,4 @@ __all__ = (
     + streams.__all__
     + tasks.__all__
 )
+

@@ -512,32 +512,55 @@ fn format_import_from(
     write!(f, [text("import")])?;
     write!(f, [space()])?;
 
-    let magic_trailing_comma = stmt
-        .trivia
-        .iter()
-        .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
-    write!(
-        f,
-        [group(&format_args![
-            if_group_breaks(&text("(")),
-            soft_block_indent(&format_with(|f| {
-                if magic_trailing_comma {
-                    write!(f, [expand_parent()])?;
-                }
-                for (i, name) in names.iter().enumerate() {
-                    write!(f, [name.format()])?;
-                    if i < names.len() - 1 {
-                        write!(f, [text(",")])?;
-                        write!(f, [soft_line_break_or_space()])?;
-                    } else {
-                        write!(f, [if_group_breaks(&text(","))])?;
+    if names.iter().any(|name| name.node.name == "*") {
+        write!(f, [text("*")])?;
+    } else {
+        let magic_trailing_comma = stmt
+            .trivia
+            .iter()
+            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+        write!(
+            f,
+            [group(&format_args![
+                if_group_breaks(&text("(")),
+                soft_block_indent(&format_with(|f| {
+                    if magic_trailing_comma {
+                        write!(f, [expand_parent()])?;
                     }
-                }
-                Ok(())
-            })),
-            if_group_breaks(&text(")")),
-        ])]
-    )?;
+                    for (i, name) in names.iter().enumerate() {
+                        write!(f, [name.format()])?;
+                        if i < names.len() - 1 {
+                            write!(f, [text(",")])?;
+                            write!(f, [soft_line_break_or_space()])?;
+                        } else {
+                            write!(f, [if_group_breaks(&text(","))])?;
+                        }
+                    }
+                    Ok(())
+                })),
+                if_group_breaks(&text(")")),
+            ])]
+        )?;
+    }
+
+    // Apply any inline comments.
+    let mut first = true;
+    for range in stmt.trivia.iter().filter_map(|trivia| {
+        if matches!(trivia.relationship, Relationship::Trailing) {
+            if let TriviaKind::InlineComment(range) = trivia.kind {
+                Some(range)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }) {
+        if std::mem::take(&mut first) {
+            write!(f, [text("  ")])?;
+        }
+        write!(f, [literal(range)])?;
+    }
 
     Ok(())
 }

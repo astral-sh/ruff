@@ -721,7 +721,7 @@ fn format_bin_op(
     let is_simple =
         matches!(op, Operator::Pow) && (is_simple_power(left) && is_simple_power(right));
 
-    write!(f, [group(&format_args![left.format()])])?;
+    write!(f, [left.format()])?;
     if !is_simple {
         write!(f, [soft_line_break_or_space()])?;
     }
