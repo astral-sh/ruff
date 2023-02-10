@@ -22,4 +22,24 @@ expression: diagnostics
     column: 12
   fix: ~
   parent: ~
+- kind:
+    TryExceptContinue: ~
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    TryExceptContinue: ~
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 12
+  fix: ~
+  parent: ~
 
