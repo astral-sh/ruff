@@ -36,6 +36,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>)
 
         let rule_name = rule.as_ref();
 
+        #[allow(clippy::or_fun_call)]
         table_out.push_str(&format!(
             "| {} | {} | {} | {} |",
             rule.code(),
