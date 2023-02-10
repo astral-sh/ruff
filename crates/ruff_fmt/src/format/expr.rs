@@ -3,7 +3,7 @@
 use rome_formatter::prelude::*;
 use rome_formatter::{format_args, write};
 use rome_text_size::TextSize;
-use rustpython_ast::Constant;
+use rustpython_parser::ast::Constant;
 
 use crate::builders::literal;
 use crate::context::ASTFormatContext;
@@ -847,9 +847,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
                 format_generator_exp(f, self.item, elt, generators)
             }
             ExprKind::Await { value } => format_await(f, self.item, value),
-            ExprKind::Yield { value } => {
-                format_yield(f, self.item, value.as_deref())
-            }
+            ExprKind::Yield { value } => format_yield(f, self.item, value.as_deref()),
             ExprKind::YieldFrom { value } => format_yield_from(f, self.item, value),
             ExprKind::Compare {
                 left,

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 use crate::cst::{Expr, Located, Stmt};
 
@@ -63,14 +63,14 @@ impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
     }
 }
 
-impl<'a> From<&RefEquality<'a, rustpython_ast::Stmt>> for &'a rustpython_ast::Stmt {
-    fn from(r: &RefEquality<'a, rustpython_ast::Stmt>) -> Self {
+impl<'a> From<&RefEquality<'a, rustpython_parser::ast::Stmt>> for &'a rustpython_parser::ast::Stmt {
+    fn from(r: &RefEquality<'a, rustpython_parser::ast::Stmt>) -> Self {
         r.0
     }
 }
 
-impl<'a> From<&RefEquality<'a, rustpython_ast::Expr>> for &'a rustpython_ast::Expr {
-    fn from(r: &RefEquality<'a, rustpython_ast::Expr>) -> Self {
+impl<'a> From<&RefEquality<'a, rustpython_parser::ast::Expr>> for &'a rustpython_parser::ast::Expr {
+    fn from(r: &RefEquality<'a, rustpython_parser::ast::Expr>) -> Self {
         r.0
     }
 }

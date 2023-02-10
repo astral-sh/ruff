@@ -1,4 +1,4 @@
-use rustpython_ast::Constant;
+use rustpython_parser::ast::Constant;
 
 use crate::core::visitor;
 use crate::core::visitor::Visitor;

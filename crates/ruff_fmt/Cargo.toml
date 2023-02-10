@@ -11,7 +11,6 @@ once_cell = "1.17.0"
 rome_formatter = { path = "../../../tools/crates/rome_formatter" }
 rome_text_size = { path = "../../../tools/crates/rome_text_size" }
 rustc-hash = "1.1.0"
-rustpython-ast = { git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "4f38cb68e4a97aeea9eb19673803a0bd5f655383" }
+rustpython-common = { workspace = true }
+rustpython-parser = { workspace = true }
 test-case = { version = "2.2.2" }

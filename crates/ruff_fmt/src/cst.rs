@@ -1,6 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use rustpython_ast::{Constant, Location};
+use rustpython_parser::ast::{Constant, Location};
 
 use crate::trivia::{Parenthesize, Trivia};
 
@@ -42,12 +42,12 @@ pub enum ExprContext {
     Del,
 }
 
-impl From<rustpython_ast::ExprContext> for ExprContext {
-    fn from(context: rustpython_ast::ExprContext) -> Self {
+impl From<rustpython_parser::ast::ExprContext> for ExprContext {
+    fn from(context: rustpython_parser::ast::ExprContext) -> Self {
         match context {
-            rustpython_ast::ExprContext::Load => Self::Load,
-            rustpython_ast::ExprContext::Store => Self::Store,
-            rustpython_ast::ExprContext::Del => Self::Del,
+            rustpython_parser::ast::ExprContext::Load => Self::Load,
+            rustpython_parser::ast::ExprContext::Store => Self::Store,
+            rustpython_parser::ast::ExprContext::Del => Self::Del,
         }
     }
 }
@@ -58,11 +58,11 @@ pub enum Boolop {
     Or,
 }
 
-impl From<rustpython_ast::Boolop> for Boolop {
-    fn from(op: rustpython_ast::Boolop) -> Self {
+impl From<rustpython_parser::ast::Boolop> for Boolop {
+    fn from(op: rustpython_parser::ast::Boolop) -> Self {
         match op {
-            rustpython_ast::Boolop::And => Self::And,
-            rustpython_ast::Boolop::Or => Self::Or,
+            rustpython_parser::ast::Boolop::And => Self::And,
+            rustpython_parser::ast::Boolop::Or => Self::Or,
         }
     }
 }
@@ -84,22 +84,22 @@ pub enum Operator {
     FloorDiv,
 }
 
-impl From<rustpython_ast::Operator> for Operator {
-    fn from(op: rustpython_ast::Operator) -> Self {
+impl From<rustpython_parser::ast::Operator> for Operator {
+    fn from(op: rustpython_parser::ast::Operator) -> Self {
         match op {
-            rustpython_ast::Operator::Add => Self::Add,
-            rustpython_ast::Operator::Sub => Self::Sub,
-            rustpython_ast::Operator::Mult => Self::Mult,
-            rustpython_ast::Operator::MatMult => Self::MatMult,
-            rustpython_ast::Operator::Div => Self::Div,
-            rustpython_ast::Operator::Mod => Self::Mod,
-            rustpython_ast::Operator::Pow => Self::Pow,
-            rustpython_ast::Operator::LShift => Self::LShift,
-            rustpython_ast::Operator::RShift => Self::RShift,
-            rustpython_ast::Operator::BitOr => Self::BitOr,
-            rustpython_ast::Operator::BitXor => Self::BitXor,
-            rustpython_ast::Operator::BitAnd => Self::BitAnd,
-            rustpython_ast::Operator::FloorDiv => Self::FloorDiv,
+            rustpython_parser::ast::Operator::Add => Self::Add,
+            rustpython_parser::ast::Operator::Sub => Self::Sub,
+            rustpython_parser::ast::Operator::Mult => Self::Mult,
+            rustpython_parser::ast::Operator::MatMult => Self::MatMult,
+            rustpython_parser::ast::Operator::Div => Self::Div,
+            rustpython_parser::ast::Operator::Mod => Self::Mod,
+            rustpython_parser::ast::Operator::Pow => Self::Pow,
+            rustpython_parser::ast::Operator::LShift => Self::LShift,
+            rustpython_parser::ast::Operator::RShift => Self::RShift,
+            rustpython_parser::ast::Operator::BitOr => Self::BitOr,
+            rustpython_parser::ast::Operator::BitXor => Self::BitXor,
+            rustpython_parser::ast::Operator::BitAnd => Self::BitAnd,
+            rustpython_parser::ast::Operator::FloorDiv => Self::FloorDiv,
         }
     }
 }
@@ -112,13 +112,13 @@ pub enum Unaryop {
     USub,
 }
 
-impl From<rustpython_ast::Unaryop> for Unaryop {
-    fn from(op: rustpython_ast::Unaryop) -> Self {
+impl From<rustpython_parser::ast::Unaryop> for Unaryop {
+    fn from(op: rustpython_parser::ast::Unaryop) -> Self {
         match op {
-            rustpython_ast::Unaryop::Invert => Self::Invert,
-            rustpython_ast::Unaryop::Not => Self::Not,
-            rustpython_ast::Unaryop::UAdd => Self::UAdd,
-            rustpython_ast::Unaryop::USub => Self::USub,
+            rustpython_parser::ast::Unaryop::Invert => Self::Invert,
+            rustpython_parser::ast::Unaryop::Not => Self::Not,
+            rustpython_parser::ast::Unaryop::UAdd => Self::UAdd,
+            rustpython_parser::ast::Unaryop::USub => Self::USub,
         }
     }
 }
@@ -137,19 +137,19 @@ pub enum Cmpop {
     NotIn,
 }
 
-impl From<rustpython_ast::Cmpop> for Cmpop {
-    fn from(op: rustpython_ast::Cmpop) -> Self {
+impl From<rustpython_parser::ast::Cmpop> for Cmpop {
+    fn from(op: rustpython_parser::ast::Cmpop) -> Self {
         match op {
-            rustpython_ast::Cmpop::Eq => Self::Eq,
-            rustpython_ast::Cmpop::NotEq => Self::NotEq,
-            rustpython_ast::Cmpop::Lt => Self::Lt,
-            rustpython_ast::Cmpop::LtE => Self::LtE,
-            rustpython_ast::Cmpop::Gt => Self::Gt,
-            rustpython_ast::Cmpop::GtE => Self::GtE,
-            rustpython_ast::Cmpop::Is => Self::Is,
-            rustpython_ast::Cmpop::IsNot => Self::IsNot,
-            rustpython_ast::Cmpop::In => Self::In,
-            rustpython_ast::Cmpop::NotIn => Self::NotIn,
+            rustpython_parser::ast::Cmpop::Eq => Self::Eq,
+            rustpython_parser::ast::Cmpop::NotEq => Self::NotEq,
+            rustpython_parser::ast::Cmpop::Lt => Self::Lt,
+            rustpython_parser::ast::Cmpop::LtE => Self::LtE,
+            rustpython_parser::ast::Cmpop::Gt => Self::Gt,
+            rustpython_parser::ast::Cmpop::GtE => Self::GtE,
+            rustpython_parser::ast::Cmpop::Is => Self::Is,
+            rustpython_parser::ast::Cmpop::IsNot => Self::IsNot,
+            rustpython_parser::ast::Cmpop::In => Self::In,
+            rustpython_parser::ast::Cmpop::NotIn => Self::NotIn,
         }
     }
 }
@@ -500,8 +500,8 @@ pub enum PatternKind {
 
 pub type Pattern = Located<PatternKind>;
 
-impl From<rustpython_ast::Alias> for Alias {
-    fn from(alias: rustpython_ast::Alias) -> Self {
+impl From<rustpython_parser::ast::Alias> for Alias {
+    fn from(alias: rustpython_parser::ast::Alias) -> Self {
         Alias {
             location: alias.location,
             end_location: alias.end_location,
@@ -515,8 +515,8 @@ impl From<rustpython_ast::Alias> for Alias {
     }
 }
 
-impl From<rustpython_ast::Withitem> for Withitem {
-    fn from(withitem: rustpython_ast::Withitem) -> Self {
+impl From<rustpython_parser::ast::Withitem> for Withitem {
+    fn from(withitem: rustpython_parser::ast::Withitem) -> Self {
         Withitem {
             context_expr: withitem.context_expr.into(),
             optional_vars: withitem.optional_vars.map(|v| Box::new((*v).into())),
@@ -524,9 +524,9 @@ impl From<rustpython_ast::Withitem> for Withitem {
     }
 }
 
-impl From<rustpython_ast::Excepthandler> for Excepthandler {
-    fn from(excepthandler: rustpython_ast::Excepthandler) -> Self {
-        let rustpython_ast::ExcepthandlerKind::ExceptHandler { type_, name, body } =
+impl From<rustpython_parser::ast::Excepthandler> for Excepthandler {
+    fn from(excepthandler: rustpython_parser::ast::Excepthandler) -> Self {
+        let rustpython_parser::ast::ExcepthandlerKind::ExceptHandler { type_, name, body } =
             excepthandler.node;
         Excepthandler {
             location: excepthandler.location,
@@ -542,10 +542,10 @@ impl From<rustpython_ast::Excepthandler> for Excepthandler {
     }
 }
 
-impl From<rustpython_ast::Stmt> for Stmt {
-    fn from(stmt: rustpython_ast::Stmt) -> Self {
+impl From<rustpython_parser::ast::Stmt> for Stmt {
+    fn from(stmt: rustpython_parser::ast::Stmt) -> Self {
         match stmt.node {
-            rustpython_ast::StmtKind::Expr { value } => Stmt {
+            rustpython_parser::ast::StmtKind::Expr { value } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Expr {
@@ -554,14 +554,14 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Pass => Stmt {
+            rustpython_parser::ast::StmtKind::Pass => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Pass,
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Return { value } => Stmt {
+            rustpython_parser::ast::StmtKind::Return { value } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Return {
@@ -570,7 +570,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Assign {
+            rustpython_parser::ast::StmtKind::Assign {
                 targets,
                 value,
                 type_comment,
@@ -585,7 +585,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::ClassDef {
+            rustpython_parser::ast::StmtKind::ClassDef {
                 name,
                 bases,
                 keywords,
@@ -604,7 +604,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::FunctionDef {
+            rustpython_parser::ast::StmtKind::FunctionDef {
                 name,
                 args,
                 body,
@@ -627,7 +627,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::If { test, body, orelse } => Stmt {
+            rustpython_parser::ast::StmtKind::If { test, body, orelse } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::If {
@@ -638,7 +638,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Assert { test, msg } => Stmt {
+            rustpython_parser::ast::StmtKind::Assert { test, msg } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Assert {
@@ -648,7 +648,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::AsyncFunctionDef {
+            rustpython_parser::ast::StmtKind::AsyncFunctionDef {
                 name,
                 args,
                 body,
@@ -669,7 +669,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Delete { targets } => Stmt {
+            rustpython_parser::ast::StmtKind::Delete { targets } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Delete {
@@ -678,7 +678,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::AugAssign { target, op, value } => Stmt {
+            rustpython_parser::ast::StmtKind::AugAssign { target, op, value } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::AugAssign {
@@ -689,7 +689,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::AnnAssign {
+            rustpython_parser::ast::StmtKind::AnnAssign {
                 target,
                 annotation,
                 value,
@@ -706,7 +706,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::For {
+            rustpython_parser::ast::StmtKind::For {
                 target,
                 iter,
                 body,
@@ -725,7 +725,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::AsyncFor {
+            rustpython_parser::ast::StmtKind::AsyncFor {
                 target,
                 iter,
                 body,
@@ -744,7 +744,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::While { test, body, orelse } => Stmt {
+            rustpython_parser::ast::StmtKind::While { test, body, orelse } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::While {
@@ -755,7 +755,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::With {
+            rustpython_parser::ast::StmtKind::With {
                 items,
                 body,
                 type_comment,
@@ -770,7 +770,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::AsyncWith {
+            rustpython_parser::ast::StmtKind::AsyncWith {
                 items,
                 body,
                 type_comment,
@@ -785,10 +785,10 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Match { .. } => {
+            rustpython_parser::ast::StmtKind::Match { .. } => {
                 todo!("match statement");
             }
-            rustpython_ast::StmtKind::Raise { exc, cause } => Stmt {
+            rustpython_parser::ast::StmtKind::Raise { exc, cause } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Raise {
@@ -798,7 +798,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Try {
+            rustpython_parser::ast::StmtKind::Try {
                 body,
                 handlers,
                 orelse,
@@ -815,7 +815,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Import { names } => Stmt {
+            rustpython_parser::ast::StmtKind::Import { names } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Import {
@@ -824,7 +824,7 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::ImportFrom {
+            rustpython_parser::ast::StmtKind::ImportFrom {
                 module,
                 names,
                 level,
@@ -839,28 +839,28 @@ impl From<rustpython_ast::Stmt> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Global { names } => Stmt {
+            rustpython_parser::ast::StmtKind::Global { names } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Global { names },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Nonlocal { names } => Stmt {
+            rustpython_parser::ast::StmtKind::Nonlocal { names } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Nonlocal { names },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Break => Stmt {
+            rustpython_parser::ast::StmtKind::Break => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Break,
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::StmtKind::Continue => Stmt {
+            rustpython_parser::ast::StmtKind::Continue => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Continue,
@@ -871,8 +871,8 @@ impl From<rustpython_ast::Stmt> for Stmt {
     }
 }
 
-impl From<rustpython_ast::Keyword> for Keyword {
-    fn from(keyword: rustpython_ast::Keyword) -> Self {
+impl From<rustpython_parser::ast::Keyword> for Keyword {
+    fn from(keyword: rustpython_parser::ast::Keyword) -> Self {
         Keyword {
             location: keyword.location,
             end_location: keyword.end_location,
@@ -886,8 +886,8 @@ impl From<rustpython_ast::Keyword> for Keyword {
     }
 }
 
-impl From<rustpython_ast::Arg> for Arg {
-    fn from(arg: rustpython_ast::Arg) -> Self {
+impl From<rustpython_parser::ast::Arg> for Arg {
+    fn from(arg: rustpython_parser::ast::Arg) -> Self {
         Arg {
             location: arg.location,
             end_location: arg.end_location,
@@ -902,8 +902,8 @@ impl From<rustpython_ast::Arg> for Arg {
     }
 }
 
-impl From<rustpython_ast::Arguments> for Arguments {
-    fn from(arguments: rustpython_ast::Arguments) -> Self {
+impl From<rustpython_parser::ast::Arguments> for Arguments {
+    fn from(arguments: rustpython_parser::ast::Arguments) -> Self {
         Arguments {
             posonlyargs: arguments.posonlyargs.into_iter().map(Into::into).collect(),
             args: arguments.args.into_iter().map(Into::into).collect(),
@@ -916,8 +916,8 @@ impl From<rustpython_ast::Arguments> for Arguments {
     }
 }
 
-impl From<rustpython_ast::Comprehension> for Comprehension {
-    fn from(comprehension: rustpython_ast::Comprehension) -> Self {
+impl From<rustpython_parser::ast::Comprehension> for Comprehension {
+    fn from(comprehension: rustpython_parser::ast::Comprehension) -> Self {
         Comprehension {
             target: comprehension.target.into(),
             iter: comprehension.iter.into(),
@@ -927,10 +927,10 @@ impl From<rustpython_ast::Comprehension> for Comprehension {
     }
 }
 
-impl From<rustpython_ast::Expr> for Expr {
-    fn from(expr: rustpython_ast::Expr) -> Self {
+impl From<rustpython_parser::ast::Expr> for Expr {
+    fn from(expr: rustpython_parser::ast::Expr) -> Self {
         match expr.node {
-            rustpython_ast::ExprKind::Name { id, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Name { id, ctx } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Name {
@@ -940,7 +940,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::BoolOp { op, values } => Expr {
+            rustpython_parser::ast::ExprKind::BoolOp { op, values } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::BoolOp {
@@ -950,7 +950,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::NamedExpr { target, value } => Expr {
+            rustpython_parser::ast::ExprKind::NamedExpr { target, value } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::NamedExpr {
@@ -960,7 +960,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::BinOp { left, op, right } => Expr {
+            rustpython_parser::ast::ExprKind::BinOp { left, op, right } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::BinOp {
@@ -971,7 +971,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::UnaryOp { op, operand } => Expr {
+            rustpython_parser::ast::ExprKind::UnaryOp { op, operand } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::UnaryOp {
@@ -981,7 +981,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Lambda { args, body } => Expr {
+            rustpython_parser::ast::ExprKind::Lambda { args, body } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Lambda {
@@ -991,7 +991,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::IfExp { test, body, orelse } => Expr {
+            rustpython_parser::ast::ExprKind::IfExp { test, body, orelse } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::IfExp {
@@ -1002,7 +1002,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Dict { keys, values } => Expr {
+            rustpython_parser::ast::ExprKind::Dict { keys, values } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Dict {
@@ -1012,7 +1012,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Set { elts } => Expr {
+            rustpython_parser::ast::ExprKind::Set { elts } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Set {
@@ -1021,7 +1021,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::ListComp { elt, generators } => Expr {
+            rustpython_parser::ast::ExprKind::ListComp { elt, generators } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::ListComp {
@@ -1031,7 +1031,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::SetComp { elt, generators } => Expr {
+            rustpython_parser::ast::ExprKind::SetComp { elt, generators } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::SetComp {
@@ -1041,7 +1041,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::DictComp {
+            rustpython_parser::ast::ExprKind::DictComp {
                 key,
                 value,
                 generators,
@@ -1056,7 +1056,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::GeneratorExp { elt, generators } => Expr {
+            rustpython_parser::ast::ExprKind::GeneratorExp { elt, generators } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::GeneratorExp {
@@ -1066,7 +1066,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Await { value } => Expr {
+            rustpython_parser::ast::ExprKind::Await { value } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Await {
@@ -1075,7 +1075,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Yield { value } => Expr {
+            rustpython_parser::ast::ExprKind::Yield { value } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Yield {
@@ -1084,7 +1084,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::YieldFrom { value } => Expr {
+            rustpython_parser::ast::ExprKind::YieldFrom { value } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::YieldFrom {
@@ -1093,7 +1093,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Compare {
+            rustpython_parser::ast::ExprKind::Compare {
                 left,
                 ops,
                 comparators,
@@ -1108,7 +1108,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Call {
+            rustpython_parser::ast::ExprKind::Call {
                 func,
                 args,
                 keywords,
@@ -1123,7 +1123,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::FormattedValue {
+            rustpython_parser::ast::ExprKind::FormattedValue {
                 value,
                 conversion,
                 format_spec,
@@ -1138,7 +1138,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::JoinedStr { values } => Expr {
+            rustpython_parser::ast::ExprKind::JoinedStr { values } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::JoinedStr {
@@ -1147,14 +1147,14 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Constant { value, kind } => Expr {
+            rustpython_parser::ast::ExprKind::Constant { value, kind } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Constant { value, kind },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Attribute { value, attr, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Attribute { value, attr, ctx } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Attribute {
@@ -1165,7 +1165,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Subscript { value, slice, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Subscript { value, slice, ctx } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Subscript {
@@ -1176,7 +1176,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Starred { value, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Starred { value, ctx } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Starred {
@@ -1186,7 +1186,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::List { elts, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::List { elts, ctx } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::List {
@@ -1196,7 +1196,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Tuple { elts, ctx } => Expr {
+            rustpython_parser::ast::ExprKind::Tuple { elts, ctx } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Tuple {
@@ -1206,7 +1206,7 @@ impl From<rustpython_ast::Expr> for Expr {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_ast::ExprKind::Slice { lower, upper, step } => Expr {
+            rustpython_parser::ast::ExprKind::Slice { lower, upper, step } => Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Slice {

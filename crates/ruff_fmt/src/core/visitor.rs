@@ -1,4 +1,4 @@
-use rustpython_ast::Constant;
+use rustpython_parser::ast::Constant;
 
 use crate::cst::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Excepthandler, ExcepthandlerKind, Expr,

@@ -1,6 +1,5 @@
 use rustc_hash::FxHashMap;
-use rustpython_ast;
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::core::types::Range;

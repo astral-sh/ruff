@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use once_cell::unsync::OnceCell;
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 use crate::core::types::Range;
 
