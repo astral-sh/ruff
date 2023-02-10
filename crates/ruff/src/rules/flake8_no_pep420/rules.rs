@@ -28,12 +28,14 @@ define_violation!(
     /// [`namespace-packages`](https://github.com/charliermarsh/ruff#namespace-packages)
     /// configuration option. Adding a namespace package to the configuration
     /// will suppress this violation for a given package.
-    pub struct ImplicitNamespacePackage(pub String);
+    pub struct ImplicitNamespacePackage {
+        pub filename: String,
+    }
 );
 impl Violation for ImplicitNamespacePackage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImplicitNamespacePackage(filename) = self;
+        let ImplicitNamespacePackage { filename } = self;
         format!("File `{filename}` is part of an implicit namespace package. Add an `__init__.py`.")
     }
 }
@@ -62,7 +64,9 @@ pub fn implicit_namespace_package(
             .to_string_lossy()
             .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
         Some(Diagnostic::new(
-            ImplicitNamespacePackage(fs::relativize_path(path)),
+            ImplicitNamespacePackage {
+                filename: fs::relativize_path(path),
+            },
             Range::default(),
         ))
     } else {
