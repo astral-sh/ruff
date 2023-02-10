@@ -1,4 +1,4 @@
-# These SHOULD have a warning
+# Errors
 print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
 
 "foo %e bar %s" % ("1", 2)
@@ -13,14 +13,14 @@ print("foo %(foo)d bar %(bar)d" % {"foo": "1", "bar": "2"})
 
 print("%d" % ("%s" % ("nested",),))
 
-# These should have a warning, but do not right now do to our limitations
+# False negatives
 WORD = "abc"
 "%d" % WORD
 "%d %s" % (WORD, WORD)
 VALUES_TO_FORMAT = (1, "2", 3.0)
 "%d %d %f" % VALUES_TO_FORMAT
 
-# These SHOULD NOT have a warning
+# OK
 "%d %s %f" % VALUES_TO_FORMAT
 
 "%s" % "1"
