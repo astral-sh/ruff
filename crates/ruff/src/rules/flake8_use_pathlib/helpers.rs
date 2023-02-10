@@ -10,6 +10,7 @@ use crate::rules::flake8_use_pathlib::violations::{
     PathlibRemove, PathlibRename, PathlibReplace, PathlibRmdir, PathlibSamefile, PathlibSplitext,
     PathlibStat, PathlibUnlink,
 };
+use crate::settings::types::PythonVersion;
 
 pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
     if let Some(diagnostic_kind) =
@@ -32,7 +33,6 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["os", "path", "isdir"] => Some(PathlibIsDir.into()),
                 ["os", "path", "isfile"] => Some(PathlibIsFile.into()),
                 ["os", "path", "islink"] => Some(PathlibIsLink.into()),
-                ["os", "readlink"] => Some(PathlibReadlink.into()),
                 ["os", "stat"] => Some(PathlibStat.into()),
                 ["os", "path", "isabs"] => Some(PathlibIsAbs.into()),
                 ["os", "path", "join"] => Some(PathlibJoin.into()),
@@ -42,6 +42,10 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["os", "path", "splitext"] => Some(PathlibSplitext.into()),
                 ["", "open"] => Some(PathlibOpen.into()),
                 ["py", "path", "local"] => Some(PathlibPyPath.into()),
+                // Python 3.9+
+                ["os", "readlink"] if checker.settings.target_version >= PythonVersion::Py39 => {
+                    Some(PathlibReadlink.into())
+                }
                 _ => None,
             })
     {
