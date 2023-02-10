@@ -185,7 +185,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(&format, &log_level, &autofix, &violations);
+    let printer = Printer::new(format, log_level, autofix, violations);
 
     if cli.watch {
         if !matches!(autofix, fix::FixMode::None) {

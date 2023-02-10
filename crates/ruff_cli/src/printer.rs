@@ -68,19 +68,19 @@ impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
     }
 }
 
-pub struct Printer<'a> {
-    format: &'a SerializationFormat,
-    log_level: &'a LogLevel,
-    autofix: &'a fix::FixMode,
-    violations: &'a Violations,
+pub struct Printer {
+    format: SerializationFormat,
+    log_level: LogLevel,
+    autofix: fix::FixMode,
+    violations: Violations,
 }
 
-impl<'a> Printer<'a> {
+impl Printer {
     pub const fn new(
-        format: &'a SerializationFormat,
-        log_level: &'a LogLevel,
-        autofix: &'a fix::FixMode,
-        violations: &'a Violations,
+        format: SerializationFormat,
+        log_level: LogLevel,
+        autofix: fix::FixMode,
+        violations: Violations,
     ) -> Self {
         Self {
             format,
@@ -91,13 +91,13 @@ impl<'a> Printer<'a> {
     }
 
     pub fn write_to_user(&self, message: &str) {
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             notify_user!("{}", message);
         }
     }
 
     fn post_text<T: Write>(&self, stdout: &mut T, diagnostics: &Diagnostics) -> Result<()> {
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             match self.violations {
                 Violations::Show => {
                     let fixed = diagnostics.fixed;
@@ -445,7 +445,7 @@ impl<'a> Printer<'a> {
             return Ok(());
         }
 
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             let s = if diagnostics.messages.len() == 1 {
                 ""
             } else {
@@ -459,7 +459,7 @@ impl<'a> Printer<'a> {
 
         let mut stdout = BufWriter::new(io::stdout().lock());
         if !diagnostics.messages.is_empty() {
-            if self.log_level >= &LogLevel::Default {
+            if self.log_level >= LogLevel::Default {
                 writeln!(stdout)?;
             }
             for message in &diagnostics.messages {
