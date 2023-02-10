@@ -1,11 +1,12 @@
 use std::str::FromStr;
 
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
 use rustpython_common::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Operator};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
+
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -44,48 +45,104 @@ enum DataType {
     String,
     Integer,
     Float,
-    Number,
-    Other,
+    Object,
+    Unknown,
+}
+
+impl From<&Expr> for DataType {
+    fn from(expr: &Expr) -> Self {
+        match &expr.node {
+            ExprKind::NamedExpr { value, .. } => (&**value).into(),
+            ExprKind::UnaryOp { operand, .. } => (&**operand).into(),
+            ExprKind::Dict { .. } => DataType::Object,
+            ExprKind::Set { .. } => DataType::Object,
+            ExprKind::ListComp { .. } => DataType::Object,
+            ExprKind::SetComp { .. } => DataType::Object,
+            ExprKind::DictComp { .. } => DataType::Object,
+            ExprKind::GeneratorExp { .. } => DataType::Object,
+            ExprKind::JoinedStr { .. } => DataType::String,
+            ExprKind::BinOp { left, op, .. } => {
+                // Ex) "a" % "b"
+                if matches!(
+                    left.node,
+                    ExprKind::Constant {
+                        value: Constant::Str(..),
+                        ..
+                    }
+                ) && matches!(op, Operator::Mod)
+                {
+                    return DataType::String;
+                }
+                DataType::Unknown
+            }
+            ExprKind::Constant { value, .. } => match value {
+                Constant::Str(_) => DataType::String,
+                Constant::Int(_) => DataType::Integer,
+                Constant::Float(_) => DataType::Float,
+                _ => DataType::Unknown,
+            },
+            ExprKind::List { .. } => DataType::Object,
+            ExprKind::Tuple { .. } => DataType::Object,
+            _ => DataType::Unknown,
+        }
+    }
 }
 
 impl DataType {
-    fn is_compatible_with(&self, other: &Self) -> bool {
+    fn is_compatible_with(&self, format: &FormatType) -> bool {
         match self {
-            DataType::String => matches!(other, DataType::String),
-            DataType::Integer => matches!(other, DataType::Integer | DataType::Number),
-            DataType::Float => matches!(other, DataType::Float | DataType::Number),
-            DataType::Number => matches!(
-                other,
-                DataType::Number | DataType::Integer | DataType::Float
+            DataType::String => matches!(
+                format,
+                FormatType::Unknown | FormatType::String | FormatType::Repr
             ),
-            DataType::Other => false,
+            DataType::Object => matches!(
+                format,
+                FormatType::Unknown | FormatType::String | FormatType::Repr
+            ),
+            DataType::Integer => matches!(
+                format,
+                FormatType::Unknown
+                    | FormatType::String
+                    | FormatType::Repr
+                    | FormatType::Integer
+                    | FormatType::Float
+                    | FormatType::Number
+            ),
+            DataType::Float => matches!(
+                format,
+                FormatType::Unknown
+                    | FormatType::String
+                    | FormatType::Repr
+                    | FormatType::Float
+                    | FormatType::Number
+            ),
+            DataType::Unknown => true,
         }
     }
 }
 
-impl From<&Constant> for DataType {
-    fn from(value: &Constant) -> Self {
-        match value {
-            Constant::Str(_) => DataType::String,
-            // All float codes also work for integers.
-            Constant::Int(_) => DataType::Number,
-            Constant::Float(_) => DataType::Float,
-            _ => DataType::Other,
-        }
-    }
+#[derive(Debug)]
+enum FormatType {
+    Repr,
+    String,
+    Integer,
+    Float,
+    Number,
+    Unknown,
 }
 
-impl From<char> for DataType {
+impl From<char> for FormatType {
     fn from(format: char) -> Self {
         match format {
-            's' => DataType::String,
+            'r' => FormatType::Repr,
+            's' => FormatType::String,
             // The python documentation says "d" only works for integers, but it works for floats as
             // well: https://docs.python.org/3/library/string.html#formatstrings
             // I checked the rest of the integer codes, and none of them work with floats
-            'n' | 'd' => DataType::Number,
-            'b' | 'c' | 'o' | 'x' | 'X' => DataType::Integer,
-            'e' | 'E' | 'f' | 'F' | 'g' | 'G' | '%' => DataType::Float,
-            _ => DataType::Other,
+            'n' | 'd' => FormatType::Number,
+            'b' | 'c' | 'o' | 'x' | 'X' => FormatType::Integer,
+            'e' | 'E' | 'f' | 'F' | 'g' | 'G' | '%' => FormatType::Float,
+            _ => FormatType::Unknown,
         }
     }
 }
@@ -103,24 +160,14 @@ fn collect_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 }
 
 /// Return `true` if the format string is equivalent to the constant type
-fn equivalent(format: &CFormatSpec, value: &Constant) -> bool {
+fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
     let constant: DataType = value.into();
-    let format: DataType = format.format_char.into();
-    if matches!(format, DataType::String) {
-        // We can always format as type `String`.
-        return true;
-    }
-
-    if let DataType::Other = constant {
-        // If the format is not string, we cannot format as type `Other`.
-        false
-    } else {
-        constant.is_compatible_with(&format)
-    }
+    let format: FormatType = format.format_char.into();
+    constant.is_compatible_with(&format)
 }
 
 /// Return `true` if the [`Constnat`] aligns with the format type.
-fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: &Constant) -> bool {
+fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: &Expr) -> bool {
     let formats = collect_specs(formats);
     // If there is more than one format, this is not valid python and we should
     // return true so that no error is reported
@@ -142,14 +189,7 @@ fn is_valid_tuple(formats: &[CFormatStrOrBytes<String>], elts: &[Expr]) -> bool 
     }
 
     for (format, elt) in formats.iter().zip(elts) {
-        if let ExprKind::Constant { value, .. } = &elt.node {
-            if !equivalent(format, value) {
-                return false;
-            }
-        } else if let ExprKind::Name { .. } = &elt.node {
-            continue;
-        } else if format.format_char != 's' {
-            // Non-`ExprKind::Constant` values can only be formatted as strings.
+        if !equivalent(format, elt) {
             return false;
         }
     }
@@ -191,14 +231,7 @@ fn is_valid_dict(
             let Some(format) = formats_hash.get(mapping_key.as_str()) else {
                 return true;
             };
-            if let ExprKind::Constant { value, .. } = &value.node {
-                if !equivalent(format, value) {
-                    return false;
-                }
-            } else if let ExprKind::Name { .. } = &value.node {
-                continue;
-            } else if format.format_char != 's' {
-                // Non-`ExprKind::Constant` values can only be formatted as strings.
+            if !equivalent(format, value) {
                 return false;
             }
         } else {
@@ -207,18 +240,6 @@ fn is_valid_dict(
         }
     }
     true
-}
-
-/// Return `true` if the format string is valid for "other" types.
-fn is_valid_other(formats: &[CFormatStrOrBytes<String>]) -> bool {
-    let formats = collect_specs(formats);
-
-    // If there's more than one format, abort.
-    if formats.len() != 1 {
-        return true;
-    }
-
-    formats.get(0).unwrap().format_char == 's'
 }
 
 /// PLE1307
@@ -263,9 +284,8 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) 
     let is_valid = match &right.node {
         ExprKind::Tuple { elts, .. } => is_valid_tuple(&format_strings, elts),
         ExprKind::Dict { keys, values } => is_valid_dict(&format_strings, keys, values),
-        ExprKind::Constant { value, .. } => is_valid_constant(&format_strings, value),
-        ExprKind::Name { .. } => true,
-        _ => is_valid_other(&format_strings),
+        ExprKind::Constant { .. } => is_valid_constant(&format_strings, right),
+        _ => true,
     };
     if !is_valid {
         checker.diagnostics.push(Diagnostic::new(

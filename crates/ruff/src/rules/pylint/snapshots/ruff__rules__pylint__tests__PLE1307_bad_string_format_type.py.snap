@@ -1,5 +1,5 @@
 ---
-source: src/rules/pylint/mod.rs
+source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -39,56 +39,56 @@ expression: diagnostics
     column: 0
   end_location:
     row: 7
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    BadStringFormatType: ~
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
     column: 10
   fix: ~
   parent: ~
 - kind:
     BadStringFormatType: ~
   location:
-    row: 9
+    row: 8
     column: 0
   end_location:
-    row: 9
+    row: 8
     column: 24
   fix: ~
   parent: ~
 - kind:
     BadStringFormatType: ~
   location:
-    row: 10
+    row: 9
     column: 0
   end_location:
-    row: 10
-    column: 9
+    row: 9
+    column: 10
   fix: ~
   parent: ~
 - kind:
     BadStringFormatType: ~
   location:
-    row: 11
+    row: 10
     column: 0
   end_location:
-    row: 11
+    row: 10
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
     column: 12
   fix: ~
   parent: ~
 - kind:
     BadStringFormatType: ~
   location:
-    row: 12
+    row: 13
     column: 0
   end_location:
-    row: 12
+    row: 13
     column: 23
   fix: ~
   parent: ~
@@ -100,6 +100,16 @@ expression: diagnostics
   end_location:
     row: 14
     column: 34
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 19
   fix: ~
   parent: ~
 
