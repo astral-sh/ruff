@@ -1,4 +1,4 @@
-# avoid-quote-escape (Q003)
+# avoidable-escaped-quote (Q003)
 
 Derived from the **flake8-quotes** linter.
 

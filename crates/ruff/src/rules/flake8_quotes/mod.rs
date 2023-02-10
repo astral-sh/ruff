@@ -36,7 +36,7 @@ mod tests {
                     Rule::BadQuotesInlineString,
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
-                    Rule::AvoidQuoteEscape,
+                    Rule::AvoidableEscapedQuote,
                 ])
             },
         )?;
@@ -65,7 +65,7 @@ mod tests {
                     Rule::BadQuotesInlineString,
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
-                    Rule::AvoidQuoteEscape,
+                    Rule::AvoidableEscapedQuote,
                 ])
             },
         )?;
@@ -98,7 +98,7 @@ mod tests {
                     Rule::BadQuotesInlineString,
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
-                    Rule::AvoidQuoteEscape,
+                    Rule::AvoidableEscapedQuote,
                 ])
             },
         )?;
@@ -131,7 +131,7 @@ mod tests {
                     Rule::BadQuotesInlineString,
                     Rule::BadQuotesMultilineString,
                     Rule::BadQuotesDocstring,
-                    Rule::AvoidQuoteEscape,
+                    Rule::AvoidableEscapedQuote,
                 ])
             },
         )?;

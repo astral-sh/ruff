@@ -1,3 +1,4 @@
+avoid-*
 do-not-*
 uses-*
 *-used
