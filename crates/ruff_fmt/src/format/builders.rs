@@ -28,7 +28,7 @@ pub fn block(body: &[Stmt]) -> Block {
     Block { body }
 }
 
-pub(crate) const fn join_names( names: &[String]) -> JoinNames {
+pub(crate) const fn join_names(names: &[String]) -> JoinNames {
     JoinNames { names }
 }
 
