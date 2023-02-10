@@ -66,14 +66,14 @@ impl Violation for ImportShadowedByLoopVar {
 }
 
 define_violation!(
-    pub struct ImportStarUsed {
+    pub struct ImportStar {
         pub name: String,
     }
 );
-impl Violation for ImportStarUsed {
+impl Violation for ImportStar {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportStarUsed { name } = self;
+        let ImportStar { name } = self;
         format!("`from {name} import *` used; unable to detect undefined names")
     }
 }

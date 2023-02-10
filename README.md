@@ -664,7 +664,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | ---- | ---- | ------- | --- |
 | F401 | unused-import | `{name}` imported but unused; consider adding to `__all__` or using a redundant alias | 🛠 |
 | F402 | import-shadowed-by-loop-var | Import `{name}` from line {line} shadowed by loop variable |  |
-| F403 | import-star-used | `from {name} import *` used; unable to detect undefined names |  |
+| F403 | import-star | `from {name} import *` used; unable to detect undefined names |  |
 | F404 | late-future-import | `from __future__` imports must occur at the beginning of the file |  |
 | F405 | import-star-usage | `{name}` may be undefined, or defined from star imports: {sources} |  |
 | F406 | import-star-not-permitted | `from {name} import *` only allowed at module level |  |
@@ -918,8 +918,8 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| S101 | assert-used | Use of `assert` detected |  |
-| S102 | exec-used | Use of `exec` detected |  |
+| S101 | assert | Use of `assert` detected |  |
+| S102 | exec-builtin | Use of `exec` detected |  |
 | S103 | bad-file-permissions | `os.chmod` setting a permissive mask `{mask:#o}` on file or directory |  |
 | S104 | hardcoded-bind-all-interfaces | Possible binding to all interfaces |  |
 | S105 | hardcoded-password-string | Possible hardcoded password: "{}" |  |

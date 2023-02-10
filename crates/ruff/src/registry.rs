@@ -83,7 +83,7 @@ ruff_macros::define_rule_mapping!(
     // pyflakes
     F401 => rules::pyflakes::rules::UnusedImport,
     F402 => rules::pyflakes::rules::ImportShadowedByLoopVar,
-    F403 => rules::pyflakes::rules::ImportStarUsed,
+    F403 => rules::pyflakes::rules::ImportStar,
     F404 => rules::pyflakes::rules::LateFutureImport,
     F405 => rules::pyflakes::rules::ImportStarUsage,
     F406 => rules::pyflakes::rules::ImportStarNotPermitted,
@@ -381,8 +381,8 @@ ruff_macros::define_rule_mapping!(
     // eradicate
     ERA001 => rules::eradicate::rules::CommentedOutCode,
     // flake8-bandit
-    S101 => rules::flake8_bandit::rules::AssertUsed,
-    S102 => rules::flake8_bandit::rules::ExecUsed,
+    S101 => rules::flake8_bandit::rules::Assert,
+    S102 => rules::flake8_bandit::rules::ExecBuiltin,
     S103 => rules::flake8_bandit::rules::BadFilePermissions,
     S104 => rules::flake8_bandit::rules::HardcodedBindAllInterfaces,
     S105 => rules::flake8_bandit::rules::HardcodedPasswordString,

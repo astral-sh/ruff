@@ -8,8 +8,8 @@ pub use f_string_missing_placeholders::{
 pub use forward_annotation_syntax_error::ForwardAnnotationSyntaxError;
 pub use if_tuple::{if_tuple, IfTuple};
 pub use imports::{
-    future_feature_not_defined, FutureFeatureNotDefined, ImportShadowedByLoopVar,
-    ImportStarNotPermitted, ImportStarUsage, ImportStarUsed, LateFutureImport, UnusedImport,
+    future_feature_not_defined, FutureFeatureNotDefined, ImportShadowedByLoopVar, ImportStar,
+    ImportStarNotPermitted, ImportStarUsage, LateFutureImport, UnusedImport,
 };
 pub use invalid_literal_comparisons::{invalid_literal_comparison, IsLiteral};
 pub use invalid_print_syntax::{invalid_print_syntax, InvalidPrintSyntax};

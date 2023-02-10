@@ -31,7 +31,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_7.py"); "F401_7")]
     #[test_case(Rule::UnusedImport, Path::new("F401_8.py"); "F401_8")]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"); "F402")]
-    #[test_case(Rule::ImportStarUsed, Path::new("F403.py"); "F403")]
+    #[test_case(Rule::ImportStar, Path::new("F403.py"); "F403")]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"); "F404")]
     #[test_case(Rule::ImportStarUsage, Path::new("F405.py"); "F405")]
     #[test_case(Rule::ImportStarNotPermitted, Path::new("F406.py"); "F406")]
@@ -460,7 +460,7 @@ mod tests {
         // Can't find undefined names with import *.
         flakes(
             "from fu import *; bar",
-            &[Rule::ImportStarUsed, Rule::ImportStarUsage],
+            &[Rule::ImportStar, Rule::ImportStarUsage],
         );
     }
 
@@ -2476,7 +2476,7 @@ mod tests {
         csc(1)
         "#,
             &[
-                Rule::ImportStarUsed,
+                Rule::ImportStar,
                 Rule::ImportStarUsage,
                 Rule::ImportStarUsage,
                 Rule::ImportStarUsage,
@@ -2494,7 +2494,7 @@ mod tests {
         a = 1
         __all__ = ['a']
         "#,
-            &[Rule::ImportStarUsed, Rule::UnusedImport],
+            &[Rule::ImportStar, Rule::UnusedImport],
         );
     }
 
