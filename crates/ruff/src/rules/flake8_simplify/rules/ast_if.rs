@@ -94,6 +94,16 @@ impl Violation for UseTernaryOperator {
 }
 
 define_violation!(
+    pub struct CombineIfConditions;
+);
+impl Violation for CombineIfConditions {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Combine the if statements and use an 'or'")
+    }
+}
+
+define_violation!(
     pub struct DictGetWithDefault {
         pub contents: String,
         pub fixable: bool,
@@ -454,6 +464,61 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
 fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
     expr1.eq(expr2)
+}
+
+fn get_if_body_pairs(orelse: &Vec<Stmt>, result: &mut Vec<Vec<Stmt>>) {
+    if orelse.is_empty() {
+        return;
+    }
+    let mut current_vec: Vec<Stmt> = vec![];
+    for if_line in orelse {
+        if let StmtKind::If {
+            test: orelse_test,
+            body: orelse_body,
+            orelse: orelse_orelse,
+        } = &if_line.node
+        {
+            result.push(current_vec.clone());
+            current_vec = vec![];
+            get_if_body_pairs(orelse_orelse, result);
+        } else {
+            current_vec.push(if_line.clone());
+        }
+    }
+    if !current_vec.is_empty() {
+        result.push(current_vec.clone());
+    }
+}
+
+/// SIM114
+pub fn combine_if_conditions(checker: &mut Checker, body: &Vec<Stmt>, orelse: &Vec<Stmt>) {
+    if orelse.is_empty() {
+        return;
+    }
+    // It's not all combinations because of this:
+    // https://github.com/MartinThoma/flake8-simplify/issues/70#issuecomment-924074984
+    let mut final_stmts: Vec<Vec<Stmt>> = vec![body.to_vec()];
+    get_if_body_pairs(orelse, &mut final_stmts);
+    let mut if_statements = final_stmts.len();
+    if if_statements <= 1 {
+        return;
+    }
+    // We do this because arrays are 0 indexed, and we dont need to check the last one
+    if_statements -= 2;
+    println!("WE got hit 2");
+    println!("{:?}\n===========\n", final_stmts);
+    for i in 0..if_statements {
+        println!("{:?}\n\n{:?}", final_stmts[i], final_stmts[i + 1]);
+        if final_stmts[i] == final_stmts[i + 1] {
+            println!("IS EQUAL");
+            let first = &final_stmts[i].first().unwrap();
+            let last = &final_stmts[i].last().unwrap();
+            checker.diagnostics.push(Diagnostic::new(
+                CombineIfConditions,
+                Range::new(first.location, last.end_location.unwrap()),
+            ));
+        }
+    }
 }
 
 /// SIM401
