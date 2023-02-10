@@ -145,6 +145,7 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-print (T20)](#flake8-print-t20)
+   1. [flake8-pyi (PYI)](#flake8-pyi-pyi)
    1. [flake8-pytest-style (PT)](#flake8-pytest-style-pt)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
@@ -1142,6 +1143,14 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/) on PyPI.
 | T201 | print-found | `print` found |  |
 | T203 | p-print-found | `pprint` found |  |
 
+### flake8-pyi (PYI)
+
+For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| [PYI001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/prefix-type-params.md) | [prefix-type-params](https://github.com/charliermarsh/ruff/blob/main/docs/rules/prefix-type-params.md) | Name of private `{kind}` must start with _ |  |
+
 ### flake8-pytest-style (PT)
 
 For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/) on PyPI.
@@ -1701,6 +1710,7 @@ natively, including:
 * [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
 * [flake8-pie](https://pypi.org/project/flake8-pie/)
 * [flake8-print](https://pypi.org/project/flake8-print/)
+* [flake8-pyi](https://pypi.org/project/flake8-pyi/)
 * [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
 * [flake8-quotes](https://pypi.org/project/flake8-quotes/)
 * [flake8-raise](https://pypi.org/project/flake8-raise/)
