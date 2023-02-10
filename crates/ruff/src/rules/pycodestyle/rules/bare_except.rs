@@ -7,9 +7,9 @@ use crate::source_code::Locator;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct DoNotUseBareExcept;
+    pub struct BareExcept;
 );
-impl Violation for DoNotUseBareExcept {
+impl Violation for BareExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not use bare `except`")
@@ -17,7 +17,7 @@ impl Violation for DoNotUseBareExcept {
 }
 
 /// E722
-pub fn do_not_use_bare_except(
+pub fn bare_except(
     type_: Option<&Expr>,
     body: &[Stmt],
     handler: &Excepthandler,
@@ -28,10 +28,7 @@ pub fn do_not_use_bare_except(
             .iter()
             .any(|stmt| matches!(stmt.node, StmtKind::Raise { exc: None, .. }))
     {
-        Some(Diagnostic::new(
-            DoNotUseBareExcept,
-            except_range(handler, locator),
-        ))
+        Some(Diagnostic::new(BareExcept, except_range(handler, locator)))
     } else {
         None
     }

@@ -11,26 +11,26 @@ use crate::source_code::Stylist;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    pub struct DoNotAssignLambda(pub String);
+    pub struct LambdaAssignment(pub String);
 );
-impl AlwaysAutofixableViolation for DoNotAssignLambda {
+impl AlwaysAutofixableViolation for LambdaAssignment {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not assign a `lambda` expression, use a `def`")
     }
 
     fn autofix_title(&self) -> String {
-        let DoNotAssignLambda(name) = self;
+        let LambdaAssignment(name) = self;
         format!("Rewrite `{name}` as a `def`")
     }
 }
 
 /// E731
-pub fn do_not_assign_lambda(checker: &mut Checker, target: &Expr, value: &Expr, stmt: &Stmt) {
+pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stmt: &Stmt) {
     if let ExprKind::Name { id, .. } = &target.node {
         if let ExprKind::Lambda { args, body } = &value.node {
             let mut diagnostic =
-                Diagnostic::new(DoNotAssignLambda(id.to_string()), Range::from_located(stmt));
+                Diagnostic::new(LambdaAssignment(id.to_string()), Range::from_located(stmt));
             if checker.patch(diagnostic.kind.rule()) {
                 if !match_leading_content(stmt, checker.locator)
                     && !match_trailing_content(stmt, checker.locator)

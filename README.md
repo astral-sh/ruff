@@ -727,8 +727,8 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | E713 | not-in-test | Test for membership should be `not in` | 🛠 |
 | E714 | not-is-test | Test for object identity should be `is not` | 🛠 |
 | E721 | type-comparison | Do not compare types, use `isinstance()` |  |
-| E722 | do-not-use-bare-except | Do not use bare `except` |  |
-| E731 | do-not-assign-lambda | Do not assign a `lambda` expression, use a `def` | 🛠 |
+| E722 | bare-except | Do not use bare `except` |  |
+| E731 | lambda-assignment | Do not assign a `lambda` expression, use a `def` | 🛠 |
 | E741 | ambiguous-variable-name | Ambiguous variable name: `{name}` |  |
 | E742 | ambiguous-class-name | Ambiguous class name: `{name}` |  |
 | E743 | ambiguous-function-name | Ambiguous function name: `{name}` |  |
@@ -971,7 +971,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B008 | function-call-argument-default | Do not perform function call `{name}` in argument defaults |  |
 | B009 | get-attr-with-constant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | set-attr-with-constant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
-| B011 | do-not-assert-false | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
+| B011 | assert-false | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B012 | jump-statement-in-finally | `{name}` inside `finally` blocks cause exceptions to be silenced |  |
 | B013 | redundant-tuple-in-exception-handler | A length-one tuple literal is redundant. Write `except {name}` instead of `except ({name},)`. | 🛠 |
 | B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
