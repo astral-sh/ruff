@@ -435,20 +435,27 @@ fn format_assert(
     msg: Option<&Expr>,
 ) -> FormatResult<()> {
     write!(f, [text("assert"), space()])?;
-    if is_self_closing(test) {
-        write!(f, [test.format()])?;
-    } else {
+    write!(
+        f,
+        [group(&format_args![
+            if_group_breaks(&text("(")),
+            soft_block_indent(&test.format()),
+            if_group_breaks(&text(")")),
+        ])]
+    )?;
+    if let Some(msg) = msg {
         write!(
             f,
-            [group(&format_args![
-                if_group_breaks(&text("(")),
-                soft_block_indent(&test.format()),
-                if_group_breaks(&text(")")),
-            ])]
+            [
+                text(","),
+                space(),
+                group(&format_args![
+                    if_group_breaks(&text("(")),
+                    soft_block_indent(&msg.format()),
+                    if_group_breaks(&text(")")),
+                ])
+            ]
         )?;
-    }
-    if let Some(msg) = msg {
-        write!(f, [text(", "), msg.format()])?;
     }
     Ok(())
 }
@@ -505,11 +512,18 @@ fn format_import_from(
     write!(f, [text("import")])?;
     write!(f, [space()])?;
 
+    let magic_trailing_comma = stmt
+        .trivia
+        .iter()
+        .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
     write!(
         f,
         [group(&format_args![
             if_group_breaks(&text("(")),
             soft_block_indent(&format_with(|f| {
+                if magic_trailing_comma {
+                    write!(f, [expand_parent()])?;
+                }
                 for (i, name) in names.iter().enumerate() {
                     write!(f, [name.format()])?;
                     if i < names.len() - 1 {

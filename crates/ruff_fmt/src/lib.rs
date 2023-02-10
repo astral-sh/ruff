@@ -78,13 +78,12 @@ mod tests {
         Ok(())
     }
 
+    // Passing modulo string normalization.
+    // #[test_case(Path::new("simple_cases/collections.py"); "collections")]
     // Passing apart from one deviation in RHS tuple assignment.
-    #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
+    // #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
     // Lots of deviations, _mostly_ related to string normalization and wrapping.
-    #[test_case(Path::new("simple_cases/expression.py"); "expression")]
-    // #[test_case(Path::new("simple_cases/comments.py"); "comments")]
-    // #[test_case(Path::new("simple_cases/function.py"); "function")]
-    // #[test_case(Path::new("simple_cases/empty_lines.py"); "empty_lines")]
+    // #[test_case(Path::new("simple_cases/expression.py"); "expression")]
     fn failing(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.display());
         let content = std::fs::read_to_string(test_resource_path(

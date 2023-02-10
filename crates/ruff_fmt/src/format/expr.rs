@@ -229,7 +229,6 @@ fn format_list(
 ) -> FormatResult<()> {
     write!(f, [text("[")])?;
     if !elts.is_empty() {
-        // TODO(charlie): DRY.
         let magic_trailing_comma = expr
             .trivia
             .iter()
@@ -268,10 +267,16 @@ fn format_set(
     } else {
         write!(f, [text("{")])?;
         if !elts.is_empty() {
-            // TODO(charlie): DRY.
+            let magic_trailing_comma = expr
+                .trivia
+                .iter()
+                .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
             write!(
                 f,
                 [group(&format_args![soft_block_indent(&format_with(|f| {
+                    if magic_trailing_comma {
+                        write!(f, [expand_parent()])?;
+                    }
                     for (i, elt) in elts.iter().enumerate() {
                         write!(f, [group(&format_args![elt.format()])])?;
                         if i < elts.len() - 1 {
@@ -303,7 +308,7 @@ fn format_call(
         write!(f, [text(")")])?;
     } else {
         write!(f, [text("(")])?;
-        // TODO(charlie): DRY.
+
         let magic_trailing_comma = expr
             .trivia
             .iter()
@@ -576,10 +581,16 @@ fn format_dict(
 ) -> FormatResult<()> {
     write!(f, [text("{")])?;
     if !keys.is_empty() {
-        // TODO(charlie): DRY.
+        let magic_trailing_comma = expr
+            .trivia
+            .iter()
+            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
         write!(
             f,
             [soft_block_indent(&format_with(|f| {
+                if magic_trailing_comma {
+                    write!(f, [expand_parent()])?;
+                }
                 for (i, (k, v)) in keys.iter().zip(values).enumerate() {
                     if let Some(k) = k {
                         write!(f, [k.format()])?;
