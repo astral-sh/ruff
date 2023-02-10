@@ -1,8 +1,9 @@
 use itertools::Itertools;
+use libcst_native::Tuple;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use super::branch::Branch;
-use super::helpers::result_exists;
+use super::helpers::{code_is_only_comments, result_exists};
 use super::visitor::{ReturnVisitor, Stack};
 use crate::ast::helpers::{elif_else_range, unparse_expr};
 use crate::ast::types::Range;
@@ -350,28 +351,46 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
                                 expr.location,
                             ))
                             .to_owned();
-                        // Avoid a trailing empty line and avoid causing invalid syntax with semicolon usage
-                        let fixed_source = match in_between_source
-                            .strip_prefix(checker.stylist.line_ending().as_str())
-                        {
-                            Some(newline_stripped) => {
-                                match newline_stripped
-                                    .strip_prefix(checker.stylist.indentation().as_str())
-                                {
-                                    Some(unindented) => unindented.to_owned(),
-                                    None => in_between_source,
+                        // Ensure that all indentation is the same (no if or while statement).
+                        let lines_iter = (checker
+                            .locator
+                            .slice_source_code_range(&Range::new(
+                                Location::new(last_assign_loc.location.row(), 0),
+                                Location::new(last_assign_loc.location.row() + 1, 0),
+                            ))
+                            .chars()
+                            .take_while(|c| checker.stylist.indentation().contains(*c))
+                            .join("")
+                            .to_owned()
+                            + &in_between_source)
+                            .lines().tuple_windows().any(|ln: (&str, &str)| ln == ln);
+                        // Check if the code without the final return statement is only comments
+                        if code_is_only_comments(
+                            in_between_source.trim_end().trim_end_matches("return"),
+                        ) {
+                            // Avoid a trailing empty line and avoid causing invalid syntax with semicolon usage
+                            let fixed_source = match in_between_source
+                                .strip_prefix(checker.stylist.line_ending().as_str())
+                            {
+                                Some(newline_stripped) => {
+                                    match newline_stripped
+                                        .strip_prefix(checker.stylist.indentation().as_str())
+                                    {
+                                        Some(unindented) => unindented.to_owned(),
+                                        None => in_between_source,
+                                    }
                                 }
-                            }
-                            None => match in_between_source.strip_prefix(';') {
-                                Some(no_semicolon) => no_semicolon.to_owned(),
-                                None => in_between_source,
-                            },
-                        };
-                        diagnostic.amend(Fix::replacement(
-                            fixed_source + &unparse_expr(&assign_expr.clone(), checker.stylist),
-                            last_assign_loc.location,
-                            expr.end_location.unwrap(),
-                        ));
+                                None => match in_between_source.strip_prefix(';') {
+                                    Some(no_semicolon) => no_semicolon.to_owned(),
+                                    None => in_between_source,
+                                },
+                            };
+                            diagnostic.amend(Fix::replacement(
+                                fixed_source + &unparse_expr(&assign_expr.clone(), checker.stylist),
+                                last_assign_loc.location,
+                                expr.end_location.unwrap(),
+                            ));
+                        }
                     }
                 }
             }
