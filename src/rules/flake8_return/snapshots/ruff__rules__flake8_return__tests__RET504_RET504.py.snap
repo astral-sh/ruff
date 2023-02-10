@@ -46,51 +46,58 @@ expression: diagnostics
   end_location:
     row: 19
     column: 16
+  fix: ~
+  parent: ~
+- kind:
+    UnnecessaryAssign: ~
+  location:
+    row: 33
+    column: 11
+  end_location:
+    row: 33
+    column: 14
   fix:
     content:
-      - "if True:"
-      - "        return 2"
+      - "\"\"\""
+      - "    This is a"
+      - "    block comment"
+      - "    we want to keep"
+      - "    \"\"\""
+      - "    # This is a comment that we want to keep."
+      - "    return [5, 4, 3, 2, 1]"
     location:
-      row: 17
+      row: 26
       column: 4
     end_location:
-      row: 19
-      column: 16
+      row: 33
+      column: 14
   parent: ~
 - kind:
     UnnecessaryAssign: ~
   location:
-    row: 31
+    row: 43
     column: 11
   end_location:
-    row: 31
+    row: 43
     column: 17
-  fix:
-    content:
-      - return str(obj.bar)
-    location:
-      row: 30
-      column: 8
-    end_location:
-      row: 31
-      column: 17
+  fix: ~
   parent: ~
 - kind:
     UnnecessaryAssign: ~
   location:
-    row: 39
+    row: 51
     column: 11
   end_location:
-    row: 39
+    row: 51
     column: 20
   fix:
     content:
       - "return formatted.replace(\"()\", \"\").replace(\"  \", \" \").strip()"
     location:
-      row: 38
+      row: 50
       column: 4
     end_location:
-      row: 39
+      row: 51
       column: 20
   parent: ~
 

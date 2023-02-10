@@ -2,7 +2,7 @@ use itertools::Itertools;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use super::branch::Branch;
-use super::helpers::{code_is_only_comments, result_exists};
+use super::helpers::{code_is_only_comments, extract_indentation, result_exists};
 use super::visitor::{ReturnVisitor, Stack};
 use crate::ast::helpers::{elif_else_range, unparse_expr};
 use crate::ast::types::Range;
@@ -350,7 +350,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
                                 expr.location,
                             ))
                             .to_owned();
-                        // Ensure that all indentation is the same (no if or while statement).
+                        // Ensure that all indentation is identical (no if or while statement).
                         let all_indentation_same = (checker
                             .locator
                             .slice_source_code_range(&Range::new(
@@ -360,24 +360,19 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
                             .chars()
                             .take_while(|c| checker.stylist.indentation().contains(*c))
                             .join("")
-                            .to_owned()
                             + &in_between_source)
                             .lines()
                             .tuple_windows()
-                            .any(|ln: (&str, &str)| {
-                                ln.0.chars()
-                                    .take_while(|c| checker.stylist.indentation().contains(*c))
-                                    .collect::<String>()
-                                    == ln
-                                        .1
-                                        .chars()
-                                        .take_while(|c| checker.stylist.indentation().contains(*c))
-                                        .collect::<String>()
+                            .all(|(ln1, ln2): (&str, &str)| {
+                                extract_indentation(ln1, checker.stylist)
+                                    == extract_indentation(ln2, checker.stylist)
                             });
                         // Check if the code without the final return statement is only comments
-                        if all_indentation_same && code_is_only_comments(
-                            in_between_source.trim_end().trim_end_matches("return"),
-                        ) {
+                        if all_indentation_same
+                            && code_is_only_comments(
+                                in_between_source.trim_end().trim_end_matches("return"),
+                            )
+                        {
                             // Avoid a trailing empty line and avoid causing invalid syntax with semicolon usage
                             let fixed_source = match in_between_source
                                 .strip_prefix(checker.stylist.line_ending().as_str())

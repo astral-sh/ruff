@@ -22,6 +22,18 @@ def x():
     return a
 
 
+def x():
+    var = [5, 4, 3, 2, 1]
+    """
+    This is a
+    block comment
+    we want to keep
+    """
+    # This is a comment that we want to keep.
+    return var # Another critical comment
+    # Last important comment
+    
+
 # Can be refactored false positives
 # https://github.com/afonasev/flake8-return/issues/47#issuecomment-1122571066
 def get_bar_if_exists(obj):

@@ -3,6 +3,8 @@ use rustpython_ast::{Constant, Expr, ExprKind, Stmt};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 
+use crate::source_code::Stylist;
+
 /// Return `true` if a function's return statement include at least one
 /// non-`None` value.
 pub fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
@@ -20,10 +22,10 @@ pub fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
     })
 }
 
-/// Check if the specified range is composed of exclusively comments
-/// and a single return statement.
+/// Check if the given piece code is composed of exclusively comments
 pub fn code_is_only_comments(code: &str) -> bool {
-    let code_tokens = lexer::make_tokenizer(code).flatten();
+    let dedented = textwrap::dedent(code);
+    let code_tokens = lexer::make_tokenizer(&dedented).flatten();
     for (_, tok, _) in code_tokens {
         if !matches!(
             tok,
@@ -33,10 +35,15 @@ pub fn code_is_only_comments(code: &str) -> bool {
                 | Tok::Newline
                 | Tok::NonLogicalNewline
         ) {
-            println!("{:?}", tok);
             return false;
         }
     }
-    println!("{:?}", code);
     true
+}
+
+/// Extract the indentation from a given line
+pub fn extract_indentation(line: &str, stylist: &Stylist) -> String {
+    line.chars()
+        .take_while(|c| stylist.indentation().contains(*c))
+        .collect()
 }
