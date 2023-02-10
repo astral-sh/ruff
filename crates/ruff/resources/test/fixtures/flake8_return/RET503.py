@@ -1,3 +1,14 @@
+import os
+import posix
+import sys
+
+# todo: import sys as std_sys
+# todo: from sys import exit
+
+import pytest
+
+# todo: from pytest import xfail
+
 ###
 # Errors
 ###
@@ -123,3 +134,52 @@ def prompts(self, foo):
     for x in foo:
         yield x
         yield x + 1
+
+
+# Functions that never return
+def noreturn__exit(x):
+    if x > 0:
+        return 1
+    os._exit(0)
+
+
+def noreturn_abort(x):
+    if x > 0:
+        return 1
+    os.abort()
+
+
+def noreturn_abort_2():
+    if x > 0:
+        return 1
+    posix.abort()
+
+
+def noreturn_exit():
+    if x > 0:
+        return 1
+    sys.exit(0)
+
+
+def noreturn_pytest_exit():
+    if x > 0:
+        return 1
+    pytest.exit("oof")
+
+
+def noreturn_pytest_fail():
+    if x > 0:
+        return 1
+    pytest.fail("oof")
+
+
+def noreturn_pytest_skip():
+    if x > 0:
+        return 1
+    pytest.skip("oof")
+
+
+def noreturn_pytest_xfail():
+    if x > 0:
+        return 1
+    pytest.xfail("oof")
