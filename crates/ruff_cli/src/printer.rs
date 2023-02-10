@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -68,19 +69,19 @@ impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
     }
 }
 
-pub struct Printer<'a> {
-    format: &'a SerializationFormat,
-    log_level: &'a LogLevel,
-    autofix: &'a fix::FixMode,
-    violations: &'a Violations,
+pub struct Printer {
+    format: SerializationFormat,
+    log_level: LogLevel,
+    autofix: fix::FixMode,
+    violations: Violations,
 }
 
-impl<'a> Printer<'a> {
+impl Printer {
     pub const fn new(
-        format: &'a SerializationFormat,
-        log_level: &'a LogLevel,
-        autofix: &'a fix::FixMode,
-        violations: &'a Violations,
+        format: SerializationFormat,
+        log_level: LogLevel,
+        autofix: fix::FixMode,
+        violations: Violations,
     ) -> Self {
         Self {
             format,
@@ -91,13 +92,13 @@ impl<'a> Printer<'a> {
     }
 
     pub fn write_to_user(&self, message: &str) {
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             notify_user!("{}", message);
         }
     }
 
     fn post_text<T: Write>(&self, stdout: &mut T, diagnostics: &Diagnostics) -> Result<()> {
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             match self.violations {
                 Violations::Show => {
                     let fixed = diagnostics.fixed;
@@ -445,7 +446,7 @@ impl<'a> Printer<'a> {
             return Ok(());
         }
 
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             let s = if diagnostics.messages.len() == 1 {
                 ""
             } else {
@@ -459,7 +460,7 @@ impl<'a> Printer<'a> {
 
         let mut stdout = BufWriter::new(io::stdout().lock());
         if !diagnostics.messages.is_empty() {
-            if self.log_level >= &LogLevel::Default {
+            if self.log_level >= LogLevel::Default {
                 writeln!(stdout)?;
             }
             for message in &diagnostics.messages {
@@ -496,34 +497,35 @@ fn num_digits(n: usize) -> usize {
         .max(1)
 }
 
+struct CodeAndBody<'a>(&'a Message);
+
+impl Display for CodeAndBody<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{code} {autofix}{body}",
+            code = self.0.kind.rule().code().red().bold(),
+            autofix = self
+                .0
+                .kind
+                .fixable()
+                .then_some(format_args!("[{}] ", "*".cyan()))
+                .unwrap_or(format_args!("")),
+            body = self.0.kind.body(),
+        )
+    }
+}
+
 /// Print a single `Message` with full details.
 fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
-    let label = if message.kind.fixable() {
-        format!(
-            "{}{}{}{}{}{} {} [{}] {}",
-            relativize_path(Path::new(&message.filename)).bold(),
-            ":".cyan(),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            ":".cyan(),
-            message.kind.rule().code().red().bold(),
-            "*".cyan(),
-            message.kind.body(),
-        )
-    } else {
-        format!(
-            "{}{}{}{}{}{} {} {}",
-            relativize_path(Path::new(&message.filename)).bold(),
-            ":".cyan(),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            ":".cyan(),
-            message.kind.rule().code().red().bold(),
-            message.kind.body(),
-        )
-    };
+    let label = format!(
+        "{path}{sep}{row}{sep}{col}{sep} {code_and_body}",
+        path = relativize_path(Path::new(&message.filename)).bold(),
+        sep = ":".cyan(),
+        row = message.location.row(),
+        col = message.location.column(),
+        code_and_body = CodeAndBody(message)
+    );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
         let commit = message.kind.commit();
@@ -578,30 +580,15 @@ fn print_grouped_message<T: Write>(
     row_length: usize,
     column_length: usize,
 ) -> Result<()> {
-    let label = if message.kind.fixable() {
-        format!(
-            "  {}{}{}{}{}  {}  [{}] {}",
-            " ".repeat(row_length - num_digits(message.location.row())),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            " ".repeat(column_length - num_digits(message.location.column())),
-            message.kind.rule().code().red().bold(),
-            "*".cyan(),
-            message.kind.body(),
-        )
-    } else {
-        format!(
-            "  {}{}{}{}{}  {}  {}",
-            " ".repeat(row_length - num_digits(message.location.row())),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            " ".repeat(column_length - num_digits(message.location.column())),
-            message.kind.rule().code().red().bold(),
-            message.kind.body(),
-        )
-    };
+    let label = format!(
+        "  {row_padding}{row}{sep}{col}{col_padding}  {code_and_body}",
+        row_padding = " ".repeat(row_length - num_digits(message.location.row())),
+        row = message.location.row(),
+        sep = ":".cyan(),
+        col = message.location.column(),
+        col_padding = " ".repeat(column_length - num_digits(message.location.column())),
+        code_and_body = CodeAndBody(message),
+    );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
         let commit = message.kind.commit();

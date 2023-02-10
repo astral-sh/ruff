@@ -6,8 +6,7 @@ use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
-use crate::violation::{Availability, Violation};
-use crate::AutofixKind;
+use crate::violation::{AutofixKind, Availability, Violation};
 
 define_violation!(
     pub struct BlankLineAfterSummary {

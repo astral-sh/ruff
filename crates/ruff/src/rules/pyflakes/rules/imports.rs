@@ -6,8 +6,7 @@ use rustpython_parser::ast::Alias;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violation::{Availability, Violation};
-use crate::AutofixKind;
+use crate::violation::{AutofixKind, Availability, Violation};
 
 define_violation!(
     pub struct UnusedImport {
