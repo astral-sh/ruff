@@ -1365,6 +1365,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLE0604 | invalid-all-object | Invalid object in `__all__`, must contain only strings |  |
 | PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
+| PLE1307 | [bad-string-format-type](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-string-format-type.md) | Format type does not match argument type |  |
 | PLE1310 | bad-str-strip-call | String `{strip}` call contains duplicate characters (did you mean `{removal}`?) |  |
 | PLE2502 | bidirectional-unicode | Avoid using bidirectional unicode |  |
 

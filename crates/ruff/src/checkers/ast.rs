@@ -2976,6 +2976,9 @@ where
                     if self.settings.rules.enabled(&Rule::PrintfStringFormatting) {
                         pyupgrade::rules::printf_string_formatting(self, expr, left, right);
                     }
+                    if self.settings.rules.enabled(&Rule::BadStringFormatType) {
+                        pylint::rules::bad_string_format_type(self, expr, right);
+                    }
                     if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
                         flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                     }
