@@ -5,7 +5,7 @@ use std::path::Path;
 
 use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 
-use crate::ast::helpers::collect_call_path;
+use crate::ast::helpers::{collect_call_path, map_callable};
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Documentable;
 
@@ -31,18 +31,22 @@ pub struct VisibleScope {
 /// Returns `true` if a function is a "static method".
 pub fn is_staticmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        checker.resolve_call_path(expr).map_or(false, |call_path| {
-            call_path.as_slice() == ["", "staticmethod"]
-        })
+        checker
+            .resolve_call_path(map_callable(expr))
+            .map_or(false, |call_path| {
+                call_path.as_slice() == ["", "staticmethod"]
+            })
     })
 }
 
 /// Returns `true` if a function is a "class method".
 pub fn is_classmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        checker.resolve_call_path(expr).map_or(false, |call_path| {
-            call_path.as_slice() == ["", "classmethod"]
-        })
+        checker
+            .resolve_call_path(map_callable(expr))
+            .map_or(false, |call_path| {
+                call_path.as_slice() == ["", "classmethod"]
+            })
     })
 }
 
@@ -50,33 +54,37 @@ pub fn is_classmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
 pub fn is_overload(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list
         .iter()
-        .any(|expr| checker.match_typing_expr(expr, "overload"))
+        .any(|expr| checker.match_typing_expr(map_callable(expr), "overload"))
 }
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
 pub fn is_override(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list
         .iter()
-        .any(|expr| checker.match_typing_expr(expr, "override"))
+        .any(|expr| checker.match_typing_expr(map_callable(expr), "override"))
 }
 
 /// Returns `true` if a function definition is an `@abstractmethod`.
 pub fn is_abstract(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        checker.resolve_call_path(expr).map_or(false, |call_path| {
-            call_path.as_slice() == ["abc", "abstractmethod"]
-                || call_path.as_slice() == ["abc", "abstractproperty"]
-        })
+        checker
+            .resolve_call_path(map_callable(expr))
+            .map_or(false, |call_path| {
+                call_path.as_slice() == ["abc", "abstractmethod"]
+                    || call_path.as_slice() == ["abc", "abstractproperty"]
+            })
     })
 }
 
 /// Returns `true` if a function definition is a `@property`.
 pub fn is_property(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
-        checker.resolve_call_path(expr).map_or(false, |call_path| {
-            call_path.as_slice() == ["", "property"]
-                || call_path.as_slice() == ["functools", "cached_property"]
-        })
+        checker
+            .resolve_call_path(map_callable(expr))
+            .map_or(false, |call_path| {
+                call_path.as_slice() == ["", "property"]
+                    || call_path.as_slice() == ["functools", "cached_property"]
+            })
     })
 }
 /// Returns `true` if a function is a "magic method".

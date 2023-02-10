@@ -1,0 +1,25 @@
+---
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    TryExceptContinue: ~
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    TryExceptContinue: ~
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 12
+  fix: ~
+  parent: ~
+

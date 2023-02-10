@@ -41,9 +41,29 @@ ruff_macros::define_rule_mapping!(
     E223 => rules::pycodestyle::rules::TabBeforeOperator,
     #[cfg(feature = "logical_lines")]
     E224 => rules::pycodestyle::rules::TabAfterOperator,
+    #[cfg(feature = "logical_lines")]
+    E261 => rules::pycodestyle::rules::TooFewSpacesBeforeInlineComment,
+    #[cfg(feature = "logical_lines")]
+    E262 => rules::pycodestyle::rules::NoSpaceAfterInlineComment,
+    #[cfg(feature = "logical_lines")]
+    E265 => rules::pycodestyle::rules::NoSpaceAfterBlockComment,
+    #[cfg(feature = "logical_lines")]
+    E266 => rules::pycodestyle::rules::MultipleLeadingHashesForBlockComment,
+    #[cfg(feature = "logical_lines")]
+    E271 => rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    E272 => rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
+    #[cfg(feature = "logical_lines")]
+    E273 => rules::pycodestyle::rules::TabAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    E274 => rules::pycodestyle::rules::TabBeforeKeyword,
     E401 => rules::pycodestyle::rules::MultipleImportsOnOneLine,
     E402 => rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
     E501 => rules::pycodestyle::rules::LineTooLong,
+    E701 => rules::pycodestyle::rules::MultipleStatementsOnOneLineColon,
+    E702 => rules::pycodestyle::rules::MultipleStatementsOnOneLineSemicolon,
+    E703 => rules::pycodestyle::rules::UselessSemicolon,
+    E704 => rules::pycodestyle::rules::MultipleStatementsOnOneLineDef,
     E711 => rules::pycodestyle::rules::NoneComparison,
     E712 => rules::pycodestyle::rules::TrueFalseComparison,
     E713 => rules::pycodestyle::rules::NotInTest,
@@ -368,8 +388,10 @@ ruff_macros::define_rule_mapping!(
     S105 => rules::flake8_bandit::rules::HardcodedPasswordString,
     S106 => rules::flake8_bandit::rules::HardcodedPasswordFuncArg,
     S107 => rules::flake8_bandit::rules::HardcodedPasswordDefault,
+    S608 => rules::flake8_bandit::rules::HardcodedSQLExpression,
     S108 => rules::flake8_bandit::rules::HardcodedTempFile,
     S110 => rules::flake8_bandit::rules::TryExceptPass,
+    S112 => rules::flake8_bandit::rules::TryExceptContinue,
     S113 => rules::flake8_bandit::rules::RequestWithoutTimeout,
     S324 => rules::flake8_bandit::rules::HashlibInsecureHashFunction,
     S501 => rules::flake8_bandit::rules::RequestWithNoCertValidation,
@@ -389,7 +411,7 @@ ruff_macros::define_rule_mapping!(
     ARG004 => rules::flake8_unused_arguments::rules::UnusedStaticMethodArgument,
     ARG005 => rules::flake8_unused_arguments::rules::UnusedLambdaArgument,
     // flake8-import-conventions
-    ICN001 => rules::flake8_import_conventions::rules::ImportAliasIsNotConventional,
+    ICN001 => rules::flake8_import_conventions::rules::UnconventionalImportAlias,
     // flake8-datetimez
     DTZ001 => rules::flake8_datetimez::rules::CallDatetimeWithoutTzinfo,
     DTZ002 => rules::flake8_datetimez::rules::CallDatetimeToday,
@@ -422,6 +444,8 @@ ruff_macros::define_rule_mapping!(
     EM101 => rules::flake8_errmsg::rules::RawStringInException,
     EM102 => rules::flake8_errmsg::rules::FStringInException,
     EM103 => rules::flake8_errmsg::rules::DotFormatInException,
+    // flake8-pyi
+    PYI001 => rules::flake8_pyi::rules::PrefixTypeParams,
     // flake8-pytest-style
     PT001 => rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     PT002 => rules::flake8_pytest_style::rules::FixturePositionalArgs,
@@ -612,6 +636,9 @@ pub enum Linter {
     /// [flake8-print](https://pypi.org/project/flake8-print/)
     #[prefix = "T20"]
     Flake8Print,
+    /// [flake8-pyi](https://pypi.org/project/flake8-pyi/)
+    #[prefix = "PYI"]
+    Flake8Pyi,
     /// [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
     #[prefix = "PT"]
     Flake8PytestStyle,
@@ -743,6 +770,10 @@ impl Rule {
             | Rule::SingleLineImplicitStringConcatenation
             | Rule::TrailingCommaMissing
             | Rule::TrailingCommaOnBareTupleProhibited
+            | Rule::MultipleStatementsOnOneLineColon
+            | Rule::UselessSemicolon
+            | Rule::MultipleStatementsOnOneLineDef
+            | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::TrailingCommaProhibited => &LintSource::Tokens,
             Rule::IOError => &LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
@@ -750,13 +781,21 @@ impl Rule {
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MultipleLeadingHashesForBlockComment
+            | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
+            | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
+            | Rule::NoSpaceAfterBlockComment
+            | Rule::NoSpaceAfterInlineComment
             | Rule::OverIndented
+            | Rule::TabAfterKeyword
             | Rule::TabAfterOperator
+            | Rule::TabBeforeKeyword
             | Rule::TabBeforeOperator
+            | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
             | Rule::WhitespaceAfterOpenBracket

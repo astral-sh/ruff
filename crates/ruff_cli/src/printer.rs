@@ -48,6 +48,7 @@ struct ExpandedStatistics<'a> {
     count: usize,
     code: &'a str,
     message: String,
+    fixable: bool,
 }
 
 struct SerializeRuleAsCode<'a>(&'a Rule);
@@ -371,6 +372,12 @@ impl<'a> Printer<'a> {
                     .find(|message| message.kind.rule() == *rule)
                     .map(|message| message.kind.body())
                     .unwrap(),
+                fixable: diagnostics
+                    .messages
+                    .iter()
+                    .find(|message| message.kind.rule() == *rule)
+                    .iter()
+                    .any(|message| message.kind.fixable()),
             })
             .collect::<Vec<_>>();
 
@@ -391,13 +398,28 @@ impl<'a> Printer<'a> {
                     .map(|statistic| statistic.code.len())
                     .max()
                     .unwrap();
+                let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
+
+                let fixable = format!("[{}] ", "*".cyan());
+                let unfixable = "[ ] ";
 
                 // By default, we mimic Flake8's `--statistics` format.
-                for msg in statistics {
+                for statistic in statistics {
                     writeln!(
                         stdout,
-                        "{:>count_width$}\t{:<code_width$}\t{}",
-                        msg.count, msg.code, msg.message
+                        "{:>count_width$}\t{:<code_width$}\t{}{}",
+                        statistic.count.to_string().bold(),
+                        statistic.code.red().bold(),
+                        if any_fixable {
+                            if statistic.fixable {
+                                &fixable
+                            } else {
+                                unfixable
+                            }
+                        } else {
+                            ""
+                        },
+                        statistic.message,
                     )?;
                 }
                 return Ok(());

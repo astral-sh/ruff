@@ -1,8 +1,8 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
@@ -17,8 +17,6 @@ impl Violation for InvalidAllFormat {
 }
 
 /// PLE0605
-pub fn invalid_all_format(checker: &mut Checker, expr: &Expr) {
-    checker
-        .diagnostics
-        .push(Diagnostic::new(InvalidAllFormat, Range::from_located(expr)));
+pub fn invalid_all_format(expr: &Expr) -> Diagnostic {
+    Diagnostic::new(InvalidAllFormat, Range::from_located(expr))
 }

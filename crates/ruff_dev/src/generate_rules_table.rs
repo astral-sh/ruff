@@ -36,10 +36,8 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>)
 
         if rule.explanation().is_some() {
             table_out.push_str(&format!(
-                "| [{}]({}/{}.md) | [{}]({}/{}.md) | {} | {} |",
+                "| {} | [{}]({}/{}.md) | {} | {} |",
                 rule.code(),
-                URL_PREFIX,
-                rule.as_ref(),
                 rule.as_ref(),
                 URL_PREFIX,
                 rule.as_ref(),

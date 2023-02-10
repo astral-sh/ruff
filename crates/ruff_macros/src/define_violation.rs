@@ -30,20 +30,13 @@ impl Parse for LintMeta {
     fn parse(input: ParseStream) -> Result<Self> {
         let attrs = input.call(Attribute::parse_outer)?;
 
-        let mut in_code = false;
         let mut explanation = String::new();
         for attr in &attrs {
             if let Some(lit) = parse_attr(["doc"], attr) {
                 let value = lit.value();
                 let line = value.strip_prefix(' ').unwrap_or(&value);
-                if line.starts_with("```") {
-                    explanation += line;
-                    explanation.push('\n');
-                    in_code = !in_code;
-                } else if !(in_code && line.starts_with("# ")) {
-                    explanation += line;
-                    explanation.push('\n');
-                }
+                explanation.push_str(line);
+                explanation.push('\n');
             } else {
                 return Err(Error::new_spanned(attr, "unexpected attribute"));
             }

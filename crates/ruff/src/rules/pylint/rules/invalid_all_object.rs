@@ -1,8 +1,8 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
@@ -17,8 +17,6 @@ impl Violation for InvalidAllObject {
 }
 
 /// PLE0604
-pub fn invalid_all_object(checker: &mut Checker, expr: &Expr) {
-    checker
-        .diagnostics
-        .push(Diagnostic::new(InvalidAllObject, Range::from_located(expr)));
+pub fn invalid_all_object(expr: &Expr) -> Diagnostic {
+    Diagnostic::new(InvalidAllObject, Range::from_located(expr))
 }

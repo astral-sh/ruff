@@ -72,14 +72,7 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool
 /// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
 pub fn collect_call_path(expr: &Expr) -> CallPath {
     let mut segments = smallvec![];
-    collect_call_path_inner(
-        if let ExprKind::Call { func, .. } = &expr.node {
-            func
-        } else {
-            expr
-        },
-        &mut segments,
-    );
+    collect_call_path_inner(expr, &mut segments);
     segments
 }
 
@@ -573,6 +566,16 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
         arg_names.insert(arg.node.arg.as_str());
     }
     arg_names
+}
+
+/// Given an [`Expr`] that can be callable or not (like a decorator, which could be used with or
+/// without explicit call syntax), return the underlying callable.
+pub fn map_callable(decorator: &Expr) -> &Expr {
+    if let ExprKind::Call { func, .. } = &decorator.node {
+        func
+    } else {
+        decorator
+    }
 }
 
 /// Returns `true` if a statement or expression includes at least one comment.

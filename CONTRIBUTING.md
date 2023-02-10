@@ -10,7 +10,7 @@ For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
 creating an [**issue**](https://github.com/charliermarsh/ruff/issues) outlining your proposed
-change. You can also join us on [**Discord**](https://discord.gg/Z8KbeK24) to discuss your idea with
+change. You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with
 the community.
 
 If you're looking for a place to start, we recommend implementing a new lint rule (see:
@@ -21,6 +21,9 @@ existing Python plugins, which can be used as a reference implementation.
 As a concrete example: consider taking on one of the rules from the [`tryceratops`](https://github.com/charliermarsh/ruff/issues/2056)
 plugin, and looking to the originating [Python source](https://github.com/guilatrova/tryceratops)
 for guidance.
+
+Alternatively, we've started work on the [`flake8-pyi`](https://github.com/charliermarsh/ruff/issues/848)
+plugin (see the [Python source](https://github.com/PyCQA/flake8-pyi)) -- another good place to start.
 
 ### Prerequisites
 
@@ -38,7 +41,7 @@ cargo install cargo-insta
 After cloning the repository, run Ruff locally with:
 
 ```shell
-cargo run /path/to/file.py --no-cache
+cargo run check /path/to/file.py --no-cache
 ```
 
 Prior to opening a pull request, ensure that your code has been auto-formatted,
@@ -120,7 +123,7 @@ contain a variety of violations and non-violations designed to evaluate and demo
 of your lint rule.
 
 Run `cargo dev generate-all` to generate the code for your new fixture. Then run Ruff
-locally with (e.g.) `cargo run crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
+locally with (e.g.) `cargo run check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
 `test_case` macro in the relevant `crates/ruff/src/[linter]/mod.rs` file. Then, run `cargo test --all`.

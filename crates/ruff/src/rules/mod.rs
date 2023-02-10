@@ -19,6 +19,7 @@ pub mod flake8_logging_format;
 pub mod flake8_no_pep420;
 pub mod flake8_pie;
 pub mod flake8_print;
+pub mod flake8_pyi;
 pub mod flake8_pytest_style;
 pub mod flake8_quotes;
 pub mod flake8_raise;

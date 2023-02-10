@@ -66,8 +66,8 @@ const IMMUTABLE_GENERIC_TYPES: &[&[&str]] = &[
     &["typing", "Tuple"],
 ];
 
-pub fn is_mutable_func(checker: &Checker, expr: &Expr) -> bool {
-    checker.resolve_call_path(expr).map_or(false, |call_path| {
+pub fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
+    checker.resolve_call_path(func).map_or(false, |call_path| {
         MUTABLE_FUNCS
             .iter()
             .any(|target| call_path.as_slice() == *target)
