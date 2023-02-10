@@ -1,120 +1,120 @@
 ---
-source: src/rules/flake8_return/mod.rs
+source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
     ImplicitReturn: ~
   location:
-    row: 15
+    row: 18
     column: 4
   end_location:
-    row: 16
+    row: 19
     column: 16
   fix: ~
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 22
+    row: 25
     column: 8
   end_location:
-    row: 22
+    row: 25
     column: 15
   fix:
     content:
       - "        return None"
       - ""
     location:
-      row: 23
+      row: 26
       column: 0
     end_location:
-      row: 23
+      row: 26
       column: 0
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 31
+    row: 34
     column: 4
   end_location:
-    row: 31
+    row: 34
     column: 11
   fix:
     content:
       - "    return None"
       - ""
     location:
-      row: 32
+      row: 35
       column: 0
     end_location:
-      row: 32
+      row: 35
       column: 0
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 37
+    row: 40
     column: 8
   end_location:
-    row: 38
+    row: 41
     column: 20
   fix: ~
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 47
+    row: 50
     column: 8
   end_location:
-    row: 47
+    row: 50
     column: 15
   fix:
     content:
       - "        return None"
       - ""
     location:
-      row: 48
+      row: 51
       column: 0
     end_location:
-      row: 48
+      row: 51
       column: 0
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 54
+    row: 57
     column: 4
   end_location:
-    row: 54
+    row: 57
     column: 22
   fix:
     content:
       - "    return None"
       - ""
     location:
-      row: 55
+      row: 58
       column: 0
     end_location:
-      row: 55
+      row: 58
       column: 0
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 61
+    row: 64
     column: 4
   end_location:
-    row: 61
+    row: 64
     column: 21
   fix:
     content:
       - "    return None"
       - ""
     location:
-      row: 62
+      row: 65
       column: 0
     end_location:
-      row: 62
+      row: 65
       column: 0
   parent: ~
 

@@ -1,7 +1,10 @@
+import builtins
 import os
 import posix
 from posix import abort
 import sys as std_sys
+import _thread
+import _winapi
 
 import pytest
 from pytest import xfail as py_xfail
@@ -148,28 +151,76 @@ def prompts(self, foo):
 
 
 # Functions that never return
-def noreturn__exit(x):
+def noreturn_exit(x):
+    if x > 0:
+        return 1
+    exit()
+
+
+def noreturn_quit(x):
+    if x > 0:
+        return 1
+    quit()
+
+
+def noreturn_builtins_exit(x):
+    if x > 0:
+        return 1
+    builtins.exit()
+
+
+def noreturn_builtins_quit(x):
+    if x > 0:
+        return 1
+    builtins.quit()
+
+
+def noreturn_os__exit(x):
     if x > 0:
         return 1
     os._exit(0)
 
 
-def noreturn_abort(x):
+def noreturn_os_abort(x):
     if x > 0:
         return 1
     os.abort()
 
 
-def noreturn_abort_2():
+def noreturn_posix__exit():
+    if x > 0:
+        return 1
+    posix._exit()
+
+
+def noreturn_posix_abort():
+    if x > 0:
+        return 1
+    posix.abort()
+
+
+def noreturn_posix_abort_2():
     if x > 0:
         return 1
     abort()
 
 
-def noreturn_exit():
+def noreturn_sys_exit():
     if x > 0:
         return 1
     std_sys.exit(0)
+
+
+def noreturn__thread_exit():
+    if x > 0:
+        return 1
+    _thread.exit(0)
+
+
+def noreturn__winapi_exitprocess():
+    if x > 0:
+        return 1
+    _winapi.ExitProcess(0)
 
 
 def noreturn_pytest_exit():
@@ -191,6 +242,12 @@ def noreturn_pytest_skip():
 
 
 def noreturn_pytest_xfail():
+    if x > 0:
+        return 1
+    pytest.xfail("oof")
+
+
+def noreturn_pytest_xfail_2():
     if x > 0:
         return 1
     py_xfail("oof")
