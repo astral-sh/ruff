@@ -4,11 +4,15 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{bail, Result};
+use colored::control::SHOULD_COLORIZE;
 use colored::Colorize;
 use ignore::Error;
 use itertools::Itertools;
 use log::{debug, error};
+use mdcat::terminal::{TerminalProgram, TerminalSize};
+use mdcat::{Environment, ResourceAccess, Settings};
 use path_absolutize::path_dedot;
+use pulldown_cmark::{Options, Parser};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use ruff::cache::CACHE_DIR_NAME;
@@ -20,6 +24,7 @@ use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
 use serde::Serialize;
+use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
 
 use crate::args::{HelpFormat, Overrides};
@@ -312,7 +317,28 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
                 }
             }
 
-            writeln!(stdout, "{}", output)?;
+            let parser = Parser::new_ext(
+                &output,
+                Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH,
+            );
+
+            let cwd = std::env::current_dir()?;
+            let env = &Environment::for_local_directory(&cwd)?;
+
+            let terminal = if SHOULD_COLORIZE.should_colorize() {
+                TerminalProgram::detect()
+            } else {
+                TerminalProgram::Dumb
+            };
+
+            let settings = &Settings {
+                resource_access: ResourceAccess::LocalOnly,
+                syntax_set: SyntaxSet::load_defaults_newlines(),
+                terminal_capabilities: terminal.capabilities(),
+                terminal_size: TerminalSize::detect().unwrap_or_default(),
+            };
+
+            mdcat::push_tty(settings, env, &mut stdout, parser)?;
         }
         HelpFormat::Json => {
             writeln!(
