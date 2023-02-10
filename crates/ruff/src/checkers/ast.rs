@@ -1528,7 +1528,7 @@ where
                 if self.settings.rules.enabled(&Rule::AssertTuple) {
                     pyflakes::rules::assert_tuple(self, stmt, test);
                 }
-                if self.settings.rules.enabled(&Rule::DoNotAssertFalse) {
+                if self.settings.rules.enabled(&Rule::AssertFalse) {
                     flake8_bugbear::rules::assert_false(
                         self,
                         stmt,
@@ -1695,9 +1695,9 @@ where
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
-                if self.settings.rules.enabled(&Rule::DoNotAssignLambda) {
+                if self.settings.rules.enabled(&Rule::LambdaAssignment) {
                     if let [target] = &targets[..] {
-                        pycodestyle::rules::do_not_assign_lambda(self, target, value, stmt);
+                        pycodestyle::rules::lambda_assignment(self, target, value, stmt);
                     }
                 }
 
@@ -1751,9 +1751,9 @@ where
                 }
             }
             StmtKind::AnnAssign { target, value, .. } => {
-                if self.settings.rules.enabled(&Rule::DoNotAssignLambda) {
+                if self.settings.rules.enabled(&Rule::LambdaAssignment) {
                     if let Some(value) = value {
-                        pycodestyle::rules::do_not_assign_lambda(self, target, value, stmt);
+                        pycodestyle::rules::lambda_assignment(self, target, value, stmt);
                     }
                 }
             }
@@ -3533,8 +3533,8 @@ where
             ExcepthandlerKind::ExceptHandler {
                 type_, name, body, ..
             } => {
-                if self.settings.rules.enabled(&Rule::DoNotUseBareExcept) {
-                    if let Some(diagnostic) = pycodestyle::rules::do_not_use_bare_except(
+                if self.settings.rules.enabled(&Rule::BareExcept) {
+                    if let Some(diagnostic) = pycodestyle::rules::bare_except(
                         type_.as_deref(),
                         body,
                         excepthandler,
