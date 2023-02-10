@@ -915,7 +915,7 @@ impl<'a> Generator<'a> {
             }
             Constant::None => self.p("None"),
             Constant::Bool(b) => self.p(if *b { "True" } else { "False" }),
-            Constant::Int(i) => self.p(&format!("{}", i)),
+            Constant::Int(i) => self.p(&format!("{i}")),
             Constant::Tuple(tup) => {
                 if let [elt] = &**tup {
                     self.p("(");

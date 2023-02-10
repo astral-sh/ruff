@@ -313,7 +313,7 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
                 output.push_str("Message formats:");
                 for format in rule.message_formats() {
                     output.push('\n');
-                    output.push_str(&format!("* {}", format));
+                    output.push_str(&format!("* {format}"));
                 }
             }
 
