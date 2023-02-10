@@ -13,11 +13,11 @@ use crate::{
 
 define_violation!(
     /// ### What it does
-    /// Checks for `__init__.py` methods that turned into generators
+    /// Checks for `__init__` methods that turned into generators
     /// via the presence of `yield` or `yield from` statements.
     ///
     /// ### Why is this bad?
-    /// Generators are not allowed in `__init__.py` methods.
+    /// Generators are not allowed in `__init__` methods.
     ///
     /// ### Example
     /// ```python
