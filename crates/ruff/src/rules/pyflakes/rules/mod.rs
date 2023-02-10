@@ -36,7 +36,7 @@ pub(crate) use strings::{
     StringDotFormatExtraPositionalArguments, StringDotFormatInvalidFormat,
     StringDotFormatMissingArguments, StringDotFormatMixingAutomatic,
 };
-pub use undefined_export::UndefinedExport;
+pub use undefined_export::{undefined_export, UndefinedExport};
 pub use undefined_local::{undefined_local, UndefinedLocal};
 pub use undefined_name::UndefinedName;
 pub use unused_annotation::{unused_annotation, UnusedAnnotation};
