@@ -1150,7 +1150,7 @@ For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| [PYI001](https://github.com/charliermarsh/ruff/blob/main/docs/rules/prefix-type-params.md) | [prefix-type-params](https://github.com/charliermarsh/ruff/blob/main/docs/rules/prefix-type-params.md) | Name of private `{kind}` must start with _ |  |
+| PYI001 | [prefix-type-params](https://github.com/charliermarsh/ruff/blob/main/docs/rules/prefix-type-params.md) | Name of private `{kind}` must start with _ |  |
 
 ### flake8-pytest-style (PT)
 
