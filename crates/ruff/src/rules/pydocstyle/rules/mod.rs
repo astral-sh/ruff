@@ -1,4 +1,4 @@
-pub use backslashes::{backslashes, UsesRPrefixForBackslashedContent};
+pub use backslashes::{backslashes, EscapeSequenceInDocstring};
 pub use blank_after_summary::{blank_after_summary, BlankLineAfterSummary};
 pub use blank_before_after_class::{
     blank_before_after_class, NoBlankLineBeforeClass, OneBlankLineAfterClass,
@@ -33,7 +33,7 @@ pub use sections::{
     SectionUnderlineMatchesSectionLength, SectionUnderlineNotOverIndented,
 };
 pub use starts_with_this::{starts_with_this, NoThisPrefix};
-pub use triple_quotes::{triple_quotes, UsesTripleQuotes};
+pub use triple_quotes::{triple_quotes, TripleSingleQuotes};
 
 mod backslashes;
 mod blank_after_summary;

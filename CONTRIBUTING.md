@@ -22,6 +22,9 @@ As a concrete example: consider taking on one of the rules from the [`tryceratop
 plugin, and looking to the originating [Python source](https://github.com/guilatrova/tryceratops)
 for guidance.
 
+Alternatively, we've started work on the [`flake8-pyi`](https://github.com/charliermarsh/ruff/issues/848)
+plugin (see the [Python source](https://github.com/PyCQA/flake8-pyi)) -- another good place to start.
+
 ### Prerequisites
 
 Ruff is written in Rust. You'll need to install the
@@ -91,15 +94,16 @@ At time of writing, the repository includes the following crates:
 
 At a high level, the steps involved in adding a new lint rule are as follows:
 
-1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
-2. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
-3. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
-4. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast.rs` (for AST-based
+1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention).
+2. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
+3. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
+4. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
+5. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast.rs` (for AST-based
    checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks), `crates/ruff/src/checkers/lines.rs`
    (for text-based checks), or `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based
    checks).
-5. Add a test fixture.
-6. Update the generated files (documentation and generated code).
+6. Add a test fixture.
+7. Update the generated files (documentation and generated code).
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate
 rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
@@ -128,6 +132,17 @@ Your test will fail, but you'll be prompted to follow-up with `cargo insta revie
 generated snapshot, then commit the snapshot file alongside the rest of your changes.
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
+
+#### Rule naming convention
+
+The rule name should make sense when read as "allow *rule-name*" or "allow *rule-name* items".
+
+This implies that rule names:
+
+* should state the bad thing being checked for
+
+* should not contain instructions on what you what you should use instead
+  (these belong in the rule documentation and the `autofix_title` for rules that have autofix)
 
 ### Example: Adding a new configuration option
 

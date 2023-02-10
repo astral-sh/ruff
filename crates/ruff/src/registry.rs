@@ -69,8 +69,8 @@ ruff_macros::define_rule_mapping!(
     E713 => rules::pycodestyle::rules::NotInTest,
     E714 => rules::pycodestyle::rules::NotIsTest,
     E721 => rules::pycodestyle::rules::TypeComparison,
-    E722 => rules::pycodestyle::rules::DoNotUseBareExcept,
-    E731 => rules::pycodestyle::rules::DoNotAssignLambda,
+    E722 => rules::pycodestyle::rules::BareExcept,
+    E731 => rules::pycodestyle::rules::LambdaAssignment,
     E741 => rules::pycodestyle::rules::AmbiguousVariableName,
     E742 => rules::pycodestyle::rules::AmbiguousClassName,
     E743 => rules::pycodestyle::rules::AmbiguousFunctionName,
@@ -83,7 +83,7 @@ ruff_macros::define_rule_mapping!(
     // pyflakes
     F401 => rules::pyflakes::rules::UnusedImport,
     F402 => rules::pyflakes::rules::ImportShadowedByLoopVar,
-    F403 => rules::pyflakes::rules::ImportStarUsed,
+    F403 => rules::pyflakes::rules::ImportStar,
     F404 => rules::pyflakes::rules::LateFutureImport,
     F405 => rules::pyflakes::rules::ImportStarUsage,
     F406 => rules::pyflakes::rules::ImportStarNotPermitted,
@@ -125,8 +125,10 @@ ruff_macros::define_rule_mapping!(
     F842 => rules::pyflakes::rules::UnusedAnnotation,
     F901 => rules::pyflakes::rules::RaiseNotImplemented,
     // pylint
+    PLE0100 => rules::pylint::rules::YieldInInit,
     PLE0604 => rules::pylint::rules::InvalidAllObject,
     PLE0605 => rules::pylint::rules::InvalidAllFormat,
+    PLE1307 => rules::pylint::rules::BadStringFormatType,
     PLE2502 => rules::pylint::rules::BidirectionalUnicode,
     PLE1310 => rules::pylint::rules::BadStrStripCall,
     PLC0414 => rules::pylint::rules::UselessImportAlias,
@@ -160,7 +162,7 @@ ruff_macros::define_rule_mapping!(
     B008 => rules::flake8_bugbear::rules::FunctionCallArgumentDefault,
     B009 => rules::flake8_bugbear::rules::GetAttrWithConstant,
     B010 => rules::flake8_bugbear::rules::SetAttrWithConstant,
-    B011 => rules::flake8_bugbear::rules::DoNotAssertFalse,
+    B011 => rules::flake8_bugbear::rules::AssertFalse,
     B012 => rules::flake8_bugbear::rules::JumpStatementInFinally,
     B013 => rules::flake8_bugbear::rules::RedundantTupleInExceptionHandler,
     B014 => rules::flake8_bugbear::rules::DuplicateHandlerException,
@@ -225,7 +227,7 @@ ruff_macros::define_rule_mapping!(
     Q000 => rules::flake8_quotes::rules::BadQuotesInlineString,
     Q001 => rules::flake8_quotes::rules::BadQuotesMultilineString,
     Q002 => rules::flake8_quotes::rules::BadQuotesDocstring,
-    Q003 => rules::flake8_quotes::rules::AvoidQuoteEscape,
+    Q003 => rules::flake8_quotes::rules::AvoidableEscapedQuote,
     // flake8-annotations
     ANN001 => rules::flake8_annotations::rules::MissingTypeFunctionArgument,
     ANN002 => rules::flake8_annotations::rules::MissingTypeArgs,
@@ -337,8 +339,8 @@ ruff_macros::define_rule_mapping!(
     D213 => rules::pydocstyle::rules::MultiLineSummarySecondLine,
     D214 => rules::pydocstyle::rules::SectionNotOverIndented,
     D215 => rules::pydocstyle::rules::SectionUnderlineNotOverIndented,
-    D300 => rules::pydocstyle::rules::UsesTripleQuotes,
-    D301 => rules::pydocstyle::rules::UsesRPrefixForBackslashedContent,
+    D300 => rules::pydocstyle::rules::TripleSingleQuotes,
+    D301 => rules::pydocstyle::rules::EscapeSequenceInDocstring,
     D400 => rules::pydocstyle::rules::EndsInPeriod,
     D401 => rules::pydocstyle::rules::NonImperativeMood,
     D402 => rules::pydocstyle::rules::NoSignature,
@@ -381,13 +383,14 @@ ruff_macros::define_rule_mapping!(
     // eradicate
     ERA001 => rules::eradicate::rules::CommentedOutCode,
     // flake8-bandit
-    S101 => rules::flake8_bandit::rules::AssertUsed,
-    S102 => rules::flake8_bandit::rules::ExecUsed,
+    S101 => rules::flake8_bandit::rules::Assert,
+    S102 => rules::flake8_bandit::rules::ExecBuiltin,
     S103 => rules::flake8_bandit::rules::BadFilePermissions,
     S104 => rules::flake8_bandit::rules::HardcodedBindAllInterfaces,
     S105 => rules::flake8_bandit::rules::HardcodedPasswordString,
     S106 => rules::flake8_bandit::rules::HardcodedPasswordFuncArg,
     S107 => rules::flake8_bandit::rules::HardcodedPasswordDefault,
+    S608 => rules::flake8_bandit::rules::HardcodedSQLExpression,
     S108 => rules::flake8_bandit::rules::HardcodedTempFile,
     S110 => rules::flake8_bandit::rules::TryExceptPass,
     S112 => rules::flake8_bandit::rules::TryExceptContinue,
@@ -443,6 +446,8 @@ ruff_macros::define_rule_mapping!(
     EM101 => rules::flake8_errmsg::rules::RawStringInException,
     EM102 => rules::flake8_errmsg::rules::FStringInException,
     EM103 => rules::flake8_errmsg::rules::DotFormatInException,
+    // flake8-pyi
+    PYI001 => rules::flake8_pyi::rules::PrefixTypeParams,
     // flake8-pytest-style
     PT001 => rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     PT002 => rules::flake8_pytest_style::rules::FixturePositionalArgs,
@@ -633,6 +638,9 @@ pub enum Linter {
     /// [flake8-print](https://pypi.org/project/flake8-print/)
     #[prefix = "T20"]
     Flake8Print,
+    /// [flake8-pyi](https://pypi.org/project/flake8-pyi/)
+    #[prefix = "PYI"]
+    Flake8Pyi,
     /// [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
     #[prefix = "PT"]
     Flake8PytestStyle,
@@ -748,12 +756,13 @@ impl Rule {
             | Rule::ShebangMissingExecutableFile
             | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
+            | Rule::BidirectionalUnicode
             | Rule::ShebangPython
             | Rule::ShebangWhitespace => &LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
-            | Rule::AvoidQuoteEscape
+            | Rule::AvoidableEscapedQuote
             | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString
@@ -852,6 +861,28 @@ mod tests {
     use strum::IntoEnumIterator;
 
     use super::{Linter, Rule, RuleNamespace};
+
+    #[test]
+    fn test_rule_naming_convention() {
+        // The disallowed rule names are defined in a separate file so that they can also be picked up by add_rule.py.
+        let patterns: Vec<_> = include_str!("../resources/test/disallowed_rule_names.txt")
+            .trim()
+            .split('\n')
+            .map(|line| {
+                glob::Pattern::new(line).expect("malformed pattern in disallowed_rule_names.txt")
+            })
+            .collect();
+
+        for rule in Rule::iter() {
+            let rule_name = rule.as_ref();
+            for pattern in &patterns {
+                assert!(
+                    !pattern.matches(rule_name),
+                    "{rule_name} does not match naming convention, see CONTRIBUTING.md"
+                );
+            }
+        }
+    }
 
     #[test]
     fn check_code_serialization() {

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 /// Helper functions for the tests of rule implementations.
 use std::path::Path;
 

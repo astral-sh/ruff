@@ -145,6 +145,7 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [flake8-no-pep420 (INP)](#flake8-no-pep420-inp)
    1. [flake8-pie (PIE)](#flake8-pie-pie)
    1. [flake8-print (T20)](#flake8-print-t20)
+   1. [flake8-pyi (PYI)](#flake8-pyi-pyi)
    1. [flake8-pytest-style (PT)](#flake8-pytest-style-pt)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
    1. [flake8-return (RET)](#flake8-return-ret)
@@ -663,7 +664,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | ---- | ---- | ------- | --- |
 | F401 | unused-import | `{name}` imported but unused; consider adding to `__all__` or using a redundant alias | 🛠 |
 | F402 | import-shadowed-by-loop-var | Import `{name}` from line {line} shadowed by loop variable |  |
-| F403 | import-star-used | `from {name} import *` used; unable to detect undefined names |  |
+| F403 | import-star | `from {name} import *` used; unable to detect undefined names |  |
 | F404 | late-future-import | `from __future__` imports must occur at the beginning of the file |  |
 | F405 | import-star-usage | `{name}` may be undefined, or defined from star imports: {sources} |  |
 | F406 | import-star-not-permitted | `from {name} import *` only allowed at module level |  |
@@ -726,8 +727,8 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | E713 | not-in-test | Test for membership should be `not in` | 🛠 |
 | E714 | not-is-test | Test for object identity should be `is not` | 🛠 |
 | E721 | type-comparison | Do not compare types, use `isinstance()` |  |
-| E722 | do-not-use-bare-except | Do not use bare `except` |  |
-| E731 | do-not-assign-lambda | Do not assign a `lambda` expression, use a `def` | 🛠 |
+| E722 | bare-except | Do not use bare `except` |  |
+| E731 | lambda-assignment | Do not assign a `lambda` expression, use a `def` | 🛠 |
 | E741 | ambiguous-variable-name | Ambiguous variable name: `{name}` |  |
 | E742 | ambiguous-class-name | Ambiguous class name: `{name}` |  |
 | E743 | ambiguous-function-name | Ambiguous function name: `{name}` |  |
@@ -811,8 +812,8 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line | 🛠 |
 | D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
 | D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
-| D300 | uses-triple-quotes | Use """triple double quotes""" |  |
-| D301 | uses-r-prefix-for-backslashed-content | Use r""" if any backslashes in a docstring |  |
+| D300 | triple-single-quotes | Use """triple double quotes""" |  |
+| D301 | escape-sequence-in-docstring | Use r""" if any backslashes in a docstring |  |
 | D400 | ends-in-period | First line should end with a period | 🛠 |
 | D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
@@ -917,8 +918,8 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| S101 | assert-used | Use of `assert` detected |  |
-| S102 | exec-used | Use of `exec` detected |  |
+| S101 | assert | Use of `assert` detected |  |
+| S102 | exec-builtin | Use of `exec` detected |  |
 | S103 | bad-file-permissions | `os.chmod` setting a permissive mask `{mask:#o}` on file or directory |  |
 | S104 | hardcoded-bind-all-interfaces | Possible binding to all interfaces |  |
 | S105 | hardcoded-password-string | Possible hardcoded password: "{}" |  |
@@ -933,6 +934,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S506 | unsafe-yaml-load | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 | S508 | snmp-insecure-version | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
 | S509 | snmp-weak-cryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
+| S608 | [hardcoded-sql-expression](https://github.com/charliermarsh/ruff/blob/main/docs/rules/hardcoded-sql-expression.md) | Possible SQL injection vector through string-based query construction: "{}" |  |
 | S612 | logging-config-insecure-listen | Use of insecure `logging.config.listen` detected |  |
 | S701 | jinja2-autoescape-false | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
 
@@ -969,7 +971,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B008 | function-call-argument-default | Do not perform function call `{name}` in argument defaults |  |
 | B009 | get-attr-with-constant | Do not call `getattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
 | B010 | set-attr-with-constant | Do not call `setattr` with a constant attribute value. It is not any safer than normal property access. | 🛠 |
-| B011 | do-not-assert-false | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
+| B011 | assert-false | Do not `assert False` (`python -O` removes these calls), raise `AssertionError()` | 🛠 |
 | B012 | jump-statement-in-finally | `{name}` inside `finally` blocks cause exceptions to be silenced |  |
 | B013 | redundant-tuple-in-exception-handler | A length-one tuple literal is redundant. Write `except {name}` instead of `except ({name},)`. | 🛠 |
 | B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
@@ -1142,6 +1144,14 @@ For more, see [flake8-print](https://pypi.org/project/flake8-print/) on PyPI.
 | T201 | print-found | `print` found |  |
 | T203 | p-print-found | `pprint` found |  |
 
+### flake8-pyi (PYI)
+
+For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| PYI001 | [prefix-type-params](https://github.com/charliermarsh/ruff/blob/main/docs/rules/prefix-type-params.md) | Name of private `{kind}` must start with _ |  |
+
 ### flake8-pytest-style (PT)
 
 For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/) on PyPI.
@@ -1183,7 +1193,7 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/) on PyPI.
 | Q000 | [bad-quotes-inline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | Double quotes found but single quotes preferred | 🛠 |
 | Q001 | [bad-quotes-multiline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | Double quote multiline found but single quotes preferred | 🛠 |
 | Q002 | [bad-quotes-docstring](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | Double quote docstring found but single quotes preferred | 🛠 |
-| Q003 | [avoid-quote-escape](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoid-quote-escape.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
+| Q003 | [avoidable-escaped-quote](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoidable-escaped-quote.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
 
 ### flake8-return (RET)
 
@@ -1351,13 +1361,15 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| PLE0100 | [yield-in-init](https://github.com/charliermarsh/ruff/blob/main/docs/rules/yield-in-init.md) | `__init__` method is a generator |  |
 | PLE0117 | nonlocal-without-binding | Nonlocal name `{name}` found without binding |  |
 | PLE0118 | used-prior-global-declaration | Name `{name}` is used prior to global declaration on line {line} |  |
 | PLE0604 | invalid-all-object | Invalid object in `__all__`, must contain only strings |  |
 | PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
+| PLE1307 | [bad-string-format-type](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-string-format-type.md) | Format type does not match argument type |  |
 | PLE1310 | bad-str-strip-call | String `{strip}` call contains duplicate characters (did you mean `{removal}`?) |  |
-| PLE2502 | bidirectional-unicode | Avoid using bidirectional unicode |  |
+| PLE2502 | bidirectional-unicode | Contains control characters that can permit obfuscated code |  |
 
 #### Refactor (PLR)
 
@@ -1702,6 +1714,7 @@ natively, including:
 * [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
 * [flake8-pie](https://pypi.org/project/flake8-pie/)
 * [flake8-print](https://pypi.org/project/flake8-print/)
+* [flake8-pyi](https://pypi.org/project/flake8-pyi/)
 * [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
 * [flake8-quotes](https://pypi.org/project/flake8-quotes/)
 * [flake8-raise](https://pypi.org/project/flake8-raise/)
@@ -1972,6 +1985,15 @@ unfixable = ["B", "SIM", "TRY", "RUF"]
 ```
 
 If you find a case where Ruff's autofix breaks your code, please file an Issue!
+
+### How can I disable Ruff's color output?
+
+Ruff's color output is powered by the [`colored`](https://crates.io/crates/colored) crate, which
+attempts to automatically detect whether the output stream supports color. However, you can force
+colors off by setting the `NO_COLOR` environment variable to any value (e.g., `NO_COLOR=1`).
+
+[`colored`](https://crates.io/crates/colored) also supports the the `CLICOLOR` and `CLICOLOR_FORCE`
+environment variables (see the [spec](https://bixense.com/clicolors/)).
 
 <!-- End section: FAQ -->
 
@@ -3452,6 +3474,25 @@ can be identified as such via introspection of the local filesystem.
 ```toml
 [tool.ruff.isort]
 known-first-party = ["src"]
+```
+
+---
+
+#### [`known-local-folder`](#known-local-folder)
+
+A list of modules to consider being a local folder.
+Generally, this is reserved for relative
+imports (from . import module).
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+known-local-folder = ["src"]
 ```
 
 ---

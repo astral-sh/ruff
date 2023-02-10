@@ -165,6 +165,36 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
     }
 }
 
+const NORETURN_FUNCS: &[&[&str]] = &[
+    // builtins
+    &["", "exit"],
+    &["", "quit"],
+    // stdlib
+    &["builtins", "exit"],
+    &["builtins", "quit"],
+    &["os", "_exit"],
+    &["os", "abort"],
+    &["posix", "_exit"],
+    &["posix", "abort"],
+    &["sys", "exit"],
+    &["_thread", "exit"],
+    &["_winapi", "ExitProcess"],
+    // third-party modules
+    &["pytest", "exit"],
+    &["pytest", "fail"],
+    &["pytest", "skip"],
+    &["pytest", "xfail"],
+];
+
+/// Return `true` if the `func` is a known function that never returns.
+fn is_noreturn_func(checker: &Checker, func: &Expr) -> bool {
+    checker.resolve_call_path(func).map_or(false, |call_path| {
+        NORETURN_FUNCS
+            .iter()
+            .any(|target| call_path.as_slice() == *target)
+    })
+}
+
 /// RET503
 fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
     match &last_stmt.node {
@@ -208,6 +238,12 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
         | StmtKind::While { .. }
         | StmtKind::Raise { .. }
         | StmtKind::Try { .. } => {}
+        StmtKind::Expr { value, .. }
+            if matches!(
+                &value.node,
+                ExprKind::Call { func, ..  }
+                    if is_noreturn_func(checker, func)
+            ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(last_stmt));
             if checker.patch(diagnostic.kind.rule()) {

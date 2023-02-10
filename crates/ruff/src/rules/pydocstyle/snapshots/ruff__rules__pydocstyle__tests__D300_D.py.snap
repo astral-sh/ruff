@@ -1,9 +1,9 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UsesTripleQuotes: ~
+    TripleSingleQuotes: ~
   location:
     row: 307
     column: 4
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsesTripleQuotes: ~
+    TripleSingleQuotes: ~
   location:
     row: 312
     column: 4
@@ -23,7 +23,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsesTripleQuotes: ~
+    TripleSingleQuotes: ~
   location:
     row: 317
     column: 4
@@ -33,7 +33,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsesTripleQuotes: ~
+    TripleSingleQuotes: ~
   location:
     row: 322
     column: 4
@@ -43,7 +43,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsesTripleQuotes: ~
+    TripleSingleQuotes: ~
   location:
     row: 328
     column: 4

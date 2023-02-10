@@ -1,0 +1,38 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    PrefixTypeParams:
+      kind: TypeVar
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PrefixTypeParams:
+      kind: TypeVarTuple
+  location:
+    row: 5
+    column: 9
+  end_location:
+    row: 5
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    PrefixTypeParams:
+      kind: ParamSpec
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 7
+    column: 18
+  fix: ~
+  parent: ~
+

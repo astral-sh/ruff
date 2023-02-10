@@ -7,8 +7,7 @@ use crate::ast::helpers::{first_colon_range, has_comments_in};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::violation::{Availability, Violation};
-use crate::AutofixKind;
+use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::fix_with;
 

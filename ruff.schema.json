@@ -964,6 +964,16 @@
             "type": "string"
           }
         },
+        "known-local-folder": {
+          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (from . import module).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "known-third-party": {
           "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
           "type": [
@@ -1677,6 +1687,8 @@
         "PLE",
         "PLE0",
         "PLE01",
+        "PLE010",
+        "PLE0100",
         "PLE011",
         "PLE0117",
         "PLE0118",
@@ -1689,6 +1701,8 @@
         "PLE114",
         "PLE1142",
         "PLE13",
+        "PLE130",
+        "PLE1307",
         "PLE131",
         "PLE1310",
         "PLE2",
@@ -1790,6 +1804,10 @@
         "PTH122",
         "PTH123",
         "PTH124",
+        "PYI",
+        "PYI0",
+        "PYI00",
+        "PYI001",
         "Q",
         "Q0",
         "Q00",
@@ -1848,6 +1866,8 @@
         "S508",
         "S509",
         "S6",
+        "S60",
+        "S608",
         "S61",
         "S612",
         "S7",

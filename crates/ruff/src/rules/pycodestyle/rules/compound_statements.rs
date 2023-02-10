@@ -53,6 +53,16 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
     let mut def = None;
     let mut colon = None;
     let mut semi = None;
+    let mut class = None;
+    let mut elif = None;
+    let mut else_ = None;
+    let mut except = None;
+    let mut finally = None;
+    let mut for_ = None;
+    let mut if_ = None;
+    let mut try_ = None;
+    let mut while_ = None;
+    let mut with = None;
 
     // Track the bracket depth.
     let mut par_count = 0;
@@ -96,12 +106,35 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
                 def = None;
                 colon = None;
                 semi = None;
+                class = None;
+                elif = None;
+                else_ = None;
+                except = None;
+                finally = None;
+                for_ = None;
+                if_ = None;
+                try_ = None;
+                while_ = None;
+                with = None;
             }
             Tok::Def => {
                 def = Some((start, end));
             }
             Tok::Colon => {
-                colon = Some((start, end));
+                if def.is_some()
+                    || class.is_some()
+                    || elif.is_some()
+                    || else_.is_some()
+                    || except.is_some()
+                    || finally.is_some()
+                    || for_.is_some()
+                    || if_.is_some()
+                    || try_.is_some()
+                    || while_.is_some()
+                    || with.is_some()
+                {
+                    colon = Some((start, end));
+                }
             }
             Tok::Semi => {
                 semi = Some((start, end));
@@ -134,9 +167,53 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
                     // Reset.
                     def = None;
                     colon = None;
+                    class = None;
+                    elif = None;
+                    else_ = None;
+                    except = None;
+                    finally = None;
+                    for_ = None;
+                    if_ = None;
+                    try_ = None;
+                    while_ = None;
+                    with = None;
                 }
             }
         }
+
+        match tok {
+            Tok::If => {
+                if_ = Some((start, end));
+            }
+            Tok::While => {
+                while_ = Some((start, end));
+            }
+            Tok::For => {
+                for_ = Some((start, end));
+            }
+            Tok::Try => {
+                try_ = Some((start, end));
+            }
+            Tok::Except => {
+                except = Some((start, end));
+            }
+            Tok::Finally => {
+                finally = Some((start, end));
+            }
+            Tok::Elif => {
+                elif = Some((start, end));
+            }
+            Tok::Else => {
+                else_ = Some((start, end));
+            }
+            Tok::Class => {
+                class = Some((start, end));
+            }
+            Tok::With => {
+                with = Some((start, end));
+            }
+            _ => {}
+        };
     }
 
     diagnostics

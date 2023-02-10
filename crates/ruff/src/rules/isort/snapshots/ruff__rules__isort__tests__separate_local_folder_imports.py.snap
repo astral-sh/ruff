@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -8,7 +8,7 @@ expression: diagnostics
     row: 1
     column: 0
   end_location:
-    row: 5
+    row: 6
     column: 0
   fix:
     content:
@@ -17,13 +17,14 @@ expression: diagnostics
       - ""
       - import leading_prefix
       - ""
+      - import ruff
       - from . import leading_prefix
       - ""
     location:
       row: 1
       column: 0
     end_location:
-      row: 5
+      row: 6
       column: 0
   parent: ~
 

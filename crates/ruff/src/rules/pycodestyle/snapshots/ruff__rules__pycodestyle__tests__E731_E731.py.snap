@@ -1,9 +1,9 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DoNotAssignLambda: f
+    LambdaAssignment: f
   location:
     row: 2
     column: 0
@@ -22,7 +22,7 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    DoNotAssignLambda: f
+    LambdaAssignment: f
   location:
     row: 4
     column: 0
@@ -41,7 +41,7 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    DoNotAssignLambda: this
+    LambdaAssignment: this
   location:
     row: 7
     column: 4

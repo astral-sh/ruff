@@ -5,8 +5,8 @@ expression: diagnostics
 - kind:
     TryExceptContinue: ~
   location:
-    row: 4
-    column: 4
+    row: 3
+    column: 0
   end_location:
     row: 4
     column: 12
@@ -15,10 +15,30 @@ expression: diagnostics
 - kind:
     TryExceptContinue: ~
   location:
-    row: 9
-    column: 4
+    row: 8
+    column: 0
   end_location:
     row: 9
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    TryExceptContinue: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 14
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    TryExceptContinue: ~
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 19
     column: 12
   fix: ~
   parent: ~

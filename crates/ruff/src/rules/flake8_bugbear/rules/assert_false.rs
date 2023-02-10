@@ -9,9 +9,9 @@ use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    pub struct DoNotAssertFalse;
+    pub struct AssertFalse;
 );
-impl AlwaysAutofixableViolation for DoNotAssertFalse {
+impl AlwaysAutofixableViolation for AssertFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`")
@@ -61,7 +61,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(DoNotAssertFalse, Range::from_located(test));
+    let mut diagnostic = Diagnostic::new(AssertFalse, Range::from_located(test));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&assertion_error(msg), checker.stylist),

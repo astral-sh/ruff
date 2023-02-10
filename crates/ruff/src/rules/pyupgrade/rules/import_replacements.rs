@@ -10,8 +10,7 @@ use crate::registry::{Diagnostic, Rule};
 use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
 use crate::source_code::{Locator, Stylist};
-use crate::violation::{Availability, Violation};
-use crate::AutofixKind;
+use crate::violation::{AutofixKind, Availability, Violation};
 
 define_violation!(
     pub struct ImportReplacements {

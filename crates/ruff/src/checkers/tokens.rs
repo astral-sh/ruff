@@ -32,7 +32,7 @@ pub fn check_tokens(
     let enforce_quotes = settings.rules.enabled(&Rule::BadQuotesInlineString)
         || settings.rules.enabled(&Rule::BadQuotesMultilineString)
         || settings.rules.enabled(&Rule::BadQuotesDocstring)
-        || settings.rules.enabled(&Rule::AvoidQuoteEscape);
+        || settings.rules.enabled(&Rule::AvoidableEscapedQuote);
     let enforce_commented_out_code = settings.rules.enabled(&Rule::CommentedOutCode);
     let enforce_compound_statements = settings
         .rules
@@ -58,10 +58,8 @@ pub fn check_tokens(
         || settings.rules.enabled(&Rule::TrailingCommaProhibited);
     let enforce_extraneous_parenthesis = settings.rules.enabled(&Rule::ExtraneousParentheses);
 
-    if enforce_ambiguous_unicode_character
-        || enforce_commented_out_code
-        || enforce_invalid_escape_sequence
-    {
+    // RUF001, RUF002, RUF003
+    if enforce_ambiguous_unicode_character {
         let mut state_machine = StateMachine::default();
         for &(start, ref tok, end) in tokens.iter().flatten() {
             let is_docstring = if enforce_ambiguous_unicode_character {
@@ -70,50 +68,51 @@ pub fn check_tokens(
                 false
             };
 
-            // RUF001, RUF002, RUF003
-            if enforce_ambiguous_unicode_character {
-                if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
-                    diagnostics.extend(ruff::rules::ambiguous_unicode_character(
-                        locator,
-                        start,
-                        end,
-                        if matches!(tok, Tok::String { .. }) {
-                            if is_docstring {
-                                Context::Docstring
-                            } else {
-                                Context::String
-                            }
+            if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
+                diagnostics.extend(ruff::rules::ambiguous_unicode_character(
+                    locator,
+                    start,
+                    end,
+                    if matches!(tok, Tok::String { .. }) {
+                        if is_docstring {
+                            Context::Docstring
                         } else {
-                            Context::Comment
-                        },
-                        settings,
-                        autofix,
-                    ));
+                            Context::String
+                        }
+                    } else {
+                        Context::Comment
+                    },
+                    settings,
+                    autofix,
+                ));
+            }
+        }
+    }
+
+    // ERA001
+    if enforce_commented_out_code {
+        for (start, tok, end) in tokens.iter().flatten() {
+            if matches!(tok, Tok::Comment(_)) {
+                if let Some(diagnostic) =
+                    eradicate::rules::commented_out_code(locator, *start, *end, settings, autofix)
+                {
+                    diagnostics.push(diagnostic);
                 }
             }
+        }
+    }
 
-            // eradicate
-            if enforce_commented_out_code {
-                if matches!(tok, Tok::Comment(_)) {
-                    if let Some(diagnostic) =
-                        eradicate::rules::commented_out_code(locator, start, end, settings, autofix)
-                    {
-                        diagnostics.push(diagnostic);
-                    }
-                }
-            }
-
-            // W605
-            if enforce_invalid_escape_sequence {
-                if matches!(tok, Tok::String { .. }) {
-                    diagnostics.extend(pycodestyle::rules::invalid_escape_sequence(
-                        locator,
-                        start,
-                        end,
-                        matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
-                    ));
-                }
+    // W605
+    if enforce_invalid_escape_sequence {
+        for (start, tok, end) in tokens.iter().flatten() {
+            if matches!(tok, Tok::String { .. }) {
+                diagnostics.extend(pycodestyle::rules::invalid_escape_sequence(
+                    locator,
+                    *start,
+                    *end,
+                    matches!(autofix, flags::Autofix::Enabled)
+                        && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
+                ));
             }
         }
     }
