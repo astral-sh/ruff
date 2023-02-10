@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_comprehensions/mod.rs
+source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,7 +11,15 @@ expression: diagnostics
   end_location:
     row: 2
     column: 26
-  fix: ~
+  fix:
+    content:
+      - (x + 1 for x in nums)
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 26
   parent: ~
 - kind:
     UnnecessaryMap:
@@ -22,7 +30,15 @@ expression: diagnostics
   end_location:
     row: 3
     column: 27
-  fix: ~
+  fix:
+    content:
+      - (str(x) for x in nums)
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 27
   parent: ~
 - kind:
     UnnecessaryMap:
@@ -33,18 +49,15 @@ expression: diagnostics
   end_location:
     row: 4
     column: 32
-  fix: ~
-  parent: ~
-- kind:
-    UnnecessaryMap:
-      obj_type: generator
-  location:
-    row: 4
-    column: 5
-  end_location:
-    row: 4
-    column: 31
-  fix: ~
+  fix:
+    content:
+      - "[x * 2 for x in nums]"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 32
   parent: ~
 - kind:
     UnnecessaryMap:
@@ -55,18 +68,15 @@ expression: diagnostics
   end_location:
     row: 5
     column: 36
-  fix: ~
-  parent: ~
-- kind:
-    UnnecessaryMap:
-      obj_type: generator
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 5
-    column: 35
-  fix: ~
+  fix:
+    content:
+      - "{x % 2 == 0 for x in nums}"
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 36
   parent: ~
 - kind:
     UnnecessaryMap:
@@ -77,17 +87,63 @@ expression: diagnostics
   end_location:
     row: 6
     column: 36
-  fix: ~
+  fix:
+    content:
+      - "{v: v**2 for v in nums}"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 36
   parent: ~
 - kind:
     UnnecessaryMap:
       obj_type: generator
   location:
-    row: 6
-    column: 5
+    row: 7
+    column: 0
   end_location:
-    row: 6
-    column: 35
+    row: 7
+    column: 26
+  fix:
+    content:
+      - "(\"const\" for _ in nums)"
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 26
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 24
+  fix:
+    content:
+      - (3.0 for _ in nums)
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 24
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: generator
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 24
   fix: ~
   parent: ~
 

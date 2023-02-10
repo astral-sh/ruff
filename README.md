@@ -1029,10 +1029,10 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C410 | unnecessary-literal-within-list-call | Unnecessary `{literal}` literal passed to `list()` (remove the outer call to `list()`) | 🛠 |
 | C411 | unnecessary-list-call | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
 | C413 | unnecessary-call-around-sorted | Unnecessary `{func}` call around `sorted()` | 🛠 |
-| C414 | unnecessary-double-cast-or-process | Unnecessary `{inner}` call within `{outer}()` |  |
+| C414 | [unnecessary-double-cast-or-process](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-double-cast-or-process.md) | Unnecessary `{inner}` call within `{outer}()` | 🛠 |
 | C415 | unnecessary-subscript-reversal | Unnecessary subscript reversal of iterable within `{func}()` |  |
 | C416 | unnecessary-comprehension | Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`) | 🛠 |
-| C417 | unnecessary-map | Unnecessary `map` usage (rewrite using a generator expression) |  |
+| C417 | [unnecessary-map](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-map.md) | Unnecessary `map` usage (rewrite using a generator expression) | 🛠 |
 
 ### flake8-datetimez (DTZ)
 

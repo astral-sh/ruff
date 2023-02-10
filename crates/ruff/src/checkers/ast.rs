@@ -2529,7 +2529,13 @@ where
                     );
                 }
                 if self.settings.rules.enabled(&Rule::UnnecessaryMap) {
-                    flake8_comprehensions::rules::unnecessary_map(self, expr, func, args);
+                    flake8_comprehensions::rules::unnecessary_map(
+                        self,
+                        expr,
+                        self.current_expr_parent().map(Into::into),
+                        func,
+                        args,
+                    );
                 }
 
                 // flake8-boolean-trap
