@@ -10,10 +10,9 @@ inclusion of `yield` or `yield from` expressions.
 The `__init__` method is the constructor for a given Python class,
 responsible for initializing, rather than creating, new objects.
 
-The `__init__` method is not allowed to return a value. By including a
-`yield` or `yield from` expression in an `__init__`, the method will
-return a generator object when called at runtime, resulting in a
-runtime error.
+The `__init__` method has to return `None`. By including a `yield` or
+`yield from` expression in an `__init__`, the method will return a
+generator object when called at runtime, resulting in a runtime error.
 
 ### Example
 ```python
