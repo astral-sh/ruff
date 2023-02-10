@@ -4647,8 +4647,10 @@ impl<'a> Checker<'a> {
         // Identify any valid runtime imports. If a module is imported at runtime, and
         // used at runtime, then by default, we avoid flagging any other
         // imports from that model as typing-only.
-        let runtime_imports: Vec<Vec<&Binding>> = if !self.settings.flake8_type_checking.strict
-            && (self
+        let runtime_imports: Vec<Vec<&Binding>> = if self.settings.flake8_type_checking.strict {
+            vec![]
+        } else {
+            if self
                 .settings
                 .rules
                 .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
@@ -4663,28 +4665,40 @@ impl<'a> Checker<'a> {
                 || self
                     .settings
                     .rules
-                    .enabled(&Rule::TypingOnlyStandardLibraryImport))
-        {
-            self.scopes
-                .iter()
-                .map(|scope| {
-                    scope
-                        .bindings
-                        .values()
-                        .map(|index| &self.bindings[*index])
-                        .filter(|binding| {
-                            flake8_type_checking::helpers::is_valid_runtime_import(binding)
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .collect::<Vec<_>>()
-        } else {
-            vec![]
+                    .enabled(&Rule::TypingOnlyStandardLibraryImport)
+            {
+                self.scopes
+                    .iter()
+                    .map(|scope| {
+                        scope
+                            .bindings
+                            .values()
+                            .map(|index| &self.bindings[*index])
+                            .filter(|binding| {
+                                flake8_type_checking::helpers::is_valid_runtime_import(binding)
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                vec![]
+            }
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
         for (index, stack) in self.dead_scopes.iter().rev() {
             let scope = &self.scopes[*index];
+
+            // F822
+            if *index == GLOBAL_SCOPE_INDEX {
+                if self.settings.rules.enabled(&Rule::UndefinedExport) {
+                    if let Some((names, range)) = &all_names {
+                        diagnostics.extend(pyflakes::rules::undefined_export(
+                            names, range, self.path, scope,
+                        ));
+                    }
+                }
+            }
 
             // PLW0602
             if self
@@ -4712,23 +4726,6 @@ impl<'a> Checker<'a> {
             // Imports in classes are public members.
             if matches!(scope.kind, ScopeKind::Class(..)) {
                 continue;
-            }
-
-            if self.settings.rules.enabled(&Rule::UndefinedExport) {
-                if !scope.import_starred && !self.path.ends_with("__init__.py") {
-                    if let Some((names, range)) = &all_names {
-                        for &name in names {
-                            if !scope.bindings.contains_key(name) {
-                                diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::UndefinedExport {
-                                        name: name.to_string(),
-                                    },
-                                    *range,
-                                ));
-                            }
-                        }
-                    }
-                }
             }
 
             // Look for any bindings that were redefined in another scope, and remain
