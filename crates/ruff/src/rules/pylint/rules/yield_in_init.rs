@@ -9,10 +9,10 @@ use crate::{
 };
 
 define_violation!(
-    pub struct InitIsGenerator;
+    pub struct YieldInInit;
 );
 
-impl Violation for InitIsGenerator {
+impl Violation for YieldInInit {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`__init__` method is a generator")
@@ -20,7 +20,7 @@ impl Violation for InitIsGenerator {
 }
 
 /// PLE0100
-pub fn init_is_generator(checker: &mut Checker, expr: &Expr) {
+pub fn yield_in_init(checker: &mut Checker, expr: &Expr) {
     let parent_scope_is_class: Option<bool> =
         checker
             .current_scopes()
@@ -38,6 +38,6 @@ pub fn init_is_generator(checker: &mut Checker, expr: &Expr) {
     if parent_scope_is_class == Some(true) && current_scope_is_init == Some(true) {
         checker
             .diagnostics
-            .push(Diagnostic::new(InitIsGenerator, Range::from_located(expr)));
+            .push(Diagnostic::new(YieldInInit, Range::from_located(expr)));
     }
 }

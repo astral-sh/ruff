@@ -2790,16 +2790,16 @@ where
                 if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::InitIsGenerator) {
-                    pylint::rules::init_is_generator(self, expr);
+                if self.settings.rules.enabled(&Rule::YieldInInit) {
+                    pylint::rules::yield_in_init(self, expr);
                 }
             }
             ExprKind::YieldFrom { .. } => {
                 if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::InitIsGenerator) {
-                    pylint::rules::init_is_generator(self, expr);
+                if self.settings.rules.enabled(&Rule::YieldInInit) {
+                    pylint::rules::yield_in_init(self, expr);
                 }
             }
             ExprKind::Await { .. } => {
