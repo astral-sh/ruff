@@ -1,4 +1,4 @@
-# dynamically-typed-expression (ANN401)
+# any-type (ANN401)
 
 Derived from the **flake8-annotations** linter.
 
