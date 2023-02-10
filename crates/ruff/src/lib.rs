@@ -5,6 +5,11 @@
 //!
 //! [Ruff]: https://github.com/charliermarsh/ruff
 
+use cfg_if::cfg_if;
+pub use rule_selector::RuleSelector;
+pub use rules::pycodestyle::rules::IOError;
+pub use violation::{AutofixKind, Availability as AutofixAvailability};
+
 mod assert_yaml_snapshot;
 mod ast;
 mod autofix;
@@ -34,20 +39,12 @@ mod vendor;
 mod violation;
 mod visibility;
 
-use cfg_if::cfg_if;
-pub use rule_selector::RuleSelector;
-pub use rules::pycodestyle::rules::IOError;
-pub use violation::{AutofixKind, Availability as AutofixAvailability};
-
 cfg_if! {
-    if #[cfg(not(target_family = "wasm"))] {
-        pub mod packaging;
-
-        mod lib_native;
-        pub use lib_native::check;
-    } else {
+    if #[cfg(target_family = "wasm")] {
         mod lib_wasm;
         pub use lib_wasm::check;
+    } else {
+        pub mod packaging;
     }
 }
 
