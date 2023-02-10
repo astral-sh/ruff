@@ -22,6 +22,9 @@ As a concrete example: consider taking on one of the rules from the [`tryceratop
 plugin, and looking to the originating [Python source](https://github.com/guilatrova/tryceratops)
 for guidance.
 
+Alternatively, we've started work on the [`flake8-pyi`](https://github.com/charliermarsh/ruff/issues/848)
+plugin (see the [Python source](https://github.com/PyCQA/flake8-pyi)) -- another good place to start.
+
 ### Prerequisites
 
 Ruff is written in Rust. You'll need to install the

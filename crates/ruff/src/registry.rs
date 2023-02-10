@@ -443,6 +443,8 @@ ruff_macros::define_rule_mapping!(
     EM101 => rules::flake8_errmsg::rules::RawStringInException,
     EM102 => rules::flake8_errmsg::rules::FStringInException,
     EM103 => rules::flake8_errmsg::rules::DotFormatInException,
+    // flake8-pyi
+    PYI001 => rules::flake8_pyi::rules::PrefixTypeParams,
     // flake8-pytest-style
     PT001 => rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     PT002 => rules::flake8_pytest_style::rules::FixturePositionalArgs,
@@ -633,6 +635,9 @@ pub enum Linter {
     /// [flake8-print](https://pypi.org/project/flake8-print/)
     #[prefix = "T20"]
     Flake8Print,
+    /// [flake8-pyi](https://pypi.org/project/flake8-pyi/)
+    #[prefix = "PYI"]
+    Flake8Pyi,
     /// [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
     #[prefix = "PT"]
     Flake8PytestStyle,
