@@ -23,7 +23,7 @@ impl Format<ASTFormatContext<'_>> for FormatWithitem<'_> {
 
         write!(f, [withitem.context_expr.format()])?;
         if let Some(optional_vars) = &withitem.optional_vars {
-            write!(f, [text(" as ")])?;
+            write!(f, [space(), text("as"), space()])?;
             write!(f, [optional_vars.format()])?;
         }
 

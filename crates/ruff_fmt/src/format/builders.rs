@@ -28,10 +28,20 @@ pub fn block(body: &[Stmt]) -> Block {
     Block { body }
 }
 
-pub fn join_names<Context>(f: &mut Formatter<Context>, names: &[String]) -> FormatResult<()> {
-    let mut join = f.join_with(text(", "));
-    for name in names {
-        join.entry(&dynamic_text(name, TextSize::default()));
+pub(crate) const fn join_names( names: &[String]) -> JoinNames {
+    JoinNames { names }
+}
+
+pub(crate) struct JoinNames<'a> {
+    names: &'a [String],
+}
+
+impl<Context> Format<Context> for JoinNames<'_> {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        let mut join = f.join_with(text(", "));
+        for name in self.names {
+            join.entry(&dynamic_text(name, TextSize::default()));
+        }
+        join.finish()
     }
-    join.finish()
 }

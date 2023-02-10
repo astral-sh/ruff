@@ -1564,7 +1564,7 @@ where
                         self,
                         stmt,
                         test,
-                        msg.as_ref().map(|expr| &**expr),
+                        msg.as_deref(),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::Assert) {

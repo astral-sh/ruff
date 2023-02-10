@@ -22,16 +22,16 @@ impl Format<ASTFormatContext<'_>> for FormatUnaryop<'_> {
         let unaryop = self.item;
         write!(
             f,
-            [text(match unaryop {
-                Unaryop::Invert => "~",
-                Unaryop::Not => "not",
-                Unaryop::UAdd => "+",
-                Unaryop::USub => "-",
-            })]
+            [
+                text(match unaryop {
+                    Unaryop::Invert => "~",
+                    Unaryop::Not => "not",
+                    Unaryop::UAdd => "+",
+                    Unaryop::USub => "-",
+                }),
+                matches!(unaryop, Unaryop::Not).then_some(space())
+            ]
         )?;
-        if matches!(unaryop, Unaryop::Not) {
-            write!(f, [space()])?;
-        }
         Ok(())
     }
 }

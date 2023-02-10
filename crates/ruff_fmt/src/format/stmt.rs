@@ -49,8 +49,7 @@ fn format_continue(f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> 
 fn format_global(f: &mut Formatter<ASTFormatContext<'_>>, names: &[String]) -> FormatResult<()> {
     write!(f, [text("global")])?;
     if !names.is_empty() {
-        write!(f, [space()])?;
-        join_names(f, names)?;
+        write!(f, [space(), join_names(names)])?;
     }
     Ok(())
 }
@@ -58,40 +57,41 @@ fn format_global(f: &mut Formatter<ASTFormatContext<'_>>, names: &[String]) -> F
 fn format_nonlocal(f: &mut Formatter<ASTFormatContext<'_>>, names: &[String]) -> FormatResult<()> {
     write!(f, [text("nonlocal")])?;
     if !names.is_empty() {
-        write!(f, [space()])?;
-        join_names(f, names)?;
+        write!(f, [space(), join_names(names)])?;
     }
     Ok(())
 }
 
 fn format_delete(f: &mut Formatter<ASTFormatContext<'_>>, targets: &[Expr]) -> FormatResult<()> {
     write!(f, [text("del")])?;
-    if targets.len() == 1 {
-        write!(f, [space()])?;
-        write!(f, [targets[0].format()])?;
-    } else if !targets.is_empty() {
-        write!(f, [space()])?;
-        write!(
-            f,
-            [group(&format_args![
-                if_group_breaks(&text("(")),
-                soft_block_indent(&format_with(|f| {
-                    for (i, target) in targets.iter().enumerate() {
-                        write!(f, [target.format()])?;
-                        if i < targets.len() - 1 {
-                            write!(f, [text(",")])?;
-                            write!(f, [soft_line_break_or_space()])?;
-                        } else {
-                            write!(f, [if_group_breaks(&text(","))])?;
-                        }
-                    }
-                    Ok(())
-                })),
-                if_group_breaks(&text(")")),
-            ])]
-        )?;
+
+    match targets.len() {
+        0 => Ok(()),
+        1 => write!(f, [space(), targets[0].format()]),
+        _ => {
+            write!(
+                f,
+                [
+                    space(),
+                    group(&format_args![
+                        if_group_breaks(&text("(")),
+                        soft_block_indent(&format_with(|f| {
+                            for (i, target) in targets.iter().enumerate() {
+                                write!(f, [target.format()])?;
+
+                                if i < targets.len() - 1 {
+                                    write!(f, [text(","), soft_line_break_or_space()])?;
+                                } else {
+                                    write!(f, [if_group_breaks(&text(","))])?;
+                                }
+                            }
+                            Ok(())
+                        })),
+                        if_group_breaks(&text(")")),
+                    ])
+                ])
+        }
     }
-    Ok(())
 }
 
 fn format_class_def(
@@ -103,52 +103,48 @@ fn format_class_def(
     decorator_list: &[Expr],
 ) -> FormatResult<()> {
     for decorator in decorator_list {
-        write!(f, [text("@")])?;
-        write!(f, [decorator.format()])?;
-        write!(f, [hard_line_break()])?;
+        write!(f, [text("@"), decorator.format(), hard_line_break()])?;
     }
-    write!(f, [text("class")])?;
-    write!(f, [space()])?;
-    write!(f, [dynamic_text(name, TextSize::default())])?;
+
+    write!(f, [text("class"), space(), dynamic_text(name, TextSize::default())])?;
+
     if !bases.is_empty() || !keywords.is_empty() {
-        write!(f, [text("(")])?;
-        write!(
-            f,
-            [group(&format_args![soft_block_indent(&format_with(|f| {
-                for (i, expr) in bases.iter().enumerate() {
-                    write!(f, [expr.format()])?;
-                    if i < bases.len() - 1 || !keywords.is_empty() {
-                        write!(f, [text(",")])?;
-                        write!(f, [soft_line_break_or_space()])?;
+        let format_bases = format_with(|f| {
+            for (i, expr) in bases.iter().enumerate() {
+                write!(f, [expr.format()])?;
+
+                if i < bases.len() - 1 || !keywords.is_empty() {
+                    write!(f, [text(","), soft_line_break_or_space()])?;
+                } else {
+                    write!(f, [if_group_breaks(&text(","))])?;
+                }
+
+                for (i, keyword) in keywords.iter().enumerate() {
+                    if let Some(arg) = &keyword.node.arg {
+                        write!(f, [dynamic_text(arg, TextSize::default()), text("="), keyword.node.value.format()])?;
+                    } else {
+                        write!(f, [text("**"), keyword.node.value.format()])?;
+                    }
+                    if i < keywords.len() - 1 {
+                        write!(f, [text(","), soft_line_break_or_space()])?;
                     } else {
                         write!(f, [if_group_breaks(&text(","))])?;
                     }
-                    for (i, keyword) in keywords.iter().enumerate() {
-                        if let Some(arg) = &keyword.node.arg {
-                            write!(f, [dynamic_text(arg, TextSize::default())])?;
-                            write!(f, [text("=")])?;
-                            write!(f, [keyword.node.value.format()])?;
-                        } else {
-                            write!(f, [text("**")])?;
-                            write!(f, [keyword.node.value.format()])?;
-                        }
-                        if i < keywords.len() - 1 {
-                            write!(f, [text(",")])?;
-                            write!(f, [soft_line_break_or_space()])?;
-                        } else {
-                            write!(f, [if_group_breaks(&text(","))])?;
-                        }
-                    }
                 }
-                Ok(())
-            }))])]
-        )?;
-        write!(f, [text(")")])?;
+            }
+            Ok(())
+        });
+
+        write!(
+            f,
+            [
+                text("("),
+                group(&soft_block_indent(&format_bases)),
+                text(")")
+        ])?;
     }
 
-    write!(f, [text(":")])?;
-    write!(f, [block_indent(&format_args![block(body)])])?;
-    Ok(())
+    write!(f, [text(":"), block_indent(&block(body))])
 }
 
 fn format_func_def(
@@ -162,21 +158,18 @@ fn format_func_def(
     async_: bool,
 ) -> FormatResult<()> {
     for decorator in decorator_list {
-        write!(f, [text("@")])?;
-        write!(f, [decorator.format()])?;
-        write!(f, [hard_line_break()])?;
+        write!(f, [text("@"), decorator.format(), hard_line_break()])?;
     }
     if async_ {
-        write!(f, [text("async")])?;
-        write!(f, [space()])?;
+        write!(f, [text("async"), space()])?;
     }
-    write!(f, [text("def")])?;
-    write!(f, [space()])?;
-    write!(f, [dynamic_text(name, TextSize::default())])?;
-    write!(f, [text("(")])?;
-    write!(
-        f,
-        [group(&format_args![soft_block_indent(&format_with(|f| {
+    write!(f, [
+        text("def"),
+        space(),
+        dynamic_text(name, TextSize::default()),
+        text("("),
+
+        group(&soft_block_indent(&format_with(|f| {
             if stmt
                 .trivia
                 .iter()
@@ -184,15 +177,16 @@ fn format_func_def(
             {
                 write!(f, [expand_parent()])?;
             }
-            write!(f, [args.format()])?;
-            Ok(())
-        }))])]
-    )?;
-    write!(f, [text(")")])?;
+            write!(f, [args.format()])
+        }))),
+        text(")")
+    ])?;
+
+
     if let Some(returns) = returns {
-        write!(f, [text(" -> ")])?;
-        write!(f, [returns.format()])?;
+        write!(f, [text(" -> "), returns.format()])?;
     }
+
     write!(f, [text(":")])?;
 
     // Apply any inline comments.
@@ -214,8 +208,7 @@ fn format_func_def(
         write!(f, [literal(range)])?;
     }
 
-    write!(f, [block_indent(&format_args![block(body)])])?;
-    Ok(())
+    write!(f, [block_indent(&format_args![block(body)])])
 }
 
 fn format_assign(
@@ -229,21 +222,17 @@ fn format_assign(
     for target in &targets[1..] {
         // TODO(charlie): This doesn't match Black's behavior. We need to parenthesize
         // this expression sometimes.
-        write!(f, [text(" = ")])?;
-        write!(f, [target.format()])?;
+        write!(f, [text(" = "), target.format()])?;
     }
     write!(f, [text(" = ")])?;
     if is_self_closing(value) {
-        write!(f, [group(&format_args![value.format()])])?;
+        write!(f, [group(&value.format())])?;
     } else {
         write!(
             f,
             [group(&format_args![
                 if_group_breaks(&text("(")),
-                soft_block_indent(&format_with(|f| {
-                    write!(f, [value.format()])?;
-                    Ok(())
-                })),
+                soft_block_indent(&value.format()),
                 if_group_breaks(&text(")")),
             ])]
         )?;
@@ -287,22 +276,21 @@ fn format_ann_assign(
     if need_parens {
         write!(f, [text(")")])?;
     }
-    write!(f, [text(": ")])?;
-    write!(f, [annotation.format()])?;
+    write!(f, [text(": "), annotation.format()])?;
+
     if let Some(value) = value {
-        write!(f, [text(" = ")])?;
-        write!(
-            f,
-            [group(&format_args![
+        write!(f, [
+            space(),
+            text("="),
+            space(),
+            group(&format_args![
                 if_group_breaks(&text("(")),
-                soft_block_indent(&format_with(|f| {
-                    write!(f, [value.format()])?;
-                    Ok(())
-                })),
+                soft_block_indent(&value.format()),
                 if_group_breaks(&text(")")),
-            ])]
-        )?;
+            ])
+        ])?;
     }
+
     Ok(())
 }
 
@@ -315,14 +303,17 @@ fn format_for(
     _orelse: &[Stmt],
     _type_comment: Option<&str>,
 ) -> FormatResult<()> {
-    write!(f, [text("for")])?;
-    write!(f, [space()])?;
-    write!(f, [target.format()])?;
-    write!(f, [text(" in ")])?;
-    write!(f, [group(&format_args![iter.format()])])?;
-    write!(f, [text(":")])?;
-    write!(f, [block_indent(&format_args![block(body)])])?;
-    Ok(())
+    write!(f, [
+        text("for"),
+        space(),
+        target.format(),
+        space(),
+        text("in"),
+        space(),
+        group(&iter.format()),
+        text(":"),
+        block_indent(&block(body))
+    ])
 }
 
 fn format_while(
@@ -332,8 +323,7 @@ fn format_while(
     body: &[Stmt],
     orelse: &[Stmt],
 ) -> FormatResult<()> {
-    write!(f, [text("while")])?;
-    write!(f, [space()])?;
+    write!(f, [text("while"), space()])?;
     if is_self_closing(test) {
         write!(f, [test.format()])?;
     } else {
@@ -341,16 +331,14 @@ fn format_while(
             f,
             [group(&format_args![
                 if_group_breaks(&text("(")),
-                soft_block_indent(&format_args![test.format()]),
+                soft_block_indent(&test.format()),
                 if_group_breaks(&text(")")),
             ])]
         )?;
     }
-    write!(f, [text(":")])?;
-    write!(f, [block_indent(&format_args![block(body)])])?;
+    write!(f, [text(":"), block_indent(&block(body))])?;
     if !orelse.is_empty() {
-        write!(f, [text("else:")])?;
-        write!(f, [block_indent(&format_args![block(orelse)])])?;
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
     }
     Ok(())
 }
@@ -361,8 +349,7 @@ fn format_if(
     body: &[Stmt],
     orelse: &[Stmt],
 ) -> FormatResult<()> {
-    write!(f, [text("if")])?;
-    write!(f, [space()])?;
+    write!(f, [text("if"), space()])?;
     if is_self_closing(test) {
         write!(f, [test.format()])?;
     } else {
@@ -370,25 +357,22 @@ fn format_if(
             f,
             [group(&format_args![
                 if_group_breaks(&text("(")),
-                soft_block_indent(&format_args![test.format()]),
+                soft_block_indent(&test.format()),
                 if_group_breaks(&text(")")),
             ])]
         )?;
     }
-    write!(f, [text(":")])?;
-    write!(f, [block_indent(&format_args![block(body)])])?;
+    write!(f, [text(":"), block_indent(&block(body))])?;
     if !orelse.is_empty() {
         if orelse.len() == 1 {
             if let StmtKind::If { test, body, orelse } = &orelse[0].node {
                 write!(f, [text("el")])?;
                 format_if(f, test, body, orelse)?;
             } else {
-                write!(f, [text("else:")])?;
-                write!(f, [block_indent(&format_args![block(orelse)])])?;
+                write!(f, [text("else:"), block_indent(&block(orelse))])?;
             }
         } else {
-            write!(f, [text("else:")])?;
-            write!(f, [block_indent(&format_args![block(orelse)])])?;
+            write!(f, [text("else:"), block_indent(&block(orelse))])?;
         }
     }
     Ok(())
@@ -402,11 +386,9 @@ fn format_raise(
 ) -> FormatResult<()> {
     write!(f, [text("raise")])?;
     if let Some(exc) = exc {
-        write!(f, [space()])?;
-        write!(f, [exc.format()])?;
+        write!(f, [space(), exc.format()])?;
         if let Some(cause) = cause {
-            write!(f, [text(" from ")])?;
-            write!(f, [cause.format()])?;
+            write!(f, [space(), text("from"), space(), cause.format()])?;
         }
     }
     Ok(())
@@ -418,8 +400,7 @@ fn format_return(
 ) -> FormatResult<()> {
     write!(f, [text("return")])?;
     if let Some(value) = value {
-        write!(f, [space()])?;
-        write!(f, [value.format()])?;
+        write!(f, [space(), value.format()])?;
     }
     Ok(())
 }
@@ -430,8 +411,7 @@ fn format_assert(
     test: &Expr,
     msg: Option<&Expr>,
 ) -> FormatResult<()> {
-    write!(f, [text("assert")])?;
-    write!(f, [space()])?;
+    write!(f, [text("assert"), space()])?;
     if is_self_closing(test) {
         write!(f, [test.format()])?;
     } else {
@@ -439,14 +419,13 @@ fn format_assert(
             f,
             [group(&format_args![
                 if_group_breaks(&text("(")),
-                soft_block_indent(&format_args![test.format()]),
+                soft_block_indent(&test.format()),
                 if_group_breaks(&text(")")),
             ])]
         )?;
     }
     if let Some(msg) = msg {
-        write!(f, [text(", ")])?;
-        write!(f, [msg.format()])?;
+        write!(f, [text(", "), msg.format()])?;
     }
     Ok(())
 }
@@ -456,19 +435,17 @@ fn format_import(
     stmt: &Stmt,
     names: &[Alias],
 ) -> FormatResult<()> {
-    write!(f, [text("import")])?;
-    write!(f, [space()])?;
+    write!(f, [
+        text("import"),
+        space(),
 
-    write!(
-        f,
-        [group(&format_args![
+        group(&format_args![
             if_group_breaks(&text("(")),
             soft_block_indent(&format_with(|f| {
                 for (i, name) in names.iter().enumerate() {
                     write!(f, [name.format()])?;
                     if i < names.len() - 1 {
-                        write!(f, [text(",")])?;
-                        write!(f, [soft_line_break_or_space()])?;
+                        write!(f, [text(","), soft_line_break_or_space()])?;
                     } else {
                         write!(f, [if_group_breaks(&text(","))])?;
                     }
@@ -476,10 +453,8 @@ fn format_import(
                 Ok(())
             })),
             if_group_breaks(&text(")")),
-        ])]
-    )?;
-
-    Ok(())
+        ])
+    ])
 }
 
 fn format_import_from(
@@ -586,21 +561,19 @@ fn format_with_(
     async_: bool,
 ) -> FormatResult<()> {
     if async_ {
-        write!(f, [text("async")])?;
-        write!(f, [space()])?;
+        write!(f, [text("async"), space()])?;
     }
-    write!(f, [text("with")])?;
-    write!(f, [space()])?;
-    write!(
-        f,
-        [group(&format_args![
+
+    write!(f, [
+        text("with"),
+        space(),
+        group(&format_args![
             if_group_breaks(&text("(")),
             soft_block_indent(&format_with(|f| {
                 for (i, item) in items.iter().enumerate() {
                     write!(f, [item.format()])?;
                     if i < items.len() - 1 {
-                        write!(f, [text(",")])?;
-                        write!(f, [soft_line_break_or_space()])?;
+                        write!(f, [text(","), soft_line_break_or_space()])?;
                     } else {
                         write!(f, [if_group_breaks(&text(","))])?;
                     }
@@ -608,11 +581,10 @@ fn format_with_(
                 Ok(())
             })),
             if_group_breaks(&text(")")),
-        ])]
-    )?;
-    write!(f, [text(":")])?;
-    write!(f, [block_indent(&format_args![block(body)])])?;
-    Ok(())
+        ]),
+        text(":"),
+        block_indent(&block(body))
+    ])
 }
 
 pub struct FormatStmt<'a> {
@@ -629,8 +601,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                         write!(f, [empty_line()])?;
                     }
                     TriviaKind::StandaloneComment(range) => {
-                        write!(f, [literal(range)])?;
-                        write!(f, [hard_line_break()])?;
+                        write!(f, [literal(range), hard_line_break()])?;
                     }
                     _ => {}
                 }
@@ -655,7 +626,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 self.item,
                 name,
                 args,
-                returns.as_ref().map(|expr| &**expr),
+                returns.as_deref(),
                 body,
                 decorator_list,
                 false,
@@ -672,7 +643,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 self.item,
                 name,
                 args,
-                returns.as_ref().map(|expr| &**expr),
+                returns.as_deref(),
                 body,
                 decorator_list,
                 true,
@@ -698,7 +669,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 self.item,
                 target,
                 annotation,
-                value.as_ref().map(|expr| &**expr),
+                value.as_deref(),
                 *simple,
             ),
             StmtKind::For {
@@ -714,7 +685,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 iter,
                 body,
                 orelse,
-                type_comment.as_ref().map(String::as_str),
+                type_comment.as_deref(),
             ),
             // StmtKind::AsyncFor { .. } => {}
             StmtKind::While { test, body, orelse } => {
@@ -749,8 +720,8 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
             StmtKind::Raise { exc, cause } => format_raise(
                 f,
                 self.item,
-                exc.as_ref().map(|expr| &**expr),
-                cause.as_ref().map(|expr| &**expr),
+                exc.as_deref(),
+                cause.as_deref(),
             ),
             // StmtKind::Try { .. } => {}
             StmtKind::Assert { test, msg } => {
@@ -783,8 +754,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                         write!(f, [empty_line()])?;
                     }
                     TriviaKind::StandaloneComment(range) => {
-                        write!(f, [literal(range)])?;
-                        write!(f, [hard_line_break()])?;
+                        write!(f, [literal(range), hard_line_break()])?;
                     }
                     _ => {}
                 }

@@ -848,7 +848,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             }
             ExprKind::Await { value } => format_await(f, self.item, value),
             ExprKind::Yield { value } => {
-                format_yield(f, self.item, value.as_ref().map(|expr| &**expr))
+                format_yield(f, self.item, value.as_deref())
             }
             ExprKind::YieldFrom { value } => format_yield_from(f, self.item, value),
             ExprKind::Compare {
@@ -864,7 +864,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             // ExprKind::FormattedValue { .. } => {}
             ExprKind::JoinedStr { values } => format_joined_str(f, self.item, values),
             ExprKind::Constant { value, kind } => {
-                format_constant(f, self.item, value, kind.as_ref().map(String::as_str))
+                format_constant(f, self.item, value, kind.as_deref())
             }
             ExprKind::Attribute { value, attr, .. } => format_attribute(f, self.item, value, attr),
             ExprKind::Subscript { value, slice, .. } => {
@@ -877,9 +877,9 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             ExprKind::Slice { lower, upper, step } => format_slice(
                 f,
                 self.item,
-                lower.as_ref().map(|expr| &**expr),
-                upper.as_ref().map(|expr| &**expr),
-                step.as_ref().map(|expr| &**expr),
+                lower.as_deref(),
+                upper.as_deref(),
+                step.as_deref(),
             ),
             _ => {
                 unimplemented!("Implement ExprKind: {:?}", self.item.node)
