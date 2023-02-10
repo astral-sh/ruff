@@ -107,7 +107,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     if let ExprKind::Name { id, .. } = &target.node {
                         self.stack
                             .assigns
-                            .entry(&id)
+                            .entry(id)
                             .or_insert_with(Vec::new)
                             .push(Range::from_located(stmt));
                         return;

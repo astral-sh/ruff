@@ -339,7 +339,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
                 if let Some(assign_locations) = stack.assigns.get(id.as_str()) {
                     let expr_loc = expr.end_location.unwrap();
                     if let Some(last_assign_loc) = assign_locations
-                        .into_iter()
+                        .iter()
                         .rev()
                         .find(|x| x.location < expr_loc)
                     {
@@ -350,15 +350,23 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
                                 expr.location,
                             ))
                             .to_owned();
-                        let fixed_source = match in_between_source.strip_prefix(|chr| {
-                            checker.stylist.line_ending().as_str().contains(chr) || chr == ';'
-                        }) {
-                            Some(val) => val.to_owned(),
-                            None => in_between_source,
-                        }; // Avoid trailing newline and causing invalid syntax with semicolon usage
-                        println!("{:?}\n{:?}\n{:?}\n",fixed_source.clone() + &unparse_expr(&assign_expr.clone(), checker.stylist),
-                        last_assign_loc.location,
-                        expr.end_location.unwrap());
+                        // Avoid a trailing empty line and avoid causing invalid syntax with semicolon usage
+                        let fixed_source = match in_between_source
+                            .strip_prefix(checker.stylist.line_ending().as_str())
+                        {
+                            Some(newline_stripped) => {
+                                match newline_stripped
+                                    .strip_prefix(checker.stylist.indentation().as_str())
+                                {
+                                    Some(unindented) => unindented.to_owned(),
+                                    None => in_between_source,
+                                }
+                            }
+                            None => match in_between_source.strip_prefix(';') {
+                                Some(no_semicolon) => no_semicolon.to_owned(),
+                                None => in_between_source,
+                            },
+                        };
                         diagnostic.amend(Fix::replacement(
                             fixed_source + &unparse_expr(&assign_expr.clone(), checker.stylist),
                             last_assign_loc.location,

@@ -10,7 +10,15 @@ expression: diagnostics
   end_location:
     row: 6
     column: 12
-  fix: ~
+  fix:
+    content:
+      - return 1
+    location:
+      row: 5
+      column: 4
+    end_location:
+      row: 6
+      column: 12
   parent: ~
 - kind:
     UnnecessaryAssign: ~
@@ -20,7 +28,15 @@ expression: diagnostics
   end_location:
     row: 13
     column: 12
-  fix: ~
+  fix:
+    content:
+      - return 2
+    location:
+      row: 12
+      column: 4
+    end_location:
+      row: 13
+      column: 12
   parent: ~
 - kind:
     UnnecessaryAssign: ~
@@ -30,7 +46,16 @@ expression: diagnostics
   end_location:
     row: 19
     column: 16
-  fix: ~
+  fix:
+    content:
+      - "if True:"
+      - "        return 2"
+    location:
+      row: 17
+      column: 4
+    end_location:
+      row: 19
+      column: 16
   parent: ~
 - kind:
     UnnecessaryAssign: ~
@@ -40,7 +65,15 @@ expression: diagnostics
   end_location:
     row: 31
     column: 17
-  fix: ~
+  fix:
+    content:
+      - return str(obj.bar)
+    location:
+      row: 30
+      column: 8
+    end_location:
+      row: 31
+      column: 17
   parent: ~
 - kind:
     UnnecessaryAssign: ~
@@ -50,6 +83,14 @@ expression: diagnostics
   end_location:
     row: 39
     column: 20
-  fix: ~
+  fix:
+    content:
+      - "return formatted.replace(\"()\", \"\").replace(\"  \", \" \").strip()"
+    location:
+      row: 38
+      column: 4
+    end_location:
+      row: 39
+      column: 20
   parent: ~
 
