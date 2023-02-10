@@ -2,10 +2,10 @@
 
 Derived from the **flake8-no-pep420** linter.
 
-### What it does
+## What it does
 Checks for packages that are missing an `__init__.py` file.
 
-### Why is this bad?
+## Why is this bad?
 Python packages are directories that contain a file named `__init__.py`.
 The existence of this file indicates that the directory is a Python
 package, and so it can be imported the same way a module can be

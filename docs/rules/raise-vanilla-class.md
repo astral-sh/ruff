@@ -2,10 +2,10 @@
 
 Derived from the **tryceratops** linter.
 
-### What it does
+## What it does
 Checks for code that raises `Exception` directly.
 
-### Why is this bad?
+## Why is this bad?
 Handling such exceptions requires the use of `except Exception`, which
 captures _any_ raised exception, including failed assertions,
 division by zero, and more.
@@ -14,7 +14,7 @@ Prefer to raise your own exception, or a more specific built-in
 exception, so that you can avoid over-capturing exceptions that you
 don't intend to handle.
 
-### Example
+## Example
 ```py
 def main_function():
     if not cond:

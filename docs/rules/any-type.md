@@ -2,11 +2,11 @@
 
 Derived from the **flake8-annotations** linter.
 
-### What it does
+## What it does
 Checks that an expression is annotated with a more specific type than
 `Any`.
 
-### Why is this bad?
+## Why is this bad?
 `Any` is a special type indicating an unconstrained type. When an
 expression is annotated with type `Any`, type checkers will allow all
 operations on it.
@@ -14,7 +14,7 @@ operations on it.
 It's better to be explicit about the type of an expression, and to use
 `Any` as an "escape hatch" only when it is really needed.
 
-### Example
+## Example
 ```python
 def foo(x: Any):
     ...
