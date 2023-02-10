@@ -328,7 +328,7 @@ fn format_for(
         [
             text("for"),
             space(),
-            target.format(),
+            group(&target.format()),
             space(),
             text("in"),
             space(),

@@ -79,6 +79,7 @@ mod tests {
     }
 
     #[test_case(Path::new("simple_cases/collections.py"); "collections")]
+    #[test_case(Path::new("simple_cases/bracketmatch.py"); "bracketmatch")]
     fn passing_modulo_string_normalization(path: &Path) -> Result<()> {
         fn adjust_quotes(contents: &str) -> String {
             // Replace all single quotes with double quotes.
