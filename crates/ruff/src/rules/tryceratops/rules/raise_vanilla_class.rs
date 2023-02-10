@@ -20,7 +20,7 @@ define_violation!(
     /// don't intend to handle.
     ///
     /// ## Example
-    /// ```py
+    /// ```python
     /// def main_function():
     ///     if not cond:
     ///         raise Exception()
@@ -34,7 +34,7 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    /// ```py
+    /// ```python
     /// def main_function():
     ///     if not cond:
     ///         raise CustomException()
@@ -47,6 +47,7 @@ define_violation!(
     ///         logger.error("Main function failed")
     ///     except Exception:
     ///         logger.error("Oops")
+    /// ```
     pub struct RaiseVanillaClass;
 );
 impl Violation for RaiseVanillaClass {

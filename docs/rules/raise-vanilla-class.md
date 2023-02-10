@@ -15,7 +15,7 @@ exception, so that you can avoid over-capturing exceptions that you
 don't intend to handle.
 
 ## Example
-```py
+```python
 def main_function():
     if not cond:
         raise Exception()
@@ -29,7 +29,7 @@ def consumer_func():
 ```
 
 Use instead:
-```py
+```python
 def main_function():
     if not cond:
         raise CustomException()
@@ -42,3 +42,4 @@ def consumer_func():
         logger.error("Main function failed")
     except Exception:
         logger.error("Oops")
+```
