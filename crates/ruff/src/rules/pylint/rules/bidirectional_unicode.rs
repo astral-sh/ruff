@@ -1,9 +1,11 @@
+use rustpython_parser::ast::{Expr, Location};
+
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::Expr;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::source_code::Locator;
 use crate::violation::Violation;
 
 const BIDI_UNICODE: [char; 10] = [
@@ -37,11 +39,20 @@ impl Violation for BidirectionalUnicode {
 }
 
 /// PLE2502
-pub fn bidirectional_unicode(checker: &mut Checker, expr: &Expr, value: &str) {
-    if value.contains(BIDI_UNICODE) {
-        checker.diagnostics.push(Diagnostic::new(
+pub fn bidirectional_unicode(
+    locator: &Locator,
+    start: Location,
+    end: Location,
+) -> Option<Diagnostic> {
+    if locator
+        .slice_source_code_range(&Range::new(start, end))
+        .contains(BIDI_UNICODE)
+    {
+        return Some(Diagnostic::new(
             BidirectionalUnicode,
-            Range::from_located(expr),
+            Range::new(start, end),
         ));
+    } else {
+        None
     }
 }

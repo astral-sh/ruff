@@ -1,7 +1,4 @@
 # E2502
-print("\u202B\u202E\u05e9\u05DC\u05D5\u05DD\u202C")
-
-# E2502
 print("שלום‬")
 
 # E2502
@@ -19,6 +16,13 @@ def subtract_funds(account: str, amount: int):
     bank[account] -= amount
     return
 
+
+# OK
+print("\u202B\u202E\u05e9\u05DC\u05D5\u05DD\u202C")
+
+
+# OK
+print("\N{RIGHT-TO-LEFT MARK}")
 
 # OK
 print("Hello World")

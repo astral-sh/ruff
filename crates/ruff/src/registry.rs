@@ -764,6 +764,7 @@ impl Rule {
             | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString
+            | Rule::BidirectionalUnicode
             | Rule::CommentedOutCode
             | Rule::MultiLineImplicitStringConcatenation
             | Rule::ExtraneousParentheses
