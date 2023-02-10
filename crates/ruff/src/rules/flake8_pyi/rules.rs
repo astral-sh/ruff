@@ -1,14 +1,54 @@
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
+use serde::{Deserialize, Serialize};
+use std::fmt;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum VarKind {
+    TypeVar,
+    ParamSpec,
+    TypeVarTuple,
+}
+
+impl fmt::Display for VarKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            VarKind::TypeVar => fmt.write_str("TypeVar"),
+            VarKind::ParamSpec => fmt.write_str("ParamSpec"),
+            VarKind::TypeVarTuple => fmt.write_str("TypeVarTuple"),
+        }
+    }
+}
+
 define_violation!(
+    /// ### What it does
+    /// Checks that type `TypeVar`, `ParamSpec`, and `TypeVarTuple` definitions in
+    /// stubs are prefixed with `_`.
+    ///
+    /// ### Why is this bad?
+    /// By prefixing type parameters with `_`, we can avoid accidentally exposing
+    /// names internal to the stub.
+    ///
+    /// ### Example
+    /// ```python
+    /// from typing import TypeVar
+    ///
+    /// T = TypeVar("T")
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// from typing import TypeVar
+    ///
+    /// _T = TypeVar("_T")
+    /// ```
     pub struct PrefixTypeParams {
-        pub kind: String,
+        pub kind: VarKind,
     }
 );
 impl Violation for PrefixTypeParams {
@@ -20,15 +60,7 @@ impl Violation for PrefixTypeParams {
 }
 
 /// PYI001
-pub fn prefix_type_params(
-    checker: &mut Checker,
-    value: &Expr,
-    targets: &[Expr],
-    is_type_stub: bool,
-) {
-    if !is_type_stub {
-        return;
-    }
+pub fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr]) {
     if targets.len() != 1 {
         return;
     }
@@ -38,20 +70,23 @@ pub fn prefix_type_params(
         }
     };
 
-    let mut type_param_name: Option<&str> = None;
     if let ExprKind::Call { func, .. } = &value.node {
-        if let ExprKind::Name { id, .. } = &func.node {
-            type_param_name = Some(id);
-        }
-    }
-
-    if let Some(type_param_name) = type_param_name {
-        let diagnostic = Diagnostic::new(
-            PrefixTypeParams {
-                kind: type_param_name.into(),
-            },
+        let Some(kind) = checker.resolve_call_path(func).and_then(|call_path| {
+            if checker.match_typing_call_path(&call_path, "ParamSpec") {
+                Some(VarKind::ParamSpec)
+            } else if checker.match_typing_call_path(&call_path, "TypeVar") {
+                Some(VarKind::TypeVar)
+            } else if checker.match_typing_call_path(&call_path, "TypeVarTuple") {
+                Some(VarKind::TypeVarTuple)
+            } else {
+                None
+            }
+        }) else {
+            return;
+        };
+        checker.diagnostics.push(Diagnostic::new(
+            PrefixTypeParams { kind },
             Range::from_located(value),
-        );
-        checker.diagnostics.push(diagnostic);
+        ));
     }
 }

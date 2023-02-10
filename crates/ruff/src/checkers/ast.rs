@@ -1723,8 +1723,9 @@ where
                 }
 
                 if self.settings.rules.enabled(&Rule::PrefixTypeParams) {
-                    let is_type_stub = self.path.extension().map_or(false, |x| x == "pyi");
-                    flake8_pyi::rules::prefix_type_params(self, value, targets, is_type_stub);
+                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                        flake8_pyi::rules::prefix_type_params(self, value, targets);
+                    }
                 }
 
                 if self.settings.rules.enabled(&Rule::UselessMetaclassType) {
