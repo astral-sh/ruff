@@ -400,18 +400,21 @@ impl<'a> Printer<'a> {
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
 
+                let fixable = format!("[{}] ", "*".cyan());
+                let unfixable = "[ ] ";
+
                 // By default, we mimic Flake8's `--statistics` format.
                 for statistic in statistics {
                     writeln!(
                         stdout,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
-                        statistic.count,
-                        statistic.code,
+                        statistic.count.to_string().bold(),
+                        statistic.code.red().bold(),
                         if any_fixable {
                             if statistic.fixable {
-                                "[*] "
+                                &fixable
                             } else {
-                                "[ ] "
+                                unfixable
                             }
                         } else {
                             ""
