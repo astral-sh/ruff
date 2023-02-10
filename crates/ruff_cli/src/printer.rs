@@ -398,16 +398,25 @@ impl<'a> Printer<'a> {
                     .map(|statistic| statistic.code.len())
                     .max()
                     .unwrap();
+                let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
 
                 // By default, we mimic Flake8's `--statistics` format.
-                for msg in statistics {
+                for statistic in statistics {
                     writeln!(
                         stdout,
-                        "{:>count_width$}\t{:<code_width$}\t{}\t{}",
-                        msg.count,
-                        msg.code,
-                        if msg.fixable { "[*]" } else { "[]" },
-                        msg.message
+                        "{:>count_width$}\t{:<code_width$}\t{}{}",
+                        statistic.count,
+                        statistic.code,
+                        if any_fixable {
+                            if statistic.fixable {
+                                "[*] "
+                            } else {
+                                "[ ] "
+                            }
+                        } else {
+                            ""
+                        },
+                        statistic.message,
                     )?;
                 }
                 return Ok(());
