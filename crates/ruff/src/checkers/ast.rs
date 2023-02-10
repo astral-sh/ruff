@@ -1291,9 +1291,12 @@ where
                     if self.settings.rules.enabled(&Rule::RelativeImports) {
                         if let Some(diagnostic) =
                             flake8_tidy_imports::relative_imports::banned_relative_import(
+                                self,
                                 stmt,
                                 level.as_ref(),
+                                module.as_deref(),
                                 &self.settings.flake8_tidy_imports.ban_relative_imports,
+                                self.path,
                             )
                         {
                             self.diagnostics.push(diagnostic);
