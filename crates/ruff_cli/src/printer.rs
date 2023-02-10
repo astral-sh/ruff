@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -496,21 +497,34 @@ fn num_digits(n: usize) -> usize {
         .max(1)
 }
 
+struct CodeAndBody<'a>(&'a Message);
+
+impl Display for CodeAndBody<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{code} {autofix}{body}",
+            code = self.0.kind.rule().code().red().bold(),
+            autofix = self
+                .0
+                .kind
+                .fixable()
+                .then_some(format_args!("[{}] ", "*".cyan()))
+                .unwrap_or(format_args!("")),
+            body = self.0.kind.body(),
+        )
+    }
+}
+
 /// Print a single `Message` with full details.
 fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
     let label = format!(
-        "{path}{sep}{row}{sep}{col}{sep} {code} {autofix}{body}",
+        "{path}{sep}{row}{sep}{col}{sep} {code_and_body}",
         path = relativize_path(Path::new(&message.filename)).bold(),
         sep = ":".cyan(),
         row = message.location.row(),
         col = message.location.column(),
-        code = message.kind.rule().code().red().bold(),
-        autofix = message
-            .kind
-            .fixable()
-            .then_some(format_args!("[{}] ", "*".cyan()))
-            .unwrap_or(format_args!("")),
-        body = message.kind.body(),
+        code_and_body = CodeAndBody(message)
     );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
@@ -567,19 +581,13 @@ fn print_grouped_message<T: Write>(
     column_length: usize,
 ) -> Result<()> {
     let label = format!(
-        "  {row_padding}{row}{sep}{col}{col_padding}  {code}  {autofix}{body}",
+        "  {row_padding}{row}{sep}{col}{col_padding}  {code_and_body}",
         row_padding = " ".repeat(row_length - num_digits(message.location.row())),
         row = message.location.row(),
         sep = ":".cyan(),
         col = message.location.column(),
         col_padding = " ".repeat(column_length - num_digits(message.location.column())),
-        code = message.kind.rule().code().red().bold(),
-        autofix = message
-            .kind
-            .fixable()
-            .then_some(format_args!("[{}] ", "*".cyan()))
-            .unwrap_or(format_args!("")),
-        body = message.kind.body(),
+        code_and_body = CodeAndBody(message),
     );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
