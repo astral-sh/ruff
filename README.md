@@ -934,6 +934,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S506 | unsafe-yaml-load | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 | S508 | snmp-insecure-version | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
 | S509 | snmp-weak-cryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
+| S608 | [hardcoded-sql-expression](https://github.com/charliermarsh/ruff/blob/main/docs/rules/hardcoded-sql-expression.md) | Possible SQL injection vector through string-based query construction: "{}" |  |
 | S612 | logging-config-insecure-listen | Use of insecure `logging.config.listen` detected |  |
 | S701 | jinja2-autoescape-false | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
 

@@ -2402,6 +2402,9 @@ where
                     self.diagnostics
                         .extend(flake8_bandit::rules::hardcoded_password_func_arg(keywords));
                 }
+                if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                    flake8_bandit::rules::hardcoded_sql_expression(self, expr);
+                }
                 if self
                     .settings
                     .rules
@@ -2809,6 +2812,9 @@ where
                 {
                     pyflakes::rules::f_string_missing_placeholders(expr, values, self);
                 }
+                if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                    flake8_bandit::rules::hardcoded_sql_expression(self, expr);
+                }
             }
             ExprKind::BinOp {
                 left,
@@ -2970,6 +2976,9 @@ where
                     if self.settings.rules.enabled(&Rule::PrintfStringFormatting) {
                         pyupgrade::rules::printf_string_formatting(self, expr, left, right);
                     }
+                    if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                        flake8_bandit::rules::hardcoded_sql_expression(self, expr);
+                    }
                 }
             }
             ExprKind::BinOp {
@@ -2990,6 +2999,9 @@ where
                     .enabled(&Rule::UnpackInsteadOfConcatenatingToCollectionLiteral)
                 {
                     ruff::rules::unpack_instead_of_concatenating_to_collection_literal(self, expr);
+                }
+                if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                    flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
