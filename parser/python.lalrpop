@@ -1274,11 +1274,11 @@ ArgumentList: ArgumentList = {
 };
 
 FunctionArgument: (Option<(ast::Location, ast::Location, Option<String>)>, ast::Expr) = {
-    <e:NamedExpressionTest> <c:CompFor?> => {
+    <location:@L> <e:NamedExpressionTest> <c:CompFor?> <end_location:@R> => {
         let expr = match c {
             Some(c) => ast::Expr {
-                location: e.location,
-                end_location: e.end_location,
+                location,
+                end_location: Some(end_location),
                 custom: (),
                 node: ast::ExprKind::GeneratorExp {
                     elt: Box::new(e),
