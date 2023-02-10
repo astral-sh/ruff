@@ -1193,7 +1193,7 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/) on PyPI.
 | Q000 | [bad-quotes-inline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | Double quotes found but single quotes preferred | 🛠 |
 | Q001 | [bad-quotes-multiline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | Double quote multiline found but single quotes preferred | 🛠 |
 | Q002 | [bad-quotes-docstring](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | Double quote docstring found but single quotes preferred | 🛠 |
-| Q003 | [avoid-quote-escape](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoid-quote-escape.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
+| Q003 | [avoidable-escaped-quote](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoidable-escaped-quote.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
 
 ### flake8-return (RET)
 

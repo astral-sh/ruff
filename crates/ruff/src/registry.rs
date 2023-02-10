@@ -226,7 +226,7 @@ ruff_macros::define_rule_mapping!(
     Q000 => rules::flake8_quotes::rules::BadQuotesInlineString,
     Q001 => rules::flake8_quotes::rules::BadQuotesMultilineString,
     Q002 => rules::flake8_quotes::rules::BadQuotesDocstring,
-    Q003 => rules::flake8_quotes::rules::AvoidQuoteEscape,
+    Q003 => rules::flake8_quotes::rules::AvoidableEscapedQuote,
     // flake8-annotations
     ANN001 => rules::flake8_annotations::rules::MissingTypeFunctionArgument,
     ANN002 => rules::flake8_annotations::rules::MissingTypeArgs,
@@ -759,7 +759,7 @@ impl Rule {
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
-            | Rule::AvoidQuoteEscape
+            | Rule::AvoidableEscapedQuote
             | Rule::BadQuotesDocstring
             | Rule::BadQuotesInlineString
             | Rule::BadQuotesMultilineString

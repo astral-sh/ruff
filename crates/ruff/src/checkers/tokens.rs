@@ -32,7 +32,7 @@ pub fn check_tokens(
     let enforce_quotes = settings.rules.enabled(&Rule::BadQuotesInlineString)
         || settings.rules.enabled(&Rule::BadQuotesMultilineString)
         || settings.rules.enabled(&Rule::BadQuotesDocstring)
-        || settings.rules.enabled(&Rule::AvoidQuoteEscape);
+        || settings.rules.enabled(&Rule::AvoidableEscapedQuote);
     let enforce_commented_out_code = settings.rules.enabled(&Rule::CommentedOutCode);
     let enforce_compound_statements = settings
         .rules

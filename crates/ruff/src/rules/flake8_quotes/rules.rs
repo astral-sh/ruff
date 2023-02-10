@@ -162,9 +162,9 @@ define_violation!(
     /// ```python
     /// foo = "bar's"
     /// ```
-    pub struct AvoidQuoteEscape;
+    pub struct AvoidableEscapedQuote;
 );
-impl AlwaysAutofixableViolation for AvoidQuoteEscape {
+impl AlwaysAutofixableViolation for AvoidableEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Change outer quotes to avoid escaping inner quotes")
@@ -379,9 +379,9 @@ fn strings(
                     && !string_contents.contains(bad_single(&quotes_settings.inline_quotes))
                 {
                     let mut diagnostic =
-                        Diagnostic::new(AvoidQuoteEscape, Range::new(*start, *end));
+                        Diagnostic::new(AvoidableEscapedQuote, Range::new(*start, *end));
                     if matches!(autofix, flags::Autofix::Enabled)
-                        && settings.rules.should_fix(&Rule::AvoidQuoteEscape)
+                        && settings.rules.should_fix(&Rule::AvoidableEscapedQuote)
                     {
                         let quote = bad_single(&quotes_settings.inline_quotes);
 
