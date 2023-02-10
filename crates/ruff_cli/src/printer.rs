@@ -100,7 +100,7 @@ impl Printer {
         if self.log_level >= LogLevel::Default {
             match self.violations {
                 Violations::Show => {
-                    let fixed = diagnostics.fixed;
+                    let fixed = diagnostics.fixed.values().sum::<usize>();
                     let remaining = diagnostics.messages.len();
                     let total = fixed + remaining;
                     if fixed > 0 {
@@ -114,7 +114,7 @@ impl Printer {
                         writeln!(stdout, "Found {remaining} error{s}.")?;
                     }
 
-                    if !matches!(self.autofix, fix::FixMode::Apply) {
+                    if show_fix_status(self.autofix) {
                         let num_fixable = diagnostics
                             .messages
                             .iter()
@@ -130,7 +130,7 @@ impl Printer {
                     }
                 }
                 Violations::Hide => {
-                    let fixed = diagnostics.fixed;
+                    let fixed = diagnostics.fixed.values().sum::<usize>();
                     if fixed > 0 {
                         let s = if fixed == 1 { "" } else { "s" };
                         if matches!(self.autofix, fix::FixMode::Apply) {
@@ -227,7 +227,7 @@ impl Printer {
             }
             SerializationFormat::Text => {
                 for message in &diagnostics.messages {
-                    print_message(&mut stdout, message)?;
+                    print_message(&mut stdout, message, self.autofix)?;
                 }
 
                 self.post_text(&mut stdout, diagnostics)?;
@@ -260,7 +260,13 @@ impl Printer {
 
                     // Print each message.
                     for message in messages {
-                        print_grouped_message(&mut stdout, message, row_length, column_length)?;
+                        print_grouped_message(
+                            &mut stdout,
+                            message,
+                            self.autofix,
+                            row_length,
+                            column_length,
+                        )?;
                     }
                     writeln!(stdout)?;
                 }
@@ -463,7 +469,7 @@ impl Printer {
                 writeln!(stdout)?;
             }
             for message in &diagnostics.messages {
-                print_message(&mut stdout, message)?;
+                print_message(&mut stdout, message, self.autofix)?;
             }
         }
         stdout.flush()?;
@@ -496,9 +502,19 @@ fn num_digits(n: usize) -> usize {
         .max(1)
 }
 
+/// Return `true` if the [`Printer`] should indicate that a rule is fixable.
+fn show_fix_status(autofix: fix::FixMode) -> bool {
+    // If we're in application mode, avoid indicating that a rule is fixable.
+    // If the specific violation were truly fixable, it would've been fixed in
+    // this pass! (We're occasionally unable to determine whether a specific
+    // violation is fixable without trying to fix it, so if autofix is not
+    // enabled, we may inadvertently indicate that a rule is fixable.)
+    !matches!(autofix, fix::FixMode::Apply)
+}
+
 /// Print a single `Message` with full details.
-fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
-    let label = if message.kind.fixable() {
+fn print_message<T: Write>(stdout: &mut T, message: &Message, autofix: fix::FixMode) -> Result<()> {
+    let label = if show_fix_status(autofix) && message.kind.fixable() {
         format!(
             "{}{}{}{}{}{} {} [{}] {}",
             relativize_path(Path::new(&message.filename)).bold(),
@@ -575,10 +591,11 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
 fn print_grouped_message<T: Write>(
     stdout: &mut T,
     message: &Message,
+    autofix: fix::FixMode,
     row_length: usize,
     column_length: usize,
 ) -> Result<()> {
-    let label = if message.kind.fixable() {
+    let label = if show_fix_status(autofix) && message.kind.fixable() {
         format!(
             "  {}{}{}{}{}  {}  [{}] {}",
             " ".repeat(row_length - num_digits(message.location.row())),

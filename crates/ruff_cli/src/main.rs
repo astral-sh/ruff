@@ -282,11 +282,11 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
         if !cli.exit_zero {
             if cli.diff || fix_only {
-                if diagnostics.fixed > 0 {
+                if !diagnostics.fixed.is_empty() {
                     return Ok(ExitStatus::Failure);
                 }
             } else if cli.exit_non_zero_on_fix {
-                if diagnostics.fixed > 0 || !diagnostics.messages.is_empty() {
+                if !diagnostics.fixed.is_empty() || !diagnostics.messages.is_empty() {
                     return Ok(ExitStatus::Failure);
                 }
             } else {

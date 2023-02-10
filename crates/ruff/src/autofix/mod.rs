@@ -1,42 +1,52 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
+use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
 
 pub mod helpers;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
-pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, usize)> {
+pub fn fix_file(
+    diagnostics: &[Diagnostic],
+    locator: &Locator,
+) -> Option<(String, FxHashMap<&'static Rule, usize>)> {
     if diagnostics.iter().all(|check| check.fix.is_none()) {
-        return None;
+        None
+    } else {
+        Some(apply_fixes(diagnostics.iter(), locator))
     }
-
-    Some(apply_fixes(
-        diagnostics.iter().filter_map(|check| check.fix.as_ref()),
-        locator,
-    ))
 }
 
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
-    fixes: impl Iterator<Item = &'a Fix>,
+    diagnostics: impl Iterator<Item = &'a Diagnostic>,
     locator: &'a Locator<'a>,
-) -> (String, usize) {
+) -> (String, FxHashMap<&'static Rule, usize>) {
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Location = Location::new(1, 0);
     let mut applied: BTreeSet<&Fix> = BTreeSet::default();
-    let mut num_fixed: usize = 0;
+    let mut fixed = FxHashMap::default();
 
-    for fix in fixes.sorted_by_key(|fix| fix.location) {
+    for (rule, fix) in diagnostics
+        .filter_map(|diagnostic| {
+            if let Some(fix) = diagnostic.fix.as_ref() {
+                Some((diagnostic.kind.rule(), fix))
+            } else {
+                None
+            }
+        })
+        .sorted_by_key(|(.., fix)| fix.location)
+    {
         // If we already applied an identical fix as part of another correction, skip
         // any re-application.
         if applied.contains(&fix) {
-            num_fixed += 1;
+            *fixed.entry(rule).or_default() += 1;
             continue;
         }
 
@@ -56,14 +66,14 @@ fn apply_fixes<'a>(
         // Track that the fix was applied.
         last_pos = fix.end_location;
         applied.insert(fix);
-        num_fixed += 1;
+        *fixed.entry(rule).or_default() += 1;
     }
 
     // Add the remaining content.
     let slice = locator.slice_source_code_at(last_pos);
     output.push_str(slice);
 
-    (output, num_fixed)
+    (output, fixed)
 }
 
 /// Apply a single fix.

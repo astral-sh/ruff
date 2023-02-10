@@ -10,8 +10,10 @@ use colored::Colorize;
 use log::{debug, error};
 use ruff::linter::{lint_fix, lint_only, LinterResult};
 use ruff::message::Message;
+use ruff::registry::Rule;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff::{fix, fs};
+use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
 use crate::cache;
@@ -19,19 +21,24 @@ use crate::cache;
 #[derive(Debug, Default)]
 pub struct Diagnostics {
     pub messages: Vec<Message>,
-    pub fixed: usize,
+    pub fixed: FxHashMap<&'static Rule, usize>,
 }
 
 impl Diagnostics {
     pub fn new(messages: Vec<Message>) -> Self {
-        Self { messages, fixed: 0 }
+        Self {
+            messages,
+            fixed: FxHashMap::default(),
+        }
     }
 }
 
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
         self.messages.extend(other.messages);
-        self.fixed += other.fixed;
+        for (rule, fixed) in other.fixed {
+            *self.fixed.entry(rule).or_default() += fixed;
+        }
     }
 }
 
@@ -77,7 +84,7 @@ pub fn lint_path(
     ) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
         if let Ok((result, transformed, fixed)) = lint_fix(&contents, path, package, &settings.lib)
         {
-            if fixed > 0 {
+            if !fixed.is_empty() {
                 if matches!(autofix, fix::FixMode::Apply) {
                     write(path, transformed.as_bytes())?;
                 } else if matches!(autofix, fix::FixMode::Diff) {
@@ -94,12 +101,12 @@ pub fn lint_path(
         } else {
             // If we fail to autofix, lint the original source code.
             let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
-            let fixed = 0;
+            let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
         let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
-        let fixed = 0;
+        let fixed = FxHashMap::default();
         (result, fixed)
     };
 
@@ -159,7 +166,7 @@ pub fn lint_stdin(
                 io::stdout().write_all(transformed.as_bytes())?;
             } else if matches!(autofix, fix::FixMode::Diff) {
                 // But only write a diff if it's non-empty.
-                if fixed > 0 {
+                if !fixed.is_empty() {
                     let text_diff = TextDiff::from_lines(contents, &transformed);
                     let mut unified_diff = text_diff.unified_diff();
                     if let Some(path) = path {
@@ -183,7 +190,7 @@ pub fn lint_stdin(
                 settings,
                 autofix.into(),
             );
-            let fixed = 0;
+            let fixed = FxHashMap::default();
 
             // Write the contents to stdout anyway.
             if matches!(autofix, fix::FixMode::Apply) {
@@ -200,7 +207,7 @@ pub fn lint_stdin(
             settings,
             autofix.into(),
         );
-        let fixed = 0;
+        let fixed = FxHashMap::default();
         (result, fixed)
     };
 
