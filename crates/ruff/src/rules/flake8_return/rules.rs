@@ -166,6 +166,8 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
 }
 
 const NORETURN_FUNCS: &[&[&str]] = &[
+    // builtins
+    &["", "exit"],
     // stdlib
     &["os", "_exit"],
     &["os", "abort"],
@@ -178,7 +180,7 @@ const NORETURN_FUNCS: &[&[&str]] = &[
     &["pytest", "xfail"],
 ];
 
-/// A helper for RET503
+/// Return `true` if the `func` is a known function that never returns.
 fn is_noreturn_func(checker: &Checker, func: &Expr) -> bool {
     checker.resolve_call_path(func).map_or(false, |call_path| {
         NORETURN_FUNCS
