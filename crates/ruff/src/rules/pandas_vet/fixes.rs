@@ -1,11 +1,11 @@
-use rustpython_parser::ast::{Expr, ExprKind, Keyword, Location};
+use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Keyword, Location};
 
 use crate::ast::helpers;
 use crate::ast::types::Range;
 use crate::autofix::apply_fix;
 use crate::autofix::helpers::remove_argument;
 use crate::fix::Fix;
-use crate::source_code::Locator;
+use crate::source_code::{Locator, Stylist};
 
 fn match_name(expr: &Expr) -> Option<&str> {
     if let ExprKind::Call { func, .. } = &expr.node {
@@ -69,4 +69,18 @@ pub fn fix_inplace_argument(
     } else {
         None
     }
+}
+
+/// Replace attribute with `attr`
+pub fn fix_attr(attr: &str, value: &Expr, stylist: &Stylist) -> String {
+    let stmt = Expr::new(
+        Location::default(),
+        Location::default(),
+        ExprKind::Attribute {
+            value: Box::new(value.clone()),
+            attr: attr.to_string(),
+            ctx: ExprContext::Store,
+        },
+    );
+    helpers::unparse_expr(&stmt, stylist)
 }

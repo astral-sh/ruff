@@ -1,0 +1,23 @@
+---
+source: crates/ruff/src/rules/pandas_vet/mod.rs
+expression: diagnostics
+---
+- kind:
+    UseOfDotIat: ~
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 6
+  fix:
+    content:
+      - df.iloc
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 6
+  parent: ~
+

@@ -250,6 +250,11 @@ mod tests {
     }
 
     #[test_case(Rule::UseOfInplaceArgument, Path::new("PD002.py"); "PD002")]
+    #[test_case(Rule::UseOfDotIsNull, Path::new("fixes.py"); "PD003")]
+    #[test_case(Rule::UseOfDotNotNull, Path::new("fixes.py"); "PD004")]
+    #[test_case(Rule::UseOfDotAt, Path::new("fixes.py"); "PD008")]
+    #[test_case(Rule::UseOfDotIat, Path::new("fixes.py"); "PD009")]
+    #[test_case(Rule::UseOfDotValues, Path::new("fixes.py"); "PD011")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

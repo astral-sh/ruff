@@ -1322,13 +1322,13 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | PD002 | use-of-inplace-argument | `inplace=True` should be avoided; it has inconsistent behavior | 🛠 |
-| PD003 | use-of-dot-is-null | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
-| PD004 | use-of-dot-not-null | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
+| PD003 | use-of-dot-is-null | `.isna` is preferred to `.isnull`; functionality is equivalent | 🛠 |
+| PD004 | use-of-dot-not-null | `.notna` is preferred to `.notnull`; functionality is equivalent | 🛠 |
 | PD007 | use-of-dot-ix | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
-| PD008 | use-of-dot-at | Use `.loc` instead of `.at`.  If speed is important, use numpy. |  |
-| PD009 | use-of-dot-iat | Use `.iloc` instead of `.iat`.  If speed is important, use numpy. |  |
+| PD008 | use-of-dot-at | Use `.loc` instead of `.at`.  If speed is important, use numpy. | 🛠 |
+| PD009 | use-of-dot-iat | Use `.iloc` instead of `.iat`.  If speed is important, use numpy. | 🛠 |
 | PD010 | use-of-dot-pivot-or-unstack | `.pivot_table` is preferred to `.pivot` or `.unstack`; provides same functionality |  |
-| PD011 | use-of-dot-values | Use `.to_numpy()` instead of `.values` |  |
+| PD011 | use-of-dot-values | Use `.to_numpy()` instead of `.values` | 🛠 |
 | PD012 | use-of-dot-read-table | `.read_csv` is preferred to `.read_table`; provides same functionality |  |
 | PD013 | use-of-dot-stack | `.melt` is preferred to `.stack`; provides same functionality |  |
 | PD015 | use-of-pd-merge | Use `.merge` method instead of `pd.merge` function. They have equivalent functionality. |  |

@@ -1,0 +1,23 @@
+---
+source: crates/ruff/src/rules/pandas_vet/mod.rs
+expression: diagnostics
+---
+- kind:
+    UseOfDotValues: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 9
+  fix:
+    content:
+      - df.to_numpy()
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 9
+  parent: ~
+

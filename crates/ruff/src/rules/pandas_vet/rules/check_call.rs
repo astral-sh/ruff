@@ -3,27 +3,37 @@ use rustpython_parser::ast::{ExprKind, Located};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, DiagnosticKind, Rule};
+use crate::rules::pandas_vet::fixes::fix_attr;
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
-use crate::violation::Violation;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 define_violation!(
     pub struct UseOfDotIsNull;
 );
-impl Violation for UseOfDotIsNull {
+impl AlwaysAutofixableViolation for UseOfDotIsNull {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`.isna` is preferred to `.isnull`; functionality is equivalent")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Replace `.isnull` with `.isna`")
     }
 }
 
 define_violation!(
     pub struct UseOfDotNotNull;
 );
-impl Violation for UseOfDotNotNull {
+impl AlwaysAutofixableViolation for UseOfDotNotNull {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`.notna` is preferred to `.notnull`; functionality is equivalent")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Replace `.notnull` with `.notna`")
     }
 }
 
@@ -102,7 +112,21 @@ pub fn check_call(checker: &mut Checker, func: &Located<ExprKind>) {
         }
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(violation, Range::from_located(func)));
+    let mut diagnostic = Diagnostic::new(violation, Range::from_located(func));
+    if checker.patch(diagnostic.kind.rule()) {
+        let replacement = match *diagnostic.kind.rule() {
+            Rule::UseOfDotIsNull => Some("isna"),
+            Rule::UseOfDotNotNull => Some("notna"),
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            diagnostic.amend(Fix::replacement(
+                fix_attr(replacement, value, checker.stylist),
+                func.location,
+                func.end_location.unwrap(),
+            ));
+        }
+    }
+
+    checker.diagnostics.push(diagnostic);
 }

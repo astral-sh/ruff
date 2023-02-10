@@ -3,9 +3,11 @@ use rustpython_parser::ast::{ExprKind, Located};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::{Diagnostic, DiagnosticKind, Rule};
+use crate::rules::pandas_vet::fixes::fix_attr;
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
-use crate::violation::Violation;
+use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 define_violation!(
     pub struct UseOfDotIx;
@@ -20,30 +22,42 @@ impl Violation for UseOfDotIx {
 define_violation!(
     pub struct UseOfDotAt;
 );
-impl Violation for UseOfDotAt {
+impl AlwaysAutofixableViolation for UseOfDotAt {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `.loc` instead of `.at`.  If speed is important, use numpy.")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Replace `.at` with `.loc`")
     }
 }
 
 define_violation!(
     pub struct UseOfDotIat;
 );
-impl Violation for UseOfDotIat {
+impl AlwaysAutofixableViolation for UseOfDotIat {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `.iloc` instead of `.iat`.  If speed is important, use numpy.")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Replace `.iat` with `.iloc`")
     }
 }
 
 define_violation!(
     pub struct UseOfDotValues;
 );
-impl Violation for UseOfDotValues {
+impl AlwaysAutofixableViolation for UseOfDotValues {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `.to_numpy()` instead of `.values`")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Replace `.values` with `.to_numpy()`")
     }
 }
 
@@ -94,7 +108,22 @@ pub fn check_attr(
         }
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(violation, Range::from_located(attr_expr)));
+    let mut diagnostic = Diagnostic::new(violation, Range::from_located(attr_expr));
+    if checker.patch(diagnostic.kind.rule()) {
+        let replacement = match *diagnostic.kind.rule() {
+            Rule::UseOfDotAt => Some("loc"),
+            Rule::UseOfDotIat => Some("iloc"),
+            Rule::UseOfDotValues => Some("to_numpy()"),
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            diagnostic.amend(Fix::replacement(
+                fix_attr(replacement, value, checker.stylist),
+                attr_expr.location,
+                attr_expr.end_location.unwrap(),
+            ));
+        }
+    }
+
+    checker.diagnostics.push(diagnostic);
 }
