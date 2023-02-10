@@ -1,10 +1,9 @@
-use ruff_macros::derive_message_formats;
-use rustpython_ast::Expr;
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::Expr;
 
 use crate::{
     ast::types::{FunctionDef, Range, ScopeKind},
     checkers::ast::Checker,
-    define_violation,
     registry::Diagnostic,
     violation::Violation,
 };
