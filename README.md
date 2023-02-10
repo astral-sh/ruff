@@ -428,6 +428,7 @@ Arguments:
 Options:
       --fix              Attempt to automatically fix lint violations
       --show-source      Show violations with source code
+      --show-fixes       Show an enumeration of all autofixed lint violations
       --diff             Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
   -w, --watch            Run in watch mode by re-running whenever files change
       --fix-only         Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
@@ -2551,6 +2552,25 @@ specific prefixes.
 [tool.ruff]
 # On top of the defaults (`E`, `F`), enable flake8-bugbear (`B`) and flake8-quotes (`Q`).
 select = ["E", "F", "B", "Q"]
+```
+
+---
+
+#### [`show-fixes`](#show-fixes)
+
+Whether to show an enumeration of all autofixed lint violations
+(overridden by the `--show-fixes` command-line flag).
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml
+[tool.ruff]
+# By default, always enumerate fixed violations.
+show-fixes = true
 ```
 
 ---

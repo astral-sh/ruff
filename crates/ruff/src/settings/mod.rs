@@ -53,6 +53,7 @@ impl AllSettings {
                 fix: config.fix.unwrap_or(false),
                 fix_only: config.fix_only.unwrap_or(false),
                 format: config.format.unwrap_or_default(),
+                show_fixes: config.show_fixes.unwrap_or(false),
                 update_check: config.update_check.unwrap_or_default(),
             },
             lib: Settings::from_configuration(config, project_root)?,
@@ -61,6 +62,7 @@ impl AllSettings {
 }
 
 #[derive(Debug, Default, Clone)]
+#[allow(clippy::struct_excessive_bools)]
 /// Settings that are not used by this library and
 /// only here so that `ruff_cli` can use them.
 pub struct CliSettings {
@@ -68,6 +70,7 @@ pub struct CliSettings {
     pub fix: bool,
     pub fix_only: bool,
     pub format: SerializationFormat,
+    pub show_fixes: bool,
     pub update_check: bool,
 }
 

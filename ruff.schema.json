@@ -414,6 +414,13 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "show-fixes": {
+      "description": "Whether to show an enumeration of all autofixed lint violations (overridden by the `--show-fixes` command-line flag).",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "show-source": {
       "description": "Whether to show source code snippets when reporting lint violations (overridden by the `--show-source` command-line flag).",
       "type": [
