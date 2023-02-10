@@ -3561,6 +3561,7 @@ where
                 if self.settings.rules.enabled(&Rule::TryExceptPass) {
                     flake8_bandit::rules::try_except_pass(
                         self,
+                        excepthandler,
                         type_.as_deref(),
                         name.as_deref(),
                         body,
@@ -3570,6 +3571,7 @@ where
                 if self.settings.rules.enabled(&Rule::TryExceptContinue) {
                     flake8_bandit::rules::try_except_continue(
                         self,
+                        excepthandler,
                         type_.as_deref(),
                         name.as_deref(),
                         body,

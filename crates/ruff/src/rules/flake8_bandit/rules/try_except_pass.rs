@@ -1,5 +1,6 @@
+use rustpython_parser::ast::{Excepthandler, Expr, Stmt, StmtKind};
+
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -20,6 +21,7 @@ impl Violation for TryExceptPass {
 /// S110
 pub fn try_except_pass(
     checker: &mut Checker,
+    excepthandler: &Excepthandler,
     type_: Option<&Expr>,
     _name: Option<&str>,
     body: &[Stmt],
@@ -31,7 +33,7 @@ pub fn try_except_pass(
     {
         checker.diagnostics.push(Diagnostic::new(
             TryExceptPass,
-            Range::from_located(&body[0]),
+            Range::from_located(excepthandler),
         ));
     }
 }
