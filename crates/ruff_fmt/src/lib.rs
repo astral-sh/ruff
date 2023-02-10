@@ -78,8 +78,22 @@ mod tests {
         Ok(())
     }
 
-    // Passing modulo string normalization.
-    // #[test_case(Path::new("simple_cases/collections.py"); "collections")]
+    #[test_case(Path::new("simple_cases/collections.py"); "collections")]
+    fn passing_modulo_string_normalization(path: &Path) -> Result<()> {
+        fn adjust_quotes(contents: &str) -> String {
+            // Replace all single quotes with double quotes.
+            contents.replace("'", "\"")
+        }
+
+        let snapshot = format!("{}", path.display());
+        let content = std::fs::read_to_string(test_resource_path(
+            Path::new("fixtures/black").join(path).as_path(),
+        ))?;
+        let formatted = fmt(&content)?;
+        insta::assert_display_snapshot!(snapshot, adjust_quotes(formatted.print()?.as_code()));
+        Ok(())
+    }
+
     // Passing apart from one deviation in RHS tuple assignment.
     // #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
     // Lots of deviations, _mostly_ related to string normalization and wrapping.
