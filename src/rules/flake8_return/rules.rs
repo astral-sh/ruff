@@ -1,5 +1,4 @@
 use itertools::Itertools;
-use libcst_native::Tuple;
 use rustpython_ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use super::branch::Branch;
@@ -352,7 +351,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
                             ))
                             .to_owned();
                         // Ensure that all indentation is the same (no if or while statement).
-                        let lines_iter = (checker
+                        let all_indentation_same = (checker
                             .locator
                             .slice_source_code_range(&Range::new(
                                 Location::new(last_assign_loc.location.row(), 0),
@@ -363,9 +362,20 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
                             .join("")
                             .to_owned()
                             + &in_between_source)
-                            .lines().tuple_windows().any(|ln: (&str, &str)| ln == ln);
+                            .lines()
+                            .tuple_windows()
+                            .any(|ln: (&str, &str)| {
+                                ln.0.chars()
+                                    .take_while(|c| checker.stylist.indentation().contains(*c))
+                                    .collect::<String>()
+                                    == ln
+                                        .1
+                                        .chars()
+                                        .take_while(|c| checker.stylist.indentation().contains(*c))
+                                        .collect::<String>()
+                            });
                         // Check if the code without the final return statement is only comments
-                        if code_is_only_comments(
+                        if all_indentation_same && code_is_only_comments(
                             in_between_source.trim_end().trim_end_matches("return"),
                         ) {
                             // Avoid a trailing empty line and avoid causing invalid syntax with semicolon usage
