@@ -1,6 +1,6 @@
-pub use assert_used::{assert_used, AssertUsed};
+pub use assert_used::{assert_used, Assert};
 pub use bad_file_permissions::{bad_file_permissions, BadFilePermissions};
-pub use exec_used::{exec_used, ExecUsed};
+pub use exec_used::{exec_used, ExecBuiltin};
 pub use hardcoded_bind_all_interfaces::{
     hardcoded_bind_all_interfaces, HardcodedBindAllInterfaces,
 };

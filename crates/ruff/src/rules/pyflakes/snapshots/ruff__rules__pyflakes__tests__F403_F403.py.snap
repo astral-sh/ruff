@@ -1,9 +1,9 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImportStarUsed:
+    ImportStar:
       name: F634
   location:
     row: 1
@@ -14,7 +14,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportStarUsed:
+    ImportStar:
       name: F634
   location:
     row: 2

@@ -1226,9 +1226,9 @@ where
                             }
                         }
 
-                        if self.settings.rules.enabled(&Rule::ImportStarUsed) {
+                        if self.settings.rules.enabled(&Rule::ImportStar) {
                             self.diagnostics.push(Diagnostic::new(
-                                pyflakes::rules::ImportStarUsed {
+                                pyflakes::rules::ImportStar {
                                     name: helpers::format_import_from(
                                         level.as_ref(),
                                         module.as_deref(),
@@ -1536,7 +1536,7 @@ where
                         msg.as_ref().map(|expr| &**expr),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::AssertUsed) {
+                if self.settings.rules.enabled(&Rule::Assert) {
                     self.diagnostics
                         .push(flake8_bandit::rules::assert_used(stmt));
                 }
@@ -2369,7 +2369,7 @@ where
                 }
 
                 // flake8-bandit
-                if self.settings.rules.enabled(&Rule::ExecUsed) {
+                if self.settings.rules.enabled(&Rule::ExecBuiltin) {
                     if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {
                         self.diagnostics.push(diagnostic);
                     }

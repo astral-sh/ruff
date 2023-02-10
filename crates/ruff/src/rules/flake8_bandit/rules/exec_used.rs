@@ -6,9 +6,9 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct ExecUsed;
+    pub struct ExecBuiltin;
 );
-impl Violation for ExecUsed {
+impl Violation for ExecBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use of `exec` detected")
@@ -23,5 +23,5 @@ pub fn exec_used(expr: &Expr, func: &Expr) -> Option<Diagnostic> {
     if id != "exec" {
         return None;
     }
-    Some(Diagnostic::new(ExecUsed, Range::from_located(expr)))
+    Some(Diagnostic::new(ExecBuiltin, Range::from_located(expr)))
 }
