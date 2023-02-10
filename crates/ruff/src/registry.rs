@@ -860,6 +860,28 @@ mod tests {
     use super::{Linter, Rule, RuleNamespace};
 
     #[test]
+    fn test_rule_naming_convention() {
+        // The disallowed rule names are defined in a separate file so that they can also be picked up by add_rule.py.
+        let patterns: Vec<_> = include_str!("../resources/test/disallowed_rule_names.txt")
+            .trim()
+            .split('\n')
+            .map(|line| {
+                glob::Pattern::new(line).expect("malformed pattern in disallowed_rule_names.txt")
+            })
+            .collect();
+
+        for rule in Rule::iter() {
+            let rule_name = rule.as_ref();
+            for pattern in &patterns {
+                assert!(
+                    !pattern.matches(rule_name),
+                    "{rule_name} does not match naming convention, see CONTRIBUTING.md"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn check_code_serialization() {
         for rule in Rule::iter() {
             assert!(
