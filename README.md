@@ -3467,6 +3467,25 @@ known-first-party = ["src"]
 
 ---
 
+#### [`known-local-folder`](#known-local-folder)
+
+A list of modules to consider being a local folder.
+Generally, this is reserved for relative
+imports (from . import module).
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+known-local-folder = ["src"]
+```
+
+---
+
 #### [`known-third-party`](#known-third-party)
 
 A list of modules to consider third-party, regardless of whether they

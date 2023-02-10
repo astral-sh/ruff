@@ -122,6 +122,7 @@ pub fn format_imports(
     force_wrap_aliases: bool,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
+    known_local_folder: &BTreeSet<String>,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
@@ -155,6 +156,7 @@ pub fn format_imports(
             force_wrap_aliases,
             known_first_party,
             known_third_party,
+            known_local_folder,
             order_by_type,
             relative_imports_order,
             single_line_exclusions,
@@ -212,6 +214,7 @@ fn format_import_block(
     force_wrap_aliases: bool,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
+    known_local_folder: &BTreeSet<String>,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
@@ -229,6 +232,7 @@ fn format_import_block(
         package,
         known_first_party,
         known_third_party,
+        known_local_folder,
         extra_standard_library,
         target_version,
     );
@@ -366,6 +370,12 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    known_local_folder: vec!["ruff".to_string()]
+                        .into_iter()
+                        .collect::<BTreeSet<_>>(),
+                    ..super::settings::Settings::default()
+                },
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;

@@ -164,6 +164,7 @@ pub fn typing_only_runtime_import(
             package,
             &settings.isort.known_first_party,
             &settings.isort.known_third_party,
+            &settings.isort.known_local_folder,
             &settings.isort.extra_standard_library,
             settings.target_version,
         ) {
