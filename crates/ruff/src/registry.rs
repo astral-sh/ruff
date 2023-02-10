@@ -105,6 +105,7 @@ ruff_macros::define_rule_mapping!(
     F842 => rules::pyflakes::rules::UnusedAnnotation,
     F901 => rules::pyflakes::rules::RaiseNotImplemented,
     // pylint
+    PLE0100 => rules::pylint::rules::InitIsGenerator,
     PLE0604 => rules::pylint::rules::InvalidAllObject,
     PLE0605 => rules::pylint::rules::InvalidAllFormat,
     PLE2502 => rules::pylint::rules::BidirectionalUnicode,

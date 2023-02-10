@@ -1,0 +1,25 @@
+---
+source: src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    InitIsGenerator: ~
+  location:
+    row: 9
+    column: 8
+  end_location:
+    row: 9
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    InitIsGenerator: ~
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 29
+  fix: ~
+  parent: ~
+
