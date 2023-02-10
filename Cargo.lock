@@ -2011,7 +2011,6 @@ name = "ruff_macros"
 version = "0.0.244"
 dependencies = [
  "itertools",
- "once_cell",
  "proc-macro2",
  "quote",
  "syn",
