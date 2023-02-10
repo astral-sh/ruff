@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, Stmt, StmtKind};
+use rustpython_parser::ast::{Excepthandler, Expr, Stmt, StmtKind};
 
 use ruff_macros::{define_violation, derive_message_formats};
 
@@ -21,6 +21,7 @@ impl Violation for TryExceptContinue {
 /// S112
 pub fn try_except_continue(
     checker: &mut Checker,
+    excepthandler: &Excepthandler,
     type_: Option<&Expr>,
     _name: Option<&str>,
     body: &[Stmt],
@@ -32,7 +33,7 @@ pub fn try_except_continue(
     {
         checker.diagnostics.push(Diagnostic::new(
             TryExceptContinue,
-            Range::from_located(&body[0]),
+            Range::from_located(excepthandler),
         ));
     }
 }
