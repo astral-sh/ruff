@@ -311,6 +311,19 @@ with (0 as a, 1 as b,): pass
     }
 
     #[test]
+    fn test_generator_expression_argument() {
+        let source = r#"' '.join(
+    sql
+    for sql in (
+        "LIMIT %d" % limit if limit else None,
+        ("OFFSET %d" % offset) if offset else None,
+    )
+)"#;
+        let parse_ast = parse_expression(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
     fn test_dict_unpacking() {
         let parse_ast = parse_expression(r#"{"a": "b", **c, "d": "e"}"#, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
