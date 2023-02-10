@@ -44,6 +44,7 @@ mod tests {
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"); "PLE1307")]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"); "PLE2502")]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]
+    #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"); "PLE0100")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

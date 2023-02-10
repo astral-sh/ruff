@@ -1360,6 +1360,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
+| PLE0100 | yield-in-init | `__init__` method is a generator |  |
 | PLE0117 | nonlocal-without-binding | Nonlocal name `{name}` found without binding |  |
 | PLE0118 | used-prior-global-declaration | Name `{name}` is used prior to global declaration on line {line} |  |
 | PLE0604 | invalid-all-object | Invalid object in `__all__`, must contain only strings |  |

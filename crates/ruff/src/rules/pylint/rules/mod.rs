@@ -24,6 +24,7 @@ pub use used_prior_global_declaration::{
 };
 pub use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub use useless_import_alias::{useless_import_alias, UselessImportAlias};
+pub use yield_in_init::{yield_in_init, YieldInInit};
 
 mod await_outside_async;
 mod bad_str_strip_call;
@@ -47,3 +48,4 @@ mod use_from_import;
 mod used_prior_global_declaration;
 mod useless_else_on_loop;
 mod useless_import_alias;
+mod yield_in_init;
