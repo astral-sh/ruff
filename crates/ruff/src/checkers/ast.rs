@@ -7,11 +7,10 @@ use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{Comprehension, Located, Location};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
-    Arg, Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind,
-    KeywordData, Operator, Stmt, StmtKind, Suite,
+    Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
+    ExprKind, KeywordData, Located, Location, Operator, Stmt, StmtKind, Suite,
 };
 use rustpython_parser::parser;
 use smallvec::smallvec;
@@ -32,16 +31,15 @@ use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
-use crate::noqa::Directive;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format,
-    flake8_pie, flake8_print, flake8_pytest_style, flake8_raise, flake8_return, flake8_self,
-    flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
-    pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return,
+    flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
+    flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
+    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -284,7 +282,7 @@ impl<'a> Checker<'a> {
     }
 
     /// Return `true` if a `Rule` is disabled by a `noqa` directive.
-    pub fn is_ignored(&self, code: &Rule, lineno: usize) -> bool {
+    pub fn rule_is_ignored(&self, code: &Rule, lineno: usize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
@@ -295,16 +293,7 @@ impl<'a> Checker<'a> {
         if matches!(self.noqa, flags::Noqa::Disabled) {
             return false;
         }
-        let noqa_lineno = self.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-        let line = self.locator.slice_source_code_range(&Range::new(
-            Location::new(*noqa_lineno, 0),
-            Location::new(noqa_lineno + 1, 0),
-        ));
-        match noqa::extract_noqa_directive(line) {
-            Directive::None => false,
-            Directive::All(..) => true,
-            Directive::Codes(.., codes) => noqa::includes(code, &codes),
-        }
+        noqa::rule_is_ignored(code, lineno, self.noqa_line_for, self.locator)
     }
 }
 
@@ -696,6 +685,24 @@ where
                     flake8_pytest_style::rules::marks(self, decorator_list);
                 }
 
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
+                {
+                    flake8_boolean_trap::rules::check_positional_boolean_in_def(self, name, args);
+                }
+
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
+                {
+                    flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
+                        self, name, args,
+                    );
+                }
+
                 self.check_builtin_shadowing(name, stmt, true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be
@@ -1048,7 +1055,7 @@ where
                     if self
                         .settings
                         .rules
-                        .enabled(&Rule::ImportAliasIsNotConventional)
+                        .enabled(&Rule::UnconventionalImportAlias)
                     {
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::check_conventional_import(
@@ -1307,7 +1314,7 @@ where
                     if self
                         .settings
                         .rules
-                        .enabled(&Rule::ImportAliasIsNotConventional)
+                        .enabled(&Rule::UnconventionalImportAlias)
                     {
                         let full_name = helpers::format_import_from_member(
                             level.as_ref(),
@@ -1547,7 +1554,7 @@ where
                 }
             }
             StmtKind::With { items, body, .. } => {
-                if self.settings.rules.enabled(&Rule::NoAssertRaisesException) {
+                if self.settings.rules.enabled(&Rule::AssertRaisesException) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
                 if self
@@ -1703,6 +1710,12 @@ where
                         flake8_bandit::rules::assign_hardcoded_password_string(value, targets)
                     {
                         self.diagnostics.push(diagnostic);
+                    }
+                }
+
+                if self.settings.rules.enabled(&Rule::PrefixTypeParams) {
+                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                        flake8_pyi::rules::prefix_type_params(self, value, targets);
                     }
                 }
 
@@ -1929,7 +1942,21 @@ where
                 value,
                 ..
             } => {
-                self.visit_annotation(annotation);
+                // If we're in a class or module scope, then the annotation needs to be available
+                // at runtime.
+                // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
+                if !self.annotations_future_enabled
+                    && matches!(
+                        self.current_scope().kind,
+                        ScopeKind::Class(..) | ScopeKind::Module
+                    )
+                {
+                    self.in_type_definition = true;
+                    self.visit_expr(annotation);
+                    self.in_type_definition = false;
+                } else {
+                    self.visit_annotation(annotation);
+                }
                 if let Some(expr) = value {
                     if self.match_typing_expr(annotation, "TypeAlias") {
                         self.in_type_definition = true;
@@ -2285,10 +2312,10 @@ where
                     pyupgrade::rules::open_alias(self, expr, func);
                 }
                 if self.settings.rules.enabled(&Rule::ReplaceUniversalNewlines) {
-                    pyupgrade::rules::replace_universal_newlines(self, expr, keywords);
+                    pyupgrade::rules::replace_universal_newlines(self, func, keywords);
                 }
                 if self.settings.rules.enabled(&Rule::ReplaceStdoutStderr) {
-                    pyupgrade::rules::replace_stdout_stderr(self, expr, keywords);
+                    pyupgrade::rules::replace_stdout_stderr(self, expr, func, keywords);
                 }
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias(self, &expr);
@@ -2319,7 +2346,7 @@ where
                     .rules
                     .enabled(&Rule::UselessContextlibSuppress)
                 {
-                    flake8_bugbear::rules::useless_contextlib_suppress(self, expr, args);
+                    flake8_bugbear::rules::useless_contextlib_suppress(self, expr, func, args);
                 }
                 if self
                     .settings
@@ -2374,6 +2401,9 @@ where
                 if self.settings.rules.enabled(&Rule::HardcodedPasswordFuncArg) {
                     self.diagnostics
                         .extend(flake8_bandit::rules::hardcoded_password_func_arg(keywords));
+                }
+                if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                    flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
                 if self
                     .settings
@@ -2788,6 +2818,9 @@ where
                 {
                     pyflakes::rules::f_string_missing_placeholders(expr, values, self);
                 }
+                if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                    flake8_bandit::rules::hardcoded_sql_expression(self, expr);
+                }
             }
             ExprKind::BinOp {
                 left,
@@ -2949,6 +2982,12 @@ where
                     if self.settings.rules.enabled(&Rule::PrintfStringFormatting) {
                         pyupgrade::rules::printf_string_formatting(self, expr, left, right);
                     }
+                    if self.settings.rules.enabled(&Rule::BadStringFormatType) {
+                        pylint::rules::bad_string_format_type(self, expr, right);
+                    }
+                    if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                        flake8_bandit::rules::hardcoded_sql_expression(self, expr);
+                    }
                 }
             }
             ExprKind::BinOp {
@@ -2969,6 +3008,9 @@ where
                     .enabled(&Rule::UnpackInsteadOfConcatenatingToCollectionLiteral)
                 {
                     ruff::rules::unpack_instead_of_concatenating_to_collection_literal(self, expr);
+                }
+                if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                    flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
@@ -3232,7 +3274,7 @@ where
                 args,
                 keywords,
             } => {
-                let callable = self.resolve_call_path(expr).and_then(|call_path| {
+                let callable = self.resolve_call_path(func).and_then(|call_path| {
                     if self.match_typing_call_path(&call_path, "ForwardRef") {
                         Some(Callable::ForwardRef)
                     } else if self.match_typing_call_path(&call_path, "cast") {
@@ -3531,6 +3573,15 @@ where
                         self.settings.flake8_bandit.check_typed_exception,
                     );
                 }
+                if self.settings.rules.enabled(&Rule::TryExceptContinue) {
+                    flake8_bandit::rules::try_except_continue(
+                        self,
+                        type_.as_deref(),
+                        name.as_deref(),
+                        body,
+                        self.settings.flake8_bandit.check_typed_exception,
+                    );
+                }
                 if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
@@ -3659,24 +3710,6 @@ where
             .enabled(&Rule::FunctionCallArgumentDefault)
         {
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
-        }
-
-        // flake8-boolean-trap
-        if self
-            .settings
-            .rules
-            .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
-        {
-            flake8_boolean_trap::rules::check_positional_boolean_in_def(self, arguments);
-        }
-        if self
-            .settings
-            .rules
-            .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
-        {
-            flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
-                self, arguments,
-            );
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
@@ -3961,8 +3994,8 @@ impl<'a> Checker<'a> {
                 // Avoid overriding builtins.
                 binding
             } else if matches!(self.bindings[*index].kind, BindingKind::Global) {
-                // If the original binding was a global, and the new binding conflicts within the
-                // current scope, then the new binding is also a global.
+                // If the original binding was a global, and the new binding conflicts within
+                // the current scope, then the new binding is also a global.
                 Binding {
                     runtime_usage: self.bindings[*index].runtime_usage,
                     synthetic_usage: self.bindings[*index].synthetic_usage,
@@ -3971,8 +4004,8 @@ impl<'a> Checker<'a> {
                     ..binding
                 }
             } else if matches!(self.bindings[*index].kind, BindingKind::Nonlocal) {
-                // If the original binding was a nonlocal, and the new binding conflicts within the
-                // current scope, then the new binding is also a nonlocal.
+                // If the original binding was a nonlocal, and the new binding conflicts within
+                // the current scope, then the new binding is also a nonlocal.
                 Binding {
                     runtime_usage: self.bindings[*index].runtime_usage,
                     synthetic_usage: self.bindings[*index].synthetic_usage,
@@ -4297,17 +4330,33 @@ impl<'a> Checker<'a> {
                 _ => false,
             } {
                 let (all_names, all_names_flags) = extract_all_names(self, parent, current);
+                let all_bindings: Vec<usize> = all_names
+                    .iter()
+                    .filter_map(|name| current.bindings.get(name.as_str()))
+                    .copied()
+                    .collect();
 
-                if self.settings.rules.enabled(&Rule::InvalidAllFormat)
-                    && matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT)
-                {
-                    pylint::rules::invalid_all_format(self, expr);
+                if self.settings.rules.enabled(&Rule::InvalidAllFormat) {
+                    if matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT) {
+                        self.diagnostics
+                            .push(pylint::rules::invalid_all_format(expr));
+                    }
                 }
 
-                if self.settings.rules.enabled(&Rule::InvalidAllObject)
-                    && matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT)
-                {
-                    pylint::rules::invalid_all_object(self, expr);
+                if self.settings.rules.enabled(&Rule::InvalidAllObject) {
+                    if matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT) {
+                        self.diagnostics
+                            .push(pylint::rules::invalid_all_object(expr));
+                    }
+                }
+
+                // Mark all exported names as used-at-runtime.
+                for index in all_bindings {
+                    self.bindings[index].mark_used(
+                        GLOBAL_SCOPE_INDEX,
+                        Range::from_located(expr),
+                        ExecutionContext::Runtime,
+                    );
                 }
 
                 self.add_binding(
@@ -4686,13 +4735,7 @@ impl<'a> Checker<'a> {
                             | BindingKind::StarImportation(..)
                             | BindingKind::FutureImportation
                     ) {
-                        // Skip used exports from `__all__`
-                        if binding.used()
-                            || all_names
-                                .as_ref()
-                                .map(|names| names.contains(name))
-                                .unwrap_or_default()
-                        {
+                        if binding.used() {
                             continue;
                         }
 
@@ -4814,7 +4857,7 @@ impl<'a> Checker<'a> {
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
                     FxHashMap::default();
 
-                for (name, index) in &scope.bindings {
+                for index in scope.bindings.values() {
                     let binding = &self.bindings[*index];
 
                     let full_name = match &binding.kind {
@@ -4824,13 +4867,7 @@ impl<'a> Checker<'a> {
                         _ => continue,
                     };
 
-                    // Skip used exports from `__all__`
-                    if binding.used()
-                        || all_names
-                            .as_ref()
-                            .map(|names| names.contains(name))
-                            .unwrap_or_default()
-                    {
+                    if binding.used() {
                         continue;
                     }
 
@@ -4847,9 +4884,9 @@ impl<'a> Checker<'a> {
                         None
                     };
 
-                    if self.is_ignored(&Rule::UnusedImport, diagnostic_lineno)
+                    if self.rule_is_ignored(&Rule::UnusedImport, diagnostic_lineno)
                         || parent_lineno.map_or(false, |parent_lineno| {
-                            self.is_ignored(&Rule::UnusedImport, parent_lineno)
+                            self.rule_is_ignored(&Rule::UnusedImport, parent_lineno)
                         })
                     {
                         ignored

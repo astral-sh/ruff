@@ -1,13 +1,30 @@
 use std::path::{Path, PathBuf};
 
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
+use crate::fs;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use crate::{define_violation, fs};
 
 define_violation!(
+    /// ### What it does
+    /// Checks for packages that are missing an `__init__.py` file.
+    ///
+    /// ### Why is this bad?
+    /// Python packages are directories that contain a file named `__init__.py`.
+    /// The existence of this file indicates that the directory is a Python
+    /// package, and so it can be imported the same way a module can be
+    /// imported.
+    ///
+    /// Directories that lack an `__init__.py` file can still be imported, but
+    /// they're indicative of a special kind of package, known as a namespace
+    /// package (see: [PEP 420](https://www.python.org/dev/peps/pep-0420/)).
+    ///
+    /// Namespace packages are a relatively new feature of Python, and they're
+    /// not widely used. So a package that lacks an `__init__.py` file is
+    /// typically meant to be a regular package, and the absence of the
+    /// `__init__.py` file is probably an oversight.
     pub struct ImplicitNamespacePackage(pub String);
 );
 impl Violation for ImplicitNamespacePackage {
@@ -26,8 +43,8 @@ pub fn implicit_namespace_package(
     src: &[PathBuf],
 ) -> Option<Diagnostic> {
     if package.is_none()
-        // Ignore `.pyi` files, which don't require an `__init__.py`.
-        && path.extension().map_or(true, |ext| ext != "pyi")
+        // Ignore non-`.py` files, which don't require an `__init__.py`.
+        && path.extension().map_or(false, |ext| ext == "py")
         // Ignore any files that are direct children of the project root.
         && !path
             .parent()

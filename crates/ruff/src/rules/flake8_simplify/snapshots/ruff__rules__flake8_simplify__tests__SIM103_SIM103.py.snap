@@ -1,10 +1,11 @@
 ---
-source: src/rules/flake8_simplify/mod.rs
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
     ReturnBoolConditionDirectly:
-      cond: a
+      condition: a
+      fixable: true
   location:
     row: 3
     column: 4
@@ -23,7 +24,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ReturnBoolConditionDirectly:
-      cond: a == b
+      condition: a == b
+      fixable: true
   location:
     row: 11
     column: 4
@@ -42,7 +44,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ReturnBoolConditionDirectly:
-      cond: b
+      condition: b
+      fixable: true
   location:
     row: 21
     column: 4
@@ -61,7 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ReturnBoolConditionDirectly:
-      cond: b
+      condition: b
+      fixable: true
   location:
     row: 32
     column: 8
@@ -80,7 +84,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ReturnBoolConditionDirectly:
-      cond: a
+      condition: a
+      fixable: false
   location:
     row: 57
     column: 4
@@ -91,7 +96,8 @@ expression: diagnostics
   parent: ~
 - kind:
     ReturnBoolConditionDirectly:
-      cond: a
+      condition: a
+      fixable: false
   location:
     row: 83
     column: 4

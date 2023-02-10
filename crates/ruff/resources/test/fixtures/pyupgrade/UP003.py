@@ -5,6 +5,9 @@ type(0.0)
 type(0j)
 
 # OK
+type(arg)(" ")
+
+# OK
 y = x.dtype.type(0.0)
 
 # OK

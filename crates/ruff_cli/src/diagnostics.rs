@@ -7,7 +7,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use colored::Colorize;
-use log::debug;
+use log::{debug, error};
 use ruff::linter::{lint_fix, lint_only, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
@@ -105,17 +105,12 @@ pub fn lint_path(
 
     if let Some(err) = parse_error {
         // Notify the user of any parse errors.
-        #[allow(clippy::print_stderr)]
-        {
-            eprintln!(
-                "{}{} {}{}{} {err}",
-                "error".red().bold(),
-                ":".bold(),
-                "Failed to parse ".bold(),
-                fs::relativize_path(path).bold(),
-                ":".bold()
-            );
-        }
+        error!(
+            "{}{}{} {err}",
+            "Failed to parse ".bold(),
+            fs::relativize_path(path).bold(),
+            ":".bold()
+        );
 
         // Purge the cache.
         cache::del(path, package.as_ref(), settings, autofix.into());
@@ -210,15 +205,10 @@ pub fn lint_stdin(
     };
 
     if let Some(err) = parse_error {
-        #[allow(clippy::print_stderr)]
-        {
-            eprintln!(
-                "{}{} Failed to parse {}: {err}",
-                "error".red().bold(),
-                ":".bold(),
-                path.map_or_else(|| "-".into(), fs::relativize_path).bold()
-            );
-        }
+        error!(
+            "Failed to parse {}: {err}",
+            path.map_or_else(|| "-".into(), fs::relativize_path).bold()
+        );
     }
 
     Ok(Diagnostics { messages, fixed })

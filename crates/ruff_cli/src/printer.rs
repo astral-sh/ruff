@@ -48,6 +48,7 @@ struct ExpandedStatistics<'a> {
     count: usize,
     code: &'a str,
     message: String,
+    fixable: bool,
 }
 
 struct SerializeRuleAsCode<'a>(&'a Rule);
@@ -67,19 +68,19 @@ impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
     }
 }
 
-pub struct Printer<'a> {
-    format: &'a SerializationFormat,
-    log_level: &'a LogLevel,
-    autofix: &'a fix::FixMode,
-    violations: &'a Violations,
+pub struct Printer {
+    format: SerializationFormat,
+    log_level: LogLevel,
+    autofix: fix::FixMode,
+    violations: Violations,
 }
 
-impl<'a> Printer<'a> {
+impl Printer {
     pub const fn new(
-        format: &'a SerializationFormat,
-        log_level: &'a LogLevel,
-        autofix: &'a fix::FixMode,
-        violations: &'a Violations,
+        format: SerializationFormat,
+        log_level: LogLevel,
+        autofix: fix::FixMode,
+        violations: Violations,
     ) -> Self {
         Self {
             format,
@@ -90,13 +91,13 @@ impl<'a> Printer<'a> {
     }
 
     pub fn write_to_user(&self, message: &str) {
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             notify_user!("{}", message);
         }
     }
 
     fn post_text<T: Write>(&self, stdout: &mut T, diagnostics: &Diagnostics) -> Result<()> {
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             match self.violations {
                 Violations::Show => {
                     let fixed = diagnostics.fixed;
@@ -122,7 +123,8 @@ impl<'a> Printer<'a> {
                         if num_fixable > 0 {
                             writeln!(
                                 stdout,
-                                "[*] {num_fixable} potentially fixable with the --fix option."
+                                "[{}] {num_fixable} potentially fixable with the --fix option.",
+                                "*".cyan(),
                             )?;
                         }
                     }
@@ -370,14 +372,20 @@ impl<'a> Printer<'a> {
                     .find(|message| message.kind.rule() == *rule)
                     .map(|message| message.kind.body())
                     .unwrap(),
+                fixable: diagnostics
+                    .messages
+                    .iter()
+                    .find(|message| message.kind.rule() == *rule)
+                    .iter()
+                    .any(|message| message.kind.fixable()),
             })
             .collect::<Vec<_>>();
 
         let mut stdout = BufWriter::new(io::stdout().lock());
         match self.format {
             SerializationFormat::Text => {
-                // Compute the maximum number of digits in the count and code, for all messages, to enable
-                // pretty-printing.
+                // Compute the maximum number of digits in the count and code, for all messages,
+                // to enable pretty-printing.
                 let count_width = num_digits(
                     statistics
                         .iter()
@@ -390,13 +398,28 @@ impl<'a> Printer<'a> {
                     .map(|statistic| statistic.code.len())
                     .max()
                     .unwrap();
+                let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
+
+                let fixable = format!("[{}] ", "*".cyan());
+                let unfixable = "[ ] ";
 
                 // By default, we mimic Flake8's `--statistics` format.
-                for msg in statistics {
+                for statistic in statistics {
                     writeln!(
                         stdout,
-                        "{:>count_width$}\t{:<code_width$}\t{}",
-                        msg.count, msg.code, msg.message
+                        "{:>count_width$}\t{:<code_width$}\t{}{}",
+                        statistic.count.to_string().bold(),
+                        statistic.code.red().bold(),
+                        if any_fixable {
+                            if statistic.fixable {
+                                &fixable
+                            } else {
+                                unfixable
+                            }
+                        } else {
+                            ""
+                        },
+                        statistic.message,
                     )?;
                 }
                 return Ok(());
@@ -422,7 +445,7 @@ impl<'a> Printer<'a> {
             return Ok(());
         }
 
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             let s = if diagnostics.messages.len() == 1 {
                 ""
             } else {
@@ -436,7 +459,7 @@ impl<'a> Printer<'a> {
 
         let mut stdout = BufWriter::new(io::stdout().lock());
         if !diagnostics.messages.is_empty() {
-            if self.log_level >= &LogLevel::Default {
+            if self.log_level >= LogLevel::Default {
                 writeln!(stdout)?;
             }
             for message in &diagnostics.messages {
@@ -477,7 +500,7 @@ fn num_digits(n: usize) -> usize {
 fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
     let label = if message.kind.fixable() {
         format!(
-            "{}{}{}{}{}{} {} [*] {}",
+            "{}{}{}{}{}{} {} [{}] {}",
             relativize_path(Path::new(&message.filename)).bold(),
             ":".cyan(),
             message.location.row(),
@@ -485,6 +508,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
             message.location.column(),
             ":".cyan(),
             message.kind.rule().code().red().bold(),
+            "*".cyan(),
             message.kind.body(),
         )
     } else {
@@ -556,13 +580,14 @@ fn print_grouped_message<T: Write>(
 ) -> Result<()> {
     let label = if message.kind.fixable() {
         format!(
-            "  {}{}{}{}{}  {}  [*] {}",
+            "  {}{}{}{}{}  {}  [{}] {}",
             " ".repeat(row_length - num_digits(message.location.row())),
             message.location.row(),
             ":".cyan(),
             message.location.column(),
             " ".repeat(column_length - num_digits(message.location.column())),
             message.kind.rule().code().red().bold(),
+            "*".cyan(),
             message.kind.body(),
         )
     } else {

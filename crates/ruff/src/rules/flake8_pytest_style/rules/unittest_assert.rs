@@ -2,7 +2,7 @@ use std::hash::BuildHasherDefault;
 
 use anyhow::{anyhow, bail, Result};
 use rustc_hash::FxHashMap;
-use rustpython_ast::{
+use rustpython_parser::ast::{
     Cmpop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
 };
 

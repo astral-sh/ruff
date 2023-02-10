@@ -1,19 +1,24 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use log::error;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Located, Stmt, StmtKind, Withitem};
+use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
 
-use super::fix_with;
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::helpers::{first_colon_range, has_comments_in};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::violation::{AutofixKind, Availability, Violation};
+
+use super::fix_with;
 
 define_violation!(
-    pub struct MultipleWithStatements;
+    pub struct MultipleWithStatements {
+        pub fixable: bool,
+    }
 );
-impl AlwaysAutofixableViolation for MultipleWithStatements {
+impl Violation for MultipleWithStatements {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -22,8 +27,13 @@ impl AlwaysAutofixableViolation for MultipleWithStatements {
         )
     }
 
-    fn autofix_title(&self) -> String {
-        "Combine `with` statements".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let MultipleWithStatements { fixable, .. } = self;
+        if *fixable {
+            Some(|_| format!("Combine `with` statements"))
+        } else {
+            None
+        }
     }
 }
 
@@ -61,35 +71,33 @@ pub fn multiple_with_statements(
             ),
             checker.locator,
         );
+        let fixable = !has_comments_in(
+            Range::new(with_stmt.location, with_body[0].location),
+            checker.locator,
+        );
         let mut diagnostic = Diagnostic::new(
-            MultipleWithStatements,
+            MultipleWithStatements { fixable },
             colon.map_or_else(
                 || Range::from_located(with_stmt),
                 |colon| Range::new(with_stmt.location, colon.end_location),
             ),
         );
-        if checker.patch(diagnostic.kind.rule()) {
-            let nested_with = &with_body[0];
-            if !has_comments_in(
-                Range::new(with_stmt.location, nested_with.location),
+        if fixable && checker.patch(diagnostic.kind.rule()) {
+            match fix_with::fix_multiple_with_statements(
                 checker.locator,
+                checker.stylist,
+                with_stmt,
             ) {
-                match fix_with::fix_multiple_with_statements(
-                    checker.locator,
-                    checker.stylist,
-                    with_stmt,
-                ) {
-                    Ok(fix) => {
-                        if fix
-                            .content
-                            .lines()
-                            .all(|line| line.len() <= checker.settings.line_length)
-                        {
-                            diagnostic.amend(fix);
-                        }
+                Ok(fix) => {
+                    if fix
+                        .content
+                        .lines()
+                        .all(|line| line.len() <= checker.settings.line_length)
+                    {
+                        diagnostic.amend(fix);
                     }
-                    Err(err) => error!("Failed to fix nested with: {err}"),
                 }
+                Err(err) => error!("Failed to fix nested with: {err}"),
             }
         }
         checker.diagnostics.push(diagnostic);

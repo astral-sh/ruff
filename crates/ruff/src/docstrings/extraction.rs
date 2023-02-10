@@ -1,6 +1,6 @@
 //! Extract docstrings from an AST.
 
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 use crate::visibility::{Modifier, VisibleScope};

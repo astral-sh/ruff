@@ -1,3 +1,5 @@
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
@@ -6,9 +8,6 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers;
 use crate::violation::AlwaysAutofixableViolation;
-
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct FitsOnOneLine;

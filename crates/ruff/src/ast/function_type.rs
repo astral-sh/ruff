@@ -1,6 +1,6 @@
-use rustpython_ast::Expr;
+use rustpython_parser::ast::Expr;
 
-use crate::ast::helpers::to_call_path;
+use crate::ast::helpers::{map_callable, to_call_path};
 use crate::ast::types::{Scope, ScopeKind};
 use crate::checkers::ast::Checker;
 
@@ -26,11 +26,23 @@ pub fn classify(
     let ScopeKind::Class(scope) = &scope.kind else {
         return FunctionType::Function;
     };
-    // Special-case class method, like `__new__`.
-    if CLASS_METHODS.contains(&name)
+    if decorator_list.iter().any(|expr| {
+        // The method is decorated with a static method decorator (like
+        // `@staticmethod`).
+        checker
+            .resolve_call_path(map_callable(expr))
+            .map_or(false, |call_path| {
+                staticmethod_decorators
+                    .iter()
+                    .any(|decorator| call_path == to_call_path(decorator))
+            })
+    }) {
+        FunctionType::StaticMethod
+    } else if CLASS_METHODS.contains(&name)
+        // Special-case class method, like `__new__`.
         || scope.bases.iter().any(|expr| {
             // The class itself extends a known metaclass, so all methods are class methods.
-            checker.resolve_call_path(expr).map_or(false, |call_path| {
+            checker.resolve_call_path(map_callable(expr)).map_or(false, |call_path| {
                 METACLASS_BASES
                     .iter()
                     .any(|(module, member)| call_path.as_slice() == [*module, *member])
@@ -38,7 +50,7 @@ pub fn classify(
         })
         || decorator_list.iter().any(|expr| {
             // The method is decorated with a class method decorator (like `@classmethod`).
-            checker.resolve_call_path(expr).map_or(false, |call_path| {
+            checker.resolve_call_path(map_callable(expr)).map_or(false, |call_path| {
                 classmethod_decorators
                     .iter()
                     .any(|decorator| call_path == to_call_path(decorator))
@@ -46,16 +58,6 @@ pub fn classify(
         })
     {
         FunctionType::ClassMethod
-    } else if decorator_list.iter().any(|expr| {
-        // The method is decorated with a static method decorator (like
-        // `@staticmethod`).
-        checker.resolve_call_path(expr).map_or(false, |call_path| {
-            staticmethod_decorators
-                .iter()
-                .any(|decorator| call_path == to_call_path(decorator))
-        })
-    }) {
-        FunctionType::StaticMethod
     } else {
         // It's an instance method.
         FunctionType::Method

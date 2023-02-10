@@ -1,10 +1,10 @@
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator};
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Arguments, Constant, Expr, ExprKind, Operator};
 
 define_violation!(
     pub struct MutableArgumentDefault;
@@ -66,8 +66,8 @@ const IMMUTABLE_GENERIC_TYPES: &[&[&str]] = &[
     &["typing", "Tuple"],
 ];
 
-pub fn is_mutable_func(checker: &Checker, expr: &Expr) -> bool {
-    checker.resolve_call_path(expr).map_or(false, |call_path| {
+pub fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
+    checker.resolve_call_path(func).map_or(false, |call_path| {
         MUTABLE_FUNCS
             .iter()
             .any(|target| call_path.as_slice() == *target)

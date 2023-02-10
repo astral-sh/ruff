@@ -2,10 +2,11 @@
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
+use ruff_python::string;
+
 use super::settings::RelativeImportsOrder;
 use super::types::EitherImport::{Import, ImportFrom};
 use super::types::{AliasData, EitherImport, ImportFromData};
-use ruff_python::string;
 
 #[derive(PartialOrd, Ord, PartialEq, Eq)]
 pub enum Prefix {

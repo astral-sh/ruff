@@ -1,11 +1,10 @@
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Stmt, StmtKind};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
@@ -85,7 +84,7 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
             .iter()
             .all(|expr| check_type_check_test(checker, expr)),
         ExprKind::UnaryOp { operand, .. } => check_type_check_test(checker, operand),
-        ExprKind::Call { .. } => check_type_check_call(checker, test),
+        ExprKind::Call { func, .. } => check_type_check_call(checker, func),
         _ => false,
     }
 }

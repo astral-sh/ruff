@@ -1,0 +1,35 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    MultipleLeadingHashesForBlockComment: ~
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    MultipleLeadingHashesForBlockComment: ~
+  location:
+    row: 22
+    column: 4
+  end_location:
+    row: 22
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    MultipleLeadingHashesForBlockComment: ~
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 26
+    column: 21
+  fix: ~
+  parent: ~
+

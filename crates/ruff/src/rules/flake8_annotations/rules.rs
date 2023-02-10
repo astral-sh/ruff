@@ -1,24 +1,40 @@
 use log::error;
-use rustpython_ast::{Constant, Expr, ExprKind, Stmt};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
 
-use ruff_macros::derive_message_formats;
-
+use super::fixes;
+use super::helpers::match_function_def;
 use crate::ast::helpers::ReturnStatementVisitor;
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::{cast, helpers};
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 use crate::visibility;
 use crate::visibility::Visibility;
 
-use super::fixes;
-use super::helpers::match_function_def;
-
 define_violation!(
+    /// ### What it does
+    /// Checks that function arguments have type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the types of function arguments. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any provided arguments match expectation.
+    ///
+    /// ### Example
+    /// ```python
+    /// def foo(x):
+    ///     ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def foo(x: int):
+    ///     ...
+    /// ```
     pub struct MissingTypeFunctionArgument {
         pub name: String,
     }
@@ -32,6 +48,25 @@ impl Violation for MissingTypeFunctionArgument {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that function `*args` arguments have type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the types of function arguments. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any provided arguments match expectation.
+    ///
+    /// ### Example
+    /// ```python
+    /// def foo(*args):
+    ///     ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def foo(*args: int):
+    ///     ...
+    /// ```
     pub struct MissingTypeArgs {
         pub name: String,
     }
@@ -45,6 +80,25 @@ impl Violation for MissingTypeArgs {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that function `**kwargs` arguments have type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the types of function arguments. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any provided arguments match expectation.
+    ///
+    /// ### Example
+    /// ```python
+    /// def foo(**kwargs):
+    ///     ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def foo(**kwargs: int):
+    ///     ...
+    /// ```
     pub struct MissingTypeKwargs {
         pub name: String,
     }
@@ -58,6 +112,30 @@ impl Violation for MissingTypeKwargs {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that instance method `self` arguments have type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the types of function arguments. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any provided arguments match expectation.
+    ///
+    /// Note that many type checkers will infer the type of `self` automatically, so this
+    /// annotation is not strictly necessary.
+    ///
+    /// ### Example
+    /// ```python
+    /// class Foo:
+    ///     def bar(self):
+    ///         ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// class Foo:
+    ///     def bar(self: "Foo"):
+    ///         ...
+    /// ```
     pub struct MissingTypeSelf {
         pub name: String,
     }
@@ -71,6 +149,32 @@ impl Violation for MissingTypeSelf {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that class method `cls` arguments have type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the types of function arguments. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any provided arguments match expectation.
+    ///
+    /// Note that many type checkers will infer the type of `cls` automatically, so this
+    /// annotation is not strictly necessary.
+    ///
+    /// ### Example
+    /// ```python
+    /// class Foo:
+    ///     @classmethod
+    ///     def bar(cls):
+    ///         ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// class Foo:
+    ///     @classmethod
+    ///     def bar(cls: Type["Foo"]):
+    ///         ...
+    /// ```
     pub struct MissingTypeCls {
         pub name: String,
     }
@@ -84,6 +188,25 @@ impl Violation for MissingTypeCls {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that public functions and methods have return type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the return types of functions. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any returned values, and the types expected by callers, match expectation.
+    ///
+    /// ### Example
+    /// ```python
+    /// def add(a, b):
+    ///     return a + b
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def add(a: int, b: int) -> int:
+    ///     return a + b
+    /// ```
     pub struct MissingReturnTypePublicFunction {
         pub name: String,
     }
@@ -97,6 +220,25 @@ impl Violation for MissingReturnTypePublicFunction {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that private functions and methods have return type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the return types of functions. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any returned values, and the types expected by callers, match expectation.
+    ///
+    /// ### Example
+    /// ```python
+    /// def _add(a, b):
+    ///     return a + b
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def _add(a: int, b: int) -> int:
+    ///     return a + b
+    /// ```
     pub struct MissingReturnTypePrivateFunction {
         pub name: String,
     }
@@ -110,6 +252,38 @@ impl Violation for MissingReturnTypePrivateFunction {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that "special" methods, like `__init__`, `__new__`, and `__call__`, have
+    /// return type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the return types of functions. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any returned values, and the types expected by callers, match expectation.
+    ///
+    /// Note that type checkers often allow you to omit the return type annotation for
+    /// `__init__` methods, as long as at least one argument has a type annotation. To
+    /// opt-in to this behavior, use the `mypy-init-return` setting in your `pyproject.toml`
+    /// or `ruff.toml` file:
+    ///
+    /// ```toml
+    /// [tool.ruff.flake8-annotations]
+    /// mypy-init-return = true
+    /// ```
+    ///
+    /// ### Example
+    /// ```python
+    /// class Foo:
+    ///     def __init__(self, x: int):
+    ///         self.x = x
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// class Foo:
+    ///     def __init__(self, x: int) -> None:
+    ///         self.x = x
+    /// ```
     pub struct MissingReturnTypeSpecialMethod {
         pub name: String,
     }
@@ -127,6 +301,29 @@ impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that static methods have return type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the return types of functions. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any returned values, and the types expected by callers, match expectation.
+    ///
+    /// ### Example
+    /// ```python
+    /// class Foo:
+    ///     @staticmethod
+    ///     def bar():
+    ///         return 1
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// class Foo:
+    ///     @staticmethod
+    ///     def bar() -> int:
+    ///         return 1
+    /// ```
     pub struct MissingReturnTypeStaticMethod {
         pub name: String,
     }
@@ -140,6 +337,29 @@ impl Violation for MissingReturnTypeStaticMethod {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that class methods have return type annotations.
+    ///
+    /// ### Why is this bad?
+    /// Type annotations are a good way to document the return types of functions. They also
+    /// help catch bugs, when used alongside a type checker, by ensuring that the types of
+    /// any returned values, and the types expected by callers, match expectation.
+    ///
+    /// ### Example
+    /// ```python
+    /// class Foo:
+    ///     @classmethod
+    ///     def bar(cls):
+    ///         return 1
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// class Foo:
+    ///     @classmethod
+    ///     def bar(cls) -> int:
+    ///         return 1
+    /// ```
     pub struct MissingReturnTypeClassMethod {
         pub name: String,
     }
@@ -153,6 +373,25 @@ impl Violation for MissingReturnTypeClassMethod {
 }
 
 define_violation!(
+    /// ### What it does
+    /// Checks that an expression is annotated with a more specific type than `Any`.
+    ///
+    /// ### Why is this bad?
+    /// `Any` is a type that can be anything, and it is the default type for
+    /// unannotated expressions. It is better to be explicit about the type of an
+    /// expression, and to use `Any` only when it is really needed.
+    ///
+    /// ### Example
+    /// ```python
+    /// def foo(x: Any):
+    ///     ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def foo(x: int):
+    ///     ...
+    /// ```
     pub struct DynamicallyTypedExpression {
         pub name: String,
     }

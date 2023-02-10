@@ -14,6 +14,8 @@ const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 const TOC_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated table of contents. -->";
 const TOC_END_PRAGMA: &str = "<!-- End auto-generated table of contents. -->";
 
+const URL_PREFIX: &str = "https://github.com/charliermarsh/ruff/blob/main/docs/rules";
+
 #[derive(clap::Args)]
 pub struct Args {
     /// Write the generated table to stdout (rather than to `README.md`).
@@ -32,13 +34,25 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>)
             Some(_) => "🛠",
         };
 
-        table_out.push_str(&format!(
-            "| {} | {} | {} | {} |",
-            rule.code(),
-            rule.as_ref(),
-            rule.message_formats()[0].replace('|', r"\|"),
-            fix_token
-        ));
+        if rule.explanation().is_some() {
+            table_out.push_str(&format!(
+                "| {} | [{}]({}/{}.md) | {} | {} |",
+                rule.code(),
+                rule.as_ref(),
+                URL_PREFIX,
+                rule.as_ref(),
+                rule.message_formats()[0].replace('|', r"\|"),
+                fix_token
+            ));
+        } else {
+            table_out.push_str(&format!(
+                "| {} | {} | {} | {} |",
+                rule.code(),
+                rule.as_ref(),
+                rule.message_formats()[0].replace('|', r"\|"),
+                fix_token
+            ));
+        }
         table_out.push('\n');
     }
     table_out.push('\n');

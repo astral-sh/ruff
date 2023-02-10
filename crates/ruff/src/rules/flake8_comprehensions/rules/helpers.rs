@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 pub fn function_name(func: &Expr) -> Option<&str> {
     if let ExprKind::Name { id, .. } = &func.node {

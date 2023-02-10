@@ -1,8 +1,7 @@
-use crate::violation::{AlwaysAutofixableViolation, Availability, Violation};
-use crate::{define_violation, AutofixKind};
 use log::error;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
@@ -14,42 +13,62 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
+use crate::violation::{AutofixKind, Availability, Violation};
 
 define_violation!(
-    pub struct NestedIfStatements;
+    pub struct NestedIfStatements {
+        pub fixable: bool,
+    }
 );
-impl AlwaysAutofixableViolation for NestedIfStatements {
+impl Violation for NestedIfStatements {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a single `if` statement instead of nested `if` statements")
     }
 
-    fn autofix_title(&self) -> String {
-        "Combine `if` statements using `and`".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let NestedIfStatements { fixable, .. } = self;
+        if *fixable {
+            Some(|_| format!("Combine `if` statements using `and`"))
+        } else {
+            None
+        }
     }
 }
 
 define_violation!(
     pub struct ReturnBoolConditionDirectly {
-        pub cond: String,
+        pub condition: String,
+        pub fixable: bool,
     }
 );
-impl AlwaysAutofixableViolation for ReturnBoolConditionDirectly {
+impl Violation for ReturnBoolConditionDirectly {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReturnBoolConditionDirectly { cond } = self;
-        format!("Return the condition `{cond}` directly")
+        let ReturnBoolConditionDirectly { condition, .. } = self;
+        format!("Return the condition `{condition}` directly")
     }
 
-    fn autofix_title(&self) -> String {
-        let ReturnBoolConditionDirectly { cond } = self;
-        format!("Replace with `return {cond}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let ReturnBoolConditionDirectly { fixable, .. } = self;
+        if *fixable {
+            Some(|ReturnBoolConditionDirectly { condition, .. }| {
+                format!("Replace with `return {condition}`")
+            })
+        } else {
+            None
+        }
     }
 }
 
 define_violation!(
     pub struct UseTernaryOperator {
         pub contents: String,
+        pub fixable: bool,
     }
 );
 impl Violation for UseTernaryOperator {
@@ -57,30 +76,44 @@ impl Violation for UseTernaryOperator {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UseTernaryOperator { contents } = self;
+        let UseTernaryOperator { contents, .. } = self;
         format!("Use ternary operator `{contents}` instead of if-else-block")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|UseTernaryOperator { contents }| format!("Replace if-else-block with `{contents}`"))
+        let UseTernaryOperator { fixable, .. } = self;
+        if *fixable {
+            Some(|UseTernaryOperator { contents, .. }| {
+                format!("Replace if-else-block with `{contents}`")
+            })
+        } else {
+            None
+        }
     }
 }
 
 define_violation!(
     pub struct DictGetWithDefault {
         pub contents: String,
+        pub fixable: bool,
     }
 );
-impl AlwaysAutofixableViolation for DictGetWithDefault {
+impl Violation for DictGetWithDefault {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DictGetWithDefault { contents } = self;
+        let DictGetWithDefault { contents, .. } = self;
         format!("Use `{contents}` instead of an `if` block")
     }
 
-    fn autofix_title(&self) -> String {
-        let DictGetWithDefault { contents } = self;
-        format!("Replace with `{contents}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let DictGetWithDefault { fixable, .. } = self;
+        if *fixable {
+            Some(|DictGetWithDefault { contents, .. }| format!("Replace with `{contents}`"))
+        } else {
+            None
+        }
     }
 }
 
@@ -163,37 +196,39 @@ pub fn nested_if_statements(
     let Some((test, first_stmt)) = find_last_nested_if(body) else {
         return;
     };
+
     let colon = first_colon_range(
         Range::new(test.end_location.unwrap(), first_stmt.location),
         checker.locator,
     );
+
+    // The fixer preserves comments in the nested body, but removes comments between
+    // the outer and inner if statements.
+    let nested_if = &body[0];
+    let fixable = !has_comments_in(
+        Range::new(stmt.location, nested_if.location),
+        checker.locator,
+    );
+
     let mut diagnostic = Diagnostic::new(
-        NestedIfStatements,
+        NestedIfStatements { fixable },
         colon.map_or_else(
             || Range::from_located(stmt),
             |colon| Range::new(stmt.location, colon.end_location),
         ),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // The fixer preserves comments in the nested body, but removes comments between
-        // the outer and inner if statements.
-        let nested_if = &body[0];
-        if !has_comments_in(
-            Range::new(stmt.location, nested_if.location),
-            checker.locator,
-        ) {
-            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
-                Ok(fix) => {
-                    if fix
-                        .content
-                        .lines()
-                        .all(|line| line.len() <= checker.settings.line_length)
-                    {
-                        diagnostic.amend(fix);
-                    }
+    if fixable && checker.patch(diagnostic.kind.rule()) {
+        match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
+            Ok(fix) => {
+                if fix
+                    .content
+                    .lines()
+                    .all(|line| line.len() <= checker.settings.line_length)
+                {
+                    diagnostic.amend(fix);
                 }
-                Err(err) => error!("Failed to fix nested if: {err}"),
             }
+            Err(err) => error!("Failed to fix nested if: {err}"),
         }
     }
     checker.diagnostics.push(diagnostic);
@@ -240,22 +275,25 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         return;
     };
 
-    // If the branches have the same condition, abort (although the code could be simplified).
+    // If the branches have the same condition, abort (although the code could be
+    // simplified).
     if if_return == else_return {
         return;
     }
 
     let condition = unparse_expr(test, checker.stylist);
-    let mut diagnostic = Diagnostic::new(
-        ReturnBoolConditionDirectly { cond: condition },
-        Range::from_located(stmt),
-    );
-    if checker.patch(diagnostic.kind.rule())
-        && matches!(if_return, Bool::True)
+    let fixable = matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
-    {
+        && (matches!(test.node, ExprKind::Compare { .. }) || checker.is_builtin("bool"));
+
+    let mut diagnostic = Diagnostic::new(
+        ReturnBoolConditionDirectly { condition, fixable },
+        Range::from_located(stmt),
+    );
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
+            // If the condition is a comparison, we can replace it with the condition.
             diagnostic.amend(Fix::replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
@@ -266,7 +304,9 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
                 stmt.location,
                 stmt.end_location.unwrap(),
             ));
-        } else if checker.is_builtin("bool") {
+        } else {
+            // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
+            // verified, above, that `bool` is a builtin.)
             diagnostic.amend(Fix::replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
@@ -369,6 +409,21 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         }
     }
 
+    // Avoid suggesting ternary for `if (yield ...)`-style checks.
+    // TODO(charlie): Fix precedence handling for yields in generator.
+    if matches!(
+        body_value.node,
+        ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. }
+    ) {
+        return;
+    }
+    if matches!(
+        orelse_value.node,
+        ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } | ExprKind::Await { .. }
+    ) {
+        return;
+    }
+
     let target_var = &body_targets[0];
     let ternary = ternary(target_var, body_value, test, orelse_value);
     let contents = unparse_stmt(&ternary, checker.stylist);
@@ -378,13 +433,15 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         return;
     }
 
+    let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
         UseTernaryOperator {
             contents: contents.clone(),
+            fixable,
         },
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.rule()) && !has_comments(stmt, checker.locator) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,
@@ -509,13 +566,15 @@ pub fn use_dict_get_with_default(
         return;
     }
 
+    let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
         DictGetWithDefault {
             contents: contents.clone(),
+            fixable,
         },
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.rule()) && !has_comments(stmt, checker.locator) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,

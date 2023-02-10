@@ -1,19 +1,18 @@
 use anyhow::Result;
+use colored::Colorize;
 use fern;
+use log::Level;
 
 #[macro_export]
 macro_rules! warn_user_once {
     ($($arg:tt)*) => {
         use colored::Colorize;
+        use log::warn;
+
         static WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
         if !WARNED.swap(true, std::sync::atomic::Ordering::SeqCst) {
             let message = format!("{}", format_args!($($arg)*));
-            eprintln!(
-                "{}{} {}",
-                "warning".yellow().bold(),
-                ":".bold(),
-                message.bold(),
-            );
+            warn!("{}", message.bold());
         }
     };
 }
@@ -22,13 +21,10 @@ macro_rules! warn_user_once {
 macro_rules! warn_user {
     ($($arg:tt)*) => {
         use colored::Colorize;
+        use log::warn;
+
         let message = format!("{}", format_args!($($arg)*));
-        eprintln!(
-            "{}{} {}",
-            "warning".yellow().bold(),
-            ":".bold(),
-            message.bold(),
-        );
+        warn!("{}", message.bold());
     };
 }
 
@@ -50,7 +46,8 @@ macro_rules! notify_user {
 pub enum LogLevel {
     /// No output ([`log::LevelFilter::Off`]).
     Silent,
-    /// Only show lint violations, with no decorative output ([`log::LevelFilter::Off`]).
+    /// Only show lint violations, with no decorative output
+    /// ([`log::LevelFilter::Off`]).
     Quiet,
     /// All user-facing output ([`log::LevelFilter::Info`]).
     #[default]
@@ -73,14 +70,32 @@ impl LogLevel {
 
 pub fn set_up_logging(level: &LogLevel) -> Result<()> {
     fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ));
+        .format(|out, message, record| match record.level() {
+            Level::Error => {
+                out.finish(format_args!(
+                    "{}{} {}",
+                    "error".red().bold(),
+                    ":".bold(),
+                    message
+                ));
+            }
+            Level::Warn => {
+                out.finish(format_args!(
+                    "{}{} {}",
+                    "warning".yellow().bold(),
+                    ":".bold(),
+                    message
+                ));
+            }
+            Level::Info | Level::Debug | Level::Trace => {
+                out.finish(format_args!(
+                    "{}[{}][{}] {}",
+                    chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                    record.target(),
+                    record.level(),
+                    message
+                ));
+            }
         })
         .level(level.level_filter())
         .level_for("globset", log::LevelFilter::Warn)

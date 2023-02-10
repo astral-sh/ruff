@@ -2,7 +2,7 @@
 
 use bitflags::bitflags;
 use nohash_hasher::{IntMap, IntSet};
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::{LexResult, Tok};
 
 use crate::registry::LintSource;

@@ -1,12 +1,10 @@
+use std::string::ToString;
+
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::types::{Binding, Scope, ScopeKind};
 use crate::registry::Diagnostic;
-
-use crate::define_violation;
-
-use ruff_macros::derive_message_formats;
-
 use crate::violation::Violation;
-use std::string::ToString;
 
 define_violation!(
     pub struct UndefinedLocal {
