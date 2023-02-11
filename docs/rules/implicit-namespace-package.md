@@ -18,7 +18,9 @@ Namespace packages are less widely used, so a package that lacks an
 `__init__.py` file is typically meant to be a regular package, and
 the absence of the `__init__.py` file is probably an oversight.
 
-Note that namespace packages can be specified via the
-[`namespace-packages`](https://github.com/charliermarsh/ruff#namespace-packages)
-configuration option. Adding a namespace package to the configuration
-will suppress this violation for a given package.
+## Options
+
+* [`namespace-packages`]
+
+
+[`namespace-packages`]: ../../settings#namespace-packages

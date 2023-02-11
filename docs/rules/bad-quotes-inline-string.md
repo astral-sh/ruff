@@ -6,12 +6,15 @@ Autofix is always available.
 
 ## What it does
 Checks for inline strings that use single quotes or double quotes,
-depending on the value of the [`inline-quotes`](https://github.com/charliermarsh/ruff#inline-quotes)
-setting.
+depending on the value of the [`flake8-quotes.inline-quotes`] option.
 
 ## Why is this bad?
 Consistency is good. Use either single or double quotes for inline
 strings, but be consistent.
+
+## Options
+
+* [`flake8-quotes.inline-quotes`]
 
 ## Example
 ```python
@@ -22,3 +25,5 @@ Assuming `inline-quotes` is set to `double`, use instead:
 ```python
 foo = "bar"
 ```
+
+[`flake8-quotes.inline-quotes`]: ../../settings#inline-quotes

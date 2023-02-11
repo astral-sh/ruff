@@ -5,6 +5,8 @@ use std::fs;
 
 use anyhow::Result;
 use ruff::registry::{Linter, Rule, RuleNamespace};
+use ruff::settings::options::Options;
+use ruff::settings::options_base::ConfigurationOptions;
 use ruff::AutofixAvailability;
 use strum::IntoEnumIterator;
 
@@ -37,7 +39,7 @@ pub fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            output.push_str(explanation.trim());
+            process_documentation(explanation.trim(), &mut output);
 
             if args.dry_run {
                 println!("{output}");
@@ -48,4 +50,36 @@ pub fn main(args: &Args) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn process_documentation(documentation: &str, out: &mut String) {
+    let mut in_options = false;
+    let mut after = String::new();
+
+    for line in documentation.split_inclusive('\n') {
+        if line.starts_with("## ") {
+            in_options = line == "## Options\n";
+        } else if in_options {
+            if let Some(rest) = line.strip_prefix("* `") {
+                let option = rest.trim_end().trim_end_matches('`');
+
+                assert!(
+                    Options::get(Some(option)).is_some(),
+                    "unknown option {option}"
+                );
+
+                let anchor = option.rsplit('.').next().unwrap();
+                out.push_str(&format!("* [`{option}`]\n"));
+                after.push_str(&format!("[`{option}`]: ../../settings#{anchor}"));
+
+                continue;
+            }
+        }
+
+        out.push_str(line);
+    }
+    if !after.is_empty() {
+        out.push_str("\n\n");
+        out.push_str(&after);
+    }
 }

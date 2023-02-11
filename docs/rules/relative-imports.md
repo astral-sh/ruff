@@ -24,11 +24,9 @@ Absolute imports, or relative imports from siblings, are recommended by [PEP 8](
 > from .sibling import example
 > ```
 
-Note that degree of strictness packages can be specified via the
-[`ban-relative-imports`](https://github.com/charliermarsh/ruff#ban-relative-imports)
-configuration option, which allows banning all relative imports
-(`ban-relative-imports = "all"`) or only those that extend into the parent module or beyond
-(`ban-relative-imports = "parents"`, the default).
+## Options
+
+* [`flake8-tidy-imports.ban-relative-imports`]
 
 ## Example
 ```python
@@ -39,3 +37,5 @@ Use instead:
 ```python
 from mypkg import foo
 ```
+
+[`flake8-tidy-imports.ban-relative-imports`]: ../../settings#ban-relative-imports
