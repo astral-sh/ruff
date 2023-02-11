@@ -2062,7 +2062,7 @@ where
                 // Ex) Optional[...]
                 if !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(&Rule::UsePEP604Annotation)
+                    && self.settings.rules.enabled(&Rule::TypingUnion)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.annotations_future_enabled
@@ -2117,7 +2117,7 @@ where
                         // Ex) List[...]
                         if !self.in_deferred_string_type_definition
                             && !self.settings.pyupgrade.keep_runtime_typing
-                            && self.settings.rules.enabled(&Rule::UsePEP585Annotation)
+                            && self.settings.rules.enabled(&Rule::DeprecatedCollectionType)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.annotations_future_enabled
@@ -2162,7 +2162,7 @@ where
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(&Rule::UsePEP585Annotation)
+                    && self.settings.rules.enabled(&Rule::DeprecatedCollectionType)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.annotations_future_enabled

@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UsePEP604Annotation: ~
+    TypingUnion: ~
   location:
     row: 6
     column: 9
@@ -21,7 +21,7 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    UsePEP604Annotation: ~
+    TypingUnion: ~
   location:
     row: 10
     column: 9
@@ -39,7 +39,7 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UsePEP604Annotation: ~
+    TypingUnion: ~
   location:
     row: 14
     column: 9
@@ -57,7 +57,7 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    UsePEP604Annotation: ~
+    TypingUnion: ~
   location:
     row: 14
     column: 25
@@ -75,7 +75,7 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    UsePEP604Annotation: ~
+    TypingUnion: ~
   location:
     row: 18
     column: 9
@@ -93,7 +93,7 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    UsePEP604Annotation: ~
+    TypingUnion: ~
   location:
     row: 22
     column: 9
@@ -111,7 +111,7 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    UsePEP604Annotation: ~
+    TypingUnion: ~
   location:
     row: 26
     column: 9

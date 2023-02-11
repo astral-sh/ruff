@@ -282,10 +282,10 @@ ruff_macros::define_rule_mapping!(
     UP003 => rules::pyupgrade::rules::TypeOfPrimitive,
     UP004 => rules::pyupgrade::rules::UselessObjectInheritance,
     UP005 => rules::pyupgrade::rules::DeprecatedUnittestAlias,
-    UP006 => rules::pyupgrade::rules::UsePEP585Annotation,
-    UP007 => rules::pyupgrade::rules::UsePEP604Annotation,
+    UP006 => rules::pyupgrade::rules::DeprecatedCollectionType,
+    UP007 => rules::pyupgrade::rules::TypingUnion,
     UP008 => rules::pyupgrade::rules::SuperCallWithParameters,
-    UP009 => rules::pyupgrade::rules::PEP3120UnnecessaryCodingComment,
+    UP009 => rules::pyupgrade::rules::UTF8EncodingDeclaration,
     UP010 => rules::pyupgrade::rules::UnnecessaryFutureImport,
     UP011 => rules::pyupgrade::rules::LRUCacheWithoutParameters,
     UP012 => rules::pyupgrade::rules::UnnecessaryEncodeUTF8,
@@ -751,7 +751,7 @@ impl Rule {
             | Rule::LineTooLong
             | Rule::MixedSpacesAndTabs
             | Rule::NoNewLineAtEndOfFile
-            | Rule::PEP3120UnnecessaryCodingComment
+            | Rule::UTF8EncodingDeclaration
             | Rule::ShebangMissingExecutableFile
             | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
