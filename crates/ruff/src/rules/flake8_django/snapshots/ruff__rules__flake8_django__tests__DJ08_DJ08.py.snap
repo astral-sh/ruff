@@ -1,25 +1,35 @@
 ---
-source: src/rules/flake8_django/mod.rs
+source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
     ModelDunderStr: ~
   location:
-    row: 1
+    row: 6
     column: 0
   end_location:
-    row: 2
-    column: 8
+    row: 18
+    column: 16
   fix: ~
   parent: ~
 - kind:
     ModelDunderStr: ~
   location:
-    row: 5
+    row: 21
     column: 0
   end_location:
-    row: 6
-    column: 8
+    row: 33
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    ModelDunderStr: ~
+  location:
+    row: 36
+    column: 0
+  end_location:
+    row: 47
+    column: 16
   fix: ~
   parent: ~
 

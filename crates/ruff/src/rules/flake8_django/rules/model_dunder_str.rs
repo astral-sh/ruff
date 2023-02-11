@@ -62,8 +62,8 @@ fn checker_applies(checker: &Checker, bases: &[Expr], body: &[Stmt]) -> bool {
     false
 }
 
+/// Check if class is abstract in terms of django model inheritance
 fn is_model_abstract(body: &[Stmt]) -> bool {
-    /// Check if class is abstract in terms of django model inheritance
     for element in body.iter() {
         let ClassDef{name, body, ..} = &element.node else {
             continue

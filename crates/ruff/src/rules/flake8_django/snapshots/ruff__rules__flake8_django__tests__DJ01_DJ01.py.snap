@@ -1,64 +1,124 @@
 ---
-source: src/rules/flake8_django/mod.rs
+source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
     ModelStringFieldNullable: CharField
   location:
-    row: 5
+    row: 6
     column: 16
   end_location:
-    row: 5
+    row: 6
     column: 59
   fix: ~
   parent: ~
 - kind:
     ModelStringFieldNullable: TextField
   location:
-    row: 6
+    row: 7
     column: 16
   end_location:
-    row: 6
+    row: 7
     column: 59
   fix: ~
   parent: ~
 - kind:
     ModelStringFieldNullable: SlugField
   location:
-    row: 7
+    row: 8
     column: 16
   end_location:
-    row: 7
+    row: 8
     column: 59
   fix: ~
   parent: ~
 - kind:
     ModelStringFieldNullable: EmailField
   location:
-    row: 8
+    row: 9
     column: 17
   end_location:
-    row: 8
+    row: 9
     column: 61
   fix: ~
   parent: ~
 - kind:
     ModelStringFieldNullable: FilePathField
   location:
-    row: 9
+    row: 10
     column: 20
   end_location:
-    row: 9
+    row: 10
     column: 67
   fix: ~
   parent: ~
 - kind:
     ModelStringFieldNullable: URLField
   location:
-    row: 10
+    row: 11
     column: 15
   end_location:
-    row: 10
+    row: 11
+    column: 57
+  fix: ~
+  parent: ~
+- kind:
+    ModelStringFieldNullable: CharField
+  location:
+    row: 15
+    column: 16
+  end_location:
+    row: 15
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    ModelStringFieldNullable: TextField
+  location:
+    row: 16
+    column: 16
+  end_location:
+    row: 16
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    ModelStringFieldNullable: SlugField
+  location:
+    row: 17
+    column: 16
+  end_location:
+    row: 17
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    ModelStringFieldNullable: EmailField
+  location:
+    row: 18
+    column: 17
+  end_location:
+    row: 18
+    column: 61
+  fix: ~
+  parent: ~
+- kind:
+    ModelStringFieldNullable: FilePathField
+  location:
+    row: 19
+    column: 20
+  end_location:
+    row: 19
+    column: 67
+  fix: ~
+  parent: ~
+- kind:
+    ModelStringFieldNullable: URLField
+  location:
+    row: 20
+    column: 15
+  end_location:
+    row: 20
     column: 57
   fix: ~
   parent: ~

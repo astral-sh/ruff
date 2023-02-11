@@ -1,7 +1,17 @@
+from django.db.models import Model as DjangoModel
 from django.db import models
 
 
 class IncorrectModel(models.Model):
+    charfield = models.CharField(max_length=255, null=True)
+    textfield = models.TextField(max_length=255, null=True)
+    slugfield = models.SlugField(max_length=255, null=True)
+    emailfield = models.EmailField(max_length=255, null=True)
+    filepathfield = models.FilePathField(max_length=255, null=True)
+    urlfield = models.URLField(max_length=255, null=True)
+
+
+class IncorrectModelWithAliasedBase(DjangoModel):
     charfield = models.CharField(max_length=255, null=True)
     textfield = models.TextField(max_length=255, null=True)
     slugfield = models.SlugField(max_length=255, null=True)
