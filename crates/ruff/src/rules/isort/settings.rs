@@ -146,8 +146,7 @@ pub struct Options {
         "#
     )]
     /// A list of modules to consider being a local folder.
-    /// Generally, this is reserved for relative
-    /// imports (from . import module).
+    /// Generally, this is reserved for relative imports (`from . import module`).
     pub known_local_folder: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -233,7 +232,7 @@ pub struct Options {
         "#
     )]
     /// The number of blank lines to place after imports.
-    /// -1 for automatic determination.
+    /// Use `-1` for automatic determination.
     pub lines_after_imports: Option<isize>,
     #[option(
         default = r#"0"#,
@@ -243,7 +242,7 @@ pub struct Options {
             lines-between-types = 1
         "#
     )]
-    /// The number of lines to place between direct and from imports.
+    /// The number of lines to place between "direct" and `import from` imports.
     pub lines_between_types: Option<usize>,
     #[option(
         default = r#"[]"#,

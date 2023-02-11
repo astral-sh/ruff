@@ -965,7 +965,7 @@
           }
         },
         "known-local-folder": {
-          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (from . import module).",
+          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (`from . import module`).",
           "type": [
             "array",
             "null"
@@ -985,7 +985,7 @@
           }
         },
         "lines-after-imports": {
-          "description": "The number of blank lines to place after imports. -1 for automatic determination.",
+          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.",
           "type": [
             "integer",
             "null"
@@ -993,7 +993,7 @@
           "format": "int"
         },
         "lines-between-types": {
-          "description": "The number of lines to place between direct and from imports.",
+          "description": "The number of lines to place between \"direct\" and `import from` imports.",
           "type": [
             "integer",
             "null"

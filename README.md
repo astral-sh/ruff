@@ -3480,8 +3480,7 @@ known-first-party = ["src"]
 #### [`known-local-folder`](#known-local-folder)
 
 A list of modules to consider being a local folder.
-Generally, this is reserved for relative
-imports (from . import module).
+Generally, this is reserved for relative imports (`from . import module`).
 
 **Default value**: `[]`
 
@@ -3517,7 +3516,7 @@ known-third-party = ["src"]
 #### [`lines-after-imports`](#lines-after-imports)
 
 The number of blank lines to place after imports.
--1 for automatic determination.
+Use `-1` for automatic determination.
 
 **Default value**: `-1`
 
@@ -3535,7 +3534,7 @@ lines-after-imports = 1
 
 #### [`lines-between-types`](#lines-between-types)
 
-The number of lines to place between direct and from imports.
+The number of lines to place between "direct" and `import from` imports.
 
 **Default value**: `0`
 
