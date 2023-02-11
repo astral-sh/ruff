@@ -2758,6 +2758,7 @@ where
                 {
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(
                         self,
+                        expr,
                         func,
                         self.current_expr_parent().map(Into::into),
                     );

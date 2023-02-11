@@ -9,15 +9,8 @@ expression: diagnostics
     column: 9
   end_location:
     row: 6
-    column: 18
-  fix:
-    content: Path.cwd
-    location:
-      row: 6
-      column: 9
-    end_location:
-      row: 6
-      column: 18
+    column: 20
+  fix: ~
   parent: ~
 - kind:
     PathlibGetcwd: ~
@@ -26,15 +19,8 @@ expression: diagnostics
     column: 4
   end_location:
     row: 10
-    column: 14
-  fix:
-    content: Path.cwd
-    location:
-      row: 9
-      column: 4
-    end_location:
-      row: 10
-      column: 14
+    column: 16
+  fix: ~
   parent: ~
 - kind:
     PathlibGetcwd: ~
@@ -43,15 +29,8 @@ expression: diagnostics
     column: 4
   end_location:
     row: 14
-    column: 14
-  fix:
-    content: Path.cwd
-    location:
-      row: 14
-      column: 4
-    end_location:
-      row: 14
-      column: 14
+    column: 16
+  fix: ~
   parent: ~
 - kind:
     PathlibGetcwd: ~
@@ -60,14 +39,24 @@ expression: diagnostics
     column: 9
   end_location:
     row: 18
-    column: 18
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    PathlibAbspath: ~
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 33
   fix:
-    content: Path.cwd
+    content: "Path(\"../../hello.py\").resolve()"
     location:
-      row: 18
-      column: 9
+      row: 21
+      column: 0
     end_location:
-      row: 18
-      column: 18
+      row: 21
+      column: 33
   parent: ~
 

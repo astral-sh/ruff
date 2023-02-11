@@ -1,27 +1,28 @@
-# pathlib-getcwd (PTH109)
+# pathlib-readlink (PTH115)
 
 Derived from the **flake8-use-pathlib** linter.
 
 Autofix is sometimes available.
 
 ## What is does
-Detects the use of `os.getcwd` and `os.getcwdb`.
+Detects the use of `os.readlink`.
 Autofix is available when the `pathlib` module is imported.
 
 ## Why is this bad?
-A modern alternative to `os.getcwd()` is the `Path.cwd()` function
+A modern alternative to `os.readlink(x)` is the `Path(x).readlink()` function
 
 ## Examples
 ```python
-cwd = os.getcwd()
+link = os.readlink(x)
 ```
 
 Use instead:
 ```python
-cwd = Path.cwd()
+link = Path(x).readlink()
 ```
 
 ## Options
+* `target-version`
 * `isort.required-imports`
 
 ## References

@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_use_pathlib/mod.rs
+source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -9,7 +9,7 @@ expression: diagnostics
     column: 4
   end_location:
     row: 3
-    column: 8
+    column: 16
   fix: ~
   parent: ~
 

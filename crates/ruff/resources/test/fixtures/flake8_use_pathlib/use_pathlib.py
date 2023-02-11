@@ -16,3 +16,6 @@ _ = Path(
 
 # should not be unwrapped
 _ = Path(os.getcwd(), hello='world')
+
+# other cases
+os.path.abspath("../../hello.py")

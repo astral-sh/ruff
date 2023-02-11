@@ -14,10 +14,15 @@ use crate::rules::flake8_use_pathlib::violations::{
 };
 use crate::settings::types::PythonVersion;
 
-pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr, parent: Option<&Expr>) {
+pub fn replaceable_by_pathlib(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    parent: Option<&Expr>,
+) {
     if let Some(diagnostic_kind) =
         checker
-            .resolve_call_path(expr)
+            .resolve_call_path(func)
             .and_then(|call_path| match call_path.as_slice() {
                 ["os", "path", "abspath"] => Some(PathlibAbspath.into()),
                 ["os", "chmod"] => Some(PathlibChmod.into()),
@@ -58,7 +63,7 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr, parent: Option
         let mut diagnostic =
             Diagnostic::new::<DiagnosticKind>(diagnostic_kind, Range::from_located(expr));
         if checker.patch(diagnostic.kind.rule()) {
-            if let Some(fix) = pathlib_fix(checker, &diagnostic.kind, expr, parent) {
+            if let Some(fix) = pathlib_fix(checker, &diagnostic.kind, expr, func, parent) {
                 diagnostic.amend(fix);
             }
         }

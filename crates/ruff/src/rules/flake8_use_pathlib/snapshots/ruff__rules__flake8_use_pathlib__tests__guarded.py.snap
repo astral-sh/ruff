@@ -9,7 +9,7 @@ expression: diagnostics
     column: 4
   end_location:
     row: 8
-    column: 19
+    column: 22
   fix: ~
   parent: ~
 - kind:
@@ -19,7 +19,7 @@ expression: diagnostics
     column: 5
   end_location:
     row: 9
-    column: 13
+    column: 16
   fix: ~
   parent: ~
 - kind:
@@ -29,7 +29,7 @@ expression: diagnostics
     column: 6
   end_location:
     row: 10
-    column: 14
+    column: 17
   fix: ~
   parent: ~
 - kind:
@@ -39,7 +39,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 11
-    column: 11
+    column: 14
   fix: ~
   parent: ~
 - kind:
@@ -49,7 +49,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 12
-    column: 9
+    column: 12
   fix: ~
   parent: ~
 - kind:
@@ -59,7 +59,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 13
-    column: 10
+    column: 13
   fix: ~
   parent: ~
 - kind:
@@ -69,7 +69,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 14
-    column: 8
+    column: 11
   fix: ~
   parent: ~
 - kind:
@@ -79,7 +79,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 15
-    column: 9
+    column: 12
   fix: ~
   parent: ~
 - kind:
@@ -89,7 +89,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 16
-    column: 9
+    column: 12
   fix: ~
   parent: ~
 - kind:
@@ -99,7 +99,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 17
-    column: 9
+    column: 12
   fix: ~
   parent: ~
 - kind:
@@ -109,7 +109,7 @@ expression: diagnostics
     column: 4
   end_location:
     row: 18
-    column: 18
+    column: 21
   fix: ~
   parent: ~
 - kind:
@@ -119,7 +119,7 @@ expression: diagnostics
     column: 5
   end_location:
     row: 19
-    column: 23
+    column: 26
   fix: ~
   parent: ~
 - kind:
@@ -129,7 +129,7 @@ expression: diagnostics
     column: 6
   end_location:
     row: 20
-    column: 19
+    column: 22
   fix: ~
   parent: ~
 - kind:
@@ -139,7 +139,7 @@ expression: diagnostics
     column: 7
   end_location:
     row: 21
-    column: 21
+    column: 24
   fix: ~
   parent: ~
 - kind:
@@ -149,7 +149,7 @@ expression: diagnostics
     column: 8
   end_location:
     row: 22
-    column: 22
+    column: 25
   fix: ~
   parent: ~
 - kind:
@@ -159,7 +159,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 23
-    column: 11
+    column: 14
   fix: ~
   parent: ~
 - kind:
@@ -169,7 +169,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 24
-    column: 7
+    column: 10
   fix: ~
   parent: ~
 - kind:
@@ -179,7 +179,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 25
-    column: 13
+    column: 16
   fix: ~
   parent: ~
 - kind:
@@ -189,7 +189,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 26
-    column: 12
+    column: 15
   fix: ~
   parent: ~
 - kind:
@@ -199,7 +199,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 27
-    column: 16
+    column: 19
   fix: ~
   parent: ~
 - kind:
@@ -209,7 +209,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 28
-    column: 15
+    column: 18
   fix: ~
   parent: ~
 - kind:
@@ -219,7 +219,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 29
-    column: 16
+    column: 19
   fix: ~
   parent: ~
 - kind:
@@ -229,7 +229,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 30
-    column: 16
+    column: 19
   fix: ~
   parent: ~
 - kind:
@@ -239,7 +239,7 @@ expression: diagnostics
     column: 5
   end_location:
     row: 31
-    column: 9
+    column: 12
   fix: ~
   parent: ~
 - kind:
@@ -249,7 +249,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 33
-    column: 4
+    column: 7
   fix: ~
   parent: ~
 - kind:
@@ -259,7 +259,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 34
-    column: 10
+    column: 13
   fix: ~
   parent: ~
 

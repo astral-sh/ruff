@@ -7,9 +7,15 @@ define_violation!(
     pub struct PathlibAbspath;
 );
 impl Violation for PathlibAbspath {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.abspath` should be replaced by `.resolve()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibAbspath| format!("Replace `os.path.abspath(x)` with `Path(x).resolve()`"))
     }
 }
 
@@ -18,9 +24,15 @@ define_violation!(
     pub struct PathlibChmod;
 );
 impl Violation for PathlibChmod {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.chmod` should be replaced by `.chmod()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibChmod| format!("Replace `os.chmod(x, y)` with `Path(x).chmod(y)`"))
     }
 }
 
@@ -40,9 +52,15 @@ define_violation!(
     pub struct PathlibMkdir;
 );
 impl Violation for PathlibMkdir {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.mkdir` should be replaced by `.mkdir()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibMkdir| format!("Replace `os.mkdir(x)` with `Path(x).mkdir()`"))
     }
 }
 
@@ -51,9 +69,15 @@ define_violation!(
     pub struct PathlibRename;
 );
 impl Violation for PathlibRename {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.rename` should be replaced by `.rename()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibRename| format!("Replace `os.rename(x, y)` with `Path(x).rename(y)`"))
     }
 }
 
@@ -62,9 +86,15 @@ define_violation!(
     pub struct PathlibReplace;
 );
 impl Violation for PathlibReplace {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.replace`should be replaced by `.replace()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibReplace| format!("Replace `os.replace(x, y)` with `Path(x).replace(y)`"))
     }
 }
 
@@ -73,9 +103,15 @@ define_violation!(
     pub struct PathlibRmdir;
 );
 impl Violation for PathlibRmdir {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.rmdir` should be replaced by `.rmdir()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibRmdir| format!("Replace `os.rmdir(x)` with `Path(x).rmdir()`"))
     }
 }
 
@@ -84,9 +120,15 @@ define_violation!(
     pub struct PathlibRemove;
 );
 impl Violation for PathlibRemove {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.remove` should be replaced by `.unlink()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibRemove| format!("Replace `os.remove(x)` with `Path(x).unlink()`"))
     }
 }
 
@@ -95,9 +137,15 @@ define_violation!(
     pub struct PathlibUnlink;
 );
 impl Violation for PathlibUnlink {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.unlink` should be replaced by `.unlink()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibUnlink| format!("Replace `os.unlink(x)` with `Path(x).unlink()`"))
     }
 }
 
@@ -119,6 +167,9 @@ define_violation!(
     /// ```python
     /// cwd = Path.cwd()
     /// ```
+    ///
+    /// ## Options
+    /// * `isort.required-imports`
     ///
     /// ## References
     /// * [PEP 428](https://peps.python.org/pep-0428/)
@@ -146,9 +197,15 @@ define_violation!(
     pub struct PathlibExists;
 );
 impl Violation for PathlibExists {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.exists` should be replaced by `.exists()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibExists| format!("Replace `os.path.exists(x)` with `Path(x).exists()`"))
     }
 }
 
@@ -157,9 +214,17 @@ define_violation!(
     pub struct PathlibExpanduser;
 );
 impl Violation for PathlibExpanduser {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.expanduser` should be replaced by `.expanduser()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibExpanduser| {
+            format!("Replace `os.path.expanduser(x)` with `Path(x).expanduser()`")
+        })
     }
 }
 
@@ -168,9 +233,15 @@ define_violation!(
     pub struct PathlibIsDir;
 );
 impl Violation for PathlibIsDir {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.isdir` should be replaced by `.is_dir()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibIsDir| format!("Replace `os.path.isdir(x)` with `Path(x).is_dir()`"))
     }
 }
 
@@ -179,9 +250,15 @@ define_violation!(
     pub struct PathlibIsFile;
 );
 impl Violation for PathlibIsFile {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.isfile` should be replaced by `.is_file()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibIsFile| format!("Replace `os.path.isfile(x)` with `Path(x).is_file()`"))
     }
 }
 
@@ -190,20 +267,59 @@ define_violation!(
     pub struct PathlibIsLink;
 );
 impl Violation for PathlibIsLink {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.islink` should be replaced by `.is_symlink()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibIsLink| format!("Replace `os.path.islink(x)` with `Path(x).is_symlink()`"))
     }
 }
 
 // PTH115
 define_violation!(
+    /// ## What is does
+    /// Detects the use of `os.readlink`.
+    /// Autofix is available when the `pathlib` module is imported.
+    ///
+    /// ## Why is this bad?
+    /// A modern alternative to `os.readlink(x)` is the `Path(x).readlink()` function
+    ///
+    /// ## Examples
+    /// ```python
+    /// link = os.readlink(x)
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// link = Path(x).readlink()
+    /// ```
+    ///
+    /// ## Options
+    /// * `target-version`
+    /// * `isort.required-imports`
+    ///
+    /// ## References
+    /// * [PEP 428](https://peps.python.org/pep-0428/)
+    /// * [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+    /// * [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
+    /// * [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
+
     pub struct PathlibReadlink;
 );
 impl Violation for PathlibReadlink {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.readlink` should be replaced by `.readlink()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibReadlink| format!("Replace `os.readlink(x)` with `Path(x).readlink()`"))
     }
 }
 
@@ -223,9 +339,15 @@ define_violation!(
     pub struct PathlibIsAbs;
 );
 impl Violation for PathlibIsAbs {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.isabs` should be replaced by `.is_absolute()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibIsAbs| format!("Replace `os.path.isabs(x)` with `Path(x).is_absolute()`"))
     }
 }
 
@@ -267,9 +389,17 @@ define_violation!(
     pub struct PathlibSamefile;
 );
 impl Violation for PathlibSamefile {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.samefile` should be replaced by `.samefile()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibSamefile| {
+            format!("Replace `os.path.samefile(x, y)` with `Path(x).samefile(y)`")
+        })
     }
 }
 
@@ -306,7 +436,6 @@ impl Violation for PathlibPyPath {
     }
 }
 
-// TODO: add documentation
 // PTH201
 define_violation!(
     pub struct PathlibGetsize;

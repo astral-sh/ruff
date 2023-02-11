@@ -9,8 +9,15 @@ expression: diagnostics
     column: 4
   end_location:
     row: 7
-    column: 17
-  fix: ~
+    column: 20
+  fix:
+    content: pth.Path(p).resolve()
+    location:
+      row: 7
+      column: 4
+    end_location:
+      row: 7
+      column: 20
   parent: ~
 - kind:
     PathlibChmod: ~
@@ -19,8 +26,15 @@ expression: diagnostics
     column: 5
   end_location:
     row: 8
-    column: 14
-  fix: ~
+    column: 17
+  fix:
+    content: pth.Path(p).chmod()
+    location:
+      row: 8
+      column: 5
+    end_location:
+      row: 8
+      column: 17
   parent: ~
 - kind:
     PathlibMkdir: ~
@@ -29,8 +43,15 @@ expression: diagnostics
     column: 6
   end_location:
     row: 9
-    column: 15
-  fix: ~
+    column: 18
+  fix:
+    content: pth.Path(p).mkdir()
+    location:
+      row: 9
+      column: 6
+    end_location:
+      row: 9
+      column: 18
   parent: ~
 - kind:
     PathlibMakedirs: ~
@@ -39,7 +60,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 10
-    column: 12
+    column: 15
   fix: ~
   parent: ~
 - kind:
@@ -49,8 +70,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 11
-    column: 10
-  fix: ~
+    column: 13
+  fix:
+    content: pth.Path(p).rename()
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 13
   parent: ~
 - kind:
     PathlibReplace: ~
@@ -59,8 +87,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 12
-    column: 11
-  fix: ~
+    column: 14
+  fix:
+    content: pth.Path(p).replace()
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 12
+      column: 14
   parent: ~
 - kind:
     PathlibRmdir: ~
@@ -69,8 +104,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 13
-    column: 9
-  fix: ~
+    column: 12
+  fix:
+    content: pth.Path(p).rmdir()
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 12
   parent: ~
 - kind:
     PathlibRemove: ~
@@ -79,8 +121,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 14
-    column: 10
-  fix: ~
+    column: 13
+  fix:
+    content: pth.Path(p).unlink()
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 14
+      column: 13
   parent: ~
 - kind:
     PathlibUnlink: ~
@@ -89,8 +138,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 15
-    column: 10
-  fix: ~
+    column: 13
+  fix:
+    content: pth.Path(p).unlink()
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 13
   parent: ~
 - kind:
     PathlibGetcwd: ~
@@ -99,15 +155,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 16
-    column: 10
+    column: 13
   fix:
-    content: pth.Path.cwd
+    content: pth.Path(p).cwd()
     location:
       row: 16
       column: 0
     end_location:
       row: 16
-      column: 10
+      column: 13
   parent: ~
 - kind:
     PathlibExists: ~
@@ -116,8 +172,15 @@ expression: diagnostics
     column: 4
   end_location:
     row: 17
-    column: 16
-  fix: ~
+    column: 19
+  fix:
+    content: pth.Path(p).exists()
+    location:
+      row: 17
+      column: 4
+    end_location:
+      row: 17
+      column: 19
   parent: ~
 - kind:
     PathlibExpanduser: ~
@@ -126,8 +189,15 @@ expression: diagnostics
     column: 5
   end_location:
     row: 18
-    column: 21
-  fix: ~
+    column: 24
+  fix:
+    content: pth.Path(p).expanduser()
+    location:
+      row: 18
+      column: 5
+    end_location:
+      row: 18
+      column: 24
   parent: ~
 - kind:
     PathlibIsDir: ~
@@ -136,8 +206,15 @@ expression: diagnostics
     column: 6
   end_location:
     row: 19
-    column: 17
-  fix: ~
+    column: 20
+  fix:
+    content: pth.Path(p).is_dir()
+    location:
+      row: 19
+      column: 6
+    end_location:
+      row: 19
+      column: 20
   parent: ~
 - kind:
     PathlibIsFile: ~
@@ -146,8 +223,15 @@ expression: diagnostics
     column: 7
   end_location:
     row: 20
-    column: 19
-  fix: ~
+    column: 22
+  fix:
+    content: pth.Path(p).is_file()
+    location:
+      row: 20
+      column: 7
+    end_location:
+      row: 20
+      column: 22
   parent: ~
 - kind:
     PathlibIsLink: ~
@@ -156,8 +240,15 @@ expression: diagnostics
     column: 8
   end_location:
     row: 21
-    column: 20
-  fix: ~
+    column: 23
+  fix:
+    content: pth.Path(p).is_symlink()
+    location:
+      row: 21
+      column: 8
+    end_location:
+      row: 21
+      column: 23
   parent: ~
 - kind:
     PathlibReadlink: ~
@@ -166,8 +257,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 22
-    column: 12
-  fix: ~
+    column: 15
+  fix:
+    content: pth.Path(p).readlink()
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 22
+      column: 15
   parent: ~
 - kind:
     PathlibStat: ~
@@ -176,7 +274,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 23
-    column: 8
+    column: 11
   fix: ~
   parent: ~
 - kind:
@@ -186,8 +284,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 24
-    column: 11
-  fix: ~
+    column: 14
+  fix:
+    content: pth.Path(p).is_absolute()
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 24
+      column: 14
   parent: ~
 - kind:
     PathlibJoin: ~
@@ -196,7 +301,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 25
-    column: 10
+    column: 13
   fix: ~
   parent: ~
 - kind:
@@ -206,7 +311,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 26
-    column: 14
+    column: 17
   fix: ~
   parent: ~
 - kind:
@@ -216,7 +321,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 27
-    column: 13
+    column: 16
   fix: ~
   parent: ~
 - kind:
@@ -226,8 +331,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 28
-    column: 14
-  fix: ~
+    column: 17
+  fix:
+    content: pth.Path(p).samefile()
+    location:
+      row: 28
+      column: 0
+    end_location:
+      row: 28
+      column: 17
   parent: ~
 - kind:
     PathlibSplitext: ~
@@ -236,7 +348,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 29
-    column: 14
+    column: 17
   fix: ~
   parent: ~
 
