@@ -1,45 +1,188 @@
 ---
-source: src/rules/flake8_tidy_imports/relative_imports.rs
+source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 expression: diagnostics
 ---
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
-    row: 4
+    row: 9
     column: 0
   end_location:
-    row: 4
+    row: 9
     column: 21
-  fix: ~
+  fix:
+    content:
+      - from test import parent
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 21
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
-    row: 5
+    row: 10
     column: 0
   end_location:
-    row: 5
+    row: 10
     column: 28
-  fix: ~
+  fix:
+    content:
+      - from test.parent import example
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 28
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
-    row: 7
+    row: 11
     column: 0
   end_location:
-    row: 7
+    row: 11
     column: 27
+  fix:
+    content:
+      - from resources import grandparent
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 27
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 34
+  fix:
+    content:
+      - from resources.grandparent import example
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 12
+      column: 34
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 20
+    column: 15
+  fix:
+    content:
+      - from test.parent import world_hello
+    location:
+      row: 17
+      column: 0
+    end_location:
+      row: 20
+      column: 15
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 23
+    column: 34
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
-    row: 8
+    row: 24
     column: 0
   end_location:
-    row: 8
-    column: 34
+    row: 24
+    column: 35
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 25
+    column: 0
+  end_location:
+    row: 25
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 26
+    column: 38
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 27
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 28
+    column: 0
+  end_location:
+    row: 28
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 29
+    column: 0
+  end_location:
+    row: 29
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 30
+    column: 0
+  end_location:
+    row: 30
+    column: 62
   fix: ~
   parent: ~
 
