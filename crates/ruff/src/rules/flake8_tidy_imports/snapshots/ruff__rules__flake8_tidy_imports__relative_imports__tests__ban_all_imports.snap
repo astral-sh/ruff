@@ -3,7 +3,8 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 expression: diagnostics
 ---
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 7
     column: 0
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 8
     column: 0
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 9
     column: 0
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 10
     column: 0
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 11
     column: 0
@@ -93,7 +98,8 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 12
     column: 0
@@ -111,7 +117,8 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 13
     column: 0
@@ -129,7 +136,8 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 14
     column: 0
@@ -147,7 +155,8 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 17
     column: 0
@@ -165,7 +174,8 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 23
     column: 0
@@ -175,7 +185,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 24
     column: 0
@@ -185,7 +196,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 25
     column: 0
@@ -195,7 +207,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 26
     column: 0
@@ -205,7 +218,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 27
     column: 0
@@ -215,7 +229,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 28
     column: 0
@@ -225,7 +240,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 29
     column: 0
@@ -235,7 +251,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: all
+    RelativeImports:
+      strictness: all
   location:
     row: 30
     column: 0

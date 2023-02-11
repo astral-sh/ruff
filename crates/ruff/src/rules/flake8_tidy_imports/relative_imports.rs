@@ -1,10 +1,11 @@
 use std::path::Path;
 
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::string::is_lower_with_underscore;
 use rustpython_parser::ast::{Stmt, StmtKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::string::is_lower_with_underscore;
 
 use crate::ast::helpers::{create_stmt, unparse_stmt};
 use crate::ast::types::Range;
@@ -31,24 +32,53 @@ define_violation!(
     /// Checks for relative imports.
     ///
     /// ## Why is this bad?
-    /// According to [PEP8](https://peps.python.org/pep-0008/#imports):
-    /// > Absolute imports are recommended, as they are usually more readable and tend to be better behaved.
-    pub struct RelativeImports(pub Strictness);
+    /// Absolute imports, or relative imports from siblings, are recommended by [PEP 8](https://peps.python.org/pep-0008/#imports):
+    ///
+    /// > Absolute imports are recommended, as they are usually more readable and tend to be better behaved...
+    /// > ```python
+    /// > import mypkg.sibling
+    /// > from mypkg import sibling
+    /// > from mypkg.sibling import example
+    /// > ```
+    /// > However, explicit relative imports are an acceptable alternative to absolute imports,
+    /// > especially when dealing with complex package layouts where using absolute imports would be
+    /// > unnecessarily verbose:
+    /// > ```python
+    /// > from . import sibling
+    /// > from .sibling import example
+    /// > ```
+    ///
+    /// Note that degree of strictness packages can be specified via the
+    /// [`strictness`](https://github.com/charliermarsh/ruff#strictness)
+    /// configuration option, which allows banning all relative imports (`strictness = "all"`)
+    /// or only those that extend into the parent module or beyond (`strictness = "parents"`).
+    ///
+    /// ## Example
+    /// ```python
+    /// from .. import foo
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// from mypkg import foo
+    /// ```
+    pub struct RelativeImports {
+        pub strictness: Strictness,
+    }
 );
 impl Violation for RelativeImports {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RelativeImports(strictness) = self;
-        match strictness {
+        match self.strictness {
             Strictness::Parents => format!("Relative imports from parent modules are banned"),
             Strictness::All => format!("Relative imports are banned"),
         }
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|RelativeImports(strictness)| match strictness {
+        Some(|RelativeImports { strictness }| match strictness {
             Strictness::Parents => {
                 format!("Replace relative imports from parent modules with absolute imports")
             }
@@ -57,12 +87,12 @@ impl Violation for RelativeImports {
     }
 }
 
-pub fn fix_banned_relative_import(
-    stylist: &Stylist,
+fn fix_banned_relative_import(
     stmt: &Stmt,
     level: Option<&usize>,
     module: Option<&str>,
     path: &Path,
+    stylist: &Stylist,
 ) -> Option<Fix> {
     let base = if let Some(module) = module {
         module.to_string()
@@ -77,7 +107,7 @@ pub fn fix_banned_relative_import(
 
     let module_name = parent.file_name()?.to_string_lossy().to_string();
 
-    // Require import to be a valid PEP8 module:
+    // Require import to be a valid PEP 8 module:
     // https://python.org/dev/peps/pep-0008/#package-and-module-names
     if !is_lower_with_underscore(module_name.as_str()) {
         return None;
@@ -123,12 +153,14 @@ pub fn banned_relative_import(
     };
     if level? > &strictness_level {
         let mut diagnostic = Diagnostic::new(
-            RelativeImports(strictness.clone()),
+            RelativeImports {
+                strictness: strictness.clone(),
+            },
             Range::from_located(stmt),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) =
-                fix_banned_relative_import(checker.stylist, stmt, level, module, path)
+                fix_banned_relative_import(stmt, level, module, path, checker.stylist)
             {
                 diagnostic.amend(fix);
             };
@@ -145,11 +177,12 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::Strictness;
     use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
+
+    use super::Strictness;
 
     #[test]
     fn ban_parent_imports() -> Result<()> {

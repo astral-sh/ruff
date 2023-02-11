@@ -1,9 +1,9 @@
-# ok
+# OK
 import other
 import other.example
 from other import example
 
-# error
+# TID252
 from . import sibling
 from .sibling import example
 from .. import parent
@@ -19,7 +19,7 @@ from \
     import \
     world_hello
 
-# detected, no autofix: too many levels up
+# TID252 (without autofix; too many levels up)
 from ..... import ultragrantparent
 from ...... import ultragrantparent
 from ....... import ultragrantparent

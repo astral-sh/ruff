@@ -3,7 +3,8 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 expression: diagnostics
 ---
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 9
     column: 0
@@ -21,7 +22,8 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 10
     column: 0
@@ -39,7 +41,8 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 11
     column: 0
@@ -57,7 +60,8 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 12
     column: 0
@@ -75,7 +79,8 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 17
     column: 0
@@ -93,7 +98,8 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 23
     column: 0
@@ -103,7 +109,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 24
     column: 0
@@ -113,7 +120,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 25
     column: 0
@@ -123,7 +131,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 26
     column: 0
@@ -133,7 +142,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 27
     column: 0
@@ -143,7 +153,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 28
     column: 0
@@ -153,7 +164,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 29
     column: 0
@@ -163,7 +175,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports: parents
+    RelativeImports:
+      strictness: parents
   location:
     row: 30
     column: 0
