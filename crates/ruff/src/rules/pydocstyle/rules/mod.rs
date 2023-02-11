@@ -10,7 +10,7 @@ pub use blank_before_after_function::{
 pub use capitalized::{capitalized, FirstLineCapitalized};
 pub use ends_with_period::{ends_with_period, EndsInPeriod};
 pub use ends_with_punctuation::{ends_with_punctuation, EndsInPunctuation};
-pub use if_needed::{if_needed, SkipDocstring};
+pub use if_needed::{if_needed, OverloadWithDocstring};
 pub use indent::{indent, IndentWithSpaces, NoOverIndentation, NoUnderIndentation};
 pub use multi_line_summary_start::{
     multi_line_summary_start, MultiLineSummaryFirstLine, MultiLineSummarySecondLine,
@@ -19,7 +19,7 @@ pub use newline_after_last_paragraph::{newline_after_last_paragraph, NewLineAfte
 pub use no_signature::{no_signature, NoSignature};
 pub use no_surrounding_whitespace::{no_surrounding_whitespace, NoSurroundingWhitespace};
 pub use non_imperative_mood::{non_imperative_mood, NonImperativeMood};
-pub use not_empty::{not_empty, NonEmpty};
+pub use not_empty::{not_empty, EmptyDocstring};
 pub use not_missing::{
     not_missing, MagicMethod, PublicClass, PublicFunction, PublicInit, PublicMethod, PublicModule,
     PublicNestedClass, PublicPackage,
@@ -27,12 +27,12 @@ pub use not_missing::{
 pub use one_liner::{one_liner, FitsOnOneLine};
 pub use sections::{
     sections, BlankLineAfterLastSection, BlankLineAfterSection, BlankLineBeforeSection,
-    CapitalizeSectionName, DashedUnderlineAfterSection, DocumentAllArguments,
-    NewLineAfterSectionName, NoBlankLinesBetweenHeaderAndContent, NonEmptySection,
-    SectionNameEndsInColon, SectionNotOverIndented, SectionUnderlineAfterName,
-    SectionUnderlineMatchesSectionLength, SectionUnderlineNotOverIndented,
+    CapitalizeSectionName, DashedUnderlineAfterSection, EmptyDocstringSection,
+    NewLineAfterSectionName, NoBlankLinesBetweenHeaderAndContent, SectionNameEndsInColon,
+    SectionNotOverIndented, SectionUnderlineAfterName, SectionUnderlineMatchesSectionLength,
+    SectionUnderlineNotOverIndented, UndocumentedParam,
 };
-pub use starts_with_this::{starts_with_this, NoThisPrefix};
+pub use starts_with_this::{starts_with_this, DocstringStartsWithThis};
 pub use triple_quotes::{triple_quotes, TripleSingleQuotes};
 
 mod backslashes;

@@ -818,7 +818,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
 | D403 | first-line-capitalized | First word of the first line should be properly capitalized |  |
-| D404 | no-this-prefix | First word of the docstring should not be "This" |  |
+| D404 | docstring-starts-with-this | First word of the docstring should not be "This" |  |
 | D405 | capitalize-section-name | Section name should be properly capitalized ("{name}") | 🛠 |
 | D406 | new-line-after-section-name | Section name should end with a newline ("{name}") | 🛠 |
 | D407 | dashed-underline-after-section | Missing dashed underline after section ("{name}") | 🛠 |
@@ -828,12 +828,12 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D411 | blank-line-before-section | Missing blank line before section ("{name}") | 🛠 |
 | D412 | no-blank-lines-between-header-and-content | No blank lines allowed between a section header and its content ("{name}") | 🛠 |
 | D413 | blank-line-after-last-section | Missing blank line after last section ("{name}") | 🛠 |
-| D414 | non-empty-section | Section has no content ("{name}") |  |
+| D414 | empty-docstring-section | Section has no content ("{name}") |  |
 | D415 | ends-in-punctuation | First line should end with a period, question mark, or exclamation point | 🛠 |
 | D416 | section-name-ends-in-colon | Section name should end with a colon ("{name}") | 🛠 |
-| D417 | document-all-arguments | Missing argument description in the docstring: `{name}` |  |
-| D418 | skip-docstring | Function decorated with `@overload` shouldn't contain a docstring |  |
-| D419 | non-empty | Docstring is empty |  |
+| D417 | undocumented-param | Missing argument description in the docstring: `{name}` |  |
+| D418 | overload-with-docstring | Function decorated with `@overload` shouldn't contain a docstring |  |
+| D419 | empty-docstring | Docstring is empty |  |
 
 ### pyupgrade (UP)
 
