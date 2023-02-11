@@ -566,7 +566,7 @@ where
                     flake8_return::rules::function(self, body);
                 }
 
-                if self.settings.rules.enabled(&Rule::FunctionIsTooComplex) {
+                if self.settings.rules.enabled(&Rule::ComplexStructure) {
                     if let Some(diagnostic) = mccabe::rules::function_is_too_complex(
                         stmt,
                         name,

@@ -203,7 +203,7 @@ ruff_macros::define_rule_mapping!(
     // flake8-debugger
     T100 => rules::flake8_debugger::rules::Debugger,
     // mccabe
-    C901 => rules::mccabe::rules::FunctionIsTooComplex,
+    C901 => rules::mccabe::rules::ComplexStructure,
     // flake8-tidy-imports
     TID251 => rules::flake8_tidy_imports::banned_api::BannedApi,
     TID252 => rules::flake8_tidy_imports::relative_imports::RelativeImports,
