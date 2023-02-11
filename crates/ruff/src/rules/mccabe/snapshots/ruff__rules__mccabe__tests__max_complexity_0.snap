@@ -1,9 +1,9 @@
 ---
-source: src/rules/mccabe/mod.rs
+source: crates/ruff/src/rules/mccabe/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: trivial
       complexity: 1
   location:
@@ -15,7 +15,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: expr_as_statement
       complexity: 1
   location:
@@ -27,7 +27,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: sequential
       complexity: 1
   location:
@@ -39,7 +39,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: if_elif_else_dead_path
       complexity: 3
   location:
@@ -51,7 +51,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: nested_ifs
       complexity: 3
   location:
@@ -63,7 +63,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: for_loop
       complexity: 2
   location:
@@ -75,7 +75,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: for_else
       complexity: 2
   location:
@@ -87,7 +87,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: recursive
       complexity: 2
   location:
@@ -99,7 +99,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: nested_functions
       complexity: 3
   location:
@@ -111,7 +111,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: a
       complexity: 2
   location:
@@ -123,7 +123,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: b
       complexity: 1
   location:
@@ -135,7 +135,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: try_else
       complexity: 4
   location:
@@ -147,7 +147,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: nested_try_finally
       complexity: 3
   location:
@@ -159,7 +159,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: foobar
       complexity: 3
   location:
@@ -171,7 +171,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: annotated_assign
       complexity: 1
   location:
@@ -183,7 +183,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: handle
       complexity: 9
   location:
@@ -195,7 +195,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: a
       complexity: 1
   location:
@@ -207,7 +207,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: b
       complexity: 2
   location:
@@ -219,7 +219,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: c
       complexity: 1
   location:
@@ -231,7 +231,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: error
       complexity: 1
   location:
@@ -243,7 +243,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: info
       complexity: 1
   location:
@@ -255,7 +255,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: exception
       complexity: 1
   location:

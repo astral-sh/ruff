@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.244"
+version = "0.0.245"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -61,3 +61,9 @@ ureq = { version = "2.5.0", features = [] }
 
 [package.metadata.maturin]
 name = "ruff"
+
+[target.'cfg(windows)'.dependencies]
+mimalloc = "0.1.29"
+
+[target.'cfg(not(windows))'.dependencies]
+tikv-jemallocator = "0.5.0"

@@ -111,7 +111,7 @@ mod tests {
     fn redirects() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/redirects.py"),
-            &settings::Settings::for_rules(vec![Rule::UsePEP604Annotation]),
+            &settings::Settings::for_rules(vec![Rule::TypingUnion]),
         )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())

@@ -9,9 +9,10 @@ use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    pub struct PEP3120UnnecessaryCodingComment;
+    // TODO: document referencing [PEP 3120]: https://peps.python.org/pep-3120/
+    pub struct UTF8EncodingDeclaration;
 );
-impl AlwaysAutofixableViolation for PEP3120UnnecessaryCodingComment {
+impl AlwaysAutofixableViolation for UTF8EncodingDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("UTF-8 encoding declaration is unnecessary")
@@ -31,7 +32,7 @@ pub fn unnecessary_coding_comment(lineno: usize, line: &str, autofix: bool) -> O
     // PEP3120 makes utf-8 the default encoding.
     if CODING_COMMENT_REGEX.is_match(line) {
         let mut diagnostic = Diagnostic::new(
-            PEP3120UnnecessaryCodingComment,
+            UTF8EncodingDeclaration,
             Range::new(Location::new(lineno + 1, 0), Location::new(lineno + 2, 0)),
         );
         if autofix {

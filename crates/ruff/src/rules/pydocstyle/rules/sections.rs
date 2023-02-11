@@ -200,14 +200,14 @@ impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
 }
 
 define_violation!(
-    pub struct NonEmptySection {
+    pub struct EmptyDocstringSection {
         pub name: String,
     }
 );
-impl Violation for NonEmptySection {
+impl Violation for EmptyDocstringSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonEmptySection { name } = self;
+        let EmptyDocstringSection { name } = self;
         format!("Section has no content (\"{name}\")")
     }
 }
@@ -231,14 +231,14 @@ impl AlwaysAutofixableViolation for SectionNameEndsInColon {
 }
 
 define_violation!(
-    pub struct DocumentAllArguments {
+    pub struct UndocumentedParam {
         pub names: Vec<String>,
     }
 );
-impl Violation for DocumentAllArguments {
+impl Violation for UndocumentedParam {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DocumentAllArguments { names } = self;
+        let UndocumentedParam { names } = self;
         if names.len() == 1 {
             let name = &names[0];
             format!("Missing argument description in the docstring: `{name}`")
@@ -349,9 +349,9 @@ fn blanks_and_section_underline(
             }
             checker.diagnostics.push(diagnostic);
         }
-        if checker.settings.rules.enabled(&Rule::NonEmptySection) {
+        if checker.settings.rules.enabled(&Rule::EmptyDocstringSection) {
             checker.diagnostics.push(Diagnostic::new(
-                NonEmptySection {
+                EmptyDocstringSection {
                     name: context.section_name.to_string(),
                 },
                 Range::from_located(docstring.expr),
@@ -495,9 +495,9 @@ fn blanks_and_section_underline(
                     .take_while(|line| line.trim().is_empty())
                     .count();
                 if blank_lines_after_dashes == rest_of_lines.len() {
-                    if checker.settings.rules.enabled(&Rule::NonEmptySection) {
+                    if checker.settings.rules.enabled(&Rule::EmptyDocstringSection) {
                         checker.diagnostics.push(Diagnostic::new(
-                            NonEmptySection {
+                            EmptyDocstringSection {
                                 name: context.section_name.to_string(),
                             },
                             Range::from_located(docstring.expr),
@@ -540,9 +540,9 @@ fn blanks_and_section_underline(
                 }
             }
         } else {
-            if checker.settings.rules.enabled(&Rule::NonEmptySection) {
+            if checker.settings.rules.enabled(&Rule::EmptyDocstringSection) {
                 checker.diagnostics.push(Diagnostic::new(
-                    NonEmptySection {
+                    EmptyDocstringSection {
                         name: context.section_name.to_string(),
                     },
                     Range::from_located(docstring.expr),
@@ -836,7 +836,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     if !missing_arg_names.is_empty() {
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
-            DocumentAllArguments { names },
+            UndocumentedParam { names },
             Range::from_located(parent),
         ));
     }
@@ -975,7 +975,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
         }
     }
 
-    if checker.settings.rules.enabled(&Rule::DocumentAllArguments) {
+    if checker.settings.rules.enabled(&Rule::UndocumentedParam) {
         let capitalized_section_name = titlecase::titlecase(context.section_name);
         if capitalized_section_name == "Parameters" {
             parameters_section(checker, docstring, context);
@@ -1028,7 +1028,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
         }
     }
 
-    if checker.settings.rules.enabled(&Rule::DocumentAllArguments) {
+    if checker.settings.rules.enabled(&Rule::UndocumentedParam) {
         let capitalized_section_name = titlecase::titlecase(context.section_name);
         if capitalized_section_name == "Args" || capitalized_section_name == "Arguments" {
             args_section(checker, docstring, context);

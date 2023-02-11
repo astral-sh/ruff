@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ReturnBoolConditionDirectly:
+    NeedlessBool:
       condition: a
       fixable: true
   location:
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ReturnBoolConditionDirectly:
+    NeedlessBool:
       condition: a == b
       fixable: true
   location:
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ReturnBoolConditionDirectly:
+    NeedlessBool:
       condition: b
       fixable: true
   location:
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ReturnBoolConditionDirectly:
+    NeedlessBool:
       condition: b
       fixable: true
   location:
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    ReturnBoolConditionDirectly:
+    NeedlessBool:
       condition: a
       fixable: false
   location:
@@ -95,7 +95,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ReturnBoolConditionDirectly:
+    NeedlessBool:
       condition: a
       fixable: false
   location:

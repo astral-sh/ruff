@@ -8,29 +8,34 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for packages that are missing an `__init__.py` file.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Python packages are directories that contain a file named `__init__.py`.
     /// The existence of this file indicates that the directory is a Python
     /// package, and so it can be imported the same way a module can be
     /// imported.
     ///
     /// Directories that lack an `__init__.py` file can still be imported, but
-    /// they're indicative of a special kind of package, known as a namespace
-    /// package (see: [PEP 420](https://www.python.org/dev/peps/pep-0420/)).
+    /// they're indicative of a special kind of package, known as a "namespace
+    /// package" (see: [PEP 420](https://www.python.org/dev/peps/pep-0420/)).
+    /// Namespace packages are less widely used, so a package that lacks an
+    /// `__init__.py` file is typically meant to be a regular package, and
+    /// the absence of the `__init__.py` file is probably an oversight.
     ///
-    /// Namespace packages are a relatively new feature of Python, and they're
-    /// not widely used. So a package that lacks an `__init__.py` file is
-    /// typically meant to be a regular package, and the absence of the
-    /// `__init__.py` file is probably an oversight.
-    pub struct ImplicitNamespacePackage(pub String);
+    /// Note that namespace packages can be specified via the
+    /// [`namespace-packages`](https://github.com/charliermarsh/ruff#namespace-packages)
+    /// configuration option. Adding a namespace package to the configuration
+    /// will suppress this violation for a given package.
+    pub struct ImplicitNamespacePackage {
+        pub filename: String,
+    }
 );
 impl Violation for ImplicitNamespacePackage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImplicitNamespacePackage(filename) = self;
+        let ImplicitNamespacePackage { filename } = self;
         format!("File `{filename}` is part of an implicit namespace package. Add an `__init__.py`.")
     }
 }
@@ -59,7 +64,9 @@ pub fn implicit_namespace_package(
             .to_string_lossy()
             .replace(std::path::MAIN_SEPARATOR, "/"); // The snapshot test expects / as the path separator.
         Some(Diagnostic::new(
-            ImplicitNamespacePackage(fs::relativize_path(path)),
+            ImplicitNamespacePackage {
+                filename: fs::relativize_path(path),
+            },
             Range::default(),
         ))
     } else {

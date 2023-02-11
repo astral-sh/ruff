@@ -1,8 +1,8 @@
+use rustpython_parser::ast::Location;
+
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::Expr;
 
 use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
@@ -32,16 +32,21 @@ define_violation!(
 impl Violation for BidirectionalUnicode {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Avoid using bidirectional unicode")
+        format!("Contains control characters that can permit obfuscated code")
     }
 }
 
 /// PLE2502
-pub fn bidirectional_unicode(checker: &mut Checker, expr: &Expr, value: &str) {
-    if value.contains(BIDI_UNICODE) {
-        checker.diagnostics.push(Diagnostic::new(
+pub fn bidirectional_unicode(lineno: usize, line: &str) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+    if line.contains(BIDI_UNICODE) {
+        diagnostics.push(Diagnostic::new(
             BidirectionalUnicode,
-            Range::from_located(expr),
+            Range::new(
+                Location::new(lineno + 1, 0),
+                Location::new((lineno + 1) + 1, 0),
+            ),
         ));
     }
+    diagnostics
 }

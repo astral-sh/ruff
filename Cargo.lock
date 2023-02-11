@@ -747,7 +747,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.244"
+version = "0.0.245"
 dependencies = [
  "anyhow",
  "clap 4.1.4",
@@ -1187,6 +1187,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "libmimalloc-sys"
+version = "0.1.30"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd8c7cbf8b89019683667e347572e6d55a7df7ea36b0c4ce69961b0cde67b174"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
 name = "link-cplusplus"
 version = "1.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1254,6 +1264,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "mimalloc"
+version = "0.1.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dcb174b18635f7561a0c6c9fc2ce57218ac7523cf72c50af80e2d79ab8f3ba1"
+dependencies = [
+ "libmimalloc-sys",
 ]
 
 [[package]]
@@ -1896,7 +1915,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.244"
+version = "0.0.245"
 dependencies = [
  "anyhow",
  "bisection",
@@ -1952,7 +1971,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.244"
+version = "0.0.245"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -1970,6 +1989,7 @@ dependencies = [
  "ignore",
  "itertools",
  "log",
+ "mimalloc",
  "notify",
  "path-absolutize",
  "quick-junit",
@@ -1982,13 +2002,14 @@ dependencies = [
  "similar",
  "strum",
  "textwrap",
+ "tikv-jemallocator",
  "ureq",
  "walkdir",
 ]
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.244"
+version = "0.0.245"
 dependencies = [
  "anyhow",
  "clap 4.1.4",
@@ -2008,7 +2029,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.244"
+version = "0.0.245"
 dependencies = [
  "itertools",
  "proc-macro2",
@@ -2019,7 +2040,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python"
-version = "0.0.244"
+version = "0.0.245"
 dependencies = [
  "once_cell",
  "regex",
@@ -2506,6 +2527,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "tikv-jemalloc-sys"
+version = "0.5.3+5.3.0-patched"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a678df20055b43e57ef8cddde41cdfda9a3c1a060b67f4c5836dfb1d78543ba8"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
+name = "tikv-jemallocator"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20612db8a13a6c06d57ec83953694185a367e16945f66565e8028d2c0bd76979"
+dependencies = [
+ "libc",
+ "tikv-jemalloc-sys",
 ]
 
 [[package]]

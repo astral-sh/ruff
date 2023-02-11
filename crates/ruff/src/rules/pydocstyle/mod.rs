@@ -21,9 +21,9 @@ mod tests {
     #[test_case(Rule::BlankLineBeforeSection, Path::new("sections.py"); "D411")]
     #[test_case(Rule::CapitalizeSectionName, Path::new("sections.py"); "D405")]
     #[test_case(Rule::DashedUnderlineAfterSection, Path::new("sections.py"); "D407")]
-    #[test_case(Rule::DocumentAllArguments, Path::new("canonical_google_examples.py"); "D417_2")]
-    #[test_case(Rule::DocumentAllArguments, Path::new("canonical_numpy_examples.py"); "D417_1")]
-    #[test_case(Rule::DocumentAllArguments, Path::new("sections.py"); "D417_0")]
+    #[test_case(Rule::UndocumentedParam, Path::new("canonical_google_examples.py"); "D417_2")]
+    #[test_case(Rule::UndocumentedParam, Path::new("canonical_numpy_examples.py"); "D417_1")]
+    #[test_case(Rule::UndocumentedParam, Path::new("sections.py"); "D417_0")]
     #[test_case(Rule::EndsInPeriod, Path::new("D.py"); "D400_0")]
     #[test_case(Rule::EndsInPeriod, Path::new("D400.py"); "D400_1")]
     #[test_case(Rule::EndsInPunctuation, Path::new("D.py"); "D415")]
@@ -43,10 +43,10 @@ mod tests {
     #[test_case(Rule::NoOverIndentation, Path::new("D.py"); "D208")]
     #[test_case(Rule::NoSignature, Path::new("D.py"); "D402")]
     #[test_case(Rule::NoSurroundingWhitespace, Path::new("D.py"); "D210")]
-    #[test_case(Rule::NoThisPrefix, Path::new("D.py"); "D404")]
+    #[test_case(Rule::DocstringStartsWithThis, Path::new("D.py"); "D404")]
     #[test_case(Rule::NoUnderIndentation, Path::new("D.py"); "D207")]
-    #[test_case(Rule::NonEmpty, Path::new("D.py"); "D419")]
-    #[test_case(Rule::NonEmptySection, Path::new("sections.py"); "D414")]
+    #[test_case(Rule::EmptyDocstring, Path::new("D.py"); "D419")]
+    #[test_case(Rule::EmptyDocstringSection, Path::new("sections.py"); "D414")]
     #[test_case(Rule::NonImperativeMood, Path::new("D401.py"); "D401")]
     #[test_case(Rule::OneBlankLineAfterClass, Path::new("D.py"); "D204")]
     #[test_case(Rule::OneBlankLineBeforeClass, Path::new("D.py"); "D203")]
@@ -64,7 +64,7 @@ mod tests {
     #[test_case(Rule::SectionUnderlineAfterName, Path::new("sections.py"); "D408")]
     #[test_case(Rule::SectionUnderlineMatchesSectionLength, Path::new("sections.py"); "D409")]
     #[test_case(Rule::SectionUnderlineNotOverIndented, Path::new("sections.py"); "D215")]
-    #[test_case(Rule::SkipDocstring, Path::new("D.py"); "D418")]
+    #[test_case(Rule::OverloadWithDocstring, Path::new("D.py"); "D418")]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"); "D301")]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"); "D300")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -85,7 +85,7 @@ mod tests {
                 // When inferring the convention, we'll see a few false negatives.
                 // See: https://github.com/PyCQA/pydocstyle/issues/459.
                 pydocstyle: Settings { convention: None },
-                ..settings::Settings::for_rule(Rule::DocumentAllArguments)
+                ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -101,7 +101,7 @@ mod tests {
                 pydocstyle: Settings {
                     convention: Some(Convention::Google),
                 },
-                ..settings::Settings::for_rule(Rule::DocumentAllArguments)
+                ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -117,7 +117,7 @@ mod tests {
                 pydocstyle: Settings {
                     convention: Some(Convention::Numpy),
                 },
-                ..settings::Settings::for_rule(Rule::DocumentAllArguments)
+                ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
         )?;
         assert_yaml_snapshot!(diagnostics);

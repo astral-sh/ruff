@@ -1,12 +1,8 @@
 name: mkdocs
 
 on:
-  push:
-    paths:
-      - README.md
-      - mkdocs.template.yml
-      - .github/workflows/docs.yaml
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:

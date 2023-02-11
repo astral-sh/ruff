@@ -36,21 +36,10 @@ impl Violation for UselessSemicolon {
     }
 }
 
-define_violation!(
-    pub struct MultipleStatementsOnOneLineDef;
-);
-impl Violation for MultipleStatementsOnOneLineDef {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Multiple statements on one line (def)")
-    }
-}
-
 pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     // Track the last seen instance of a variety of tokens.
-    let mut def = None;
     let mut colon = None;
     let mut semi = None;
     let mut class = None;
@@ -103,7 +92,6 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
                 }
 
                 // Reset.
-                def = None;
                 colon = None;
                 semi = None;
                 class = None;
@@ -117,12 +105,8 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
                 while_ = None;
                 with = None;
             }
-            Tok::Def => {
-                def = Some((start, end));
-            }
             Tok::Colon => {
-                if def.is_some()
-                    || class.is_some()
+                if class.is_some()
                     || elif.is_some()
                     || else_.is_some()
                     || except.is_some()
@@ -152,20 +136,12 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
                 }
 
                 if let Some((start, end)) = colon {
-                    if let Some((start, end)) = def {
-                        diagnostics.push(Diagnostic::new(
-                            MultipleStatementsOnOneLineDef,
-                            Range::new(start, end),
-                        ));
-                    } else {
-                        diagnostics.push(Diagnostic::new(
-                            MultipleStatementsOnOneLineColon,
-                            Range::new(start, end),
-                        ));
-                    }
+                    diagnostics.push(Diagnostic::new(
+                        MultipleStatementsOnOneLineColon,
+                        Range::new(start, end),
+                    ));
 
                     // Reset.
-                    def = None;
                     colon = None;
                     class = None;
                     elif = None;
@@ -182,6 +158,20 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
         }
 
         match tok {
+            Tok::Lambda => {
+                // Reset.
+                colon = None;
+                class = None;
+                elif = None;
+                else_ = None;
+                except = None;
+                finally = None;
+                for_ = None;
+                if_ = None;
+                try_ = None;
+                while_ = None;
+                with = None;
+            }
             Tok::If => {
                 if_ = Some((start, end));
             }

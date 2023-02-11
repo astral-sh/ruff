@@ -1,5 +1,12 @@
 # Breaking Changes
 
+## 0.0.246
+
+### `multiple-statements-on-one-line-def` (`E704`) was removed ([#2773](https://github.com/charliermarsh/ruff/pull/2773))
+
+This rule was introduced in v0.0.245. However, it turns out that pycodestyle and Flake8 ignore this
+rule by default, as it is not part of PEP 8. As such, we've removed it from Ruff.
+
 ## 0.0.245
 
 ### Ruff's public `check` method was removed ([#2709](https://github.com/charliermarsh/ruff/pull/2709))

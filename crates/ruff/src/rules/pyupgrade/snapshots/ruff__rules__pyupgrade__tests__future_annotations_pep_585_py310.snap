@@ -1,9 +1,9 @@
 ---
-source: src/rules/pyupgrade/mod.rs
+source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UsePEP585Annotation:
+    DeprecatedCollectionType:
       name: List
   location:
     row: 34
@@ -22,7 +22,7 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UsePEP585Annotation:
+    DeprecatedCollectionType:
       name: List
   location:
     row: 35
@@ -41,7 +41,7 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    UsePEP585Annotation:
+    DeprecatedCollectionType:
       name: List
   location:
     row: 42
@@ -60,7 +60,7 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UsePEP585Annotation:
+    DeprecatedCollectionType:
       name: List
   location:
     row: 42

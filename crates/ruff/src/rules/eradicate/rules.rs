@@ -10,14 +10,14 @@ use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for commented-out Python code.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Commented-out code is dead code, and is often included inadvertently.
     /// It should be removed.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// # print('foo')
     /// ```

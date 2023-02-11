@@ -109,6 +109,12 @@ pub fn run(
             }
             .unwrap_or_else(|(path, message)| {
                 if let Some(path) = &path {
+                    error!(
+                        "{}{}{} {message}",
+                        "Failed to lint ".bold(),
+                        fs::relativize_path(path).bold(),
+                        ":".bold()
+                    );
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(&Rule::IOError) {
                         Diagnostics::new(vec![Message {
@@ -120,11 +126,10 @@ pub fn run(
                             source: None,
                         }])
                     } else {
-                        error!("Failed to check {}: {message}", path.to_string_lossy());
                         Diagnostics::default()
                     }
                 } else {
-                    error!("{message}");
+                    error!("{} {message}", "Encountered error:".bold());
                     Diagnostics::default()
                 }
             })
