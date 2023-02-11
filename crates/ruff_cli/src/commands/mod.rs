@@ -9,6 +9,7 @@ pub use show_settings::show_settings;
 
 mod add_noqa;
 mod clean;
+pub mod config;
 mod linter;
 mod rule;
 mod run;

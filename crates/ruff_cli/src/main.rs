@@ -101,6 +101,7 @@ quoting the executed command, along with the relevant file contents and `pyproje
 
     match command {
         Command::Rule { rule, format } => commands::rule(&rule, format)?,
+        Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
         Command::Linter { format } => commands::linter(format)?,
         Command::Clean => commands::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
