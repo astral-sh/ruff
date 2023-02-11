@@ -182,6 +182,21 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
         }
 
         match tok {
+            Tok::Lambda => {
+                // Reset.
+                def = None;
+                colon = None;
+                class = None;
+                elif = None;
+                else_ = None;
+                except = None;
+                finally = None;
+                for_ = None;
+                if_ = None;
+                try_ = None;
+                while_ = None;
+                with = None;
+            }
             Tok::If => {
                 if_ = Some((start, end));
             }
