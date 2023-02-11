@@ -35,18 +35,12 @@ define_violation!(
     /// ## References
     /// * [B608: Test for SQL injection](https://bandit.readthedocs.io/en/latest/plugins/b608_hardcoded_sql_expressions.html)
     /// * [psycopg3: Server-side binding](https://www.psycopg.org/psycopg3/docs/basic/from_pg2.html#server-side-binding)
-    pub struct HardcodedSQLExpression {
-        pub string: String,
-    }
+    pub struct HardcodedSQLExpression;
 );
 impl Violation for HardcodedSQLExpression {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let HardcodedSQLExpression { string } = self;
-        format!(
-            "Possible SQL injection vector through string-based query construction: \"{}\"",
-            string.escape_debug()
-        )
+        format!("Possible SQL injection vector through string-based query construction")
     }
 }
 
@@ -102,7 +96,7 @@ pub fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
     match unparse_string_format_expression(checker, expr) {
         Some(string) if matches_sql_statement(&string) => {
             checker.diagnostics.push(Diagnostic::new(
-                HardcodedSQLExpression { string },
+                HardcodedSQLExpression,
                 Range::from_located(expr),
             ));
         }
