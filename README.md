@@ -1217,7 +1217,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | SIM101 | duplicate-isinstance-call | Multiple `isinstance` calls for `{name}`, merge into a single call | 🛠 |
-| SIM102 | nested-if-statements | Use a single `if` statement instead of nested `if` statements | 🛠 |
+| SIM102 | collapsible-if | Use a single `if` statement instead of nested `if` statements | 🛠 |
 | SIM103 | needless-bool | Return the condition `{condition}` directly | 🛠 |
 | SIM105 | use-contextlib-suppress | Use `contextlib.suppress({exception})` instead of try-except-pass |  |
 | SIM107 | return-in-try-except-finally | Don't use `return` in `try`/`except` and `finally` |  |
