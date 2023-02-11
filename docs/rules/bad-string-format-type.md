@@ -2,14 +2,14 @@
 
 Derived from the **Pylint** linter.
 
-### What it does
+## What it does
 Checks for mismatched argument types in "old-style" format strings.
 
-### Why is this bad?
+## Why is this bad?
 The format string is not checked at compile time, so it is easy to
 introduce bugs by mistyping the format string.
 
-### Example
+## Example
 ```python
 print("%d" % "1")
 ```

@@ -3415,7 +3415,7 @@ alias (e.g., `import A as B`) to wrap such that every line contains
 exactly one member. For example, this formatting would be retained,
 rather than condensing to a single line:
 
-```py
+```python
 from .utils import (
     test_directory as test_directory,
     test_id as test_id
