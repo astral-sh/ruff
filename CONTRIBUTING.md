@@ -135,13 +135,13 @@ Finally, regenerate the documentation and generated code with `cargo dev generat
 
 #### Rule naming convention
 
-The rule name should make sense when read as "allow *rule-name*" or "allow *rule-name* items".
+The rule name should make sense when read as "allow _rule-name_" or "allow _rule-name_ items".
 
 This implies that rule names:
 
-* should state the bad thing being checked for
+- should state the bad thing being checked for
 
-* should not contain instructions on what you what you should use instead
+- should not contain instructions on what you what you should use instead
   (these belong in the rule documentation and the `autofix_title` for rules that have autofix)
 
 ### Example: Adding a new configuration option

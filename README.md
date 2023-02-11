@@ -3533,6 +3533,24 @@ lines-after-imports = 1
 
 ---
 
+#### [`lines-between-types`](#lines-between-types)
+
+The number of lines to place between direct and from imports.
+
+**Default value**: `0`
+
+**Type**: `int`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+# Use a single line between direct and from import
+lines-between-types = 1
+```
+
+---
+
 #### [`no-lines-before`](#no-lines-before)
 
 A list of sections that should _not_ be delineated from the previous
