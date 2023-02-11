@@ -19,3 +19,4 @@ elif a == "boo":
     return "ooh"
 else:
     return 42
+

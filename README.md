@@ -1227,6 +1227,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | SIM111 | convert-loop-to-all | Use `{all}` instead of `for` loop | 🛠 |
 | SIM112 | use-capital-environment-variables | Use capitalized environment variable `{expected}` instead of `{original}` | 🛠 |
 | SIM115 | open-file-with-context-handler | Use context handler for opening files |  |
+| SIM116 | [if-to-dict](https://github.com/charliermarsh/ruff/blob/main/docs/rules/if-to-dict.md) | Use a dictionary instead of consecutive `if` statements | 🛠 |
 | SIM117 | multiple-with-statements | Use a single `with` statement with multiple contexts instead of nested `with` statements | 🛠 |
 | SIM118 | key-in-dict | Use `{key} in {dict}` instead of `{key} in {dict}.keys()` | 🛠 |
 | SIM201 | negate-equal-op | Use `{left} != {right}` instead of `not {left} == {right}` | 🛠 |

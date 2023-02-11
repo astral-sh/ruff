@@ -551,7 +551,7 @@ fn constant_to_str(value: &Constant) -> String {
         Constant::Float(f) => f.to_string(),
         Constant::Ellipsis => "...".to_string(),
         Constant::Bytes(b) => {
-            let the_string = String::from_utf8(b.to_vec()).unwrap();
+            let the_string = String::from_utf8(b.clone()).unwrap();
             format!("b\"{the_string}\"")
         }
         Constant::Complex { real, imag } => format!("{}+{}j", real, imag),
@@ -565,7 +565,7 @@ fn constant_to_str(value: &Constant) -> String {
                 result.push_str(&constant_to_str(item));
                 result.push_str(", ");
             }
-            result.push_str(")");
+            result.push(')');
             result
         }
     }
@@ -617,18 +617,17 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
                 };
                 if let ExprKind::Call { .. } = &clean_value.node {
                     return;
-                } else {
-                    if let ExprKind::Compare { comparators, .. } = &test.node {
-                        if let ExprKind::Constant {
-                            value: const_val, ..
-                        } = &comparators[0].node
-                        {
-                            let key = constant_to_str(const_val);
-                            let final_value = checker
-                                .locator
-                                .slice_source_code_range(&Range::from_located(clean_value));
-                            key_value_pairs.insert(key, final_value.to_string());
-                        }
+                }
+                if let ExprKind::Compare { comparators, .. } = &test.node {
+                    if let ExprKind::Constant {
+                        value: const_val, ..
+                    } = &comparators[0].node
+                    {
+                        let key = constant_to_str(const_val);
+                        let final_value = checker
+                            .locator
+                            .slice_source_code_range(&Range::from_located(clean_value));
+                        key_value_pairs.insert(key, final_value.to_string());
                     }
                 }
             } else {
@@ -640,7 +639,7 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
                 match &orelse[0].node {
                     StmtKind::If { .. } => {
                         child = orelse.get(0);
-                    },
+                    }
                     StmtKind::Return { value } => {
                         let final_value = match value {
                             Some(item) => checker
@@ -676,10 +675,7 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
         new_str.push_str(&format!(", {}", else_val));
     }
     new_str.push(')');
-    let mut diagnostic = Diagnostic::new(
-        IfToDict,
-        Range::from_located(stmt),
-    );
+    let mut diagnostic = Diagnostic::new(IfToDict, Range::from_located(stmt));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             new_str,
