@@ -18,8 +18,8 @@ pub struct Args {
     pub(crate) dry_run: bool,
 }
 
-fn emit_field(output: &mut String, field: &OptionField, group_name: Option<&str>) {
-    output.push_str(&format!("#### [`{0}`](#{0})\n", field.name));
+fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
+    output.push_str(&format!("#### [`{0}`](#{0})\n", name));
     output.push('\n');
     output.push_str(field.doc);
     output.push_str("\n\n");
@@ -42,49 +42,24 @@ fn emit_field(output: &mut String, field: &OptionField, group_name: Option<&str>
 pub fn main(args: &Args) -> Result<()> {
     let mut output = String::new();
 
+    let mut sorted_options = Options::get_available_options();
+    sorted_options.sort_by_key(|(name, _)| *name);
+
     // Generate all the top-level fields.
-    for field in Options::get_available_options()
-        .into_iter()
-        .filter_map(|entry| {
-            if let OptionEntry::Field(field) = entry {
-                Some(field)
-            } else {
-                None
-            }
-        })
-        .sorted_by_key(|field| field.name)
-    {
-        emit_field(&mut output, &field, None);
+    for (name, entry) in &sorted_options {
+        let OptionEntry::Field(field) = entry else { continue; };
+        emit_field(&mut output, name, field, None);
         output.push_str("---\n\n");
     }
 
     // Generate all the sub-groups.
-    for group in Options::get_available_options()
-        .into_iter()
-        .filter_map(|entry| {
-            if let OptionEntry::Group(group) = entry {
-                Some(group)
-            } else {
-                None
-            }
-        })
-        .sorted_by_key(|group| group.name)
-    {
-        output.push_str(&format!("### `{}`\n", group.name));
+    for (group_name, entry) in &sorted_options {
+        let OptionEntry::Group(fields) = entry else { continue; };
+        output.push_str(&format!("### `{}`\n", group_name));
         output.push('\n');
-        for field in group
-            .fields
-            .iter()
-            .filter_map(|entry| {
-                if let OptionEntry::Field(field) = entry {
-                    Some(field)
-                } else {
-                    None
-                }
-            })
-            .sorted_by_key(|field| field.name)
-        {
-            emit_field(&mut output, field, Some(group.name));
+        for (name, entry) in fields.iter().sorted_by_key(|(name, _)| name) {
+            let OptionEntry::Field(field) = entry else { continue; };
+            emit_field(&mut output, name, field, Some(group_name));
             output.push_str("---\n\n");
         }
     }
