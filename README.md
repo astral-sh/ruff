@@ -721,7 +721,6 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | E701 | multiple-statements-on-one-line-colon | Multiple statements on one line (colon) |  |
 | E702 | multiple-statements-on-one-line-semicolon | Multiple statements on one line (semicolon) |  |
 | E703 | useless-semicolon | Statement ends with an unnecessary semicolon |  |
-| E704 | multiple-statements-on-one-line-def | Multiple statements on one line (def) |  |
 | E711 | none-comparison | Comparison to `None` should be `cond is None` | 🛠 |
 | E712 | true-false-comparison | Comparison to `True` should be `cond is True` | 🛠 |
 | E713 | not-in-test | Test for membership should be `not in` | 🛠 |
