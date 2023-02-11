@@ -38,7 +38,7 @@ pub fn model_string_field_nullable(
         let StmtKind::Assign {value, ..} = &statement.node else {
             continue
         };
-        if let Some(field_name) = check_nullable_field(value) {
+        if let Some(field_name) = check_nullable_field(checker, value) {
             errors.push(Diagnostic::new(
                 ModelStringFieldNullable(field_name.to_string()),
                 Range::from_located(value),
@@ -48,28 +48,17 @@ pub fn model_string_field_nullable(
     errors
 }
 
-fn check_nullable_field(value: &Expr) -> Option<&str> {
+fn check_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
     let ExprKind::Call {func, keywords, ..} = &value.node else {
         return None;
     };
-    let valid_field_name = match &func.node {
-        ExprKind::Attribute { attr, .. } => {
-            if !NOT_NULL_TRUE_FIELDS.contains(&&**attr) {
-                return None;
-            }
-            Some(attr)
-        }
-        ExprKind::Name { id, .. } => {
-            if !NOT_NULL_TRUE_FIELDS.contains(&&**id) {
-                return None;
-            }
-            Some(id)
-        }
-        _ => None,
-    };
-    let Some(valid_field_name) = valid_field_name else {
+
+    let Some(valid_field_name) = helpers::get_model_field_name(checker, func) else {
         return None;
     };
+    if !NOT_NULL_TRUE_FIELDS.contains(&valid_field_name) {
+        return None;
+    }
 
     let mut null_key = false;
     let mut blank_key = false;
