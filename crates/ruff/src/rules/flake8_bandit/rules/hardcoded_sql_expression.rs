@@ -32,7 +32,7 @@ define_violation!(
     /// query = "DELETE FROM foo WHERE id = '%s'" % identifier
     /// ```
     ///
-    /// ### References
+    /// ## References
     /// * [B608: Test for SQL injection](https://bandit.readthedocs.io/en/latest/plugins/b608_hardcoded_sql_expressions.html)
     /// * [psycopg3: Server-side binding](https://www.psycopg.org/psycopg3/docs/basic/from_pg2.html#server-side-binding)
     pub struct HardcodedSQLExpression {
