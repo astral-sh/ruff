@@ -44,6 +44,8 @@ pub enum Command {
         #[arg(long, value_enum, default_value = "markdown")]
         format: HelpFormat,
     },
+    /// List or describe the available configuration options
+    Config { option: Option<String> },
     /// List all supported upstream linters
     Linter {
         /// Output format
