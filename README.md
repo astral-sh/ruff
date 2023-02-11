@@ -1290,7 +1290,7 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH106 | pathlib-rmdir | `os.rmdir` should be replaced by `.rmdir()` |  |
 | PTH107 | pathlib-remove | `os.remove` should be replaced by `.unlink()` |  |
 | PTH108 | pathlib-unlink | `os.unlink` should be replaced by `.unlink()` |  |
-| PTH109 | pathlib-getcwd | `os.getcwd` should be replaced by `Path.cwd()` |  |
+| PTH109 | [pathlib-getcwd](https://github.com/charliermarsh/ruff/blob/main/docs/rules/pathlib-getcwd.md) | `os.getcwd` should be replaced by `Path.cwd()` | 🛠 |
 | PTH110 | pathlib-exists | `os.path.exists` should be replaced by `.exists()` |  |
 | PTH111 | pathlib-expanduser | `os.path.expanduser` should be replaced by `.expanduser()` |  |
 | PTH112 | pathlib-is-dir | `os.path.isdir` should be replaced by `.is_dir()` |  |
@@ -1299,13 +1299,18 @@ For more, see [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
 | PTH115 | pathlib-readlink | `os.readlink` should be replaced by `.readlink()` |  |
 | PTH116 | pathlib-stat | `os.stat` should be replaced by `.stat()` or `.owner()` or `.group()` |  |
 | PTH117 | pathlib-is-abs | `os.path.isabs` should be replaced by `.is_absolute()` |  |
-| PTH118 | pathlib-join | `os.path.join` should be replaced by foo_path / "bar" |  |
+| PTH118 | pathlib-join | `os.path.join` should be replaced by `foo_path / "bar"` |  |
 | PTH119 | pathlib-basename | `os.path.basename` should be replaced by `.name` |  |
 | PTH120 | pathlib-dirname | `os.path.dirname` should be replaced by `.parent` |  |
 | PTH121 | pathlib-samefile | `os.path.samefile` should be replaced by `.samefile()` |  |
 | PTH122 | pathlib-splitext | `os.path.splitext` should be replaced by `.suffix` |  |
 | PTH123 | pathlib-open | `open("foo")` should be replaced by `Path("foo").open()` |  |
 | PTH124 | pathlib-py-path | `py.path` is in maintenance mode, use `pathlib` instead |  |
+| PTH200 | [path-constructor-current-directory](https://github.com/charliermarsh/ruff/blob/main/docs/rules/path-constructor-current-directory.md) | Do not pass the current directory explicitly to `Path` | 🛠 |
+| PTH201 | pathlib-getsize | `os.path.getsize` should be replaced by `stat().st_size` |  |
+| PTH202 | pathlib-getatime | `os.path.getatime` should be replaced by `stat().st_atime` |  |
+| PTH203 | pathlib-getmtime | `os.path.getmtime` should be replaced by `stat().st_mtime` |  |
+| PTH204 | pathlib-getctime | `os.path.getctime` should be replaced by `stat().st_ctime` |  |
 
 ### eradicate (ERA)
 

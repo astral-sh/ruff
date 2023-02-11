@@ -1,6 +1,73 @@
 ---
-source: src/rules/flake8_use_pathlib/mod.rs
+source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
 expression: diagnostics
 ---
-[]
+- kind:
+    PathlibGetcwd: ~
+  location:
+    row: 6
+    column: 9
+  end_location:
+    row: 6
+    column: 18
+  fix:
+    content: Path.cwd
+    location:
+      row: 6
+      column: 9
+    end_location:
+      row: 6
+      column: 18
+  parent: ~
+- kind:
+    PathlibGetcwd: ~
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 10
+    column: 14
+  fix:
+    content: Path.cwd
+    location:
+      row: 9
+      column: 4
+    end_location:
+      row: 10
+      column: 14
+  parent: ~
+- kind:
+    PathlibGetcwd: ~
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 14
+  fix:
+    content: Path.cwd
+    location:
+      row: 14
+      column: 4
+    end_location:
+      row: 14
+      column: 14
+  parent: ~
+- kind:
+    PathlibGetcwd: ~
+  location:
+    row: 18
+    column: 9
+  end_location:
+    row: 18
+    column: 18
+  fix:
+    content: Path.cwd
+    location:
+      row: 18
+      column: 9
+    end_location:
+      row: 18
+      column: 18
+  parent: ~
 

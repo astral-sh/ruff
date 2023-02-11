@@ -2,6 +2,7 @@ from os import chmod, mkdir, makedirs, rename, replace, rmdir
 from os import remove, unlink, getcwd, readlink, stat
 from os.path import abspath, exists, expanduser, isdir, isfile, islink
 from os.path import isabs, join, basename, dirname, samefile, splitext
+from pathlib import Path
 
 p = "/foo"
 

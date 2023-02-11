@@ -1,5 +1,6 @@
 import os as foo
 import os.path as foo_p
+import pathlib as pth
 
 p = "/foo"
 

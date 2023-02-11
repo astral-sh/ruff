@@ -1,6 +1,6 @@
 use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::violation::Violation;
+use crate::violation::{AutofixKind, Availability, Violation};
 
 // PTH100
 define_violation!(
@@ -103,12 +103,41 @@ impl Violation for PathlibUnlink {
 
 // PTH109
 define_violation!(
+    /// ## What is does
+    /// Detects the use of `os.getcwd` and `os.getcwdb`.
+    /// Autofix is available when the `pathlib` module is imported.
+    ///
+    /// ## Why is this bad?
+    /// A modern alternative to `os.getcwd()` is the `Path.cwd()` function
+    ///
+    /// ## Examples
+    /// ```python
+    /// cwd = os.getcwd()
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// cwd = Path.cwd()
+    /// ```
+    ///
+    /// ## References
+    /// * [PEP 428](https://peps.python.org/pep-0428/)
+    /// * [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+    /// * [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
+    /// * [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
+
     pub struct PathlibGetcwd;
 );
 impl Violation for PathlibGetcwd {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.getcwd` should be replaced by `Path.cwd()`")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|PathlibGetcwd| format!("Replace `os.getcwd` with `Path.cwd()`"))
     }
 }
 
@@ -207,7 +236,7 @@ define_violation!(
 impl Violation for PathlibJoin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.join` should be replaced by foo_path / \"bar\"")
+        format!("`os.path.join` should be replaced by `foo_path / \"bar\"`")
     }
 }
 
@@ -274,5 +303,50 @@ impl Violation for PathlibPyPath {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`py.path` is in maintenance mode, use `pathlib` instead")
+    }
+}
+
+// TODO: add documentation
+// PTH201
+define_violation!(
+    pub struct PathlibGetsize;
+);
+impl Violation for PathlibGetsize {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`os.path.getsize` should be replaced by `stat().st_size`")
+    }
+}
+
+// PTH202
+define_violation!(
+    pub struct PathlibGetatime;
+);
+impl Violation for PathlibGetatime {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`os.path.getatime` should be replaced by `stat().st_atime`")
+    }
+}
+
+// PTH203
+define_violation!(
+    pub struct PathlibGetmtime;
+);
+impl Violation for PathlibGetmtime {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`os.path.getmtime` should be replaced by `stat().st_mtime`")
+    }
+}
+
+// PTH204
+define_violation!(
+    pub struct PathlibGetctime;
+);
+impl Violation for PathlibGetctime {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("`os.path.getctime` should be replaced by `stat().st_ctime`")
     }
 }

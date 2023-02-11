@@ -2756,7 +2756,19 @@ where
                     || self.settings.rules.enabled(&Rule::PathlibOpen)
                     || self.settings.rules.enabled(&Rule::PathlibPyPath)
                 {
-                    flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
+                    flake8_use_pathlib::helpers::replaceable_by_pathlib(
+                        self,
+                        func,
+                        self.current_expr_parent().map(Into::into),
+                    );
+                }
+
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::PathConstructorCurrentDirectory)
+                {
+                    flake8_use_pathlib::rules::simplify_path_constructor(self, expr, func);
                 }
 
                 // flake8-logging-format

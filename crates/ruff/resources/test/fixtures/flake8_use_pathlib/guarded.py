@@ -1,6 +1,7 @@
+# ensure that no fixes are applied when`pathlib` is not imported
+# (needed until this item is resolved: https://github.com/charliermarsh/ruff/issues/835)
 import os
 import os.path
-import pathlib
 
 p = "/foo"
 

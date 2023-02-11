@@ -1,18 +1,20 @@
 use rustpython_parser::ast::Expr;
 
+use super::fixes::pathlib_fix;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::rules::flake8_use_pathlib::violations::{
     PathlibAbspath, PathlibBasename, PathlibChmod, PathlibDirname, PathlibExists,
-    PathlibExpanduser, PathlibGetcwd, PathlibIsAbs, PathlibIsDir, PathlibIsFile, PathlibIsLink,
-    PathlibJoin, PathlibMakedirs, PathlibMkdir, PathlibOpen, PathlibPyPath, PathlibReadlink,
-    PathlibRemove, PathlibRename, PathlibReplace, PathlibRmdir, PathlibSamefile, PathlibSplitext,
-    PathlibStat, PathlibUnlink,
+    PathlibExpanduser, PathlibGetatime, PathlibGetctime, PathlibGetcwd, PathlibGetmtime,
+    PathlibGetsize, PathlibIsAbs, PathlibIsDir, PathlibIsFile, PathlibIsLink, PathlibJoin,
+    PathlibMakedirs, PathlibMkdir, PathlibOpen, PathlibPyPath, PathlibReadlink, PathlibRemove,
+    PathlibRename, PathlibReplace, PathlibRmdir, PathlibSamefile, PathlibSplitext, PathlibStat,
+    PathlibUnlink,
 };
 use crate::settings::types::PythonVersion;
 
-pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
+pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr, parent: Option<&Expr>) {
     if let Some(diagnostic_kind) =
         checker
             .resolve_call_path(expr)
@@ -46,12 +48,20 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
                 ["os", "readlink"] if checker.settings.target_version >= PythonVersion::Py39 => {
                     Some(PathlibReadlink.into())
                 }
+                ["os", "path", "getsize"] => Some(PathlibGetsize.into()),
+                ["os", "path", "getatime"] => Some(PathlibGetatime.into()),
+                ["os", "path", "getmtime"] => Some(PathlibGetmtime.into()),
+                ["os", "path", "getctime"] => Some(PathlibGetctime.into()),
                 _ => None,
             })
     {
-        let diagnostic =
+        let mut diagnostic =
             Diagnostic::new::<DiagnosticKind>(diagnostic_kind, Range::from_located(expr));
-
+        if checker.patch(diagnostic.kind.rule()) {
+            if let Some(fix) = pathlib_fix(checker, &diagnostic.kind, expr, parent) {
+                diagnostic.amend(fix);
+            }
+        }
         if checker.settings.rules.enabled(diagnostic.kind.rule()) {
             checker.diagnostics.push(diagnostic);
         }

@@ -534,6 +534,11 @@ ruff_macros::define_rule_mapping!(
     PTH122 => rules::flake8_use_pathlib::violations::PathlibSplitext,
     PTH123 => rules::flake8_use_pathlib::violations::PathlibOpen,
     PTH124 => rules::flake8_use_pathlib::violations::PathlibPyPath,
+    PTH200 => rules::flake8_use_pathlib::rules::PathConstructorCurrentDirectory,
+    PTH201 => rules::flake8_use_pathlib::violations::PathlibGetsize,
+    PTH202 => rules::flake8_use_pathlib::violations::PathlibGetatime,
+    PTH203 => rules::flake8_use_pathlib::violations::PathlibGetmtime,
+    PTH204 => rules::flake8_use_pathlib::violations::PathlibGetctime,
     // flake8-logging-format
     G001 => rules::flake8_logging_format::violations::LoggingStringFormat,
     G002 => rules::flake8_logging_format::violations::LoggingPercentFormat,

@@ -1,5 +1,7 @@
 //! Rules from [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/).
+pub(crate) mod fixes;
 pub(crate) mod helpers;
+pub(crate) mod rules;
 pub(crate) mod violations;
 
 #[cfg(test)]
@@ -18,6 +20,9 @@ mod tests {
     #[test_case(Path::new("import_from_as.py"); "PTH1_3")]
     #[test_case(Path::new("import_from.py"); "PTH1_4")]
     #[test_case(Path::new("use_pathlib.py"); "PTH1_5")]
+    #[test_case(Path::new("stat.py"); "PTH1_6")]
+    #[test_case(Path::new("simplify_pathlib_constructor.py"); "PTH1_7")]
+    #[test_case(Path::new("guarded.py"); "PTH1_8")]
     fn rules(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -47,6 +52,11 @@ mod tests {
                 Rule::PathlibSamefile,
                 Rule::PathlibSplitext,
                 Rule::PathlibOpen,
+                Rule::PathlibGetsize,
+                Rule::PathlibGetatime,
+                Rule::PathlibGetmtime,
+                Rule::PathlibGetctime,
+                Rule::PathConstructorCurrentDirectory,
             ]),
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);

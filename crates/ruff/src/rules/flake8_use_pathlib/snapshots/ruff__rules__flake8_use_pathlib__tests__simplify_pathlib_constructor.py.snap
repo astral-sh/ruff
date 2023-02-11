@@ -1,0 +1,39 @@
+---
+source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
+expression: diagnostics
+---
+- kind:
+    PathConstructorCurrentDirectory: ~
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 13
+  fix:
+    content: ""
+    location:
+      row: 5
+      column: 9
+    end_location:
+      row: 5
+      column: 12
+  parent: ~
+- kind:
+    PathConstructorCurrentDirectory: ~
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 12
+  fix:
+    content: ""
+    location:
+      row: 6
+      column: 8
+    end_location:
+      row: 6
+      column: 11
+  parent: ~
+

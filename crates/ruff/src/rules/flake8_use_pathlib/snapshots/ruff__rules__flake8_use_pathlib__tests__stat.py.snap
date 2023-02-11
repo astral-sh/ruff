@@ -1,0 +1,135 @@
+---
+source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
+expression: diagnostics
+---
+- kind:
+    PathlibGetatime: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetatime: ~
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetatime: ~
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetmtime: ~
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetmtime: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetmtime: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetctime: ~
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetctime: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetctime: ~
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetsize: ~
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetsize: ~
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetsize: ~
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    PathlibGetsize: ~
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 15
+  fix: ~
+  parent: ~
+

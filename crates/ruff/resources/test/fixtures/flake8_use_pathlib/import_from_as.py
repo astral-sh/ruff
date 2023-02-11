@@ -7,6 +7,7 @@ from os.path import expanduser as xexpanduser, isdir as xisdir
 from os.path import isfile as xisfile, islink as xislink, isabs as xisabs
 from os.path import join as xjoin, basename as xbasename, dirname as xdirname
 from os.path import samefile as xsamefile, splitext as xsplitext
+from pathlib import Path as pth
 
 p = "/foo"
 
