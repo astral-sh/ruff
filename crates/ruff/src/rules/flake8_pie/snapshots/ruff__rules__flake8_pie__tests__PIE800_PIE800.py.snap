@@ -1,9 +1,9 @@
 ---
-source: src/rules/flake8_pie/mod.rs
+source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoUnnecessarySpread: ~
+    UnnecessarySpread: ~
   location:
     row: 1
     column: 13
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoUnnecessarySpread: ~
+    UnnecessarySpread: ~
   location:
     row: 3
     column: 14
@@ -23,7 +23,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoUnnecessarySpread: ~
+    UnnecessarySpread: ~
   location:
     row: 5
     column: 10
@@ -33,7 +33,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoUnnecessarySpread: ~
+    UnnecessarySpread: ~
   location:
     row: 7
     column: 18

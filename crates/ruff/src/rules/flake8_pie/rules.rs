@@ -16,9 +16,9 @@ use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 define_violation!(
-    pub struct NoUnnecessaryPass;
+    pub struct UnnecessaryPass;
 );
-impl AlwaysAutofixableViolation for NoUnnecessaryPass {
+impl AlwaysAutofixableViolation for UnnecessaryPass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary `pass` statement")
@@ -59,9 +59,9 @@ impl Violation for PreferUniqueEnums {
 }
 
 define_violation!(
-    pub struct NoUnnecessarySpread;
+    pub struct UnnecessarySpread;
 );
-impl Violation for NoUnnecessarySpread {
+impl Violation for UnnecessarySpread {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary spread `**`")
@@ -82,9 +82,9 @@ impl Violation for SingleStartsEndsWith {
 }
 
 define_violation!(
-    pub struct NoUnnecessaryDictKwargs;
+    pub struct UnnecessaryDictKwargs;
 );
-impl Violation for NoUnnecessaryDictKwargs {
+impl Violation for UnnecessaryDictKwargs {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary `dict` kwargs")
@@ -124,7 +124,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
         ) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
                 let mut diagnostic =
-                    Diagnostic::new(NoUnnecessaryPass, Range::from_located(pass_stmt));
+                    Diagnostic::new(UnnecessaryPass, Range::from_located(pass_stmt));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = match_trailing_comment(pass_stmt, checker.locator) {
                         diagnostic.amend(Fix::deletion(
@@ -275,7 +275,7 @@ pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], value
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
             if let ExprKind::Dict { .. } = value.node {
-                let diagnostic = Diagnostic::new(NoUnnecessarySpread, Range::from_located(value));
+                let diagnostic = Diagnostic::new(UnnecessarySpread, Range::from_located(value));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -307,7 +307,7 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
                     (keys.len() == 1 && keys[0].is_none())
                 {
                     let diagnostic =
-                        Diagnostic::new(NoUnnecessaryDictKwargs, Range::from_located(expr));
+                        Diagnostic::new(UnnecessaryDictKwargs, Range::from_located(expr));
                     checker.diagnostics.push(diagnostic);
                 }
             }

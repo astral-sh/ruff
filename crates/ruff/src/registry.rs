@@ -474,11 +474,11 @@ ruff_macros::define_rule_mapping!(
     PT025 => rules::flake8_pytest_style::rules::ErroneousUseFixturesOnFixture,
     PT026 => rules::flake8_pytest_style::rules::UseFixturesWithoutParameters,
     // flake8-pie
-    PIE790 => rules::flake8_pie::rules::NoUnnecessaryPass,
+    PIE790 => rules::flake8_pie::rules::UnnecessaryPass,
     PIE794 => rules::flake8_pie::rules::DupeClassFieldDefinitions,
     PIE796 => rules::flake8_pie::rules::PreferUniqueEnums,
-    PIE800 => rules::flake8_pie::rules::NoUnnecessarySpread,
-    PIE804 => rules::flake8_pie::rules::NoUnnecessaryDictKwargs,
+    PIE800 => rules::flake8_pie::rules::UnnecessarySpread,
+    PIE804 => rules::flake8_pie::rules::UnnecessaryDictKwargs,
     PIE807 => rules::flake8_pie::rules::PreferListBuiltin,
     PIE810 => rules::flake8_pie::rules::SingleStartsEndsWith,
     // flake8-commas
