@@ -7,9 +7,9 @@ use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct NonEmpty;
+    pub struct EmptyDocstring;
 );
-impl Violation for NonEmpty {
+impl Violation for EmptyDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Docstring is empty")
@@ -22,9 +22,9 @@ pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
         return true;
     }
 
-    if checker.settings.rules.enabled(&Rule::NonEmpty) {
+    if checker.settings.rules.enabled(&Rule::EmptyDocstring) {
         checker.diagnostics.push(Diagnostic::new(
-            NonEmpty,
+            EmptyDocstring,
             Range::from_located(docstring.expr),
         ));
     }

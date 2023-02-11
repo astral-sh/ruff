@@ -5081,7 +5081,7 @@ impl<'a> Checker<'a> {
             || self.settings.rules.enabled(&Rule::NonImperativeMood)
             || self.settings.rules.enabled(&Rule::NoSignature)
             || self.settings.rules.enabled(&Rule::FirstLineCapitalized)
-            || self.settings.rules.enabled(&Rule::NoThisPrefix)
+            || self.settings.rules.enabled(&Rule::DocstringStartsWithThis)
             || self.settings.rules.enabled(&Rule::CapitalizeSectionName)
             || self.settings.rules.enabled(&Rule::NewLineAfterSectionName)
             || self
@@ -5106,12 +5106,12 @@ impl<'a> Checker<'a> {
                 .settings
                 .rules
                 .enabled(&Rule::BlankLineAfterLastSection)
-            || self.settings.rules.enabled(&Rule::NonEmptySection)
+            || self.settings.rules.enabled(&Rule::EmptyDocstringSection)
             || self.settings.rules.enabled(&Rule::EndsInPunctuation)
             || self.settings.rules.enabled(&Rule::SectionNameEndsInColon)
-            || self.settings.rules.enabled(&Rule::DocumentAllArguments)
-            || self.settings.rules.enabled(&Rule::SkipDocstring)
-            || self.settings.rules.enabled(&Rule::NonEmpty);
+            || self.settings.rules.enabled(&Rule::UndocumentedParam)
+            || self.settings.rules.enabled(&Rule::OverloadWithDocstring)
+            || self.settings.rules.enabled(&Rule::EmptyDocstring);
 
         let mut overloaded_name: Option<String> = None;
         self.definitions.reverse();
@@ -5242,13 +5242,13 @@ impl<'a> Checker<'a> {
                 if self.settings.rules.enabled(&Rule::FirstLineCapitalized) {
                     pydocstyle::rules::capitalized(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::NoThisPrefix) {
+                if self.settings.rules.enabled(&Rule::DocstringStartsWithThis) {
                     pydocstyle::rules::starts_with_this(self, &docstring);
                 }
                 if self.settings.rules.enabled(&Rule::EndsInPunctuation) {
                     pydocstyle::rules::ends_with_punctuation(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::SkipDocstring) {
+                if self.settings.rules.enabled(&Rule::OverloadWithDocstring) {
                     pydocstyle::rules::if_needed(self, &docstring);
                 }
                 if self
@@ -5284,9 +5284,9 @@ impl<'a> Checker<'a> {
                         .settings
                         .rules
                         .enabled(&Rule::BlankLineAfterLastSection)
-                    || self.settings.rules.enabled(&Rule::NonEmptySection)
+                    || self.settings.rules.enabled(&Rule::EmptyDocstringSection)
                     || self.settings.rules.enabled(&Rule::SectionNameEndsInColon)
-                    || self.settings.rules.enabled(&Rule::DocumentAllArguments)
+                    || self.settings.rules.enabled(&Rule::UndocumentedParam)
                 {
                     pydocstyle::rules::sections(
                         self,
