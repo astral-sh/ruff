@@ -44,7 +44,7 @@ def f():
 
 
 def f():
-    import pandas as pd
+    import pandas as pd  # TCH002
 
     x = dict["pd.DataFrame", "pd.DataFrame"]
 
