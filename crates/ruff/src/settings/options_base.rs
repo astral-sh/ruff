@@ -1,7 +1,11 @@
+pub trait ConfigurationOptions {
+    fn get_available_options() -> Vec<OptionEntry>;
+}
+
 #[derive(Debug)]
-pub struct OptionGroup {
-    pub name: &'static str,
-    pub fields: Vec<OptionEntry>,
+pub enum OptionEntry {
+    Field(OptionField),
+    Group(OptionGroup),
 }
 
 #[derive(Debug)]
@@ -14,11 +18,7 @@ pub struct OptionField {
 }
 
 #[derive(Debug)]
-pub enum OptionEntry {
-    Field(OptionField),
-    Group(OptionGroup),
-}
-
-pub trait ConfigurationOptions {
-    fn get_available_options() -> Vec<OptionEntry>;
+pub struct OptionGroup {
+    pub name: &'static str,
+    pub fields: Vec<OptionEntry>,
 }
