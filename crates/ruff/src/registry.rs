@@ -255,7 +255,7 @@ ruff_macros::define_rule_mapping!(
     SIM115 => rules::flake8_simplify::rules::OpenFileWithContextHandler,
     SIM101 => rules::flake8_simplify::rules::DuplicateIsinstanceCall,
     SIM102 => rules::flake8_simplify::rules::NestedIfStatements,
-    SIM103 => rules::flake8_simplify::rules::ReturnBoolConditionDirectly,
+    SIM103 => rules::flake8_simplify::rules::NeedlessBool,
     SIM105 => rules::flake8_simplify::rules::UseContextlibSuppress,
     SIM107 => rules::flake8_simplify::rules::ReturnInTryExceptFinally,
     SIM108 => rules::flake8_simplify::rules::UseTernaryOperator,

@@ -39,26 +39,24 @@ impl Violation for NestedIfStatements {
 }
 
 define_violation!(
-    pub struct ReturnBoolConditionDirectly {
+    pub struct NeedlessBool {
         pub condition: String,
         pub fixable: bool,
     }
 );
-impl Violation for ReturnBoolConditionDirectly {
+impl Violation for NeedlessBool {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReturnBoolConditionDirectly { condition, .. } = self;
+        let NeedlessBool { condition, .. } = self;
         format!("Return the condition `{condition}` directly")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let ReturnBoolConditionDirectly { fixable, .. } = self;
+        let NeedlessBool { fixable, .. } = self;
         if *fixable {
-            Some(|ReturnBoolConditionDirectly { condition, .. }| {
-                format!("Replace with `return {condition}`")
-            })
+            Some(|NeedlessBool { condition, .. }| format!("Replace with `return {condition}`"))
         } else {
             None
         }
@@ -288,7 +286,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         && (matches!(test.node, ExprKind::Compare { .. }) || checker.is_builtin("bool"));
 
     let mut diagnostic = Diagnostic::new(
-        ReturnBoolConditionDirectly { condition, fixable },
+        NeedlessBool { condition, fixable },
         Range::from_located(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {

@@ -6,8 +6,7 @@ pub use ast_expr::{use_capital_environment_variables, UseCapitalEnvironmentVaria
 pub use ast_for::{convert_for_loop_to_any_all, ConvertLoopToAll, ConvertLoopToAny};
 pub use ast_if::{
     nested_if_statements, return_bool_condition_directly, use_dict_get_with_default,
-    use_ternary_operator, DictGetWithDefault, NestedIfStatements, ReturnBoolConditionDirectly,
-    UseTernaryOperator,
+    use_ternary_operator, DictGetWithDefault, NeedlessBool, NestedIfStatements, UseTernaryOperator,
 };
 pub use ast_ifexp::{
     explicit_false_true_in_ifexpr, explicit_true_false_in_ifexpr, twisted_arms_in_ifexpr,
