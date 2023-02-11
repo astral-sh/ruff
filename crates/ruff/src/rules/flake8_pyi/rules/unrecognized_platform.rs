@@ -1,29 +1,10 @@
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
-use serde::{Deserialize, Serialize};
-use std::fmt;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum VarKind {
-    TypeVar,
-    ParamSpec,
-    TypeVarTuple,
-}
-
-impl fmt::Display for VarKind {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            VarKind::TypeVar => fmt.write_str("TypeVar"),
-            VarKind::ParamSpec => fmt.write_str("ParamSpec"),
-            VarKind::TypeVarTuple => fmt.write_str("TypeVarTuple"),
-        }
-    }
-}
 
 define_violation!(
     /// ### What it does
@@ -92,24 +73,26 @@ pub fn unrecognized_platform(
 ) {
     let ([op], [right]) = (ops, comparators) else {
         return;
-    }; // TODO
+    };
 
+    let diagnostic_unrecognized_platform_check =
+        Diagnostic::new(UnrecognizedPlatformCheck, Range::from_located(expr));
     if !checker.resolve_call_path(left).map_or(false, |call_path| {
         call_path.as_slice() == ["sys", "platform"]
     }) {
         return;
     }
 
+    // "in" might also make sense but we don't currently have one
     if !matches!(op, Cmpop::Eq | Cmpop::NotEq)
         && checker
             .settings
             .rules
             .enabled(&Rule::UnrecognizedPlatformCheck)
     {
-        checker.diagnostics.push(Diagnostic::new(
-            UnrecognizedPlatformCheck,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(diagnostic_unrecognized_platform_check);
         return;
     }
 
@@ -118,6 +101,8 @@ pub fn unrecognized_platform(
             value: Constant::Str(value),
             ..
         } => {
+            // other values are possible but we don't need them right now
+            // this protects against typos
             if !["linux", "win32", "cygwin", "darwin"].contains(&value.as_str())
                 && checker
                     .settings
@@ -138,10 +123,9 @@ pub fn unrecognized_platform(
                 .rules
                 .enabled(&Rule::UnrecognizedPlatformCheck)
             {
-                checker.diagnostics.push(Diagnostic::new(
-                    UnrecognizedPlatformCheck,
-                    Range::from_located(expr),
-                ));
+                checker
+                    .diagnostics
+                    .push(diagnostic_unrecognized_platform_check);
             }
         }
     }
