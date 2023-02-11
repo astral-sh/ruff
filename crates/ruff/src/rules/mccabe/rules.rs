@@ -18,6 +18,10 @@ define_violation!(
     /// ## Why is this bad?
     /// Functions with a high complexity are hard to understand and maintain.
     ///
+    /// ## Options
+    ///
+    /// * `mccabe.max-complexity`
+    ///
     /// ## Example
     /// ```python
     /// def foo(a, b, c):
