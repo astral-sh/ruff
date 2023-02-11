@@ -119,7 +119,8 @@ pub fn detect_package_roots<'a>(
 mod tests {
     use std::path::PathBuf;
 
-    use crate::{packaging::detect_package_root, test::test_resource_path};
+    use crate::packaging::detect_package_root;
+    use crate::test::test_resource_path;
 
     #[test]
     fn package_detection() {

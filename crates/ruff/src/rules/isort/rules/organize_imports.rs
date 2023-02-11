@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Location, Stmt};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Location, Stmt};
 use textwrap::indent;
 
 use super::super::track::Block;
@@ -12,7 +12,6 @@ use crate::ast::helpers::{
 };
 use crate::ast::types::Range;
 use crate::ast::whitespace::leading_space;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
@@ -20,6 +19,24 @@ use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
+    /// ## What it does
+    /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
+    ///
+    /// ## Why is this bad?
+    /// Consistency is good. Use a common convention for imports to make your code
+    /// more readable and idiomatic.
+    ///
+    /// ## Example
+    /// ```python
+    /// import pandas
+    /// import numpy as np
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// import numpy as np
+    /// import pandas
+    /// ```
     pub struct UnsortedImports;
 );
 impl AlwaysAutofixableViolation for UnsortedImports {
@@ -110,6 +127,7 @@ pub fn organize_imports(
         settings.isort.force_wrap_aliases,
         &settings.isort.known_first_party,
         &settings.isort.known_third_party,
+        &settings.isort.known_local_folder,
         settings.isort.order_by_type,
         settings.isort.relative_imports_order,
         &settings.isort.single_line_exclusions,

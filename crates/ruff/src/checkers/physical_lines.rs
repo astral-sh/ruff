@@ -11,6 +11,7 @@ use crate::rules::pycodestyle::rules::{
     doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
+use crate::rules::pylint;
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
 use crate::source_code::Stylist;
@@ -41,6 +42,7 @@ pub fn check_physical_lines(
         .rules
         .enabled(&Rule::PEP3120UnnecessaryCodingComment);
     let enforce_mixed_spaces_and_tabs = settings.rules.enabled(&Rule::MixedSpacesAndTabs);
+    let enforce_bidirectional_unicode = settings.rules.enabled(&Rule::BidirectionalUnicode);
 
     let fix_unnecessary_coding_comment = matches!(autofix, flags::Autofix::Enabled)
         && settings
@@ -136,6 +138,10 @@ pub fn check_physical_lines(
             if let Some(diagnostic) = line_too_long(index, line, settings) {
                 diagnostics.push(diagnostic);
             }
+        }
+
+        if enforce_bidirectional_unicode {
+            diagnostics.extend(pylint::rules::bidirectional_unicode(index, line));
         }
     }
 

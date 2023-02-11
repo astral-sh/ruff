@@ -1,5 +1,5 @@
 use num_traits::Zero;
-use rustpython_ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::{Binding, BindingKind, ExecutionContext};
 use crate::checkers::ast::Checker;

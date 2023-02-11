@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Parser;
 use configparser::ini::Ini;
+
 use ruff::flake8_to_ruff::{self, ExternalConfig};
+use ruff::logging::{set_up_logging, LogLevel};
 
 #[derive(Parser)]
 #[command(
@@ -27,6 +29,8 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    set_up_logging(&LogLevel::Default)?;
+
     let args = Args::parse();
 
     // Read the INI file.

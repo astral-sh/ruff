@@ -189,8 +189,8 @@ pub struct Options {
             fixable = ["E", "F"]
         "#
     )]
-    /// A list of rule codes or prefixes to consider autofixable. By default, all rules are
-    /// considered autofixable.
+    /// A list of rule codes or prefixes to consider autofixable. By default,
+    /// all rules are considered autofixable.
     pub fixable: Option<Vec<RuleSelector>>,
     #[option(
         default = r#""text""#,

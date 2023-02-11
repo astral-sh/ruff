@@ -1,9 +1,11 @@
 //! Generate CLI help.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
-use crate::utils::replace_readme_section;
-use anyhow::Result;
 use std::str;
+
+use anyhow::Result;
+
+use crate::utils::replace_readme_section;
 
 const COMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated command help. -->\n";
 const COMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated command help. -->";

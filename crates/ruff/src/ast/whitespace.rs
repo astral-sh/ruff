@@ -1,6 +1,6 @@
 use std::str::Lines;
 
-use rustpython_ast::{Located, Location};
+use rustpython_parser::ast::{Located, Location};
 
 use crate::ast::types::Range;
 use crate::source_code::Locator;

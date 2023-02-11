@@ -1,11 +1,9 @@
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
 use std::string::ToString;
 
 use log::error;
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashSet;
-use rustpython_ast::{Keyword, KeywordData};
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, KeywordData};
 
 use super::super::cformat::CFormatSummary;
 use super::super::fixes::{

@@ -1,9 +1,8 @@
 use std::path::Path;
 
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::{Binding, BindingKind, ExecutionContext};
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::rules::isort::{categorize, ImportType};
 use crate::settings::Settings;
@@ -165,6 +164,7 @@ pub fn typing_only_runtime_import(
             package,
             &settings.isort.known_first_party,
             &settings.isort.known_third_party,
+            &settings.isort.known_local_folder,
             &settings.isort.extra_standard_library,
             settings.target_version,
         ) {

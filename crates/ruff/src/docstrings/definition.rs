@@ -1,4 +1,4 @@
-use rustpython_ast::{Expr, Stmt};
+use rustpython_parser::ast::{Expr, Stmt};
 
 #[derive(Debug, Clone)]
 pub enum DefinitionKind<'a> {

@@ -1,16 +1,18 @@
+use std::path::Path;
+
 use itertools::Itertools;
 use log::error;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_ast::{
+use rustpython_parser::ast::{
     Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
     Located, Location, Stmt, StmtKind,
 };
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 use rustpython_parser::token::StringKind;
-use smallvec::smallvec;
+use smallvec::{smallvec, SmallVec};
 
 use crate::ast::types::{Binding, BindingKind, CallPath, Range};
 use crate::ast::visitor;
@@ -28,23 +30,29 @@ pub fn create_stmt(node: StmtKind) -> Stmt {
     Stmt::new(Location::default(), Location::default(), node)
 }
 
-/// Generate source code from an `Expr`.
+/// Generate source code from an [`Expr`].
 pub fn unparse_expr(expr: &Expr, stylist: &Stylist) -> String {
     let mut generator: Generator = stylist.into();
     generator.unparse_expr(expr, 0);
     generator.generate()
 }
 
-/// Generate source code from an `Stmt`.
+/// Generate source code from a [`Stmt`].
 pub fn unparse_stmt(stmt: &Stmt, stylist: &Stylist) -> String {
     let mut generator: Generator = stylist.into();
     generator.unparse_stmt(stmt);
     generator.generate()
 }
 
+/// Generate source code from an [`Constant`].
+pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
+    let mut generator: Generator = stylist.into();
+    generator.unparse_constant(constant);
+    generator.generate()
+}
+
 fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool {
     match &expr.node {
-        ExprKind::Call { func, .. } => collect_call_path_inner(func, parts),
         ExprKind::Attribute { value, attr, .. } => {
             if collect_call_path_inner(value, parts) {
                 parts.push(attr);
@@ -560,6 +568,17 @@ pub fn collect_arg_names<'a>(arguments: &'a Arguments) -> FxHashSet<&'a str> {
     arg_names
 }
 
+/// Given an [`Expr`] that can be callable or not (like a decorator, which could
+/// be used with or without explicit call syntax), return the underlying
+/// callable.
+pub fn map_callable(decorator: &Expr) -> &Expr {
+    if let ExprKind::Call { func, .. } = &decorator.node {
+        func
+    } else {
+        decorator
+    }
+}
+
 /// Returns `true` if a statement or expression includes at least one comment.
 pub fn has_comments<T>(located: &Located<T>, locator: &Locator) -> bool {
     let start = if match_leading_content(located, locator) {
@@ -655,6 +674,38 @@ pub fn to_call_path(target: &str) -> CallPath {
     } else {
         smallvec!["", target]
     }
+}
+
+/// Create a module path from a (package, path) pair.
+///
+/// For example, if the package is `foo/bar` and the path is `foo/bar/baz.py`,
+/// the call path is `["baz"]`.
+pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
+    path.strip_prefix(package.parent()?)
+        .ok()?
+        .iter()
+        .map(Path::new)
+        .map(std::path::Path::file_stem)
+        .map(|path| path.and_then(|path| path.to_os_string().into_string().ok()))
+        .collect::<Option<Vec<String>>>()
+}
+
+/// Create a call path from a relative import.
+pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath<'a> {
+    let mut call_path: CallPath = SmallVec::with_capacity(module.len() + 1);
+
+    // Start with the module path.
+    call_path.extend(module.iter().map(String::as_str));
+
+    // Remove segments based on the number of dots.
+    for _ in 0..name.chars().take_while(|c| *c == '.').count() {
+        call_path.pop();
+    }
+
+    // Add the remaining segments.
+    call_path.extend(name.trim_start_matches('.').split('.'));
+
+    call_path
 }
 
 /// A [`Visitor`] that collects all return statements in a function or method.
@@ -1098,7 +1149,7 @@ pub fn is_logger_candidate(func: &Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_ast::Location;
+    use rustpython_parser::ast::Location;
     use rustpython_parser::parser;
 
     use crate::ast::helpers::{

@@ -1,6 +1,5 @@
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Stmt};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

@@ -30,8 +30,9 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_6.py"); "F401_6")]
     #[test_case(Rule::UnusedImport, Path::new("F401_7.py"); "F401_7")]
     #[test_case(Rule::UnusedImport, Path::new("F401_8.py"); "F401_8")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_9.py"); "F401_9")]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"); "F402")]
-    #[test_case(Rule::ImportStarUsed, Path::new("F403.py"); "F403")]
+    #[test_case(Rule::ImportStar, Path::new("F403.py"); "F403")]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"); "F404")]
     #[test_case(Rule::ImportStarUsage, Path::new("F405.py"); "F405")]
     #[test_case(Rule::ImportStarNotPermitted, Path::new("F406.py"); "F406")]
@@ -101,6 +102,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_8.pyi"); "F821_8")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"); "F822_0")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"); "F822_1")]
+    #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"); "F822_2")]
     #[test_case(Rule::UndefinedLocal, Path::new("F823.py"); "F823")]
     #[test_case(Rule::UnusedVariable, Path::new("F841_0.py"); "F841_0")]
     #[test_case(Rule::UnusedVariable, Path::new("F841_1.py"); "F841_1")]
@@ -202,6 +204,32 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes/multi_statement_lines.py"),
             &settings::Settings::for_rule(Rule::UnusedImport),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn relative_typing_module() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/project/foo/bar.py"),
+            &settings::Settings {
+                typing_modules: vec!["foo.typical".to_string()],
+                ..settings::Settings::for_rules(vec![Rule::UndefinedName])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn nested_relative_typing_module() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/project/foo/bop/baz.py"),
+            &settings::Settings {
+                typing_modules: vec!["foo.typical".to_string()],
+                ..settings::Settings::for_rules(vec![Rule::UndefinedName])
+            },
         )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())
@@ -434,7 +462,7 @@ mod tests {
         // Can't find undefined names with import *.
         flakes(
             "from fu import *; bar",
-            &[Rule::ImportStarUsed, Rule::ImportStarUsage],
+            &[Rule::ImportStar, Rule::ImportStarUsage],
         );
     }
 
@@ -2450,7 +2478,7 @@ mod tests {
         csc(1)
         "#,
             &[
-                Rule::ImportStarUsed,
+                Rule::ImportStar,
                 Rule::ImportStarUsage,
                 Rule::ImportStarUsage,
                 Rule::ImportStarUsage,
@@ -2468,7 +2496,7 @@ mod tests {
         a = 1
         __all__ = ['a']
         "#,
-            &[Rule::ImportStarUsed, Rule::UnusedImport],
+            &[Rule::ImportStar, Rule::UnusedImport],
         );
     }
 

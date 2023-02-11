@@ -31,7 +31,35 @@ mod tests {
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
                     Rule::MissingReturnTypeClassMethod,
-                    Rule::DynamicallyTypedExpression,
+                    Rule::AnyType,
+                ])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ignore_fully_untyped() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_annotations/ignore_fully_untyped.py"),
+            &Settings {
+                flake8_annotations: super::settings::Settings {
+                    ignore_fully_untyped: true,
+                    ..Default::default()
+                },
+                ..Settings::for_rules(vec![
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingTypeArgs,
+                    Rule::MissingTypeKwargs,
+                    Rule::MissingTypeSelf,
+                    Rule::MissingTypeCls,
+                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypePrivateFunction,
+                    Rule::MissingReturnTypeSpecialMethod,
+                    Rule::MissingReturnTypeStaticMethod,
+                    Rule::MissingReturnTypeClassMethod,
+                    Rule::AnyType,
                 ])
             },
         )?;
@@ -45,10 +73,8 @@ mod tests {
             Path::new("flake8_annotations/suppress_dummy_args.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
-                    mypy_init_return: false,
                     suppress_dummy_args: true,
-                    suppress_none_returning: false,
-                    allow_star_arg_any: false,
+                    ..Default::default()
                 },
                 ..Settings::for_rules(vec![
                     Rule::MissingTypeFunctionArgument,
@@ -70,9 +96,7 @@ mod tests {
             &Settings {
                 flake8_annotations: super::settings::Settings {
                     mypy_init_return: true,
-                    suppress_dummy_args: false,
-                    suppress_none_returning: false,
-                    allow_star_arg_any: false,
+                    ..Default::default()
                 },
                 ..Settings::for_rules(vec![
                     Rule::MissingReturnTypePublicFunction,
@@ -83,7 +107,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        insta::assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -93,17 +117,21 @@ mod tests {
             Path::new("flake8_annotations/suppress_none_returning.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
-                    mypy_init_return: false,
-                    suppress_dummy_args: false,
                     suppress_none_returning: true,
-                    allow_star_arg_any: false,
+                    ..Default::default()
                 },
                 ..Settings::for_rules(vec![
+                    Rule::MissingTypeFunctionArgument,
+                    Rule::MissingTypeArgs,
+                    Rule::MissingTypeKwargs,
+                    Rule::MissingTypeSelf,
+                    Rule::MissingTypeCls,
                     Rule::MissingReturnTypePublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
                     Rule::MissingReturnTypeClassMethod,
+                    Rule::AnyType,
                 ])
             },
         )?;
@@ -117,12 +145,10 @@ mod tests {
             Path::new("flake8_annotations/allow_star_arg_any.py"),
             &Settings {
                 flake8_annotations: super::settings::Settings {
-                    mypy_init_return: false,
-                    suppress_dummy_args: false,
-                    suppress_none_returning: false,
                     allow_star_arg_any: true,
+                    ..Default::default()
                 },
-                ..Settings::for_rules(vec![Rule::DynamicallyTypedExpression])
+                ..Settings::for_rules(vec![Rule::AnyType])
             },
         )?;
         assert_yaml_snapshot!(diagnostics);

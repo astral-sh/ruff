@@ -1,12 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
     TryExceptPass: ~
   location:
-    row: 4
-    column: 4
+    row: 3
+    column: 0
   end_location:
     row: 4
     column: 8
@@ -15,8 +15,8 @@ expression: diagnostics
 - kind:
     TryExceptPass: ~
   location:
-    row: 9
-    column: 4
+    row: 8
+    column: 0
   end_location:
     row: 9
     column: 8
@@ -25,8 +25,8 @@ expression: diagnostics
 - kind:
     TryExceptPass: ~
   location:
-    row: 14
-    column: 4
+    row: 13
+    column: 0
   end_location:
     row: 14
     column: 8

@@ -1,20 +1,18 @@
+#![cfg(test)]
+
 /// Helper functions for the tests of rule implementations.
 use std::path::Path;
 
 use anyhow::Result;
 use rustpython_parser::lexer::LexResult;
 
-use crate::linter::LinterResult;
-use crate::{
-    autofix::fix_file,
-    directives, fs,
-    linter::check_path,
-    packaging::detect_package_root,
-    registry::Diagnostic,
-    rustpython_helpers,
-    settings::{flags, Settings},
-    source_code::{Indexer, Locator, Stylist},
-};
+use crate::autofix::fix_file;
+use crate::linter::{check_path, LinterResult};
+use crate::packaging::detect_package_root;
+use crate::registry::Diagnostic;
+use crate::settings::{flags, Settings};
+use crate::source_code::{Indexer, Locator, Stylist};
+use crate::{directives, fs, rustpython_helpers};
 
 pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)

@@ -541,6 +541,13 @@
             "null"
           ]
         },
+        "ignore-fully-untyped": {
+          "description": "Whether to suppress `ANN*` rules for any declaration that hasn't been typed at all. This makes it easier to gradually add types to a codebase.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
         "mypy-init-return": {
           "description": "Whether to allow the omission of a return type hint for `__init__` if at least one argument is annotated.",
           "type": [
@@ -931,7 +938,7 @@
           ]
         },
         "force-wrap-aliases": {
-          "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```py from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
+          "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```python from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
           "type": [
             "boolean",
             "null"
@@ -949,6 +956,16 @@
         },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "known-local-folder": {
+          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (from . import module).",
           "type": [
             "array",
             "null"
@@ -1460,6 +1477,11 @@
         "E50",
         "E501",
         "E7",
+        "E70",
+        "E701",
+        "E702",
+        "E703",
+        "E704",
         "E71",
         "E711",
         "E712",
@@ -1656,6 +1678,8 @@
         "PIE800",
         "PIE804",
         "PIE807",
+        "PIE81",
+        "PIE810",
         "PL",
         "PLC",
         "PLC0",
@@ -1669,6 +1693,8 @@
         "PLE",
         "PLE0",
         "PLE01",
+        "PLE010",
+        "PLE0100",
         "PLE011",
         "PLE0117",
         "PLE0118",
@@ -1680,6 +1706,15 @@
         "PLE11",
         "PLE114",
         "PLE1142",
+        "PLE13",
+        "PLE130",
+        "PLE1307",
+        "PLE131",
+        "PLE1310",
+        "PLE2",
+        "PLE25",
+        "PLE250",
+        "PLE2502",
         "PLR",
         "PLR0",
         "PLR01",
@@ -1775,6 +1810,10 @@
         "PTH122",
         "PTH123",
         "PTH124",
+        "PYI",
+        "PYI0",
+        "PYI00",
+        "PYI001",
         "Q",
         "Q0",
         "Q00",
@@ -1821,6 +1860,7 @@
         "S108",
         "S11",
         "S110",
+        "S112",
         "S113",
         "S3",
         "S32",
@@ -1832,6 +1872,8 @@
         "S508",
         "S509",
         "S6",
+        "S60",
+        "S608",
         "S61",
         "S612",
         "S7",

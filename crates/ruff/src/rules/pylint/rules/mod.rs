@@ -1,4 +1,7 @@
 pub use await_outside_async::{await_outside_async, AwaitOutsideAsync};
+pub use bad_str_strip_call::{bad_str_strip_call, BadStrStripCall};
+pub use bad_string_format_type::{bad_string_format_type, BadStringFormatType};
+pub use bidirectional_unicode::{bidirectional_unicode, BidirectionalUnicode};
 pub use comparison_of_constant::{comparison_of_constant, ComparisonOfConstant};
 pub use consider_using_sys_exit::{consider_using_sys_exit, ConsiderUsingSysExit};
 pub use global_variable_not_assigned::GlobalVariableNotAssigned;
@@ -21,8 +24,12 @@ pub use used_prior_global_declaration::{
 };
 pub use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub use useless_import_alias::{useless_import_alias, UselessImportAlias};
+pub use yield_in_init::{yield_in_init, YieldInInit};
 
 mod await_outside_async;
+mod bad_str_strip_call;
+mod bad_string_format_type;
+mod bidirectional_unicode;
 mod comparison_of_constant;
 mod consider_using_sys_exit;
 mod global_variable_not_assigned;
@@ -41,3 +48,4 @@ mod use_from_import;
 mod used_prior_global_declaration;
 mod useless_else_on_loop;
 mod useless_import_alias;
+mod yield_in_init;

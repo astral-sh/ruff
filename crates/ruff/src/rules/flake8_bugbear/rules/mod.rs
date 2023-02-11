@@ -2,8 +2,8 @@ pub use abstract_base_class::{
     abstract_base_class, AbstractBaseClassWithoutAbstractMethod,
     EmptyMethodWithoutAbstractDecorator,
 };
-pub use assert_false::{assert_false, DoNotAssertFalse};
-pub use assert_raises_exception::{assert_raises_exception, NoAssertRaisesException};
+pub use assert_false::{assert_false, AssertFalse};
+pub use assert_raises_exception::{assert_raises_exception, AssertRaisesException};
 pub use assignment_to_os_environ::{assignment_to_os_environ, AssignmentToOsEnviron};
 pub use cached_instance_method::{cached_instance_method, CachedInstanceMethod};
 pub use cannot_raise_literal::{cannot_raise_literal, CannotRaiseLiteral};
@@ -27,7 +27,6 @@ pub use raise_without_from_inside_except::{
 pub use redundant_tuple_in_exception_handler::{
     redundant_tuple_in_exception_handler, RedundantTupleInExceptionHandler,
 };
-
 pub use setattr_with_constant::{setattr_with_constant, SetAttrWithConstant};
 pub use star_arg_unpacking_after_keyword_arg::{
     star_arg_unpacking_after_keyword_arg, StarArgUnpackingAfterKeywordArg,

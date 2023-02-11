@@ -1,15 +1,13 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use itertools::Itertools;
 use log::error;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Alias, AliasData, Located};
-use rustpython_parser::ast::Stmt;
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Alias, AliasData, Located, Stmt};
 
 use crate::ast::types::Range;
 use crate::autofix;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct UnnecessaryFutureImport {

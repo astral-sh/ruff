@@ -1,9 +1,9 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
 use anyhow::{bail, Result};
 use log::debug;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
+use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::identifiers::is_identifier;
+use ruff_python::keyword::KWLIST;
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
@@ -11,8 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use ruff_python::identifiers::is_identifier;
-use ruff_python::keyword::KWLIST;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct ConvertNamedTupleFunctionalToClass {

@@ -3,14 +3,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use log::debug;
+use ruff_python::sys::KNOWN_STANDARD_LIBRARY;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use ruff_python::sys::KNOWN_STANDARD_LIBRARY;
-
-use crate::settings::types::PythonVersion;
-
 use super::types::{ImportBlock, Importable};
+use crate::settings::types::PythonVersion;
 
 #[derive(
     Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash,
@@ -29,6 +27,7 @@ enum Reason<'a> {
     NonZeroLevel,
     KnownFirstParty,
     KnownThirdParty,
+    KnownLocalFolder,
     ExtraStandardLibrary,
     Future,
     KnownStandardLibrary,
@@ -45,6 +44,7 @@ pub fn categorize(
     package: Option<&Path>,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
+    known_local_folder: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
     target_version: PythonVersion,
 ) -> ImportType {
@@ -55,6 +55,8 @@ pub fn categorize(
             (ImportType::FirstParty, Reason::KnownFirstParty)
         } else if known_third_party.contains(module_base) {
             (ImportType::ThirdParty, Reason::KnownThirdParty)
+        } else if known_local_folder.contains(module_base) {
+            (ImportType::LocalFolder, Reason::KnownLocalFolder)
         } else if extra_standard_library.contains(module_base) {
             (ImportType::StandardLibrary, Reason::ExtraStandardLibrary)
         } else if module_base == "__future__" {
@@ -100,12 +102,14 @@ fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
     None
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
     package: Option<&Path>,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
+    known_local_folder: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
     target_version: PythonVersion,
 ) -> BTreeMap<ImportType, ImportBlock<'a>> {
@@ -119,6 +123,7 @@ pub fn categorize_imports<'a>(
             package,
             known_first_party,
             known_third_party,
+            known_local_folder,
             extra_standard_library,
             target_version,
         );
@@ -137,6 +142,7 @@ pub fn categorize_imports<'a>(
             package,
             known_first_party,
             known_third_party,
+            known_local_folder,
             extra_standard_library,
             target_version,
         );
@@ -155,6 +161,7 @@ pub fn categorize_imports<'a>(
             package,
             known_first_party,
             known_third_party,
+            known_local_folder,
             extra_standard_library,
             target_version,
         );
@@ -173,6 +180,7 @@ pub fn categorize_imports<'a>(
             package,
             known_first_party,
             known_third_party,
+            known_local_folder,
             extra_standard_library,
             target_version,
         );

@@ -2,6 +2,7 @@ import collections
 from collections import namedtuple
 from typing import TypeVar
 from typing import NewType
+from typing import NamedTuple, TypedDict
 
 GLOBAL: str = "foo"
 
@@ -19,6 +20,10 @@ def assign():
 
     T = TypeVar("T")
     UserId = NewType("UserId", int)
+
+    Employee = NamedTuple('Employee', [('name', str), ('id', int)])
+
+    Point2D = TypedDict('Point2D', {'in': int, 'x-y': int})
 
 
 def aug_assign(rank, world_size):

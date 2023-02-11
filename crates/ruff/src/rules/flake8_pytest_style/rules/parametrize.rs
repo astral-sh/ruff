@@ -1,15 +1,15 @@
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
+
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Generator;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprContext, ExprKind};
 
 define_violation!(
     pub struct ParametrizeNamesWrongType {
@@ -41,12 +41,6 @@ impl Violation for ParametrizeValuesWrongType {
         let ParametrizeValuesWrongType { values, row } = self;
         format!("Wrong values type in `@pytest.mark.parametrize` expected `{values}` of `{row}`")
     }
-}
-
-fn get_parametrize_decorator<'a>(checker: &Checker, decorators: &'a [Expr]) -> Option<&'a Expr> {
-    decorators
-        .iter()
-        .find(|decorator| is_pytest_parametrize(decorator, checker))
 }
 
 fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
@@ -377,26 +371,27 @@ fn handle_value_rows(
 }
 
 pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
-    let decorator = get_parametrize_decorator(checker, decorators);
-    if let Some(decorator) = decorator {
-        if let ExprKind::Call { args, .. } = &decorator.node {
-            if checker
-                .settings
-                .rules
-                .enabled(&Rule::ParametrizeNamesWrongType)
-            {
-                if let Some(names) = args.get(0) {
-                    check_names(checker, names);
+    for decorator in decorators {
+        if is_pytest_parametrize(decorator, checker) {
+            if let ExprKind::Call { args, .. } = &decorator.node {
+                if checker
+                    .settings
+                    .rules
+                    .enabled(&Rule::ParametrizeNamesWrongType)
+                {
+                    if let Some(names) = args.get(0) {
+                        check_names(checker, names);
+                    }
                 }
-            }
-            if checker
-                .settings
-                .rules
-                .enabled(&Rule::ParametrizeValuesWrongType)
-            {
-                if let Some(names) = args.get(0) {
-                    if let Some(values) = args.get(1) {
-                        check_values(checker, names, values);
+                if checker
+                    .settings
+                    .rules
+                    .enabled(&Rule::ParametrizeValuesWrongType)
+                {
+                    if let Some(names) = args.get(0) {
+                        if let Some(values) = args.get(1) {
+                            check_values(checker, names, values);
+                        }
                     }
                 }
             }

@@ -1,14 +1,15 @@
-use itertools::Itertools;
-use rustpython_ast::{Cmpop, Expr, ExprKind, Located};
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use itertools::Itertools;
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Located};
+use serde::{Deserialize, Serialize};
+
+use crate::ast::helpers::unparse_constant;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ViolationsCmpop {
@@ -107,9 +108,9 @@ pub fn comparison_of_constant(
         {
             let diagnostic = Diagnostic::new(
                 ComparisonOfConstant {
-                    left_constant: left_constant.to_string(),
+                    left_constant: unparse_constant(left_constant, checker.stylist),
                     op: op.into(),
-                    right_constant: right_constant.to_string(),
+                    right_constant: unparse_constant(right_constant, checker.stylist),
                 },
                 Range::from_located(left),
             );

@@ -1,4 +1,4 @@
-use rustpython_ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{Stmt, StmtKind};
 
 use super::comments::Comment;
 use super::helpers::trailing_comma;

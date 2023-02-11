@@ -4,7 +4,7 @@ use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
 

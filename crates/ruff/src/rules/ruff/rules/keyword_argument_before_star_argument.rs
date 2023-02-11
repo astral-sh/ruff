@@ -1,9 +1,9 @@
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Expr, ExprKind, Keyword, KeywordData};
+
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Keyword, KeywordData};
 
 define_violation!(
     pub struct KeywordArgumentBeforeStarArgument {

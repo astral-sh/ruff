@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_annotations/mod.rs
+source: crates/ruff/src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -22,6 +22,17 @@ expression: diagnostics
   end_location:
     row: 50
     column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: a
+  location:
+    row: 59
+    column: 8
+  end_location:
+    row: 59
+    column: 9
   fix: ~
   parent: ~
 

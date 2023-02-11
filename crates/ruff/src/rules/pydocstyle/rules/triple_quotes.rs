@@ -1,16 +1,15 @@
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-use crate::define_violation;
-use ruff_macros::derive_message_formats;
-
 define_violation!(
-    pub struct UsesTripleQuotes;
+    pub struct TripleSingleQuotes;
 );
-impl Violation for UsesTripleQuotes {
+impl Violation for TripleSingleQuotes {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(r#"Use """triple double quotes""""#)
@@ -42,7 +41,7 @@ pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     };
     if !starts_with_triple {
         checker.diagnostics.push(Diagnostic::new(
-            UsesTripleQuotes,
+            TripleSingleQuotes,
             Range::from_located(docstring.expr),
         ));
     }

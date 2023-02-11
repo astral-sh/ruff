@@ -11,6 +11,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::rules::pep8_naming;
     use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
@@ -36,6 +37,25 @@ mod tests {
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn classmethod_decorators() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pep8_naming").join("N805.py").as_path(),
+            &settings::Settings {
+                pep8_naming: pep8_naming::settings::Settings {
+                    classmethod_decorators: vec![
+                        "classmethod".to_string(),
+                        "pydantic.validator".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }

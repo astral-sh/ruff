@@ -1,13 +1,11 @@
-use crate::define_violation;
-use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Expr, ExprKind, Keyword};
-use rustpython_parser::ast::Constant;
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::SimpleCallArgs;
+use crate::ast::helpers::{unparse_constant, SimpleCallArgs};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::violation::Violation;
 
 define_violation!(
     pub struct RequestWithoutTimeout {
@@ -47,7 +45,7 @@ pub fn request_without_timeout(
                 ExprKind::Constant {
                     value: value @ Constant::None,
                     ..
-                } => Some(value.to_string()),
+                } => Some(unparse_constant(value, checker.stylist)),
                 _ => None,
             } {
                 checker.diagnostics.push(Diagnostic::new(

@@ -1,10 +1,9 @@
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::types::BindingKind;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
-
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
 
 define_violation!(
     pub struct UnusedAnnotation {

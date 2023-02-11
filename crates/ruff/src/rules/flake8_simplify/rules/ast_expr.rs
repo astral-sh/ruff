@@ -1,13 +1,12 @@
-use crate::define_violation;
-use crate::violation::AlwaysAutofixableViolation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::{Constant, Expr, ExprKind};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct UseCapitalEnvironmentVariables {
@@ -36,14 +35,8 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    // check `os.environ.get('foo')` and `os.getenv('foo')``
-    if !checker.resolve_call_path(expr).map_or(false, |call_path| {
-        call_path.as_slice() == ["os", "environ", "get"] || call_path.as_slice() == ["os", "getenv"]
-    }) {
-        return;
-    }
-
-    let ExprKind::Call { args, .. } = &expr.node else {
+    // check `os.environ.get('foo')` and `os.getenv('foo')`.
+    let ExprKind::Call { func, args, .. } = &expr.node else {
         return;
     };
     let Some(arg) = args.get(0) else {
@@ -52,6 +45,12 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Constant { value: Constant::Str(env_var), kind } = &arg.node else {
         return;
     };
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["os", "environ", "get"] || call_path.as_slice() == ["os", "getenv"]
+    }) {
+        return;
+    }
+
     let capital_env_var = env_var.to_ascii_uppercase();
     if &capital_env_var == env_var {
         return;

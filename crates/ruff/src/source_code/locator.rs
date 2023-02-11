@@ -1,7 +1,7 @@
 //! Struct used to efficiently slice source code at (row, column) Locations.
 
 use once_cell::unsync::OnceCell;
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
 
@@ -151,7 +151,7 @@ impl<'a> Locator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_ast::Location;
+    use rustpython_parser::ast::Location;
 
     use crate::source_code::locator::{index_ascii, index_utf8, truncate_ascii, truncate_utf8};
 

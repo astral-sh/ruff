@@ -66,7 +66,7 @@ mod tests {
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_4.py"); "UP036_4")]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037.py"); "UP037")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),

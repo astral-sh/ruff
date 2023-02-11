@@ -49,6 +49,15 @@ pub struct Options {
     /// Whether to suppress `ANN401` for dynamically typed `*args` and
     /// `**kwargs` arguments.
     pub allow_star_arg_any: Option<bool>,
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = "ignore-fully-untyped = true"
+    )]
+    /// Whether to suppress `ANN*` rules for any declaration
+    /// that hasn't been typed at all.
+    /// This makes it easier to gradually add types to a codebase.
+    pub ignore_fully_untyped: Option<bool>,
 }
 
 #[derive(Debug, Default, Hash)]
@@ -58,6 +67,7 @@ pub struct Settings {
     pub suppress_dummy_args: bool,
     pub suppress_none_returning: bool,
     pub allow_star_arg_any: bool,
+    pub ignore_fully_untyped: bool,
 }
 
 impl From<Options> for Settings {
@@ -67,6 +77,7 @@ impl From<Options> for Settings {
             suppress_dummy_args: options.suppress_dummy_args.unwrap_or(false),
             suppress_none_returning: options.suppress_none_returning.unwrap_or(false),
             allow_star_arg_any: options.allow_star_arg_any.unwrap_or(false),
+            ignore_fully_untyped: options.ignore_fully_untyped.unwrap_or(false),
         }
     }
 }
@@ -78,6 +89,7 @@ impl From<Settings> for Options {
             suppress_dummy_args: Some(settings.suppress_dummy_args),
             suppress_none_returning: Some(settings.suppress_none_returning),
             allow_star_arg_any: Some(settings.allow_star_arg_any),
+            ignore_fully_untyped: Some(settings.ignore_fully_untyped),
         }
     }
 }

@@ -429,7 +429,7 @@ pub fn remove_argument(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_ast::Location;
+    use rustpython_parser::ast::Location;
     use rustpython_parser::parser;
 
     use crate::autofix::helpers::{next_stmt_break, trailing_semicolon};

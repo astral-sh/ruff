@@ -47,7 +47,7 @@ pub struct Options {
     /// exactly one member. For example, this formatting would be retained,
     /// rather than condensing to a single line:
     ///
-    /// ```py
+    /// ```python
     /// from .utils import (
     ///     test_directory as test_directory,
     ///     test_id as test_id
@@ -138,6 +138,17 @@ pub struct Options {
     /// A list of modules to consider third-party, regardless of whether they
     /// can be identified as such via introspection of the local filesystem.
     pub known_third_party: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            known-local-folder = ["src"]
+        "#
+    )]
+    /// A list of modules to consider being a local folder.
+    /// Generally, this is reserved for relative
+    /// imports (from . import module).
+    pub known_local_folder: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
@@ -247,6 +258,7 @@ pub struct Settings {
     pub force_wrap_aliases: bool,
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
+    pub known_local_folder: BTreeSet<String>,
     pub order_by_type: bool,
     pub relative_imports_order: RelativeImportsOrder,
     pub single_line_exclusions: BTreeSet<String>,
@@ -270,6 +282,7 @@ impl Default for Settings {
             force_wrap_aliases: false,
             known_first_party: BTreeSet::new(),
             known_third_party: BTreeSet::new(),
+            known_local_folder: BTreeSet::new(),
             order_by_type: true,
             relative_imports_order: RelativeImportsOrder::default(),
             single_line_exclusions: BTreeSet::new(),
@@ -297,6 +310,7 @@ impl From<Options> for Settings {
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
             known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
             known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
+            known_local_folder: BTreeSet::from_iter(options.known_local_folder.unwrap_or_default()),
             order_by_type: options.order_by_type.unwrap_or(true),
             relative_imports_order: options.relative_imports_order.unwrap_or_default(),
             single_line_exclusions: BTreeSet::from_iter(
@@ -324,6 +338,7 @@ impl From<Settings> for Options {
             force_wrap_aliases: Some(settings.force_wrap_aliases),
             known_first_party: Some(settings.known_first_party.into_iter().collect()),
             known_third_party: Some(settings.known_third_party.into_iter().collect()),
+            known_local_folder: Some(settings.known_local_folder.into_iter().collect()),
             order_by_type: Some(settings.order_by_type),
             relative_imports_order: Some(settings.relative_imports_order),
             single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),

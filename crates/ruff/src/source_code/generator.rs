@@ -2,10 +2,9 @@
 
 use std::ops::Deref;
 
-use rustpython_ast::{Excepthandler, ExcepthandlerKind, Suite, Withitem};
 use rustpython_parser::ast::{
-    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Expr, ExprKind,
-    Operator, Stmt, StmtKind,
+    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Excepthandler,
+    ExcepthandlerKind, Expr, ExprKind, Operator, Stmt, StmtKind, Suite, Withitem,
 };
 
 use crate::source_code::stylist::{Indentation, LineEnding, Quote, Stylist};
@@ -645,7 +644,7 @@ impl<'a> Generator<'a> {
                 let (op, prec) = opprec!(
                     un,
                     op,
-                    rustpython_ast::Unaryop,
+                    rustpython_parser::ast::Unaryop,
                     Invert("~", FACTOR),
                     Not("not ", NOT),
                     UAdd("+", FACTOR),
@@ -828,23 +827,7 @@ impl<'a> Generator<'a> {
                 if let Some(kind) = kind {
                     self.p(kind);
                 }
-                assert_eq!(f64::MAX_10_EXP, 308);
-                let inf_str = "1e309";
-                match value {
-                    Constant::Float(f) if f.is_infinite() => self.p(inf_str),
-                    Constant::Complex { real, imag }
-                        if real.is_infinite() || imag.is_infinite() =>
-                    {
-                        self.p(&value.to_string().replace("inf", inf_str));
-                    }
-                    Constant::Bytes(b) => {
-                        self.p(&bytes::repr(b, self.quote.into()));
-                    }
-                    Constant::Str(s) => {
-                        self.p(&format!("{}", str::repr(s, self.quote.into())));
-                    }
-                    _ => self.p(&format!("{value}")),
-                }
+                self.unparse_constant(value);
             }
             ExprKind::Attribute { value, attr, .. } => {
                 if let ExprKind::Constant {
@@ -917,6 +900,59 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(step, precedence::TEST);
                 }
             }
+        }
+    }
+
+    pub fn unparse_constant(&mut self, constant: &Constant) {
+        assert_eq!(f64::MAX_10_EXP, 308);
+        let inf_str = "1e309";
+        match constant {
+            Constant::Bytes(b) => {
+                self.p(&bytes::repr(b, self.quote.into()));
+            }
+            Constant::Str(s) => {
+                self.p(&format!("{}", str::repr(s, self.quote.into())));
+            }
+            Constant::None => self.p("None"),
+            Constant::Bool(b) => self.p(if *b { "True" } else { "False" }),
+            Constant::Int(i) => self.p(&format!("{}", i)),
+            Constant::Tuple(tup) => {
+                if let [elt] = &**tup {
+                    self.p("(");
+                    self.unparse_constant(elt);
+                    self.p(",");
+                    self.p(")");
+                } else {
+                    self.p("(");
+                    for (i, elt) in tup.iter().enumerate() {
+                        if i != 0 {
+                            self.p(", ");
+                        }
+                        self.unparse_constant(elt);
+                    }
+                    self.p(")");
+                }
+            }
+            Constant::Float(fp) => {
+                if fp.is_infinite() {
+                    self.p(inf_str);
+                } else {
+                    self.p(&rustpython_common::float_ops::to_string(*fp));
+                }
+            }
+            Constant::Complex { real, imag } => {
+                let value = if *real == 0.0 {
+                    format!("{imag}j")
+                } else {
+                    format!("({real}{imag:+}j)")
+                };
+                if real.is_infinite() || imag.is_infinite() {
+                    self.p(&value.replace("inf", inf_str));
+                } else {
+                    self.p(&value);
+                }
+            }
+            Constant::Ellipsis => self.p("..."),
         }
     }
 

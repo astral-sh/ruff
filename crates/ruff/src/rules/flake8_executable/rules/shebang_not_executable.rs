@@ -2,13 +2,12 @@ use std::path::Path;
 
 #[cfg(not(target_family = "wasm"))]
 use is_executable::IsExecutable;
-use ruff_macros::derive_message_formats;
+use ruff_macros::{define_violation, derive_message_formats};
 #[cfg(not(target_family = "wasm"))]
-use rustpython_ast::Location;
+use rustpython_parser::ast::Location;
 
 #[cfg(not(target_family = "wasm"))]
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 use crate::violation::Violation;
