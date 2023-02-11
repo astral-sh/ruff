@@ -25,10 +25,10 @@ Absolute imports, or relative imports from siblings, are recommended by [PEP 8](
 > ```
 
 Note that degree of strictness packages can be specified via the
-[`strictness`](https://github.com/charliermarsh/ruff#strictness)
-configuration option, which allows banning all relative imports (`strictness = "all"`)
-or only those that extend into the parent module or beyond (`strictness = "parents"`,
-the default).
+[`ban-relative-imports`](https://github.com/charliermarsh/ruff#ban-relative-imports)
+configuration option, which allows banning all relative imports
+(`ban-relative-imports = "all"`) or only those that extend into the parent module or beyond
+(`ban-relative-imports = "parents"`, the default).
 
 ## Example
 ```python
