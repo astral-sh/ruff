@@ -239,7 +239,7 @@ ruff_macros::define_rule_mapping!(
     ANN204 => rules::flake8_annotations::rules::MissingReturnTypeSpecialMethod,
     ANN205 => rules::flake8_annotations::rules::MissingReturnTypeStaticMethod,
     ANN206 => rules::flake8_annotations::rules::MissingReturnTypeClassMethod,
-    ANN401 => rules::flake8_annotations::rules::DynamicallyTypedExpression,
+    ANN401 => rules::flake8_annotations::rules::AnyType,
     // flake8-2020
     YTT101 => rules::flake8_2020::rules::SysVersionSlice3Referenced,
     YTT102 => rules::flake8_2020::rules::SysVersion2Referenced,
@@ -755,6 +755,7 @@ impl Rule {
             | Rule::ShebangMissingExecutableFile
             | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
+            | Rule::BidirectionalUnicode
             | Rule::ShebangPython
             | Rule::ShebangWhitespace => &LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment

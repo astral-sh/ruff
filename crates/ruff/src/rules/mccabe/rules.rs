@@ -7,7 +7,7 @@ use crate::source_code::Locator;
 use crate::violation::Violation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for functions with a high `McCabe` complexity.
     ///
     /// The `McCabe` complexity of a function is a measure of the complexity of the
@@ -15,10 +15,10 @@ define_violation!(
     /// number of decision points in the function. A decision point is a place in
     /// the code where the program has a choice of two or more paths to follow.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Functions with a high complexity are hard to understand and maintain.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// def foo(a, b, c):
     ///     if a:

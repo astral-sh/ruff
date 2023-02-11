@@ -3158,9 +3158,6 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteUnicodeLiteral) {
                     pyupgrade::rules::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
-                if self.settings.rules.enabled(&Rule::BidirectionalUnicode) {
-                    pylint::rules::bidirectional_unicode(self, expr, value);
-                }
             }
             ExprKind::Lambda { args, body, .. } => {
                 if self.settings.rules.enabled(&Rule::PreferListBuiltin) {
@@ -5039,10 +5036,7 @@ impl<'a> Checker<'a> {
                 .settings
                 .rules
                 .enabled(&Rule::MissingReturnTypeClassMethod)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::DynamicallyTypedExpression);
+            || self.settings.rules.enabled(&Rule::AnyType);
         let enforce_docstrings = self.settings.rules.enabled(&Rule::PublicModule)
             || self.settings.rules.enabled(&Rule::PublicClass)
             || self.settings.rules.enabled(&Rule::PublicMethod)

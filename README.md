@@ -910,7 +910,7 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/)
 | ANN204 | [missing-return-type-special-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-special-method.md) | Missing return type annotation for special method `{name}` | 🛠 |
 | ANN205 | [missing-return-type-static-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-static-method.md) | Missing return type annotation for staticmethod `{name}` |  |
 | ANN206 | [missing-return-type-class-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-class-method.md) | Missing return type annotation for classmethod `{name}` |  |
-| ANN401 | [dynamically-typed-expression](https://github.com/charliermarsh/ruff/blob/main/docs/rules/dynamically-typed-expression.md) | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
+| ANN401 | [any-type](https://github.com/charliermarsh/ruff/blob/main/docs/rules/any-type.md) | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
 
 ### flake8-bandit (S)
 
@@ -1368,7 +1368,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
 | PLE1307 | [bad-string-format-type](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-string-format-type.md) | Format type does not match argument type |  |
 | PLE1310 | bad-str-strip-call | String `{strip}` call contains duplicate characters (did you mean `{removal}`?) |  |
-| PLE2502 | bidirectional-unicode | Avoid using bidirectional unicode |  |
+| PLE2502 | bidirectional-unicode | Contains control characters that can permit obfuscated code |  |
 
 #### Refactor (PLR)
 
@@ -1984,6 +1984,15 @@ unfixable = ["B", "SIM", "TRY", "RUF"]
 ```
 
 If you find a case where Ruff's autofix breaks your code, please file an Issue!
+
+### How can I disable Ruff's color output?
+
+Ruff's color output is powered by the [`colored`](https://crates.io/crates/colored) crate, which
+attempts to automatically detect whether the output stream supports color. However, you can force
+colors off by setting the `NO_COLOR` environment variable to any value (e.g., `NO_COLOR=1`).
+
+[`colored`](https://crates.io/crates/colored) also supports the the `CLICOLOR` and `CLICOLOR_FORCE`
+environment variables (see the [spec](https://bixense.com/clicolors/)).
 
 <!-- End section: FAQ -->
 
@@ -3406,7 +3415,7 @@ alias (e.g., `import A as B`) to wrap such that every line contains
 exactly one member. For example, this formatting would be retained,
 rather than condensing to a single line:
 
-```py
+```python
 from .utils import (
     test_directory as test_directory,
     test_id as test_id

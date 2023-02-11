@@ -2,15 +2,15 @@
 
 Derived from the **flake8-annotations** linter.
 
-### What it does
+## What it does
 Checks that static methods have return type annotations.
 
-### Why is this bad?
+## Why is this bad?
 Type annotations are a good way to document the return types of functions. They also
 help catch bugs, when used alongside a type checker, by ensuring that the types of
 any returned values, and the types expected by callers, match expectation.
 
-### Example
+## Example
 ```python
 class Foo:
     @staticmethod
