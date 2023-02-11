@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UsePEP585Annotation:
+    DeprecatedCollectionType:
       name: List
   location:
     row: 4
@@ -22,7 +22,7 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UsePEP585Annotation:
+    DeprecatedCollectionType:
       name: List
   location:
     row: 11
@@ -41,7 +41,7 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UsePEP585Annotation:
+    DeprecatedCollectionType:
       name: List
   location:
     row: 18
@@ -60,7 +60,7 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UsePEP585Annotation:
+    DeprecatedCollectionType:
       name: List
   location:
     row: 25
