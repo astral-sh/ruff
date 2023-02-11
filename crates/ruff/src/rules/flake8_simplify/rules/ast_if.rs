@@ -16,11 +16,11 @@ use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violation::{AutofixKind, Availability, Violation};
 
 define_violation!(
-    pub struct NestedIfStatements {
+    pub struct CollapsibleIf {
         pub fixable: bool,
     }
 );
-impl Violation for NestedIfStatements {
+impl Violation for CollapsibleIf {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
@@ -29,7 +29,7 @@ impl Violation for NestedIfStatements {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let NestedIfStatements { fixable, .. } = self;
+        let CollapsibleIf { fixable, .. } = self;
         if *fixable {
             Some(|_| format!("Combine `if` statements using `and`"))
         } else {
@@ -209,7 +209,7 @@ pub fn nested_if_statements(
     );
 
     let mut diagnostic = Diagnostic::new(
-        NestedIfStatements { fixable },
+        CollapsibleIf { fixable },
         colon.map_or_else(
             || Range::from_located(stmt),
             |colon| Range::new(stmt.location, colon.end_location),

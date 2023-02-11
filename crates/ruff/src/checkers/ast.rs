@@ -1480,7 +1480,7 @@ where
                 if self.settings.rules.enabled(&Rule::IfTuple) {
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
-                if self.settings.rules.enabled(&Rule::NestedIfStatements) {
+                if self.settings.rules.enabled(&Rule::CollapsibleIf) {
                     flake8_simplify::rules::nested_if_statements(
                         self,
                         stmt,
