@@ -66,3 +66,18 @@ def f(a, b):
 
     y = \
         a if a is not None else b
+
+
+def f():
+    with Nested(m) as (cm):
+        pass
+
+
+def f():
+    with (Nested(m) as (cm),):
+        pass
+
+
+def f():
+    with Nested(m) as (x, y):
+        pass
