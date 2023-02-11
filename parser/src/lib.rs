@@ -27,9 +27,8 @@ mod function;
 pub mod lexer;
 pub mod mode;
 pub mod parser;
-mod string_parser;
+mod string;
 #[rustfmt::skip]
 mod python;
 mod context;
-mod string;
 pub mod token;

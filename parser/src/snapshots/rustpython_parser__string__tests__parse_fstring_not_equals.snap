@@ -1,5 +1,6 @@
 ---
-source: compiler/parser/src/string_parser.rs
+source: compiler/parser/src/string.rs
+assertion_line: 759
 expression: parse_ast
 ---
 [
@@ -11,7 +12,7 @@ expression: parse_ast
         end_location: Some(
             Location {
                 row: 1,
-                column: 13,
+                column: 11,
             },
         ),
         custom: (),
@@ -24,7 +25,7 @@ expression: parse_ast
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 11,
+                        column: 9,
                     },
                 ),
                 custom: (),
@@ -37,36 +38,36 @@ expression: parse_ast
                         end_location: Some(
                             Location {
                                 row: 1,
-                                column: 5,
+                                column: 4,
                             },
                         ),
                         custom: (),
                         node: Constant {
                             value: Int(
-                                42,
+                                1,
                             ),
                             kind: None,
                         },
                     },
                     ops: [
-                        Eq,
+                        NotEq,
                     ],
                     comparators: [
                         Located {
                             location: Location {
                                 row: 1,
-                                column: 9,
+                                column: 8,
                             },
                             end_location: Some(
                                 Location {
                                     row: 1,
-                                    column: 11,
+                                    column: 9,
                                 },
                             ),
                             custom: (),
                             node: Constant {
                                 value: Int(
-                                    42,
+                                    2,
                                 ),
                                 kind: None,
                             },
