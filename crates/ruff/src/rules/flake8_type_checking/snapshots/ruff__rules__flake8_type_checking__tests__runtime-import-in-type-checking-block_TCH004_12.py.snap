@@ -4,13 +4,13 @@ expression: diagnostics
 ---
 - kind:
     RuntimeImportInTypeCheckingBlock:
-      full_name: typing.Any
+      full_name: collections.abc.Callable
   location:
-    row: 5
-    column: 23
+    row: 6
+    column: 32
   end_location:
-    row: 5
-    column: 26
+    row: 6
+    column: 40
   fix: ~
   parent: ~
 
