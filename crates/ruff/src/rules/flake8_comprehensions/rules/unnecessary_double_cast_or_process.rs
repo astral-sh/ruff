@@ -9,13 +9,13 @@ use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for unnecessary `list/reversed/set/sorted/tuple` call within `list/set/sorted/tuple`.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// It's unnecessary to double-cast or double-process iterables by wrapping the listed functions within `list/set/sorted/tuple`.
     ///
-    /// ### Examples
+    /// ## Examples
     /// Rewrite `list(list(iterable))` as `list(iterable)`
     /// Rewrite `list(tuple(iterable))` as `list(iterable)`
     /// Rewrite `tuple(list(iterable))` as `tuple(iterable)`

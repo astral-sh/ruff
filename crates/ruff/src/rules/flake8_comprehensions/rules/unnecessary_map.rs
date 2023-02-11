@@ -11,16 +11,16 @@ use crate::rules::flake8_comprehensions::rules::helpers::function_name;
 use crate::violation::{AutofixKind, Availability, Violation};
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for unnecessary `map` usage.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// `map(func, iterable)` has great performance when func is a built-in function, and it
     /// makes sense if your function already has a name. But if your func is a lambda, it’s
     /// faster to use a generator expression or a comprehension, as it avoids the function call
     /// overhead.
     ///
-    /// ### Examples
+    /// ## Examples
     /// Rewrite `map(lambda x: x + 1, iterable)` to `(x + 1 for x in iterable)`
     /// Rewrite `map(lambda item: get_id(item), items)` to `(get_id(item) for item in items)`
     /// Rewrite `list(map(lambda num: num * 2, nums))` to `[num * 2 for num in nums]`
