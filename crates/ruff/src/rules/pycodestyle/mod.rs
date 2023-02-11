@@ -30,7 +30,6 @@ mod tests {
     #[test_case(Rule::ModuleImportNotAtTopOfFile, Path::new("E402.py"))]
     #[test_case(Rule::MultipleImportsOnOneLine, Path::new("E40.py"))]
     #[test_case(Rule::MultipleStatementsOnOneLineColon, Path::new("E70.py"))]
-    #[test_case(Rule::MultipleStatementsOnOneLineDef, Path::new("E70.py"))]
     #[test_case(Rule::MultipleStatementsOnOneLineSemicolon, Path::new("E70.py"))]
     #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_0.py"))]
     #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_1.py"))]
