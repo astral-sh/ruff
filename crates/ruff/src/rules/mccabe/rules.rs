@@ -44,15 +44,15 @@ define_violation!(
     ///         return 2
     ///     return 1
     /// ```
-    pub struct FunctionIsTooComplex {
+    pub struct ComplexStructure {
         pub name: String,
         pub complexity: usize,
     }
 );
-impl Violation for FunctionIsTooComplex {
+impl Violation for ComplexStructure {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionIsTooComplex { name, complexity } = self;
+        let ComplexStructure { name, complexity } = self;
         format!("`{name}` is too complex ({complexity})")
     }
 }
@@ -118,7 +118,7 @@ pub fn function_is_too_complex(
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
         Some(Diagnostic::new(
-            FunctionIsTooComplex {
+            ComplexStructure {
                 name: name.to_string(),
                 complexity,
             },

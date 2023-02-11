@@ -1,4 +1,4 @@
-# function-is-too-complex (C901)
+# complex-structure (C901)
 
 Derived from the **mccabe** linter.
 

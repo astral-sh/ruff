@@ -749,7 +749,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C901 | [function-is-too-complex](https://github.com/charliermarsh/ruff/blob/main/docs/rules/function-is-too-complex.md) | `{name}` is too complex ({complexity}) |  |
+| C901 | [complex-structure](https://github.com/charliermarsh/ruff/blob/main/docs/rules/complex-structure.md) | `{name}` is too complex ({complexity}) |  |
 
 ### isort (I)
 
