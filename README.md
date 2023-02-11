@@ -988,6 +988,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S509 | snmp-weak-cryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
 | S608 | [hardcoded-sql-expression](https://beta.ruff.rs/docs/rules/hardcoded-sql-expression/) | Possible SQL injection vector through string-based query construction |  |
 | S612 | logging-config-insecure-listen | Use of insecure `logging.config.listen` detected |  |
+| S613 | [ldap-injection](https://beta.ruff.rs/docs/rules/ldap-injection/) | Possible LDAP injection vector through string-based {} construction: "{}" |  |
 | S701 | jinja2-autoescape-false | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
 
 ### flake8-blind-except (BLE)

@@ -2444,6 +2444,9 @@ where
                 if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
+                if self.settings.rules.enabled(&Rule::LDAPInjection) {
+                    flake8_bandit::rules::ldap_injections(self, expr);
+                }
                 if self
                     .settings
                     .rules
@@ -2876,6 +2879,9 @@ where
                 if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
+                if self.settings.rules.enabled(&Rule::LDAPInjection) {
+                    flake8_bandit::rules::ldap_injections(self, expr);
+                }
             }
             ExprKind::BinOp {
                 left,
@@ -3043,6 +3049,9 @@ where
                     if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
                         flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                     }
+                    if self.settings.rules.enabled(&Rule::LDAPInjection) {
+                        flake8_bandit::rules::ldap_injections(self, expr);
+                    }
                 }
             }
             ExprKind::BinOp {
@@ -3066,6 +3075,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
+                }
+                if self.settings.rules.enabled(&Rule::LDAPInjection) {
+                    flake8_bandit::rules::ldap_injections(self, expr);
                 }
             }
             ExprKind::UnaryOp { op, operand } => {

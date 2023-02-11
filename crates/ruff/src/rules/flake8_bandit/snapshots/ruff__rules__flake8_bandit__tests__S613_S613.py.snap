@@ -1,0 +1,365 @@
+---
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(cn=%s)' % username"
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(&(objectClass=person)(uid=' + username + ')'"
+  location:
+    row: 13
+    column: 10
+  end_location:
+    row: 13
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(&(objectClass=person)(uid=%s))' % (username,)"
+  location:
+    row: 14
+    column: 10
+  end_location:
+    row: 14
+    column: 57
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(&(objectClass=person)(uid={}))'.format(username)"
+  location:
+    row: 15
+    column: 10
+  end_location:
+    row: 15
+    column: 60
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "f'(&(objectClass=person)(uid={username}))'"
+  location:
+    row: 16
+    column: 10
+  end_location:
+    row: 16
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(&(objectClass=person)(' + attr + '=Administrator)'"
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(  &  (  objectClass  =  person  ) ( uid = ' + username + ' )'"
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 63
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "f'(&({attr}={username}){filter1})'"
+  location:
+    row: 19
+    column: 18
+  end_location:
+    row: 19
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "f'(&({attr}={{username}}){filter1})'"
+  location:
+    row: 20
+    column: 18
+  end_location:
+    row: 20
+    column: 54
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(&(objectClass=person)(uid=' + username_f_escaped + '))'"
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 31
+    column: 57
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(&(objectClass=person)(uid=Administrator))'.format()"
+  location:
+    row: 32
+    column: 0
+  end_location:
+    row: 32
+    column: 53
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(&(objectClass=person)(uid=Administrator))' % {}"
+  location:
+    row: 33
+    column: 0
+  end_location:
+    row: 33
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(&(objectClass=person)(uid=Administrator))' + efilter1"
+  location:
+    row: 34
+    column: 0
+  end_location:
+    row: 34
+    column: 55
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "f'(&({attr}=%s){filter1})'"
+  location:
+    row: 36
+    column: 18
+  end_location:
+    row: 36
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "'uid=' + username + ',cn=users,dc=base'"
+  location:
+    row: 44
+    column: 6
+  end_location:
+    row: 44
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "'uid=%s,cn=users,dc=base' % (username,)"
+  location:
+    row: 45
+    column: 6
+  end_location:
+    row: 45
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "'uid={},cn=users,dc=base'.format(username)"
+  location:
+    row: 46
+    column: 6
+  end_location:
+    row: 46
+    column: 48
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "f'uid={username},cn=users,dc=base'"
+  location:
+    row: 47
+    column: 6
+  end_location:
+    row: 47
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "f'cn=foobar,uid={username},cn=users,dc=example,dc=org'"
+  location:
+    row: 48
+    column: 6
+  end_location:
+    row: 48
+    column: 60
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "f'uid={username},dc=base'"
+  location:
+    row: 49
+    column: 6
+  end_location:
+    row: 49
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "'uid=%s,cn=users,%s' % (username, ldap_base)"
+  location:
+    row: 50
+    column: 0
+  end_location:
+    row: 50
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "'UID = %s , cn = users , %s' % (username, ldap_base)"
+  location:
+    row: 51
+    column: 0
+  end_location:
+    row: 51
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "'entries=uid=%s,cn=users,%s' % (username, ldap_base)"
+  location:
+    row: 52
+    column: 0
+  end_location:
+    row: 52
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "f'(&(objectClass=posixAccount)(shadowExpire>={date - 1!r})(shadowExpire<={date + 1!r}))'"
+  location:
+    row: 53
+    column: 0
+  end_location:
+    row: 53
+    column: 88
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "'uid=' + username_dn_escaped + ',cn=users,dc=base'"
+  location:
+    row: 72
+    column: 0
+  end_location:
+    row: 72
+    column: 50
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(|(uid=%s))' % ')(uid='.join(map(efc, [username, username]))"
+  location:
+    row: 79
+    column: 0
+  end_location:
+    row: 79
+    column: 61
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(|(uid=' + ')(uid='.join({}.keys()) + '))'"
+  location:
+    row: 80
+    column: 0
+  end_location:
+    row: 80
+    column: 43
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "'cn=%s,%s' % (username, ','.join(dn1.split(',')[1:]))"
+  location:
+    row: 82
+    column: 0
+  end_location:
+    row: 82
+    column: 53
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: filter
+      string: "'(&(objectClass=person)(uid=' + foo(username) + ')'"
+  location:
+    row: 90
+    column: 0
+  end_location:
+    row: 90
+    column: 51
+  fix: ~
+  parent: ~
+- kind:
+    LDAPInjection:
+      injection_type: DN
+      string: "'uid=' + bar(username) + ',cn=users,dc=base'"
+  location:
+    row: 91
+    column: 0
+  end_location:
+    row: 91
+    column: 44
+  fix: ~
+  parent: ~
+

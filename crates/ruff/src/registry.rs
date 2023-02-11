@@ -391,6 +391,7 @@ ruff_macros::register_rules!(
     rules::flake8_bandit::rules::HardcodedPasswordFuncArg,
     rules::flake8_bandit::rules::HardcodedPasswordDefault,
     rules::flake8_bandit::rules::HardcodedSQLExpression,
+    rules::flake8_bandit::rules::LDAPInjection,
     rules::flake8_bandit::rules::HardcodedTempFile,
     rules::flake8_bandit::rules::TryExceptPass,
     rules::flake8_bandit::rules::TryExceptContinue,

@@ -408,6 +408,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bandit, "106") => Rule::HardcodedPasswordFuncArg,
         (Flake8Bandit, "107") => Rule::HardcodedPasswordDefault,
         (Flake8Bandit, "608") => Rule::HardcodedSQLExpression,
+        (Flake8Bandit, "613") => Rule::LDAPInjection,
         (Flake8Bandit, "108") => Rule::HardcodedTempFile,
         (Flake8Bandit, "110") => Rule::TryExceptPass,
         (Flake8Bandit, "112") => Rule::TryExceptContinue,

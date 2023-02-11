@@ -15,6 +15,7 @@ pub use hashlib_insecure_hash_functions::{
     hashlib_insecure_hash_functions, HashlibInsecureHashFunction,
 };
 pub use jinja2_autoescape_false::{jinja2_autoescape_false, Jinja2AutoescapeFalse};
+pub use ldap_injections::{ldap_injections, LDAPInjection};
 pub use logging_config_insecure_listen::{
     logging_config_insecure_listen, LoggingConfigInsecureListen,
 };
@@ -39,6 +40,7 @@ mod hardcoded_sql_expression;
 mod hardcoded_tmp_directory;
 mod hashlib_insecure_hash_functions;
 mod jinja2_autoescape_false;
+mod ldap_injections;
 mod logging_config_insecure_listen;
 mod request_with_no_cert_validation;
 mod request_without_timeout;

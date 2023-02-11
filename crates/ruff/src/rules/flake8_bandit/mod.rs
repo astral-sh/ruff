@@ -23,6 +23,7 @@ mod tests {
     #[test_case(Rule::HardcodedPasswordFuncArg, Path::new("S106.py"); "S106")]
     #[test_case(Rule::HardcodedPasswordDefault, Path::new("S107.py"); "S107")]
     #[test_case(Rule::HardcodedSQLExpression, Path::new("S608.py"); "S608")]
+    #[test_case(Rule::LDAPInjection, Path::new("S613.py"); "S613")]
     #[test_case(Rule::HardcodedTempFile, Path::new("S108.py"); "S108")]
     #[test_case(Rule::RequestWithoutTimeout, Path::new("S113.py"); "S113")]
     #[test_case(Rule::HashlibInsecureHashFunction, Path::new("S324.py"); "S324")]
