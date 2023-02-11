@@ -263,6 +263,7 @@ ruff_macros::define_rule_mapping!(
     SIM110 => rules::flake8_simplify::rules::ConvertLoopToAny,
     SIM111 => rules::flake8_simplify::rules::ConvertLoopToAll,
     SIM112 => rules::flake8_simplify::rules::UseCapitalEnvironmentVariables,
+    SIM116 => rules::flake8_simplify::rules::IfToDict,
     SIM117 => rules::flake8_simplify::rules::MultipleWithStatements,
     SIM118 => rules::flake8_simplify::rules::KeyInDict,
     SIM201 => rules::flake8_simplify::rules::NegateEqualOp,

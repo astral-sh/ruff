@@ -2,6 +2,7 @@ use log::error;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_macros::{define_violation, derive_message_formats};
+use std::collections::HashMap;
 
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::{
@@ -13,7 +14,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::violation::{AlwaysAutofixableViolation, AutofixKind, Availability, Violation};
 
 define_violation!(
     pub struct NestedIfStatements {
@@ -62,6 +63,37 @@ impl Violation for ReturnBoolConditionDirectly {
         } else {
             None
         }
+    }
+}
+
+define_violation!(
+    /// ### What it does
+    /// Checks for three or more consective if-statements with direct returns
+    ///
+    /// ### Why is this bad?
+    /// These can be simplified by using a dictionary
+    ///
+    /// ### Example
+    /// ```if x = 1:
+    ///     return "Hello"
+    /// elif x = 2:
+    ///     return "Goodbye"
+    /// else:
+    ///    return "Goodnight"
+    /// ```
+    ///
+    /// Use instead:
+    /// `return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")`
+    pub struct IfToDict;
+);
+impl AlwaysAutofixableViolation for IfToDict {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use a dictionary instead of consecutive `if` statements")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Replace if statement with a dictionary")
     }
 }
 
@@ -453,6 +485,209 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
 fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
     expr1.eq(expr2)
+}
+
+fn should_proceed_main(test: &Expr, body: &[Stmt], orelse: &[Stmt]) -> bool {
+    if let ExprKind::Compare {
+        left,
+        ops,
+        comparators,
+    } = &test.node
+    {
+        if let ExprKind::Name { .. } = &left.node {
+            if ops.len() == 1 && ops[0] == Cmpop::Eq {
+                if comparators.len() == 1 {
+                    if let ExprKind::Constant { .. } = &comparators[0].node {
+                        if body.len() == 1 {
+                            if let StmtKind::Return { .. } = &body[0].node {
+                                if orelse.len() == 1 {
+                                    if let StmtKind::If { .. } = &orelse[0].node {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+fn should_proceed_child(stmt: &Stmt, var_id: &str) -> bool {
+    if let StmtKind::If { test, body, orelse } = &stmt.node {
+        if let ExprKind::Compare {
+            left,
+            ops,
+            comparators,
+        } = &test.node
+        {
+            if let ExprKind::Name { id, .. } = &left.node {
+                if id == var_id && ops.len() == 1 && ops[0] == Cmpop::Eq {
+                    if comparators.len() == 1 {
+                        if let ExprKind::Constant { .. } = &comparators[0].node {
+                            if body.len() == 1 {
+                                if let StmtKind::Return { .. } = &body[0].node {
+                                    if orelse.len() == 1 {
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
+fn constant_to_str(value: &Constant) -> String {
+    match value {
+        Constant::None => "None".to_string(),
+        Constant::Str(s) => format!("\"{s}\""),
+        Constant::Int(i) => i.to_string(),
+        Constant::Float(f) => f.to_string(),
+        Constant::Ellipsis => "...".to_string(),
+        Constant::Bytes(b) => {
+            let the_string = String::from_utf8(b.to_vec()).unwrap();
+            format!("b\"{the_string}\"")
+        }
+        Constant::Complex { real, imag } => format!("{}+{}j", real, imag),
+        Constant::Bool(b) => match b {
+            true => "True".to_string(),
+            false => "False".to_string(),
+        },
+        Constant::Tuple(items) => {
+            let mut result = "(".to_string();
+            for item in items {
+                result.push_str(&constant_to_str(item));
+                result.push_str(", ");
+            }
+            result.push_str(")");
+            result
+        }
+    }
+}
+
+/// SIM116
+pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt], orelse: &[Stmt]) {
+    if !should_proceed_main(test, body, orelse) {
+        return;
+    }
+    let variable: String;
+    let mut child: Option<&Stmt> = orelse.get(0);
+    let mut else_value: Option<String> = None;
+    let mut key_value_pairs: HashMap<String, String> = HashMap::new();
+    // This check is useless because we also check above, but it makes Rust happy
+    if let ExprKind::Compare {
+        left, comparators, ..
+    } = &test.node
+    {
+        if let ExprKind::Constant { value, .. } = &comparators[0].node {
+            let key = constant_to_str(value);
+            if let StmtKind::Return { value } = &body[0].node {
+                let final_value = match value {
+                    Some(value) => checker
+                        .locator
+                        .slice_source_code_range(&Range::from_located(value)),
+                    None => return,
+                };
+                key_value_pairs.insert(key, final_value.to_string());
+            }
+        }
+        if let ExprKind::Name { id, .. } = &left.node {
+            variable = id.clone();
+        } else {
+            return;
+        }
+    } else {
+        return;
+    }
+    while child.is_some() {
+        if !should_proceed_child(child.unwrap(), &variable) {
+            return;
+        }
+        if let StmtKind::If { test, body, orelse } = &child.unwrap().node {
+            if let StmtKind::Return { value } = &body[0].node {
+                let clean_value = match value {
+                    Some(item) => item,
+                    None => return,
+                };
+                if let ExprKind::Call { .. } = &clean_value.node {
+                    return;
+                } else {
+                    if let ExprKind::Compare { comparators, .. } = &test.node {
+                        if let ExprKind::Constant {
+                            value: const_val, ..
+                        } = &comparators[0].node
+                        {
+                            let key = constant_to_str(const_val);
+                            let final_value = checker
+                                .locator
+                                .slice_source_code_range(&Range::from_located(clean_value));
+                            key_value_pairs.insert(key, final_value.to_string());
+                        }
+                    }
+                }
+            } else {
+                return;
+            }
+            // let current = checker.locator.slice_source_code_range(&Range::from_located(child.unwrap()));
+
+            if orelse.len() == 1 {
+                match &orelse[0].node {
+                    StmtKind::If { .. } => {
+                        child = orelse.get(0);
+                    },
+                    StmtKind::Return { value } => {
+                        let final_value = match value {
+                            Some(item) => checker
+                                .locator
+                                .slice_source_code_range(&Range::from_located(item)),
+                            None => "None",
+                        };
+                        else_value = Some(final_value.to_string());
+                        child = None;
+                    }
+                    _ => return,
+                }
+            } else {
+                child = None;
+            }
+        } else {
+            return;
+        }
+    }
+    if key_value_pairs.len() < 3 {
+        return;
+    }
+    let mut new_str = format!(
+        "{{ {} }}",
+        key_value_pairs
+            .iter()
+            .map(|(k, v)| format!("{}: {}", k, v))
+            .collect::<Vec<String>>()
+            .join(", ")
+    );
+    new_str.push_str(&format!(".get({variable}"));
+    if let Some(else_val) = &else_value {
+        new_str.push_str(&format!(", {}", else_val));
+    }
+    new_str.push(')');
+    let mut diagnostic = Diagnostic::new(
+        IfToDict,
+        Range::from_located(stmt),
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.amend(Fix::replacement(
+            new_str,
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM401
