@@ -46,7 +46,7 @@ def f():
 def f():
     import pandas as pd
 
-    x = dict["pd.DataFrame", "pd.DataFrame"]  # TCH002
+    x = dict["pd.DataFrame", "pd.DataFrame"]
 
 
 def f():
