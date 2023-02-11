@@ -4065,8 +4065,6 @@ impl<'a> Checker<'a> {
                 if let Some(index) = scope.bindings.get(&id.as_str()) {
                     // Mark the binding as used.
                     let context = self.execution_context();
-                    // println!("Marking {:?} as used", id);
-                    // println!("Context: {:?}", context);
                     self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
 
                     if matches!(self.bindings[*index].kind, BindingKind::Annotation)
@@ -4692,8 +4690,6 @@ impl<'a> Checker<'a> {
                 vec![]
             }
         };
-
-        // println!("runtime_imports: {:?}", runtime_imports);
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
         for (index, stack) in self.dead_scopes.iter().rev() {
