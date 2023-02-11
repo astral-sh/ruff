@@ -1,14 +1,12 @@
 use super::helpers;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::Constant::Bool;
-use rustpython_ast::ExprKind::{Attribute, Call, Constant, Name};
-use rustpython_ast::StmtKind::Assign;
-use rustpython_ast::{Expr, Stmt};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::Constant::Bool;
+use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+
 define_violation!(
     pub struct ModelStringFieldNullable(pub String);
 );
@@ -37,7 +35,7 @@ pub fn model_string_field_nullable(
         return errors;
     }
     for statement in body.iter() {
-        let Assign {value, ..} = &statement.node else {
+        let StmtKind::Assign {value, ..} = &statement.node else {
             continue
         };
         if let Some(field_name) = check_nullable_field(value) {
@@ -51,17 +49,17 @@ pub fn model_string_field_nullable(
 }
 
 fn check_nullable_field(value: &Expr) -> Option<&str> {
-    let Call {func, keywords, ..} = &value.node else {
+    let ExprKind::Call {func, keywords, ..} = &value.node else {
         return None;
     };
     let valid_field_name = match &func.node {
-        Attribute { attr, .. } => {
+        ExprKind::Attribute { attr, .. } => {
             if !NOT_NULL_TRUE_FIELDS.contains(&&**attr) {
                 return None;
             }
             Some(attr)
         }
-        Name { id, .. } => {
+        ExprKind::Name { id, .. } => {
             if !NOT_NULL_TRUE_FIELDS.contains(&&**id) {
                 return None;
             }
@@ -77,7 +75,7 @@ fn check_nullable_field(value: &Expr) -> Option<&str> {
     let mut blank_key = false;
     let mut unique_key = false;
     for keyword in keywords.iter() {
-        let Constant {value: Bool(true), ..} = &keyword.node.value.node else {
+        let ExprKind::Constant {value: Bool(true), ..} = &keyword.node.value.node else {
             continue
         };
         let Some(argument) = &keyword.node.arg else {

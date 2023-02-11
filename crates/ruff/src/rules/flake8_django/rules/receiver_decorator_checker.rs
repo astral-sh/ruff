@@ -1,10 +1,8 @@
 use crate::ast::types::Range;
-use crate::define_violation;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::derive_message_formats;
-use rustpython_ast::ExprKind::{Call, Name};
-use rustpython_ast::{Expr, Located};
+use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Expr, ExprKind, Located};
 define_violation!(
     pub struct ReceiverDecoratorChecker;
 );
@@ -16,10 +14,10 @@ impl Violation for ReceiverDecoratorChecker {
 }
 
 pub fn receiver_decorator_checker(decorator_list: &[Expr]) -> Option<Diagnostic> {
-    let Some(Located {node: Call{ func, ..}, ..}) = decorator_list.first() else {
+    let Some(Located {node: ExprKind::Call{ func, ..}, ..}) = decorator_list.first() else {
         return None;
     };
-    let Name {id, ..} = &func.node else {
+    let ExprKind::Name {id, ..} = &func.node else {
         return None;
     };
     if id == "receiver" {
