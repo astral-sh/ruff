@@ -2363,7 +2363,7 @@ where
                 }
 
                 // flake8-pie
-                if self.settings.rules.enabled(&Rule::NoUnnecessaryDictKwargs) {
+                if self.settings.rules.enabled(&Rule::UnnecessaryDictKwargs) {
                     flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
                 }
 
@@ -2781,7 +2781,7 @@ where
                     pyflakes::rules::repeated_keys(self, keys, values);
                 }
 
-                if self.settings.rules.enabled(&Rule::NoUnnecessarySpread) {
+                if self.settings.rules.enabled(&Rule::UnnecessarySpread) {
                     flake8_pie::rules::no_unnecessary_spread(self, keys, values);
                 }
             }
@@ -3767,7 +3767,7 @@ where
     }
 
     fn visit_body(&mut self, body: &'b [Stmt]) {
-        if self.settings.rules.enabled(&Rule::NoUnnecessaryPass) {
+        if self.settings.rules.enabled(&Rule::UnnecessaryPass) {
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
