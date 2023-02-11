@@ -1490,11 +1490,7 @@ where
                         self.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::ReturnBoolConditionDirectly)
-                {
+                if self.settings.rules.enabled(&Rule::NeedlessBool) {
                     flake8_simplify::rules::return_bool_condition_directly(self, stmt);
                 }
                 if self.settings.rules.enabled(&Rule::UseTernaryOperator) {
