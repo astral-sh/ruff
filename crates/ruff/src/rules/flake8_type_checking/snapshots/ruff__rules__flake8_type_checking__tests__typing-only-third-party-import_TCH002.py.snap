@@ -79,4 +79,15 @@ expression: diagnostics
     column: 23
   fix: ~
   parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pandas
+  location:
+    row: 47
+    column: 11
+  end_location:
+    row: 47
+    column: 23
+  fix: ~
+  parent: ~
 

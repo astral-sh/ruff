@@ -3900,7 +3900,10 @@ impl<'a> Checker<'a> {
     }
 
     pub const fn execution_context(&self) -> ExecutionContext {
-        if self.in_type_checking_block || self.in_annotation {
+        if self.in_type_checking_block
+            || self.in_annotation
+            || self.in_deferred_string_type_definition
+        {
             ExecutionContext::Typing
         } else {
             ExecutionContext::Runtime
