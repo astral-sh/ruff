@@ -393,6 +393,7 @@ pub fn lint_fix<'a>(
             // longer parseable on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
             if parseable && result.error.is_some() {
+                println!("{}", transformed);
                 #[allow(clippy::print_stderr)]
                 {
                     eprintln!(
