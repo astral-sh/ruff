@@ -5033,10 +5033,7 @@ impl<'a> Checker<'a> {
                 .settings
                 .rules
                 .enabled(&Rule::MissingReturnTypeClassMethod)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::DynamicallyTypedExpression);
+            || self.settings.rules.enabled(&Rule::AnyType);
         let enforce_docstrings = self.settings.rules.enabled(&Rule::PublicModule)
             || self.settings.rules.enabled(&Rule::PublicClass)
             || self.settings.rules.enabled(&Rule::PublicMethod)

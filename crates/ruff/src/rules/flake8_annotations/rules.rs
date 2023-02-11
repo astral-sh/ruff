@@ -401,14 +401,14 @@ define_violation!(
     /// * [PEP 484](https://www.python.org/dev/peps/pep-0484/#the-any-type)
     /// * [`typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
     /// * [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
-    pub struct DynamicallyTypedExpression {
+    pub struct AnyType {
         pub name: String,
     }
 );
-impl Violation for DynamicallyTypedExpression {
+impl Violation for AnyType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DynamicallyTypedExpression { name } = self;
+        let AnyType { name } = self;
         format!("Dynamically typed expressions (typing.Any) are disallowed in `{name}`")
     }
 }
@@ -443,7 +443,7 @@ fn check_dynamically_typed<F>(
 {
     if checker.match_typing_expr(annotation, "Any") {
         diagnostics.push(Diagnostic::new(
-            DynamicallyTypedExpression { name: func() },
+            AnyType { name: func() },
             Range::from_located(annotation),
         ));
     };
@@ -489,11 +489,7 @@ pub fn definition(
             // ANN401 for dynamically typed arguments
             if let Some(annotation) = &arg.node.annotation {
                 has_any_typed_arg = true;
-                if checker
-                    .settings
-                    .rules
-                    .enabled(&Rule::DynamicallyTypedExpression)
-                {
+                if checker.settings.rules.enabled(&Rule::AnyType) {
                     check_dynamically_typed(
                         checker,
                         annotation,
@@ -526,11 +522,7 @@ pub fn definition(
             if let Some(expr) = &arg.node.annotation {
                 has_any_typed_arg = true;
                 if !checker.settings.flake8_annotations.allow_star_arg_any {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(&Rule::DynamicallyTypedExpression)
-                    {
+                    if checker.settings.rules.enabled(&Rule::AnyType) {
                         let name = &arg.node.arg;
                         check_dynamically_typed(
                             checker,
@@ -561,11 +553,7 @@ pub fn definition(
             if let Some(expr) = &arg.node.annotation {
                 has_any_typed_arg = true;
                 if !checker.settings.flake8_annotations.allow_star_arg_any {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(&Rule::DynamicallyTypedExpression)
-                    {
+                    if checker.settings.rules.enabled(&Rule::AnyType) {
                         let name = &arg.node.arg;
                         check_dynamically_typed(
                             checker,
@@ -623,11 +611,7 @@ pub fn definition(
         // ANN201, ANN202, ANN401
         if let Some(expr) = &returns {
             has_typed_return = true;
-            if checker
-                .settings
-                .rules
-                .enabled(&Rule::DynamicallyTypedExpression)
-            {
+            if checker.settings.rules.enabled(&Rule::AnyType) {
                 check_dynamically_typed(checker, expr, || name.to_string(), &mut diagnostics);
             }
         } else if !(

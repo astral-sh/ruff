@@ -31,7 +31,7 @@ mod tests {
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
                     Rule::MissingReturnTypeClassMethod,
-                    Rule::DynamicallyTypedExpression,
+                    Rule::AnyType,
                 ])
             },
         )?;
@@ -59,7 +59,7 @@ mod tests {
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
                     Rule::MissingReturnTypeClassMethod,
-                    Rule::DynamicallyTypedExpression,
+                    Rule::AnyType,
                 ])
             },
         )?;
@@ -131,7 +131,7 @@ mod tests {
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
                     Rule::MissingReturnTypeClassMethod,
-                    Rule::DynamicallyTypedExpression,
+                    Rule::AnyType,
                 ])
             },
         )?;
@@ -148,7 +148,7 @@ mod tests {
                     allow_star_arg_any: true,
                     ..Default::default()
                 },
-                ..Settings::for_rules(vec![Rule::DynamicallyTypedExpression])
+                ..Settings::for_rules(vec![Rule::AnyType])
             },
         )?;
         assert_yaml_snapshot!(diagnostics);

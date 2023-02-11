@@ -910,7 +910,7 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/)
 | ANN204 | [missing-return-type-special-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-special-method.md) | Missing return type annotation for special method `{name}` | 🛠 |
 | ANN205 | [missing-return-type-static-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-static-method.md) | Missing return type annotation for staticmethod `{name}` |  |
 | ANN206 | [missing-return-type-class-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-class-method.md) | Missing return type annotation for classmethod `{name}` |  |
-| ANN401 | [dynamically-typed-expression](https://github.com/charliermarsh/ruff/blob/main/docs/rules/dynamically-typed-expression.md) | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
+| ANN401 | [any-type](https://github.com/charliermarsh/ruff/blob/main/docs/rules/any-type.md) | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
 
 ### flake8-bandit (S)
 

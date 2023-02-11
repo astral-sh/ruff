@@ -1,9 +1,9 @@
 ---
-source: src/rules/flake8_annotations/mod.rs
+source: crates/ruff/src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DynamicallyTypedExpression:
+    AnyType:
       name: a
   location:
     row: 10
@@ -14,7 +14,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression:
+    AnyType:
       name: foo
   location:
     row: 15
@@ -25,7 +25,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression:
+    AnyType:
       name: a
   location:
     row: 40
@@ -36,7 +36,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DynamicallyTypedExpression:
+    AnyType:
       name: foo_method
   location:
     row: 44
