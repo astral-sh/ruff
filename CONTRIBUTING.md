@@ -2,7 +2,7 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
-## The basics
+## The Basics
 
 Ruff welcomes contributions in the form of Pull Requests.
 
@@ -73,7 +73,7 @@ pre-commit run --all-files
 Your Pull Request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
 
-### Project structure
+### Project Structure
 
 Ruff is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
 such that all crates are contained in a flat `crates` directory.
@@ -190,7 +190,7 @@ To preview any changes to the documentation locally:
 The documentation should then be available locally at
 [http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
 
-## Release process
+## Release Process
 
 As of now, Ruff has an ad hoc release process: releases are cut with high frequency via GitHub
 Actions, which automatically generates the appropriate wheels across architectures and publishes
