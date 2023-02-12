@@ -2503,6 +2503,7 @@ dependencies = [
  "assert_cmd",
  "atty",
  "bincode",
+ "bitflags",
  "cachedir",
  "chrono",
  "clap 4.1.4",

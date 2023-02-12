@@ -30,6 +30,7 @@ annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { version = "1.0.66" }
 atty = { version = "0.2.14" }
 bincode = { version = "1.3.3" }
+bitflags = { version = "1.3.2" }
 cachedir = { version = "0.3.0" }
 chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
 clap = { version = "4.0.1", features = ["derive", "env"] }

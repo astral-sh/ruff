@@ -1,4 +1,5 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
+
 use std::fs::write;
 use std::io;
 use std::io::Write;
@@ -8,30 +9,45 @@ use std::path::Path;
 use anyhow::Result;
 use colored::Colorize;
 use log::{debug, error};
-use ruff::linter::{lint_fix, lint_only, LinterResult};
+use rustc_hash::FxHashMap;
+use similar::TextDiff;
+
+use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff::{fix, fs};
-use similar::TextDiff;
 
 use crate::cache;
 
 #[derive(Debug, Default)]
 pub struct Diagnostics {
     pub messages: Vec<Message>,
-    pub fixed: usize,
+    pub fixed: FxHashMap<String, FixTable>,
 }
 
 impl Diagnostics {
     pub fn new(messages: Vec<Message>) -> Self {
-        Self { messages, fixed: 0 }
+        Self {
+            messages,
+            fixed: FxHashMap::default(),
+        }
     }
 }
 
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
         self.messages.extend(other.messages);
-        self.fixed += other.fixed;
+        for (filename, fixed) in other.fixed {
+            if fixed.is_empty() {
+                continue;
+            }
+            let fixed_in_file = self.fixed.entry(filename).or_default();
+            for (rule, count) in fixed {
+                if count > 0 {
+                    *fixed_in_file.entry(rule).or_default() += count;
+                }
+            }
+        }
     }
 }
 
@@ -77,7 +93,7 @@ pub fn lint_path(
     ) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
         if let Ok((result, transformed, fixed)) = lint_fix(&contents, path, package, &settings.lib)
         {
-            if fixed > 0 {
+            if !fixed.is_empty() {
                 if matches!(autofix, fix::FixMode::Apply) {
                     write(path, transformed.as_bytes())?;
                 } else if matches!(autofix, fix::FixMode::Diff) {
@@ -94,12 +110,12 @@ pub fn lint_path(
         } else {
             // If we fail to autofix, lint the original source code.
             let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
-            let fixed = 0;
+            let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
         let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
-        let fixed = 0;
+        let fixed = FxHashMap::default();
         (result, fixed)
     };
 
@@ -128,7 +144,10 @@ pub fn lint_path(
         }
     }
 
-    Ok(Diagnostics { messages, fixed })
+    Ok(Diagnostics {
+        messages,
+        fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
+    })
 }
 
 /// Generate `Diagnostic`s from source code content derived from
@@ -159,7 +178,7 @@ pub fn lint_stdin(
                 io::stdout().write_all(transformed.as_bytes())?;
             } else if matches!(autofix, fix::FixMode::Diff) {
                 // But only write a diff if it's non-empty.
-                if fixed > 0 {
+                if !fixed.is_empty() {
                     let text_diff = TextDiff::from_lines(contents, &transformed);
                     let mut unified_diff = text_diff.unified_diff();
                     if let Some(path) = path {
@@ -183,7 +202,7 @@ pub fn lint_stdin(
                 settings,
                 autofix.into(),
             );
-            let fixed = 0;
+            let fixed = FxHashMap::default();
 
             // Write the contents to stdout anyway.
             if matches!(autofix, fix::FixMode::Apply) {
@@ -200,7 +219,7 @@ pub fn lint_stdin(
             settings,
             autofix.into(),
         );
-        let fixed = 0;
+        let fixed = FxHashMap::default();
         (result, fixed)
     };
 
@@ -211,5 +230,11 @@ pub fn lint_stdin(
         );
     }
 
-    Ok(Diagnostics { messages, fixed })
+    Ok(Diagnostics {
+        messages,
+        fixed: FxHashMap::from_iter([(
+            fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
+            fixed,
+        )]),
+    })
 }

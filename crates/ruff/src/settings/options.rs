@@ -313,6 +313,17 @@ pub struct Options {
     /// (overridden by the `--show-source` command-line flag).
     pub show_source: Option<bool>,
     #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # By default, always enumerate fixed violations.
+            show-fixes = true
+        "#
+    )]
+    /// Whether to show an enumeration of all autofixed lint violations
+    /// (overridden by the `--show-fixes` command-line flag).
+    pub show_fixes: Option<bool>,
+    #[option(
         default = r#"["."]"#,
         value_type = "list[str]",
         example = r#"

@@ -14,7 +14,7 @@ use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::CliSettings;
 use ::ruff::{fix, fs, warn_user_once};
 use args::{Args, CheckArgs, Command};
-use printer::{Printer, Violations};
+use printer::{Flags as PrinterFlags, Printer};
 
 pub(crate) mod args;
 mod cache;
@@ -140,6 +140,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         fix,
         fix_only,
         format,
+        show_fixes,
         update_check,
         ..
     } = match &pyproject_strategy {
@@ -166,12 +167,14 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     } else {
         fix::FixMode::None
     };
-    let violations = if cli.diff || fix_only {
-        Violations::Hide
-    } else {
-        Violations::Show
-    };
     let cache = !cli.no_cache;
+    let mut printer_flags = PrinterFlags::empty();
+    if !(cli.diff || fix_only) {
+        printer_flags |= PrinterFlags::SHOW_VIOLATIONS;
+    }
+    if show_fixes {
+        printer_flags |= PrinterFlags::SHOW_FIXES;
+    }
 
     #[cfg(debug_assertions)]
     if cache {
@@ -195,7 +198,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(format, log_level, autofix, violations);
+    let printer = Printer::new(format, log_level, autofix, printer_flags);
 
     if cli.watch {
         if !matches!(autofix, fix::FixMode::None) {
@@ -292,11 +295,11 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
         if !cli.exit_zero {
             if cli.diff || fix_only {
-                if diagnostics.fixed > 0 {
+                if !diagnostics.fixed.is_empty() {
                     return Ok(ExitStatus::Failure);
                 }
             } else if cli.exit_non_zero_on_fix {
-                if diagnostics.fixed > 0 || !diagnostics.messages.is_empty() {
+                if !diagnostics.fixed.is_empty() || !diagnostics.messages.is_empty() {
                     return Ok(ExitStatus::Failure);
                 }
             } else {
