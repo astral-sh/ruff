@@ -546,7 +546,7 @@ fn should_proceed_child(stmt: &Stmt, var_id: &str) -> bool {
 fn constant_to_str(value: &Constant) -> String {
     match value {
         Constant::None => "None".to_string(),
-        Constant::Str(s) => format!("\"{s}\""),
+        Constant::Str(s) => format!("{:?}", s),
         Constant::Int(i) => i.to_string(),
         Constant::Float(f) => f.to_string(),
         Constant::Ellipsis => "...".to_string(),
