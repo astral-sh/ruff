@@ -94,5 +94,6 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
             mdcat::push_tty(settings, env, &mut stdout, parser)?;
         }
     };
+
     Ok(())
 }
