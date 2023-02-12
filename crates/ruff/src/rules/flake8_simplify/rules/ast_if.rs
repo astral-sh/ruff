@@ -1,11 +1,9 @@
 use log::error;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
 
 use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::comparable::ComparableExpr;
+use crate::ast::comparable::{ComparableExpr, ComparableStmt};
 use crate::ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
@@ -15,8 +13,25 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
-use crate::source_code::Locator;
 use crate::violation::{AutofixKind, Availability, Violation};
+
+fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
+    expr1.eq(expr2)
+}
+
+fn compare_stmt(stmt1: &ComparableStmt, stmt2: &ComparableStmt) -> bool {
+    stmt1.eq(stmt2)
+}
+
+fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
+    if body1.len() != body2.len() {
+        return false;
+    }
+    body1
+        .iter()
+        .zip(body2.iter())
+        .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
+}
 
 define_violation!(
     pub struct CollapsibleIf {
@@ -482,10 +497,6 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     checker.diagnostics.push(diagnostic);
 }
 
-fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
-    expr1.eq(expr2)
-}
-
 fn get_if_body_pairs(orelse: &[Stmt], result: &mut Vec<Vec<Stmt>>) {
     if orelse.is_empty() {
         return;
@@ -515,28 +526,6 @@ fn get_if_body_pairs(orelse: &[Stmt], result: &mut Vec<Vec<Stmt>>) {
     }
 }
 
-pub fn is_equal(locator: &Locator, stmts1: &[Stmt], stmts2: &[Stmt]) -> bool {
-    if stmts1.len() != stmts2.len() {
-        return false;
-    }
-    for (stmt1, stmt2) in stmts1.iter().zip(stmts2.iter()) {
-        let text1 = locator.slice_source_code_range(&Range::from_located(stmt1));
-        let text2 = locator.slice_source_code_range(&Range::from_located(stmt2));
-        let lexer1: Vec<Tok> = lexer::make_tokenizer(text1)
-            .flatten()
-            .map(|(_, tok, _)| tok)
-            .collect();
-        let lexer2: Vec<Tok> = lexer::make_tokenizer(text2)
-            .flatten()
-            .map(|(_, tok, _)| tok)
-            .collect();
-        if lexer1 != lexer2 {
-            return false;
-        }
-    }
-    true
-}
-
 /// SIM114
 pub fn if_with_same_arms(checker: &mut Checker, body: &[Stmt], orelse: &[Stmt]) {
     if orelse.is_empty() {
@@ -553,7 +542,7 @@ pub fn if_with_same_arms(checker: &mut Checker, body: &[Stmt], orelse: &[Stmt]) 
     }
 
     for i in 0..(if_statements - 1) {
-        if is_equal(checker.locator, &final_stmts[i], &final_stmts[i + 1]) {
+        if compare_body(&final_stmts[i], &final_stmts[i + 1]) {
             let first = &final_stmts[i].first().unwrap();
             let last = &final_stmts[i].last().unwrap();
             checker.diagnostics.push(Diagnostic::new(

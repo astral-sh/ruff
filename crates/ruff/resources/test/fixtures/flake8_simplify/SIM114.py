@@ -1,4 +1,4 @@
-# These SHOULD change
+# Errors
 if a:
     b
 elif c:
@@ -52,9 +52,23 @@ if (
     and k == 14
 ):
     pass
-elif 1 == 2: pass
+elif 1 == 2:
+    pass
 
-# These SHOULD NOT change
+failures = errors = skipped = disabled = 0
+if result.eofs == "O":
+    pass
+elif result.eofs == "S":
+    skipped = 1
+elif result.eofs == "F":
+    failures = 1
+elif result.eofs == "E":
+    errors = 1
+else:
+    errors = 1
+
+
+# OK
 def complicated_calc(*arg, **kwargs):
     return 42
 

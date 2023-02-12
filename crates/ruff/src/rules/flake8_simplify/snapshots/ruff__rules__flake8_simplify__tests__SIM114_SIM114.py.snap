@@ -72,4 +72,44 @@ expression: diagnostics
     column: 8
   fix: ~
   parent: ~
+- kind:
+    IfWithSameArms: ~
+  location:
+    row: 66
+    column: 4
+  end_location:
+    row: 66
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    IfWithSameArms: ~
+  location:
+    row: 66
+    column: 4
+  end_location:
+    row: 66
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    IfWithSameArms: ~
+  location:
+    row: 66
+    column: 4
+  end_location:
+    row: 66
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    IfWithSameArms: ~
+  location:
+    row: 66
+    column: 4
+  end_location:
+    row: 66
+    column: 14
+  fix: ~
+  parent: ~
 
