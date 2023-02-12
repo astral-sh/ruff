@@ -2,6 +2,17 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
+- [The Basics](#the-basics)
+  - [Prerequisites](#prerequisites)
+  - [Development](#development)
+  - [Project Structure](#project-structure)
+  - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
+    - [Rule naming convention](#rule-naming-convention)
+  - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
+- [MkDocs](#mkdocs)
+- [Release Process](#release-process)
+- [Benchmarks](#benchmarks)
+
 ## The Basics
 
 Ruff welcomes contributions in the form of Pull Requests.
