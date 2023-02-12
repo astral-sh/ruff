@@ -35,18 +35,18 @@ impl AlwaysAutofixableViolation for UnusedVariable {
 
 /// Return the start and end [`Location`] of the token after the next match of the predicate,
 /// skipping over any bracketed expressions.
-fn match_token_after<F>(stmt: &Stmt, locator: &Locator, f: F) -> Range
+fn match_token_after<F, T>(located: &Located<T>, locator: &Locator, f: F) -> Range
 where
     F: Fn(Tok) -> bool,
 {
-    let contents = locator.slice_source_code_range(&Range::from_located(stmt));
+    let contents = locator.slice_source_code_at(located.location);
 
     // Track the bracket depth.
     let mut par_count = 0;
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for ((_, tok, _), (start, _, end)) in lexer::make_tokenizer_located(contents, stmt.location)
+    for ((_, tok, _), (start, _, end)) in lexer::make_tokenizer_located(contents, located.location)
         .flatten()
         .tuple_windows()
     {
@@ -168,43 +168,72 @@ fn remove_unused_variable(
 ) -> Option<(DeletionKind, Fix)> {
     // First case: simple assignment (`x = 1`)
     if let StmtKind::Assign { targets, value, .. } = &stmt.node {
-        if targets.len() == 1 && matches!(targets[0].node, ExprKind::Name { .. }) {
-            return if contains_effect(checker, value) {
-                // If the expression is complex (`x = foo()`), remove the assignment,
-                // but preserve the right-hand side.
-                Some((
-                    DeletionKind::Partial,
-                    Fix::deletion(
-                        stmt.location,
-                        match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal).location,
-                    ),
-                ))
-            } else {
-                // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                let parent = checker
-                    .child_to_parent
-                    .get(&RefEquality(stmt))
-                    .map(std::convert::Into::into);
-                let deleted: Vec<&Stmt> = checker
-                    .deletions
-                    .iter()
-                    .map(std::convert::Into::into)
-                    .collect();
-                match delete_stmt(
-                    stmt,
-                    parent,
-                    &deleted,
-                    checker.locator,
-                    checker.indexer,
-                    checker.stylist,
-                ) {
-                    Ok(fix) => Some((DeletionKind::Whole, fix)),
-                    Err(err) => {
-                        error!("Failed to delete unused variable: {}", err);
-                        None
+        if let Some(target) = targets.iter().find(|target| {
+            range.location == target.location && range.end_location == target.end_location.unwrap()
+        }) {
+            if matches!(target.node, ExprKind::Name { .. }) {
+                return if targets.len() > 1 {
+                    // Construct a deletion by concatenating everything before the target to
+                    // everything after it. This ensures that our edit spans the entire statement,
+                    // which in turn ensures that we only apply one edit per pass.
+                    Some((
+                        DeletionKind::Partial,
+                        Fix::replacement(
+                            format!(
+                                "{}{}",
+                                checker.locator.slice_source_code_range(&Range::new(
+                                    stmt.location,
+                                    target.location
+                                )),
+                                checker.locator.slice_source_code_range(&Range::new(
+                                    match_token_after(target, checker.locator, |tok| tok
+                                        == Tok::Equal)
+                                    .location,
+                                    stmt.end_location.unwrap()
+                                ))
+                            ),
+                            stmt.location,
+                            stmt.end_location.unwrap(),
+                        ),
+                    ))
+                } else if contains_effect(checker, value) {
+                    // If the expression is complex (`x = foo()`), remove the assignment,
+                    // but preserve the right-hand side.
+                    Some((
+                        DeletionKind::Partial,
+                        Fix::deletion(
+                            target.location,
+                            match_token_after(target, checker.locator, |tok| tok == Tok::Equal)
+                                .location,
+                        ),
+                    ))
+                } else {
+                    // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
+                    let parent = checker
+                        .child_to_parent
+                        .get(&RefEquality(stmt))
+                        .map(std::convert::Into::into);
+                    let deleted: Vec<&Stmt> = checker
+                        .deletions
+                        .iter()
+                        .map(std::convert::Into::into)
+                        .collect();
+                    match delete_stmt(
+                        stmt,
+                        parent,
+                        &deleted,
+                        checker.locator,
+                        checker.indexer,
+                        checker.stylist,
+                    ) {
+                        Ok(fix) => Some((DeletionKind::Whole, fix)),
+                        Err(err) => {
+                            error!("Failed to delete unused variable: {}", err);
+                            None
+                        }
                     }
-                }
-            };
+                };
+            }
         }
     }
 

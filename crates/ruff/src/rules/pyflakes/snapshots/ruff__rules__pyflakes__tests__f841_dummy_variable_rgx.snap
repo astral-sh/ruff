@@ -1,5 +1,5 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -71,7 +71,15 @@ expression: diagnostics
   end_location:
     row: 26
     column: 16
-  fix: ~
+  fix:
+    content:
+      - "(x, y) = bar"
+    location:
+      row: 26
+      column: 4
+    end_location:
+      row: 26
+      column: 22
   parent: ~
 - kind:
     UnusedVariable:
