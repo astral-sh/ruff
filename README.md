@@ -1267,7 +1267,7 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TID251 | banned-api | `{name}` is banned: {message} |  |
+| TID251 | [banned-api](https://github.com/charliermarsh/ruff/blob/main/docs/rules/banned-api.md) | `{name}` is banned: {message} |  |
 | TID252 | [relative-imports](https://github.com/charliermarsh/ruff/blob/main/docs/rules/relative-imports.md) | Relative imports from parent modules are banned | 🛠 |
 
 ### flake8-type-checking (TCH)
