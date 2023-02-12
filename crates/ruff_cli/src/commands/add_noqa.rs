@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 use ruff::linter::add_noqa_to_path;
 use ruff::resolver::PyprojectDiscovery;
-use ruff::{resolver, warn_user_once};
+use ruff::{packaging, resolver, warn_user_once};
 
 use crate::args::Overrides;
 use crate::iterators::par_iter;
@@ -30,13 +30,28 @@ pub fn add_noqa(
         return Ok(0);
     }
 
+    // Discover the package root for each Python file.
+    let package_roots = packaging::detect_package_roots(
+        &paths
+            .iter()
+            .flatten()
+            .map(ignore::DirEntry::path)
+            .collect::<Vec<_>>(),
+        &resolver,
+        pyproject_strategy,
+    );
+
     let start = Instant::now();
     let modifications: usize = par_iter(&paths)
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
+            let package = path
+                .parent()
+                .and_then(|parent| package_roots.get(parent))
+                .and_then(|package| *package);
             let settings = resolver.resolve(path, pyproject_strategy);
-            match add_noqa_to_path(path, settings) {
+            match add_noqa_to_path(path, package, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
                     error!("Failed to add noqa to {}: {e}", path.to_string_lossy());

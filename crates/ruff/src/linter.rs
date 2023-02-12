@@ -220,8 +220,8 @@ pub fn check_path(
 
 const MAX_ITERATIONS: usize = 100;
 
-/// Add any missing `#noqa` pragmas to the source code at the given `Path`.
-pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
+/// Add any missing `# noqa` pragmas to the source code at the given `Path`.
+pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings) -> Result<usize> {
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
@@ -247,7 +247,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         error,
     } = check_path(
         path,
-        None,
+        package,
         &contents,
         tokens,
         &locator,
