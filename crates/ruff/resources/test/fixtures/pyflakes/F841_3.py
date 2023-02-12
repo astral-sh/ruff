@@ -81,3 +81,25 @@ def f():
 def f():
     with Nested(m) as (x, y):
         pass
+
+
+def f():
+    toplevel = tt = lexer.get_token()
+    if not tt:
+        break
+
+
+def f():
+    toplevel = tt = lexer.get_token()
+
+
+def f():
+    toplevel = (a, b) = lexer.get_token()
+
+
+def f():
+    (a, b) = toplevel = lexer.get_token()
+
+
+def f():
+    toplevel = tt = 1
