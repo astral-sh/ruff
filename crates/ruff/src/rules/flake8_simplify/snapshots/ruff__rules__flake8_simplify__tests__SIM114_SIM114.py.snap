@@ -1,0 +1,75 @@
+---
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    CombineIfConditions: ~
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    CombineIfConditions: ~
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 9
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    CombineIfConditions: ~
+  location:
+    row: 15
+    column: 4
+  end_location:
+    row: 17
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    CombineIfConditions: ~
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 29
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    CombineIfConditions: ~
+  location:
+    row: 25
+    column: 8
+  end_location:
+    row: 26
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    CombineIfConditions: ~
+  location:
+    row: 32
+    column: 8
+  end_location:
+    row: 33
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    CombineIfConditions: ~
+  location:
+    row: 54
+    column: 4
+  end_location:
+    row: 54
+    column: 8
+  fix: ~
+  parent: ~
+

@@ -1258,6 +1258,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | SIM110 | convert-loop-to-any | Use `{any}` instead of `for` loop | 🛠 |
 | SIM111 | convert-loop-to-all | Use `{all}` instead of `for` loop | 🛠 |
 | SIM112 | use-capital-environment-variables | Use capitalized environment variable `{expected}` instead of `{original}` | 🛠 |
+| SIM114 | [combine-if-conditions](https://github.com/charliermarsh/ruff/blob/main/docs/rules/combine-if-conditions.md) | Combine the if statements and use an 'or' statement |  |
 | SIM115 | open-file-with-context-handler | Use context handler for opening files |  |
 | SIM117 | multiple-with-statements | Use a single `with` statement with multiple contexts instead of nested `with` statements | 🛠 |
 | SIM118 | key-in-dict | Use `{key} in {dict}` instead of `{key} in {dict}.keys()` | 🛠 |

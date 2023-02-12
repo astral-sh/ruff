@@ -1512,6 +1512,9 @@ where
                         self.current_stmt_parent().map(Into::into),
                     );
                 }
+                if self.settings.rules.enabled(&Rule::CombineIfConditions) {
+                    flake8_simplify::rules::combine_if_conditions(self, body, orelse);
+                }
                 if self.settings.rules.enabled(&Rule::NeedlessBool) {
                     flake8_simplify::rules::return_bool_condition_directly(self, stmt);
                 }

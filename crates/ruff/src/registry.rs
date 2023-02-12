@@ -252,6 +252,7 @@ ruff_macros::define_rule_mapping!(
     YTT303 => rules::flake8_2020::rules::SysVersionSlice1Referenced,
     // flake8-simplify
     SIM115 => rules::flake8_simplify::rules::OpenFileWithContextHandler,
+    SIM114 => rules::flake8_simplify::rules::CombineIfConditions,
     SIM101 => rules::flake8_simplify::rules::DuplicateIsinstanceCall,
     SIM102 => rules::flake8_simplify::rules::CollapsibleIf,
     SIM103 => rules::flake8_simplify::rules::NeedlessBool,
