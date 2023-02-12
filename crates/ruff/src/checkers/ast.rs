@@ -3155,6 +3155,23 @@ where
                 if self.settings.rules.enabled(&Rule::YodaConditions) {
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
                 }
+
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnrecognizedPlatformCheck)
+                    || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
+                {
+                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                        flake8_pyi::rules::unrecognized_platform(
+                            self,
+                            expr,
+                            left,
+                            ops,
+                            comparators,
+                        );
+                    }
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),
