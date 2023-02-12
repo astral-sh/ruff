@@ -529,7 +529,7 @@ fn should_proceed_child(stmt: &Stmt, var_id: &str) -> bool {
                         if let ExprKind::Constant { .. } = &comparators[0].node {
                             if body.len() == 1 {
                                 if let StmtKind::Return { .. } = &body[0].node {
-                                    if orelse.len() == 1 {
+                                    if orelse.len() <= 1 {
                                         return true;
                                     }
                                 }
