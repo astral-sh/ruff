@@ -3,25 +3,25 @@
 Derived from the **pycodestyle** linter.
 
 ## What it does
-Checks for bare `except:` statements in `try...except`.
+Checks for bare `except:` in `try...except` statements.
 
 ## Why is this bad?
-A bare except catches `BaseExceptions` which includes `KeyboardInterrupt`, `SystemExit`, `Exception` and others. It can make it hard to interrupt the program with Ctrl+C and disguise other problems.
+A bare except catches `BaseException` which includes `KeyboardInterrupt`, `SystemExit`, `Exception` and others. It can make it hard to interrupt the program with Ctrl+C and disguise other problems.
 
 ## Example
 ```python
 try:
-   raise(KeyboardInterrupt("You probably don't mean to break CTRL-C."))
+    raise(KeyboardInterrupt("You probably don't mean to break CTRL-C."))
 except:
-   print("But a bare except will catch BaseExceptions and break keyboard interrupts.")
+    print("But a bare except will catch BaseExceptions and break keyboard interrupts.")
 ```
 
 Use instead:
 ```python
 try:
-   do_something_that_might_break()
+    do_something_that_might_break()
 except MoreSpecificException as e:
-   handle_error(e)
+    handle_error(e)
 ```
 
 ## References
