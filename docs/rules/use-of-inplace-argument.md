@@ -5,7 +5,7 @@ Derived from the **pandas-vet** linter.
 Autofix is always available.
 
 ## What it does
-Checks for `inplace=True` inside `pandas` code.
+Checks for `inplace=True` in code using the `pandas` library.
 
 ## Why is this bad?
 - Many people expect `inplace=True` to be a performance benefit that prevents dataframe copies, but that's often not true.
