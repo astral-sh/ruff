@@ -18,7 +18,7 @@ define_violation!(
     /// ability to use the method chaining style for `pandas` operations.
     ///
     /// Further, in many cases, `inplace=True` does not provide a performance
-    /// benefit, as Pandas will often copy DataFrames in the background.
+    /// benefit, as `pandas` will often copy `DataFrames` in the background.
     ///
     /// ## Example
     /// ```python
@@ -41,7 +41,7 @@ impl AlwaysAutofixableViolation for UseOfInplaceArgument {
     }
 
     fn autofix_title(&self) -> String {
-        format!("Assign to variable and remove the `inplace` arg")
+        format!("Assign to variable; remove `inplace` arg")
     }
 }
 

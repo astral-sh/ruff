@@ -14,7 +14,7 @@ which is harder to reason about and may cause bugs. It also removes the
 ability to use the method chaining style for `pandas` operations.
 
 Further, in many cases, `inplace=True` does not provide a performance
-benefit, as Pandas will often copy DataFrames in the background.
+benefit, as `pandas` will often copy `DataFrames` in the background.
 
 ## Example
 ```python
