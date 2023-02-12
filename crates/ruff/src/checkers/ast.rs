@@ -1513,7 +1513,11 @@ where
                     );
                 }
                 if self.settings.rules.enabled(&Rule::IfWithSameArms) {
-                    flake8_simplify::rules::if_with_same_arms(self, body, orelse);
+                    flake8_simplify::rules::if_with_same_arms(
+                        self,
+                        stmt,
+                        self.current_stmt_parent().map(std::convert::Into::into),
+                    );
                 }
                 if self.settings.rules.enabled(&Rule::NeedlessBool) {
                     flake8_simplify::rules::return_bool_condition_directly(self, stmt);

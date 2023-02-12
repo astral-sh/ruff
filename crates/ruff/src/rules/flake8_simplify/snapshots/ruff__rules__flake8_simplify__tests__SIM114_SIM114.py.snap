@@ -5,30 +5,40 @@ expression: diagnostics
 - kind:
     IfWithSameArms: ~
   location:
-    row: 3
-    column: 4
+    row: 2
+    column: 0
   end_location:
-    row: 3
+    row: 5
     column: 5
   fix: ~
   parent: ~
 - kind:
     IfWithSameArms: ~
   location:
-    row: 8
-    column: 4
+    row: 7
+    column: 0
   end_location:
-    row: 9
+    row: 12
     column: 22
   fix: ~
   parent: ~
 - kind:
     IfWithSameArms: ~
   location:
-    row: 15
-    column: 4
+    row: 14
+    column: 0
   end_location:
-    row: 17
+    row: 21
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    IfWithSameArms: ~
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 36
     column: 26
   fix: ~
   parent: ~
@@ -45,70 +55,30 @@ expression: diagnostics
 - kind:
     IfWithSameArms: ~
   location:
-    row: 25
-    column: 8
+    row: 31
+    column: 4
   end_location:
-    row: 26
+    row: 36
     column: 26
   fix: ~
   parent: ~
 - kind:
     IfWithSameArms: ~
   location:
-    row: 32
-    column: 8
+    row: 38
+    column: 0
   end_location:
-    row: 33
-    column: 26
-  fix: ~
-  parent: ~
-- kind:
-    IfWithSameArms: ~
-  location:
-    row: 54
-    column: 4
-  end_location:
-    row: 54
+    row: 56
     column: 8
   fix: ~
   parent: ~
 - kind:
     IfWithSameArms: ~
   location:
-    row: 66
-    column: 4
+    row: 62
+    column: 5
   end_location:
-    row: 66
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    IfWithSameArms: ~
-  location:
-    row: 66
-    column: 4
-  end_location:
-    row: 66
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    IfWithSameArms: ~
-  location:
-    row: 66
-    column: 4
-  end_location:
-    row: 66
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    IfWithSameArms: ~
-  location:
-    row: 66
-    column: 4
-  end_location:
-    row: 66
+    row: 65
     column: 14
   fix: ~
   parent: ~

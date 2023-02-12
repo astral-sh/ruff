@@ -134,7 +134,7 @@ define_violation!(
 impl Violation for IfWithSameArms {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Combine `if` statements using `or`")
+        format!("Combine `if` branches using logical `or` operator")
     }
 }
 
@@ -497,57 +497,73 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     checker.diagnostics.push(diagnostic);
 }
 
-fn get_if_body_pairs(orelse: &[Stmt], result: &mut Vec<Vec<Stmt>>) {
-    if orelse.is_empty() {
-        return;
-    }
-    let mut current_vec: Vec<Stmt> = vec![];
-    for if_line in orelse {
-        if let StmtKind::If {
-            body: orelse_body,
-            orelse: orelse_orelse,
-            ..
-        } = &if_line.node
-        {
-            if !current_vec.is_empty() {
-                result.push(current_vec.clone());
-                current_vec = vec![];
-            }
-            if !orelse_body.is_empty() {
-                result.push(orelse_body.clone());
-            }
-            get_if_body_pairs(orelse_orelse, result);
-        } else {
-            current_vec.push(if_line.clone());
+fn get_if_body_pairs<'a>(
+    test: &'a Expr,
+    body: &'a [Stmt],
+    orelse: &'a [Stmt],
+) -> Vec<(&'a Expr, &'a [Stmt])> {
+    let mut pairs = vec![(test, body)];
+    let mut orelse = orelse;
+    loop {
+        if orelse.len() != 1 {
+            break;
         }
+        let StmtKind::If { test, body, orelse: orelse_orelse, .. } = &orelse[0].node else {
+            break;
+        };
+        pairs.push((test, body));
+        orelse = orelse_orelse;
     }
-    if !current_vec.is_empty() {
-        result.push(current_vec.clone());
-    }
+    pairs
 }
 
 /// SIM114
-pub fn if_with_same_arms(checker: &mut Checker, body: &[Stmt], orelse: &[Stmt]) {
-    if orelse.is_empty() {
+pub fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
+    let StmtKind::If { test, body, orelse } = &stmt.node else {
         return;
+    };
+
+    // It's part of a bigger if-elif block:
+    // https://github.com/MartinThoma/flake8-simplify/issues/115
+    if let Some(StmtKind::If {
+        orelse: parent_orelse,
+        ..
+    }) = parent.map(|parent| &parent.node)
+    {
+        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
+            // TODO(charlie): These two cases have the same AST:
+            //
+            // if True:
+            //     pass
+            // elif a:
+            //     b = 1
+            // else:
+            //     b = 2
+            //
+            // if True:
+            //     pass
+            // else:
+            //     if a:
+            //         b = 1
+            //     else:
+            //         b = 2
+            //
+            // We want to flag the latter, but not the former. Right now, we flag neither.
+            return;
+        }
     }
 
-    // It's not all combinations because of this:
-    // https://github.com/MartinThoma/flake8-simplify/issues/70#issuecomment-924074984
-    let mut final_stmts: Vec<Vec<Stmt>> = vec![body.to_vec()];
-    get_if_body_pairs(orelse, &mut final_stmts);
-    let if_statements = final_stmts.len();
-    if if_statements <= 1 {
-        return;
-    }
-
-    for i in 0..(if_statements - 1) {
-        if compare_body(&final_stmts[i], &final_stmts[i + 1]) {
-            let first = &final_stmts[i].first().unwrap();
-            let last = &final_stmts[i].last().unwrap();
+    let if_body_pairs = get_if_body_pairs(test, body, orelse);
+    for i in 0..(if_body_pairs.len() - 1) {
+        let (test, body) = &if_body_pairs[i];
+        let (.., next_body) = &if_body_pairs[i + 1];
+        if compare_body(body, next_body) {
             checker.diagnostics.push(Diagnostic::new(
                 IfWithSameArms,
-                Range::new(first.location, last.end_location.unwrap()),
+                Range::new(
+                    if i == 0 { stmt.location } else { test.location },
+                    next_body.last().unwrap().end_location.unwrap(),
+                ),
             ));
         }
     }
