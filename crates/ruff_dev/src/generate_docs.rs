@@ -2,6 +2,7 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::fs;
+use std::path::Path;
 
 use anyhow::Result;
 use ruff::registry::{Linter, Rule, RuleNamespace};
@@ -18,6 +19,10 @@ pub struct Args {
 }
 
 pub fn main(args: &Args) -> Result<()> {
+    let out_dir = Path::new("docs/rules");
+    if !args.dry_run {
+        fs::create_dir_all(out_dir)?;
+    }
     for rule in Rule::iter() {
         if let Some(explanation) = rule.explanation() {
             let mut output = String::new();
@@ -44,8 +49,7 @@ pub fn main(args: &Args) -> Result<()> {
             if args.dry_run {
                 println!("{output}");
             } else {
-                fs::create_dir_all("docs/rules")?;
-                fs::write(format!("docs/rules/{}.md", rule.as_ref()), output)?;
+                fs::write(out_dir.join(format!("{}.md", rule.as_ref())), output)?;
             }
         }
     }
