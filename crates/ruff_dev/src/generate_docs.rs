@@ -40,7 +40,7 @@ pub fn main(args: &Args) -> Result<()> {
             output.push_str(explanation.trim());
 
             if args.dry_run {
-                println!("{}", output);
+                println!("{output}");
             } else {
                 fs::create_dir_all("docs/rules")?;
                 fs::write(format!("docs/rules/{}.md", rule.as_ref()), output)?;
