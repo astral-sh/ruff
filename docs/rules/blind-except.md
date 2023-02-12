@@ -11,26 +11,26 @@ Catching `Exception` includes `AssertionError`, `ImportError`, `NameError`, `Att
 ## Example
 ```python
 try:
-   assert False, "You probably don't want to catch AssertionErrors."
+    assert False, "You probably don't want to catch AssertionErrors."
 except Exception:
-   print("But you will catch them.")
+    print("But you will catch them.")
 ```
 
 Use instead:
 ```python
 try:
-   assert False, "You probably don't want to catch AssertionErrors."
+    assert False, "You probably don't want to catch AssertionErrors."
 except MoreSpecificException:
-   print("And now you won't.")
+    print("And now you won't.")
 ```
 
 Or:
 ```python
 try:
-  assert False, "You probably don't want to catch AssertionErrors."
+   assert False, "You probably don't want to catch AssertionErrors."
 except Exception:
-  logger.Exception("Catch and log errors in a top level module.")
-  raise
+   logger.Exception("Catch and log errors in a top level module.")
+   raise
 ```
 
 ## References
