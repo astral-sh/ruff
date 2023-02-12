@@ -11,11 +11,13 @@ use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for unnecessary generator that can be rewritten as `list` comprehension.
+    /// Checks for unnecessary generators that can be rewritten as `list`
+    /// comprehensions.
     ///
     /// ## Why is this bad?
-    /// It is unnecessary to use `list` around a generator expression, since there are
-    /// equivalent comprehensions for these types.
+    /// It is unnecessary to use `list` around a generator expression, since
+    /// there are equivalent comprehensions for these types. Using a
+    /// comprehension is clearer and more idiomatic.
     ///
     /// ## Examples
     /// ```python
@@ -26,7 +28,6 @@ define_violation!(
     /// ```python
     /// [f(x) for x in foo]
     /// ```
-    ///
     pub struct UnnecessaryGeneratorList;
 );
 impl AlwaysAutofixableViolation for UnnecessaryGeneratorList {
