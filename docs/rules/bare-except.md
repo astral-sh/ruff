@@ -6,7 +6,9 @@ Derived from the **pycodestyle** linter.
 Checks for bare `except:` in `try...except` statements.
 
 ## Why is this bad?
-A bare except catches `BaseException` which includes `KeyboardInterrupt`, `SystemExit`, `Exception` and others. It can make it hard to interrupt the program with Ctrl+C and disguise other problems.
+A bare except catches `BaseException` which includes`KeyboardInterrupt`,
+`SystemExit`, `Exception` and others. It can make it hard to interrupt
+the program with Ctrl+C and disguise other problems.
 
 ## Example
 ```python
