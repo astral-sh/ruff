@@ -34,6 +34,9 @@ define_violation!(
     /// else:
     ///     # Posix specific definitions
     /// ```
+    ///
+    /// ## References
+    /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
     pub struct UnrecognizedPlatformCheck;
 );
 impl Violation for UnrecognizedPlatformCheck {
@@ -47,23 +50,29 @@ define_violation!(
     /// ## What it does
     /// Check for unrecognized platform names in `sys.platform` checks.
     ///
-    /// > **Note**
-    /// >
-    /// > This rule only supports the stub file.
+    /// **Note**: this rule is only enabled in `.pyi` stub files.
     ///
     /// ## Why is this bad?
-    /// To prevent you from typos, we warn if you use a platform name outside a
-    /// small set of known platforms (e.g. "linux" and "win32").
+    /// If a `sys.platform` check compares to a platform name outside of a
+    /// small set of known platforms (e.g. "linux", "win32", etc.), it's likely
+    /// a typo or a platform name that is not recognized by type checkers.
+    ///
+    /// The list of known platforms is: "linux", "win32", "cygwin", "darwin".
     ///
     /// ## Example
-    /// Use a platform name from the list of known platforms. Currently, the
-    /// list of known platforms is: "linux", "win32", "cygwin", "darwin".
     /// ```python
-    /// if sys.platform == 'win32':
-    ///     # Windows specific definitions
-    /// else:
-    ///     # Posix specific definitions
+    /// if sys.platform == "linus":
+    ///     ...
     /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// if sys.platform == "linux":
+    ///    ...
+    /// ```
+    ///
+    /// ## References
+    /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
     pub struct UnrecognizedPlatformName {
         pub platform: String,
     }

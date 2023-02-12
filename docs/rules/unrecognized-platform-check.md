@@ -28,3 +28,6 @@ if sys.platform == "linux":
 else:
     # Posix specific definitions
 ```
+
+## References
+- [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
