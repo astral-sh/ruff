@@ -393,6 +393,7 @@ Usage: ruff [OPTIONS] <COMMAND>
 Commands:
   check   Run Ruff on the given files or directories (default)
   rule    Explain a rule
+  config  List or describe the available configuration options
   linter  List all supported upstream linters
   clean   Clear any caches in the current directory and any subdirectories
   help    Print this message or the help of the given subcommand(s)
@@ -620,7 +621,7 @@ configuration.
 See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
 
-#### Exit codes
+### Exit codes
 
 By default, Ruff exits with the following status codes:
 
@@ -638,6 +639,25 @@ Ruff supports two command-line flags that alter its exit code behavior:
   found, _even if_ all such violations were fixed automatically. Note that the use of
   `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
   autofixing.
+
+### Autocompletion
+
+Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
+by `ruff completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
+`powershell`, or `zsh`.
+
+The exact steps required to enable autocompletion will vary by shell. For example instructions,
+see the [Poetry](https://python-poetry.org/docs/#enable-tab-completion-for-bash-fish-or-zsh) or
+[ripgrep](https://github.com/BurntSushi/ripgrep/blob/master/FAQ.md#complete) documentation.
+
+As an example: to enable autocompletion for Zsh, run
+`ruff generate-shell-completion zsh > ~/.zfunc/_ruff`. Then add the following line to your
+`~/.zshrc` file, if they're not already present:
+
+```zsh
+fpath+=~/.zfunc
+autoload -Uz compinit && compinit
+```
 
 <!-- End section: Configuration -->
 
@@ -683,7 +703,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F523 | string-dot-format-extra-positional-arguments | `.format` call has unused arguments at position(s): {message} |  |
 | F524 | string-dot-format-missing-arguments | `.format` call is missing argument(s) for placeholder(s): {message} |  |
 | F525 | string-dot-format-mixing-automatic | `.format` string mixes automatic and manual numbering |  |
-| F541 | f-string-missing-placeholders | f-string without any placeholders | 🛠 |
+| F541 | [f-string-missing-placeholders](https://github.com/charliermarsh/ruff/blob/main/docs/rules/f-string-missing-placeholders.md) | f-string without any placeholders | 🛠 |
 | F601 | multi-value-repeated-key-literal | Dictionary key literal `{name}` repeated | 🛠 |
 | F602 | multi-value-repeated-key-variable | Dictionary key `{name}` repeated | 🛠 |
 | F621 | expressions-in-star-assignment | Too many expressions in star-unpacking assignment |  |
@@ -702,7 +722,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F821 | undefined-name | Undefined name `{name}` |  |
 | F822 | undefined-export | Undefined name `{name}` in `__all__` |  |
 | F823 | undefined-local | Local variable `{name}` referenced before assignment |  |
-| F841 | unused-variable | Local variable `{name}` is assigned to but never used | 🛠 |
+| F841 | [unused-variable](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unused-variable.md) | Local variable `{name}` is assigned to but never used | 🛠 |
 | F842 | unused-annotation | Local variable `{name}` is annotated but never used |  |
 | F901 | raise-not-implemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
@@ -1028,10 +1048,10 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C410 | unnecessary-literal-within-list-call | Unnecessary `{literal}` literal passed to `list()` (remove the outer call to `list()`) | 🛠 |
 | C411 | unnecessary-list-call | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
 | C413 | unnecessary-call-around-sorted | Unnecessary `{func}` call around `sorted()` | 🛠 |
-| C414 | unnecessary-double-cast-or-process | Unnecessary `{inner}` call within `{outer}()` |  |
+| C414 | [unnecessary-double-cast-or-process](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-double-cast-or-process.md) | Unnecessary `{inner}` call within `{outer}()` | 🛠 |
 | C415 | unnecessary-subscript-reversal | Unnecessary subscript reversal of iterable within `{func}()` |  |
 | C416 | unnecessary-comprehension | Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`) | 🛠 |
-| C417 | unnecessary-map | Unnecessary `map` usage (rewrite using a generator expression) |  |
+| C417 | [unnecessary-map](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-map.md) | Unnecessary `map` usage (rewrite using a generator expression) | 🛠 |
 
 ### flake8-datetimez (DTZ)
 

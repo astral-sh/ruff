@@ -40,8 +40,19 @@ jobs:
         run: rustup component add rustfmt
       - run: cargo fmt --all --check
 
-  cargo_clippy:
+  cargo-clippy:
     name: "cargo clippy"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Install Rust toolchain"
+        run: |
+          rustup component add clippy
+      - uses: Swatinem/rust-cache@v1
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  cargo-clippy-wasm:
+    name: "cargo clippy (wasm)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -50,7 +61,6 @@ jobs:
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v1
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: cargo clippy -p ruff --target wasm32-unknown-unknown --all-features -- -D warnings
 
   cargo-test:

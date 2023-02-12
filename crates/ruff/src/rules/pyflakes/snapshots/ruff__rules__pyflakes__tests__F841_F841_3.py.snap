@@ -1,5 +1,5 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -185,7 +185,15 @@ expression: diagnostics
   end_location:
     row: 33
     column: 22
-  fix: ~
+  fix:
+    content:
+      - "(x2, y2) = (1, 2)"
+    location:
+      row: 33
+      column: 4
+    end_location:
+      row: 33
+      column: 31
   parent: ~
 - kind:
     UnusedVariable:
@@ -196,7 +204,15 @@ expression: diagnostics
   end_location:
     row: 34
     column: 11
-  fix: ~
+  fix:
+    content:
+      - "(x3, y3) = (1, 2)"
+    location:
+      row: 34
+      column: 4
+    end_location:
+      row: 34
+      column: 31
   parent: ~
 - kind:
     UnusedVariable:
@@ -311,5 +327,176 @@ expression: diagnostics
     end_location:
       row: 69
       column: 0
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: cm
+  location:
+    row: 72
+    column: 23
+  end_location:
+    row: 72
+    column: 25
+  fix:
+    content:
+      - ""
+    location:
+      row: 72
+      column: 18
+    end_location:
+      row: 72
+      column: 26
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: cm
+  location:
+    row: 77
+    column: 24
+  end_location:
+    row: 77
+    column: 26
+  fix:
+    content:
+      - ""
+    location:
+      row: 77
+      column: 19
+    end_location:
+      row: 77
+      column: 27
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: toplevel
+  location:
+    row: 87
+    column: 4
+  end_location:
+    row: 87
+    column: 12
+  fix:
+    content:
+      - tt = lexer.get_token()
+    location:
+      row: 87
+      column: 4
+    end_location:
+      row: 87
+      column: 37
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: toplevel
+  location:
+    row: 93
+    column: 4
+  end_location:
+    row: 93
+    column: 12
+  fix:
+    content:
+      - tt = lexer.get_token()
+    location:
+      row: 93
+      column: 4
+    end_location:
+      row: 93
+      column: 37
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: tt
+  location:
+    row: 93
+    column: 15
+  end_location:
+    row: 93
+    column: 17
+  fix:
+    content:
+      - toplevel = lexer.get_token()
+    location:
+      row: 93
+      column: 4
+    end_location:
+      row: 93
+      column: 37
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: toplevel
+  location:
+    row: 97
+    column: 4
+  end_location:
+    row: 97
+    column: 12
+  fix:
+    content:
+      - "(a, b) = lexer.get_token()"
+    location:
+      row: 97
+      column: 4
+    end_location:
+      row: 97
+      column: 41
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: toplevel
+  location:
+    row: 101
+    column: 13
+  end_location:
+    row: 101
+    column: 21
+  fix:
+    content:
+      - "(a, b) = lexer.get_token()"
+    location:
+      row: 101
+      column: 4
+    end_location:
+      row: 101
+      column: 41
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: toplevel
+  location:
+    row: 105
+    column: 4
+  end_location:
+    row: 105
+    column: 12
+  fix:
+    content:
+      - tt = 1
+    location:
+      row: 105
+      column: 4
+    end_location:
+      row: 105
+      column: 21
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: tt
+  location:
+    row: 105
+    column: 15
+  end_location:
+    row: 105
+    column: 17
+  fix:
+    content:
+      - toplevel = 1
+    location:
+      row: 105
+      column: 4
+    end_location:
+      row: 105
+      column: 21
   parent: ~
 
