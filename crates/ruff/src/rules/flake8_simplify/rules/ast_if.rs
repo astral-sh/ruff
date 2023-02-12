@@ -663,7 +663,7 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
         return;
     }
     let mut new_str = format!(
-        "{{ {} }}",
+        "return {{ {} }}",
         key_value_pairs
             .iter()
             .map(|(k, v)| format!("{}: {}", k, v))

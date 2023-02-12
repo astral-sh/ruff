@@ -16,6 +16,15 @@ elif a == 2:
     return (4, 5, 6)
 elif a == 3:
     return (7, 8, 9)
+else:
+    return (10, 11, 12)
+
+if a == 1:
+    return (1, 2, 3)
+elif a == 2:
+    return (4, 5, 6)
+elif a == 3:
+    return (7, 8, 9)
 
 # These Should NOT change
 if a == "foo":
