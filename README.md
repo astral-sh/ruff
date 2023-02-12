@@ -620,7 +620,7 @@ configuration.
 See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
 
-#### Exit codes
+### Exit codes
 
 By default, Ruff exits with the following status codes:
 
@@ -638,6 +638,25 @@ Ruff supports two command-line flags that alter its exit code behavior:
   found, _even if_ all such violations were fixed automatically. Note that the use of
   `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
   autofixing.
+
+### Autocompletion
+
+Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
+by `ruff completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
+`powershell`, or `zsh`.
+
+The exact steps required to enable autocompletion will vary by shell. For example instructions,
+see the [Poetry](https://python-poetry.org/docs/#enable-tab-completion-for-bash-fish-or-zsh) or
+[ripgrep](https://github.com/BurntSushi/ripgrep/blob/master/FAQ.md#complete) documentation.
+
+As an example: to enable autocompletion for Zsh, run
+`ruff generate-shell-completion zsh > ~/.zfunc/_ruff`. Then add the following line to your
+`~/.zshrc` file, if they're not already present:
+
+```zsh
+fpath+=~/.zfunc
+autoload -Uz compinit && compinit
+```
 
 <!-- End section: Configuration -->
 
