@@ -40,10 +40,7 @@ pub fn check_tokens(
         || settings
             .rules
             .enabled(&Rule::MultipleStatementsOnOneLineSemicolon)
-        || settings.rules.enabled(&Rule::UselessSemicolon)
-        || settings
-            .rules
-            .enabled(&Rule::MultipleStatementsOnOneLineDef);
+        || settings.rules.enabled(&Rule::UselessSemicolon);
     let enforce_invalid_escape_sequence = settings.rules.enabled(&Rule::InvalidEscapeSequence);
     let enforce_implicit_string_concatenation = settings
         .rules
@@ -117,7 +114,7 @@ pub fn check_tokens(
         }
     }
 
-    // E701, E702, E703, E704
+    // E701, E702, E703
     if enforce_compound_statements {
         diagnostics.extend(
             pycodestyle::rules::compound_statements(tokens)

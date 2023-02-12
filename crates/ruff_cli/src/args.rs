@@ -41,9 +41,11 @@ pub enum Command {
         rule: Rule,
 
         /// Output format
-        #[arg(long, value_enum, default_value = "text")]
+        #[arg(long, value_enum, default_value = "pretty")]
         format: HelpFormat,
     },
+    /// List or describe the available configuration options
+    Config { option: Option<String> },
     /// List all supported upstream linters
     Linter {
         /// Output format
@@ -284,6 +286,7 @@ pub struct CheckArgs {
 pub enum HelpFormat {
     Text,
     Json,
+    Pretty,
 }
 
 #[allow(clippy::module_name_repetitions)]

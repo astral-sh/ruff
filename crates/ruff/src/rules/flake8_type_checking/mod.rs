@@ -29,6 +29,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_9.py"); "TCH004_9")]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_10.py"); "TCH004_10")]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_11.py"); "TCH004_11")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_12.py"); "TCH004_12")]
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TCH005.py"); "TCH005")]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"); "strict")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

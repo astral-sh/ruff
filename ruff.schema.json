@@ -965,7 +965,7 @@
           }
         },
         "known-local-folder": {
-          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (from . import module).",
+          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (`from . import module`).",
           "type": [
             "array",
             "null"
@@ -985,12 +985,21 @@
           }
         },
         "lines-after-imports": {
-          "description": "The number of blank lines to place after imports. -1 for automatic determination.",
+          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.",
           "type": [
             "integer",
             "null"
           ],
           "format": "int"
+        },
+        "lines-between-types": {
+          "description": "The number of lines to place between \"direct\" and `import from` imports.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         },
         "no-lines-before": {
           "description": "A list of sections that should _not_ be delineated from the previous section via empty lines.",
@@ -1481,7 +1490,6 @@
         "E701",
         "E702",
         "E703",
-        "E704",
         "E71",
         "E711",
         "E712",

@@ -44,3 +44,5 @@ a: List[str] = []
 #:
 if a := 1:
     pass
+#:
+func = lambda x: x** 2 if cond else lambda x:x

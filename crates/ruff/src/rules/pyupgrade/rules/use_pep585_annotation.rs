@@ -8,14 +8,15 @@ use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    pub struct UsePEP585Annotation {
+    // TODO: document referencing [PEP 585]: https://peps.python.org/pep-0585/
+    pub struct DeprecatedCollectionType {
         pub name: String,
     }
 );
-impl AlwaysAutofixableViolation for UsePEP585Annotation {
+impl AlwaysAutofixableViolation for DeprecatedCollectionType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UsePEP585Annotation { name } = self;
+        let DeprecatedCollectionType { name } = self;
         format!(
             "Use `{}` instead of `{}` for type annotations",
             name.to_lowercase(),
@@ -24,7 +25,7 @@ impl AlwaysAutofixableViolation for UsePEP585Annotation {
     }
 
     fn autofix_title(&self) -> String {
-        let UsePEP585Annotation { name } = self;
+        let DeprecatedCollectionType { name } = self;
         format!("Replace `{name}` with `{}`", name.to_lowercase(),)
     }
 }
@@ -36,7 +37,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
         .and_then(|call_path| call_path.last().copied())
     {
         let mut diagnostic = Diagnostic::new(
-            UsePEP585Annotation {
+            DeprecatedCollectionType {
                 name: binding.to_string(),
             },
             Range::from_located(expr),

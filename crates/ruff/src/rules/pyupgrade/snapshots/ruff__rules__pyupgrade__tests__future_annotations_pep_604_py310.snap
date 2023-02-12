@@ -1,9 +1,9 @@
 ---
-source: src/rules/pyupgrade/mod.rs
+source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UsePEP604Annotation: ~
+    TypingUnion: ~
   location:
     row: 40
     column: 3
@@ -21,7 +21,7 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    UsePEP604Annotation: ~
+    TypingUnion: ~
   location:
     row: 42
     column: 20

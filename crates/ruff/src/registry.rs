@@ -63,7 +63,6 @@ ruff_macros::define_rule_mapping!(
     E701 => rules::pycodestyle::rules::MultipleStatementsOnOneLineColon,
     E702 => rules::pycodestyle::rules::MultipleStatementsOnOneLineSemicolon,
     E703 => rules::pycodestyle::rules::UselessSemicolon,
-    E704 => rules::pycodestyle::rules::MultipleStatementsOnOneLineDef,
     E711 => rules::pycodestyle::rules::NoneComparison,
     E712 => rules::pycodestyle::rules::TrueFalseComparison,
     E713 => rules::pycodestyle::rules::NotInTest,
@@ -203,7 +202,7 @@ ruff_macros::define_rule_mapping!(
     // flake8-debugger
     T100 => rules::flake8_debugger::rules::Debugger,
     // mccabe
-    C901 => rules::mccabe::rules::FunctionIsTooComplex,
+    C901 => rules::mccabe::rules::ComplexStructure,
     // flake8-tidy-imports
     TID251 => rules::flake8_tidy_imports::banned_api::BannedApi,
     TID252 => rules::flake8_tidy_imports::relative_imports::RelativeImports,
@@ -254,8 +253,8 @@ ruff_macros::define_rule_mapping!(
     // flake8-simplify
     SIM115 => rules::flake8_simplify::rules::OpenFileWithContextHandler,
     SIM101 => rules::flake8_simplify::rules::DuplicateIsinstanceCall,
-    SIM102 => rules::flake8_simplify::rules::NestedIfStatements,
-    SIM103 => rules::flake8_simplify::rules::ReturnBoolConditionDirectly,
+    SIM102 => rules::flake8_simplify::rules::CollapsibleIf,
+    SIM103 => rules::flake8_simplify::rules::NeedlessBool,
     SIM105 => rules::flake8_simplify::rules::UseContextlibSuppress,
     SIM107 => rules::flake8_simplify::rules::ReturnInTryExceptFinally,
     SIM108 => rules::flake8_simplify::rules::UseTernaryOperator,
@@ -282,10 +281,10 @@ ruff_macros::define_rule_mapping!(
     UP003 => rules::pyupgrade::rules::TypeOfPrimitive,
     UP004 => rules::pyupgrade::rules::UselessObjectInheritance,
     UP005 => rules::pyupgrade::rules::DeprecatedUnittestAlias,
-    UP006 => rules::pyupgrade::rules::UsePEP585Annotation,
-    UP007 => rules::pyupgrade::rules::UsePEP604Annotation,
+    UP006 => rules::pyupgrade::rules::DeprecatedCollectionType,
+    UP007 => rules::pyupgrade::rules::TypingUnion,
     UP008 => rules::pyupgrade::rules::SuperCallWithParameters,
-    UP009 => rules::pyupgrade::rules::PEP3120UnnecessaryCodingComment,
+    UP009 => rules::pyupgrade::rules::UTF8EncodingDeclaration,
     UP010 => rules::pyupgrade::rules::UnnecessaryFutureImport,
     UP011 => rules::pyupgrade::rules::LRUCacheWithoutParameters,
     UP012 => rules::pyupgrade::rules::UnnecessaryEncodeUTF8,
@@ -344,7 +343,7 @@ ruff_macros::define_rule_mapping!(
     D401 => rules::pydocstyle::rules::NonImperativeMood,
     D402 => rules::pydocstyle::rules::NoSignature,
     D403 => rules::pydocstyle::rules::FirstLineCapitalized,
-    D404 => rules::pydocstyle::rules::NoThisPrefix,
+    D404 => rules::pydocstyle::rules::DocstringStartsWithThis,
     D405 => rules::pydocstyle::rules::CapitalizeSectionName,
     D406 => rules::pydocstyle::rules::NewLineAfterSectionName,
     D407 => rules::pydocstyle::rules::DashedUnderlineAfterSection,
@@ -354,12 +353,12 @@ ruff_macros::define_rule_mapping!(
     D411 => rules::pydocstyle::rules::BlankLineBeforeSection,
     D412 => rules::pydocstyle::rules::NoBlankLinesBetweenHeaderAndContent,
     D413 => rules::pydocstyle::rules::BlankLineAfterLastSection,
-    D414 => rules::pydocstyle::rules::NonEmptySection,
+    D414 => rules::pydocstyle::rules::EmptyDocstringSection,
     D415 => rules::pydocstyle::rules::EndsInPunctuation,
     D416 => rules::pydocstyle::rules::SectionNameEndsInColon,
-    D417 => rules::pydocstyle::rules::DocumentAllArguments,
-    D418 => rules::pydocstyle::rules::SkipDocstring,
-    D419 => rules::pydocstyle::rules::NonEmpty,
+    D417 => rules::pydocstyle::rules::UndocumentedParam,
+    D418 => rules::pydocstyle::rules::OverloadWithDocstring,
+    D419 => rules::pydocstyle::rules::EmptyDocstring,
     // pep8-naming
     N801 => rules::pep8_naming::rules::InvalidClassName,
     N802 => rules::pep8_naming::rules::InvalidFunctionName,
@@ -474,11 +473,11 @@ ruff_macros::define_rule_mapping!(
     PT025 => rules::flake8_pytest_style::rules::ErroneousUseFixturesOnFixture,
     PT026 => rules::flake8_pytest_style::rules::UseFixturesWithoutParameters,
     // flake8-pie
-    PIE790 => rules::flake8_pie::rules::NoUnnecessaryPass,
+    PIE790 => rules::flake8_pie::rules::UnnecessaryPass,
     PIE794 => rules::flake8_pie::rules::DupeClassFieldDefinitions,
     PIE796 => rules::flake8_pie::rules::PreferUniqueEnums,
-    PIE800 => rules::flake8_pie::rules::NoUnnecessarySpread,
-    PIE804 => rules::flake8_pie::rules::NoUnnecessaryDictKwargs,
+    PIE800 => rules::flake8_pie::rules::UnnecessarySpread,
+    PIE804 => rules::flake8_pie::rules::UnnecessaryDictKwargs,
     PIE807 => rules::flake8_pie::rules::PreferListBuiltin,
     PIE810 => rules::flake8_pie::rules::SingleStartsEndsWith,
     // flake8-commas
@@ -758,7 +757,7 @@ impl Rule {
             | Rule::LineTooLong
             | Rule::MixedSpacesAndTabs
             | Rule::NoNewLineAtEndOfFile
-            | Rule::PEP3120UnnecessaryCodingComment
+            | Rule::UTF8EncodingDeclaration
             | Rule::ShebangMissingExecutableFile
             | Rule::ShebangNotExecutable
             | Rule::ShebangNewline
@@ -781,7 +780,6 @@ impl Rule {
             | Rule::TrailingCommaOnBareTupleProhibited
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::UselessSemicolon
-            | Rule::MultipleStatementsOnOneLineDef
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::TrailingCommaProhibited => &LintSource::Tokens,
             Rule::IOError => &LintSource::Io,

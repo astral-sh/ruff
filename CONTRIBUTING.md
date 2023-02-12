@@ -170,6 +170,26 @@ lives in `crates/ruff/src/flake8_to_ruff/converter.rs`.
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
+## MkDocs
+
+To preview any changes to the documentation locally:
+
+1. Install MkDocs and Material for MkDocs with:
+   ```shell
+   pip install -r docs/requirements.txt
+   ```
+2. Generate the MkDocs site with:
+   ```shell
+   python scripts/generate_mkdocs.py
+   ```
+3. Run the development server with:
+   ```shell
+   mkdocs serve
+   ```
+
+The documentation should then be available locally at
+[http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
+
 ## Release process
 
 As of now, Ruff has an ad hoc release process: releases are cut with high frequency via GitHub

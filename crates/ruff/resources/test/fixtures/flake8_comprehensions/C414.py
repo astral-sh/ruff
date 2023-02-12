@@ -12,3 +12,9 @@ sorted(list(x))
 sorted(tuple(x))
 sorted(sorted(x))
 sorted(reversed(x))
+tuple(
+    list(
+        [x, 3, "hell"\
+        "o"]
+    )
+)

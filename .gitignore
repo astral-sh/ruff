@@ -4,6 +4,7 @@ crates/ruff/resources/test/cpython
 docs/*
 !docs/rules
 !docs/assets
+!docs/requirements.txt
 mkdocs.yml
 .overrides
 

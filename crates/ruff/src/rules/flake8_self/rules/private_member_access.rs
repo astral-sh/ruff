@@ -21,15 +21,23 @@ impl Violation for PrivateMemberAccess {
     }
 }
 
-const VALID_IDS: [&str; 3] = ["self", "cls", "mcs"];
-
 /// SLF001
 pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, attr, .. } = &expr.node {
         if !attr.ends_with("__") && (attr.starts_with('_') || attr.starts_with("__")) {
-            let call_path = collect_call_path(value);
-            if VALID_IDS.iter().any(|id| call_path.as_slice() == [*id]) {
-                return;
+            if let ExprKind::Call { func, .. } = &value.node {
+                let call_path = collect_call_path(func);
+                if call_path.as_slice() == ["super"] {
+                    return;
+                }
+            } else {
+                let call_path = collect_call_path(value);
+                if call_path.as_slice() == ["self"]
+                    || call_path.as_slice() == ["cls"]
+                    || call_path.as_slice() == ["mcs"]
+                {
+                    return;
+                }
             }
 
             checker.diagnostics.push(Diagnostic::new(

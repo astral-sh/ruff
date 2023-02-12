@@ -9,9 +9,9 @@ use crate::violation::Violation;
 use crate::visibility::is_overload;
 
 define_violation!(
-    pub struct SkipDocstring;
+    pub struct OverloadWithDocstring;
 );
-impl Violation for SkipDocstring {
+impl Violation for OverloadWithDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Function decorated with `@overload` shouldn't contain a docstring")
@@ -31,7 +31,7 @@ pub fn if_needed(checker: &mut Checker, docstring: &Docstring) {
         return;
     }
     checker.diagnostics.push(Diagnostic::new(
-        SkipDocstring,
+        OverloadWithDocstring,
         identifier_range(stmt, checker.locator),
     ));
 }

@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PEP3120UnnecessaryCodingComment: ~
+    UTF8EncodingDeclaration: ~
   location:
     row: 2
     column: 0

@@ -24,6 +24,14 @@ mod iterators;
 mod printer;
 mod resolve;
 
+#[cfg(target_os = "windows")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+#[cfg(not(target_os = "windows"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 enum ExitStatus {
     /// Linting was successful and there were no linting errors.
     Success,
@@ -92,9 +100,10 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, format } => commands::rule(&rule, format)?,
-        Command::Linter { format } => commands::linter::linter(format),
-        Command::Clean => commands::clean(log_level)?,
+        Command::Rule { rule, format } => commands::rule::rule(&rule, format)?,
+        Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
+        Command::Linter { format } => commands::linter::linter(format)?,
+        Command::Clean => commands::clean::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut io::stdout());
         }
@@ -117,11 +126,11 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     )?;
 
     if cli.show_settings {
-        commands::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
+        commands::show_settings::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
+        commands::show_files::show_files(&cli.files, &pyproject_strategy, &overrides)?;
         return Ok(ExitStatus::Success);
     }
 
@@ -175,7 +184,8 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         if !matches!(autofix, fix::FixMode::None) {
             warn_user_once!("--fix is incompatible with --add-noqa.");
         }
-        let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
+        let modifications =
+            commands::add_noqa::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             #[allow(clippy::print_stderr)]
             {
@@ -199,7 +209,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::run(
+        let messages = commands::run::run(
             &cli.files,
             &pyproject_strategy,
             &overrides,
@@ -228,7 +238,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                         Printer::clear_screen()?;
                         printer.write_to_user("File change detected...\n");
 
-                        let messages = commands::run(
+                        let messages = commands::run::run(
                             &cli.files,
                             &pyproject_strategy,
                             &overrides,
@@ -246,14 +256,14 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
         // Generate lint violations.
         let diagnostics = if is_stdin {
-            commands::run_stdin(
+            commands::run_stdin::run_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_strategy,
                 &overrides,
                 autofix,
             )?
         } else {
-            commands::run(
+            commands::run::run(
                 &cli.files,
                 &pyproject_strategy,
                 &overrides,

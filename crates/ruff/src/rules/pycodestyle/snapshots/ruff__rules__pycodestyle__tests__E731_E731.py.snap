@@ -59,4 +59,42 @@ expression: diagnostics
       row: 7
       column: 29
   parent: ~
+- kind:
+    LambdaAssignment: f
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 21
+  fix:
+    content:
+      - "def f():"
+      - "    return (yield 1)"
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 21
+  parent: ~
+- kind:
+    LambdaAssignment: f
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 28
+  fix:
+    content:
+      - "def f():"
+      - "    return (yield from g())"
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 28
+  parent: ~
 

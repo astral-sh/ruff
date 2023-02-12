@@ -33,14 +33,12 @@ pub(crate) use super_call_with_parameters::{super_call_with_parameters, SuperCal
 pub(crate) use type_of_primitive::{type_of_primitive, TypeOfPrimitive};
 pub(crate) use typing_text_str_alias::{typing_text_str_alias, TypingTextStrAlias};
 pub(crate) use unnecessary_builtin_import::{unnecessary_builtin_import, UnnecessaryBuiltinImport};
-pub(crate) use unnecessary_coding_comment::{
-    unnecessary_coding_comment, PEP3120UnnecessaryCodingComment,
-};
+pub(crate) use unnecessary_coding_comment::{unnecessary_coding_comment, UTF8EncodingDeclaration};
 pub(crate) use unnecessary_encode_utf8::{unnecessary_encode_utf8, UnnecessaryEncodeUTF8};
 pub(crate) use unnecessary_future_import::{unnecessary_future_import, UnnecessaryFutureImport};
 pub(crate) use unpack_list_comprehension::{unpack_list_comprehension, RewriteListComprehension};
-pub(crate) use use_pep585_annotation::{use_pep585_annotation, UsePEP585Annotation};
-pub(crate) use use_pep604_annotation::{use_pep604_annotation, UsePEP604Annotation};
+pub(crate) use use_pep585_annotation::{use_pep585_annotation, DeprecatedCollectionType};
+pub(crate) use use_pep604_annotation::{use_pep604_annotation, TypingUnion};
 pub(crate) use useless_metaclass_type::{useless_metaclass_type, UselessMetaclassType};
 pub(crate) use useless_object_inheritance::{useless_object_inheritance, UselessObjectInheritance};
 
