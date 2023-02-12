@@ -683,7 +683,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F523 | string-dot-format-extra-positional-arguments | `.format` call has unused arguments at position(s): {message} |  |
 | F524 | string-dot-format-missing-arguments | `.format` call is missing argument(s) for placeholder(s): {message} |  |
 | F525 | string-dot-format-mixing-automatic | `.format` string mixes automatic and manual numbering |  |
-| F541 | f-string-missing-placeholders | f-string without any placeholders | 🛠 |
+| F541 | [f-string-missing-placeholders](https://github.com/charliermarsh/ruff/blob/main/docs/rules/f-string-missing-placeholders.md) | f-string without any placeholders | 🛠 |
 | F601 | multi-value-repeated-key-literal | Dictionary key literal `{name}` repeated | 🛠 |
 | F602 | multi-value-repeated-key-variable | Dictionary key `{name}` repeated | 🛠 |
 | F621 | expressions-in-star-assignment | Too many expressions in star-unpacking assignment |  |
@@ -702,7 +702,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F821 | undefined-name | Undefined name `{name}` |  |
 | F822 | undefined-export | Undefined name `{name}` in `__all__` |  |
 | F823 | undefined-local | Local variable `{name}` referenced before assignment |  |
-| F841 | unused-variable | Local variable `{name}` is assigned to but never used | 🛠 |
+| F841 | [unused-variable](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unused-variable.md) | Local variable `{name}` is assigned to but never used | 🛠 |
 | F842 | unused-annotation | Local variable `{name}` is annotated but never used |  |
 | F901 | raise-not-implemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
