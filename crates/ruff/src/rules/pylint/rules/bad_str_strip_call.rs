@@ -94,7 +94,7 @@ fn has_duplicates(s: &str) -> bool {
     for ch in s.chars() {
         if escaped {
             escaped = false;
-            let pair = format!("\\{}", ch);
+            let pair = format!("\\{ch}");
             if !seen.insert(pair) {
                 return true;
             }

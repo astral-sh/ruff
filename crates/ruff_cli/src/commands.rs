@@ -4,11 +4,15 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{bail, Result};
+use colored::control::SHOULD_COLORIZE;
 use colored::Colorize;
 use ignore::Error;
 use itertools::Itertools;
 use log::{debug, error};
+use mdcat::terminal::{TerminalProgram, TerminalSize};
+use mdcat::{Environment, ResourceAccess, Settings};
 use path_absolutize::path_dedot;
+use pulldown_cmark::{Options, Parser};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use ruff::cache::CACHE_DIR_NAME;
@@ -20,6 +24,7 @@ use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, AutofixAvailability, IOError};
 use serde::Serialize;
+use syntect::parsing::SyntaxSet;
 use walkdir::WalkDir;
 
 use crate::args::{HelpFormat, Overrides};
@@ -281,9 +286,10 @@ struct Explanation<'a> {
 pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let (linter, _) = Linter::parse_code(rule.code()).unwrap();
     let mut stdout = BufWriter::new(io::stdout().lock());
+    let mut output = String::new();
+
     match format {
-        HelpFormat::Text => {
-            let mut output = String::new();
+        HelpFormat::Text | HelpFormat::Markdown => {
             output.push_str(&format!("# {} ({})", rule.as_ref(), rule.code()));
             output.push('\n');
             output.push('\n');
@@ -308,22 +314,46 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
                 output.push_str("Message formats:");
                 for format in rule.message_formats() {
                     output.push('\n');
-                    output.push_str(&format!("* {}", format));
+                    output.push_str(&format!("* {format}"));
                 }
             }
-
-            writeln!(stdout, "{}", output)?;
         }
         HelpFormat::Json => {
-            writeln!(
-                stdout,
-                "{}",
-                serde_json::to_string_pretty(&Explanation {
-                    code: rule.code(),
-                    linter: linter.name(),
-                    summary: rule.message_formats()[0],
-                })?
-            )?;
+            output.push_str(&serde_json::to_string_pretty(&Explanation {
+                code: rule.code(),
+                linter: linter.name(),
+                summary: rule.message_formats()[0],
+            })?);
+        }
+    };
+
+    match format {
+        HelpFormat::Json | HelpFormat::Text => {
+            writeln!(stdout, "{output}")?;
+        }
+        HelpFormat::Markdown => {
+            let parser = Parser::new_ext(
+                &output,
+                Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH,
+            );
+
+            let cwd = std::env::current_dir()?;
+            let env = &Environment::for_local_directory(&cwd)?;
+
+            let terminal = if SHOULD_COLORIZE.should_colorize() {
+                TerminalProgram::detect()
+            } else {
+                TerminalProgram::Dumb
+            };
+
+            let settings = &Settings {
+                resource_access: ResourceAccess::LocalOnly,
+                syntax_set: SyntaxSet::load_defaults_newlines(),
+                terminal_capabilities: terminal.capabilities(),
+                terminal_size: TerminalSize::detect().unwrap_or_default(),
+            };
+
+            mdcat::push_tty(settings, env, &mut stdout, parser)?;
         }
     };
     Ok(())
