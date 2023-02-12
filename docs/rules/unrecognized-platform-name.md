@@ -18,7 +18,7 @@ Use a platform name from the list of known platforms. Currently, the
 list of known platforms is: "linux", "win32", "cygwin", "darwin".
 ```python
 if sys.platform == 'win32':
-   # Windows specific definitions
+    # Windows specific definitions
 else:
-   # Posix specific definitions
+    # Posix specific definitions
 ```
