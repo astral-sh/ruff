@@ -251,7 +251,6 @@ ruff_macros::define_rule_mapping!(
     YTT302 => rules::flake8_2020::rules::SysVersionCmpStr10,
     YTT303 => rules::flake8_2020::rules::SysVersionSlice1Referenced,
     // flake8-simplify
-    SIM115 => rules::flake8_simplify::rules::OpenFileWithContextHandler,
     SIM101 => rules::flake8_simplify::rules::DuplicateIsinstanceCall,
     SIM102 => rules::flake8_simplify::rules::CollapsibleIf,
     SIM103 => rules::flake8_simplify::rules::NeedlessBool,
@@ -262,6 +261,8 @@ ruff_macros::define_rule_mapping!(
     SIM110 => rules::flake8_simplify::rules::ConvertLoopToAny,
     SIM111 => rules::flake8_simplify::rules::ConvertLoopToAll,
     SIM112 => rules::flake8_simplify::rules::UseCapitalEnvironmentVariables,
+    SIM114 => rules::flake8_simplify::rules::IfWithSameArms,
+    SIM115 => rules::flake8_simplify::rules::OpenFileWithContextHandler,
     SIM117 => rules::flake8_simplify::rules::MultipleWithStatements,
     SIM118 => rules::flake8_simplify::rules::KeyInDict,
     SIM201 => rules::flake8_simplify::rules::NegateEqualOp,

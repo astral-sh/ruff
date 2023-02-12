@@ -1,5 +1,7 @@
 use log::error;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use rustpython_parser::lexer;
+use rustpython_parser::lexer::Tok;
 
 use ruff_macros::{define_violation, derive_message_formats};
 
@@ -13,6 +15,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
+use crate::source_code::Locator;
 use crate::violation::{AutofixKind, Availability, Violation};
 
 define_violation!(
@@ -87,6 +90,36 @@ impl Violation for UseTernaryOperator {
         } else {
             None
         }
+    }
+}
+
+define_violation!(
+    /// ### What it does
+    /// Checks for `if` branches with identical arm bodies.
+    ///
+    /// ### Why is this bad?
+    /// If multiple arms of an `if` statement have the same body, using `or`
+    /// better signals the intent of the statement.
+    ///
+    /// ### Example
+    /// ```python
+    /// if x = 1:
+    ///     print("Hello")
+    /// elif x = 2:
+    ///     print("Hello")
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// if x = 1 or x = 2
+    ///     print("Hello")
+    /// ```
+    pub struct IfWithSameArms;
+);
+impl Violation for IfWithSameArms {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Combine `if` statements using `or`")
     }
 }
 
@@ -451,6 +484,84 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
 fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
     expr1.eq(expr2)
+}
+
+fn get_if_body_pairs(orelse: &[Stmt], result: &mut Vec<Vec<Stmt>>) {
+    if orelse.is_empty() {
+        return;
+    }
+    let mut current_vec: Vec<Stmt> = vec![];
+    for if_line in orelse {
+        if let StmtKind::If {
+            body: orelse_body,
+            orelse: orelse_orelse,
+            ..
+        } = &if_line.node
+        {
+            if !current_vec.is_empty() {
+                result.push(current_vec.clone());
+                current_vec = vec![];
+            }
+            if !orelse_body.is_empty() {
+                result.push(orelse_body.clone());
+            }
+            get_if_body_pairs(orelse_orelse, result);
+        } else {
+            current_vec.push(if_line.clone());
+        }
+    }
+    if !current_vec.is_empty() {
+        result.push(current_vec.clone());
+    }
+}
+
+pub fn is_equal(locator: &Locator, stmts1: &[Stmt], stmts2: &[Stmt]) -> bool {
+    if stmts1.len() != stmts2.len() {
+        return false;
+    }
+    for (stmt1, stmt2) in stmts1.iter().zip(stmts2.iter()) {
+        let text1 = locator.slice_source_code_range(&Range::from_located(stmt1));
+        let text2 = locator.slice_source_code_range(&Range::from_located(stmt2));
+        let lexer1: Vec<Tok> = lexer::make_tokenizer(text1)
+            .flatten()
+            .map(|(_, tok, _)| tok)
+            .collect();
+        let lexer2: Vec<Tok> = lexer::make_tokenizer(text2)
+            .flatten()
+            .map(|(_, tok, _)| tok)
+            .collect();
+        if lexer1 != lexer2 {
+            return false;
+        }
+    }
+    true
+}
+
+/// SIM114
+pub fn if_with_same_arms(checker: &mut Checker, body: &[Stmt], orelse: &[Stmt]) {
+    if orelse.is_empty() {
+        return;
+    }
+
+    // It's not all combinations because of this:
+    // https://github.com/MartinThoma/flake8-simplify/issues/70#issuecomment-924074984
+    let mut final_stmts: Vec<Vec<Stmt>> = vec![body.to_vec()];
+    get_if_body_pairs(orelse, &mut final_stmts);
+    let if_statements = final_stmts.len();
+    if if_statements <= 1 {
+        return;
+    }
+
+    for i in 0..(if_statements - 1) {
+        if is_equal(checker.locator, &final_stmts[i], &final_stmts[i + 1]) {
+            let first = &final_stmts[i].first().unwrap();
+            let last = &final_stmts[i].last().unwrap();
+            checker.diagnostics.push(Diagnostic::new(
+                IfWithSameArms,
+                Range::new(first.location, last.end_location.unwrap()),
+            ));
+        }
+    }
 }
 
 /// SIM401
