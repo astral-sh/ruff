@@ -943,7 +943,7 @@ For more, see [flake8-blind-except](https://pypi.org/project/flake8-blind-except
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| BLE001 | blind-except | Do not catch blind exception: `{name}` |  |
+| BLE001 | [blind-except](https://github.com/charliermarsh/ruff/blob/main/docs/rules/blind-except.md) | Do not catch blind exception: `{name}` |  |
 
 ### flake8-boolean-trap (FBT)
 
