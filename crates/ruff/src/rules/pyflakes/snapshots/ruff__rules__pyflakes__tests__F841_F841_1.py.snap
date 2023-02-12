@@ -35,13 +35,13 @@ expression: diagnostics
     column: 19
   fix:
     content:
-      - "(x, y) = 1, 2"
+      - ""
     location:
       row: 16
-      column: 4
+      column: 13
     end_location:
       row: 16
-      column: 26
+      column: 22
   parent: ~
 - kind:
     UnusedVariable:
@@ -54,13 +54,13 @@ expression: diagnostics
     column: 10
   fix:
     content:
-      - "(x, y) = 1, 2"
+      - ""
     location:
       row: 20
       column: 4
     end_location:
       row: 20
-      column: 26
+      column: 13
   parent: ~
 - kind:
     UnusedVariable:

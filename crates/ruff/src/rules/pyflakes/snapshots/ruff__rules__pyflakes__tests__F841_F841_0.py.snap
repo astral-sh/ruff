@@ -92,13 +92,13 @@ expression: diagnostics
     column: 16
   fix:
     content:
-      - "(x, y) = bar"
+      - ""
     location:
       row: 26
-      column: 4
+      column: 13
     end_location:
       row: 26
-      column: 22
+      column: 19
   parent: ~
 - kind:
     UnusedVariable:

@@ -201,31 +201,7 @@ fn remove_unused_variable(
             range.location == target.location && range.end_location == target.end_location.unwrap()
         }) {
             if matches!(target.node, ExprKind::Name { .. }) {
-                return if targets.len() > 1 {
-                    // Construct a deletion by concatenating everything before the target to
-                    // everything after it. This ensures that our edit spans the entire statement,
-                    // which in turn ensures that we only apply one edit per pass.
-                    Some((
-                        DeletionKind::Partial,
-                        Fix::replacement(
-                            format!(
-                                "{}{}",
-                                checker.locator.slice_source_code_range(&Range::new(
-                                    stmt.location,
-                                    target.location
-                                )),
-                                checker.locator.slice_source_code_range(&Range::new(
-                                    match_token_after(target, checker.locator, |tok| tok
-                                        == Tok::Equal)
-                                    .location,
-                                    stmt.end_location.unwrap()
-                                ))
-                            ),
-                            stmt.location,
-                            stmt.end_location.unwrap(),
-                        ),
-                    ))
-                } else if contains_effect(checker, value) {
+                return if targets.len() > 1 || contains_effect(checker, value) {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
                     Some((
