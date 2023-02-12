@@ -95,10 +95,11 @@ impl Violation for UseTernaryOperator {
 
 define_violation!(
     /// ### What it does
-    /// Checks if consecutive `if` branches have the same body.
+    /// Checks for `if` branches with identical arm bodies.
     ///
     /// ### Why is this bad?
-    /// These branches can be combine using the python `or` statement
+    /// If multiple arms of an `if` statement have the same body, using `or`
+    /// better signals the intent of the statement.
     ///
     /// ### Example
     /// ```python
@@ -113,12 +114,12 @@ define_violation!(
     /// if x = 1 or x = 2
     ///     print("Hello")
     /// ```
-    pub struct CombineIfConditions;
+    pub struct IfWithSameArms;
 );
-impl Violation for CombineIfConditions {
+impl Violation for IfWithSameArms {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Combine the if statements and use an 'or' statement")
+        format!("Combine `if` statements using `or`")
     }
 }
 
@@ -537,26 +538,26 @@ pub fn is_equal(locator: &Locator, stmts1: &[Stmt], stmts2: &[Stmt]) -> bool {
 }
 
 /// SIM114
-pub fn combine_if_conditions(checker: &mut Checker, body: &[Stmt], orelse: &[Stmt]) {
+pub fn if_with_same_arms(checker: &mut Checker, body: &[Stmt], orelse: &[Stmt]) {
     if orelse.is_empty() {
         return;
     }
+
     // It's not all combinations because of this:
     // https://github.com/MartinThoma/flake8-simplify/issues/70#issuecomment-924074984
     let mut final_stmts: Vec<Vec<Stmt>> = vec![body.to_vec()];
     get_if_body_pairs(orelse, &mut final_stmts);
-    let mut if_statements = final_stmts.len();
+    let if_statements = final_stmts.len();
     if if_statements <= 1 {
         return;
     }
-    // We do this because arrays are 0 indexed, and we dont need to check the last one
-    if_statements -= 1;
-    for i in 0..if_statements {
+
+    for i in 0..(if_statements - 1) {
         if is_equal(checker.locator, &final_stmts[i], &final_stmts[i + 1]) {
             let first = &final_stmts[i].first().unwrap();
             let last = &final_stmts[i].last().unwrap();
             checker.diagnostics.push(Diagnostic::new(
-                CombineIfConditions,
+                IfWithSameArms,
                 Range::new(first.location, last.end_location.unwrap()),
             ));
         }

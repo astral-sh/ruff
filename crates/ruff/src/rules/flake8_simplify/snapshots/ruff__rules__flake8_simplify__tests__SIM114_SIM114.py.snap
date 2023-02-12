@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CombineIfConditions: ~
+    IfWithSameArms: ~
   location:
     row: 3
     column: 4
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CombineIfConditions: ~
+    IfWithSameArms: ~
   location:
     row: 8
     column: 4
@@ -23,7 +23,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CombineIfConditions: ~
+    IfWithSameArms: ~
   location:
     row: 15
     column: 4
@@ -33,7 +33,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CombineIfConditions: ~
+    IfWithSameArms: ~
   location:
     row: 24
     column: 4
@@ -43,7 +43,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CombineIfConditions: ~
+    IfWithSameArms: ~
   location:
     row: 25
     column: 8
@@ -53,7 +53,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CombineIfConditions: ~
+    IfWithSameArms: ~
   location:
     row: 32
     column: 8
@@ -63,7 +63,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CombineIfConditions: ~
+    IfWithSameArms: ~
   location:
     row: 54
     column: 4
