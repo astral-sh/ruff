@@ -328,7 +328,10 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     };
 
     match format {
-        HelpFormat::Text => {
+        HelpFormat::Json | HelpFormat::Text => {
+            writeln!(stdout, "{output}")?;
+        }
+        HelpFormat::Markdown => {
             let parser = Parser::new_ext(
                 &output,
                 Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH,
@@ -351,9 +354,6 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
             };
 
             mdcat::push_tty(settings, env, &mut stdout, parser)?;
-        }
-        HelpFormat::Json | HelpFormat::Markdown => {
-            writeln!(stdout, "{output}")?;
         }
     };
     Ok(())

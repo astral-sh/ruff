@@ -41,7 +41,7 @@ pub enum Command {
         rule: Rule,
 
         /// Output format
-        #[arg(long, value_enum, default_value = "text")]
+        #[arg(long, value_enum, default_value = "markdown")]
         format: HelpFormat,
     },
     /// List all supported upstream linters

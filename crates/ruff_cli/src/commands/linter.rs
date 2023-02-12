@@ -52,7 +52,7 @@ pub fn linter(format: HelpFormat) {
             #[allow(clippy::print_stdout)]
             {
                 println!("| {:>6} | {:<27} |", "Prefix", "Name");
-                println!("| {:>6} | :{:<26} |", "-----:", "-".repeat(26));
+                println!("| {:>6} | {:<27} |", "------", "-".repeat(27));
             }
             for linter in Linter::iter() {
                 let prefix = match linter.common_prefix() {
