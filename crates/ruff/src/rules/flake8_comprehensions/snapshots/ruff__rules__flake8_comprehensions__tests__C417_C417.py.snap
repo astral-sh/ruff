@@ -194,12 +194,50 @@ expression: diagnostics
   parent: ~
 - kind:
     UnnecessaryMap:
+      obj_type: set
+  location:
+    row: 15
+    column: 7
+  end_location:
+    row: 15
+    column: 43
+  fix:
+    content:
+      - " {x % 2 == 0 for x in nums} "
+    location:
+      row: 15
+      column: 7
+    end_location:
+      row: 15
+      column: 43
+  parent: ~
+- kind:
+    UnnecessaryMap:
+      obj_type: dict
+  location:
+    row: 16
+    column: 7
+  end_location:
+    row: 16
+    column: 43
+  fix:
+    content:
+      - " {v: v**2 for v in nums} "
+    location:
+      row: 16
+      column: 7
+    end_location:
+      row: 16
+      column: 43
+  parent: ~
+- kind:
+    UnnecessaryMap:
       obj_type: generator
   location:
-    row: 17
+    row: 21
     column: 0
   end_location:
-    row: 17
+    row: 21
     column: 24
   fix: ~
   parent: ~

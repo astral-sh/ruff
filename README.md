@@ -1036,9 +1036,9 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C400 | unnecessary-generator-list | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
-| C401 | unnecessary-generator-set | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
-| C402 | unnecessary-generator-dict | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
+| C400 | [unnecessary-generator-list](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-generator-list.md) | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
+| C401 | [unnecessary-generator-set](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-generator-set.md) | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
+| C402 | [unnecessary-generator-dict](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-generator-dict.md) | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
 | C403 | unnecessary-list-comprehension-set | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
 | C404 | unnecessary-list-comprehension-dict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) | 🛠 |
 | C405 | unnecessary-literal-set | Unnecessary `{obj_type}` literal (rewrite as a `set` literal) | 🛠 |
