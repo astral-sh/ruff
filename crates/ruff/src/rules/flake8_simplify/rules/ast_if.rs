@@ -126,7 +126,7 @@ define_violation!(
     ///
     /// Use instead:
     /// ```python
-    /// if x = 1 or x = 2
+    /// if x = 1 or x = 2:
     ///     print("Hello")
     /// ```
     pub struct IfWithSameArms;

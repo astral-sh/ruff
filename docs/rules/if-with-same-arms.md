@@ -19,6 +19,6 @@ elif x = 2:
 
 Use instead:
 ```python
-if x = 1 or x = 2
+if x = 1 or x = 2:
     print("Hello")
 ```
