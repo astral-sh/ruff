@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,17 +11,6 @@ expression: diagnostics
   end_location:
     row: 13
     column: 19
-  fix: ~
-  parent: ~
-- kind:
-    HardcodedPasswordString:
-      string: s3cr3t
-  location:
-    row: 14
-    column: 8
-  end_location:
-    row: 14
-    column: 16
   fix: ~
   parent: ~
 - kind:
@@ -110,17 +99,6 @@ expression: diagnostics
   end_location:
     row: 23
     column: 24
-  fix: ~
-  parent: ~
-- kind:
-    HardcodedPasswordString:
-      string: s3cr3t
-  location:
-    row: 24
-    column: 12
-  end_location:
-    row: 24
-    column: 20
   fix: ~
   parent: ~
 - kind:
@@ -226,17 +204,6 @@ expression: diagnostics
     HardcodedPasswordString:
       string: s3cr3t
   location:
-    row: 40
-    column: 16
-  end_location:
-    row: 40
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    HardcodedPasswordString:
-      string: s3cr3t
-  location:
     row: 41
     column: 17
   end_location:
@@ -297,17 +264,6 @@ expression: diagnostics
   end_location:
     row: 47
     column: 20
-  fix: ~
-  parent: ~
-- kind:
-    HardcodedPasswordString:
-      string: s3cr3t
-  location:
-    row: 48
-    column: 9
-  end_location:
-    row: 48
-    column: 17
   fix: ~
   parent: ~
 - kind:

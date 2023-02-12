@@ -2,9 +2,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::checkers::ast::Checker;
 
-const PASSWORD_NAMES: [&str; 7] = [
-    "password", "pass", "passwd", "pwd", "secret", "token", "secrete",
-];
+const PASSWORD_NAMES: [&str; 6] = ["password", "passwd", "pwd", "secret", "token", "api_key"];
 
 pub fn string_literal(expr: &Expr) -> Option<&str> {
     match &expr.node {
