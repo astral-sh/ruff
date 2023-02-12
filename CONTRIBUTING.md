@@ -172,15 +172,23 @@ Finally, regenerate the documentation and generated code with `cargo dev generat
 
 ## MkDocs
 
-To locally preview your MkDocs changes:
-1. Install MkDocs and MkDocs Material
+To preview any changes to the documentation locally:
+
+1. Install MkDocs and Material for MkDocs with:
    ```shell
    pip install -r docs/requirements.txt
    ```
-2. Run the development server  
+2. Generate the MkDocs site with:
+   ```shell
+   python scripts/generate_mkdocs.py
+   ```
+3. Run the development server with:
    ```shell
    mkdocs serve
    ```
+
+The documentation should then be available locally at
+[http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
 
 ## Release process
 
