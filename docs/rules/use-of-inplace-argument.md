@@ -8,9 +8,12 @@ Autofix is always available.
 Checks for `inplace=True` in code using the `pandas` library.
 
 ## Why is this bad?
-- Many people expect `inplace=True` to be a performance benefit that prevents dataframe copies, but that's often not true.
-- It encourages mutation rather than immutable data, which is harder to reason about and may cause bugs.
-- It removes the ability to use the chaining style for `pandas` code.
+- `inplace=True` often does not provide a performance benefit. It is
+likely to copy dataframes in the background.
+- It encourages mutation rather than immutable data, which is harder to
+reason about and may cause bugs.
+- It removes the ability to use the method chaining style for `pandas`
+code.
 
 ## Example
 ```python
