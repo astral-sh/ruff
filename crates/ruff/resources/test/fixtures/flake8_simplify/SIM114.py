@@ -55,16 +55,13 @@ if (
 elif 1 == 2:
     pass
 
-failures = errors = skipped = disabled = 0
 if result.eofs == "O":
     pass
 elif result.eofs == "S":
     skipped = 1
 elif result.eofs == "F":
-    failures = 1
-elif result.eofs == "E":
     errors = 1
-else:
+elif result.eofs == "E":
     errors = 1
 
 
@@ -91,3 +88,9 @@ elif b:
     z = 2
 elif c:
     z = 1
+
+# False negative (or arguably a different rule)
+if result.eofs == "F":
+    errors = 1
+else:
+    errors = 1
