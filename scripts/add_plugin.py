@@ -39,7 +39,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::linter::test_path;
+    use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
