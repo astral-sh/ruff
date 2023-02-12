@@ -1,15 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 
-use super::super::types;
-use super::helpers::{is_pytest_parametrize, split_names};
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::source_code::Generator;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
+
+use super::super::types;
+use super::helpers::{is_pytest_parametrize, split_names};
 
 define_violation!(
     pub struct ParametrizeNamesWrongType {
@@ -99,24 +100,25 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            let mut generator: Generator = checker.stylist.into();
-                            generator.unparse_expr(
-                                &create_expr(ExprKind::Tuple {
-                                    elts: names
-                                        .iter()
-                                        .map(|&name| {
-                                            create_expr(ExprKind::Constant {
-                                                value: Constant::Str(name.to_string()),
-                                                kind: None,
-                                            })
-                                        })
-                                        .collect(),
-                                    ctx: ExprContext::Load,
-                                }),
-                                1,
-                            );
                             diagnostic.amend(Fix::replacement(
-                                generator.generate(),
+                                format!(
+                                    "({})",
+                                    unparse_expr(
+                                        &create_expr(ExprKind::Tuple {
+                                            elts: names
+                                                .iter()
+                                                .map(|&name| {
+                                                    create_expr(ExprKind::Constant {
+                                                        value: Constant::Str(name.to_string()),
+                                                        kind: None,
+                                                    })
+                                                })
+                                                .collect(),
+                                            ctx: ExprContext::Load,
+                                        }),
+                                        checker.stylist,
+                                    )
+                                ),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
@@ -224,16 +226,17 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from_located(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            let mut generator: Generator = checker.stylist.into();
-                            generator.unparse_expr(
-                                &create_expr(ExprKind::Tuple {
-                                    elts: elts.clone(),
-                                    ctx: ExprContext::Load,
-                                }),
-                                1, // so tuple is generated with parentheses
-                            );
                             diagnostic.amend(Fix::replacement(
-                                generator.generate(),
+                                format!(
+                                    "({})",
+                                    unparse_expr(
+                                        &create_expr(ExprKind::Tuple {
+                                            elts: elts.clone(),
+                                            ctx: ExprContext::Load,
+                                        }),
+                                        checker.stylist,
+                                    )
+                                ),
                                 expr.location,
                                 expr.end_location.unwrap(),
                             ));
