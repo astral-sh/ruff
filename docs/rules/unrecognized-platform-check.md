@@ -6,19 +6,25 @@ Derived from the **flake8-pyi** linter.
 Check for unrecognized `sys.platform` checks. Platform checks should be
 simple string comparisons.
 
-> **Note**
->
-> This rule only supports the stub file.
+**Note**: this rule is only enabled in `.pyi` stub files.
 
 ## Why is this bad?
-Some checks are too complex for type checkers to understand. Please use
-simple string comparisons. Such as `sys.platform == "linux"`.
+Some `sys.platform` checks are too complex for type checkers to
+understand, and thus result in false positives. `sys.platform` checks
+should be simple string comparisons, like `sys.platform == "linux"`.
 
 ## Example
-Use a simple string comparison instead. Such as `==` or `!=`.
 ```python
-if sys.platform == 'win32':
-    # Windows specific definitions
+if sys.platform.startswith("linux"):
+   # Linux specific definitions
+else:
+  # Posix specific definitions
+```
+
+Instead, use a simple string comparison, such as `==` or `!=`:
+```python
+if sys.platform == "linux":
+    # Linux specific definitions
 else:
     # Posix specific definitions
 ```

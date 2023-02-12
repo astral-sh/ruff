@@ -1,5 +1,6 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
+
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -11,19 +12,25 @@ define_violation!(
     /// Check for unrecognized `sys.platform` checks. Platform checks should be
     /// simple string comparisons.
     ///
-    /// > **Note**
-    /// >
-    /// > This rule only supports the stub file.
+    /// **Note**: this rule is only enabled in `.pyi` stub files.
     ///
     /// ## Why is this bad?
-    /// Some checks are too complex for type checkers to understand. Please use
-    /// simple string comparisons. Such as `sys.platform == "linux"`.
+    /// Some `sys.platform` checks are too complex for type checkers to
+    /// understand, and thus result in false positives. `sys.platform` checks
+    /// should be simple string comparisons, like `sys.platform == "linux"`.
     ///
     /// ## Example
-    /// Use a simple string comparison instead. Such as `==` or `!=`.
     /// ```python
-    /// if sys.platform == 'win32':
-    ///     # Windows specific definitions
+    /// if sys.platform.startswith("linux"):
+    ///    # Linux specific definitions
+    /// else:
+    ///   # Posix specific definitions
+    /// ```
+    ///
+    /// Instead, use a simple string comparison, such as `==` or `!=`:
+    /// ```python
+    /// if sys.platform == "linux":
+    ///     # Linux specific definitions
     /// else:
     ///     # Posix specific definitions
     /// ```
@@ -89,7 +96,7 @@ pub fn unrecognized_platform(
         return;
     }
 
-    // "in" might also make sense but we don't currently have one
+    // "in" might also make sense but we don't currently have one.
     if !matches!(op, Cmpop::Eq | Cmpop::NotEq)
         && checker
             .settings
@@ -107,8 +114,8 @@ pub fn unrecognized_platform(
             value: Constant::Str(value),
             ..
         } => {
-            // other values are possible but we don't need them right now
-            // this protects against typos
+            // Other values are possible but we don't need them right now.
+            // This protects against typos.
             if !["linux", "win32", "cygwin", "darwin"].contains(&value.as_str())
                 && checker
                     .settings
