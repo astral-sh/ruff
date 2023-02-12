@@ -7,10 +7,10 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for code that raises `Exception` directly.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Handling such exceptions requires the use of `except Exception`, which
     /// captures _any_ raised exception, including failed assertions,
     /// division by zero, and more.
@@ -19,8 +19,8 @@ define_violation!(
     /// exception, so that you can avoid over-capturing exceptions that you
     /// don't intend to handle.
     ///
-    /// ### Example
-    /// ```py
+    /// ## Example
+    /// ```python
     /// def main_function():
     ///     if not cond:
     ///         raise Exception()
@@ -34,7 +34,7 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    /// ```py
+    /// ```python
     /// def main_function():
     ///     if not cond:
     ///         raise CustomException()
@@ -47,6 +47,7 @@ define_violation!(
     ///         logger.error("Main function failed")
     ///     except Exception:
     ///         logger.error("Oops")
+    /// ```
     pub struct RaiseVanillaClass;
 );
 impl Violation for RaiseVanillaClass {

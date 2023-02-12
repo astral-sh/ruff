@@ -7,7 +7,7 @@ use crate::source_code::Locator;
 use crate::violation::Violation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for functions with a high `McCabe` complexity.
     ///
     /// The `McCabe` complexity of a function is a measure of the complexity of the
@@ -15,10 +15,10 @@ define_violation!(
     /// number of decision points in the function. A decision point is a place in
     /// the code where the program has a choice of two or more paths to follow.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Functions with a high complexity are hard to understand and maintain.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// def foo(a, b, c):
     ///     if a:
@@ -44,15 +44,15 @@ define_violation!(
     ///         return 2
     ///     return 1
     /// ```
-    pub struct FunctionIsTooComplex {
+    pub struct ComplexStructure {
         pub name: String,
         pub complexity: usize,
     }
 );
-impl Violation for FunctionIsTooComplex {
+impl Violation for ComplexStructure {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionIsTooComplex { name, complexity } = self;
+        let ComplexStructure { name, complexity } = self;
         format!("`{name}` is too complex ({complexity})")
     }
 }
@@ -118,7 +118,7 @@ pub fn function_is_too_complex(
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
         Some(Diagnostic::new(
-            FunctionIsTooComplex {
+            ComplexStructure {
                 name: name.to_string(),
                 complexity,
             },

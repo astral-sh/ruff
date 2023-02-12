@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.244"
+version = "0.0.245"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -41,8 +41,10 @@ glob = { version = "0.3.0" }
 ignore = { version = "0.4.18" }
 itertools = { version = "0.10.5" }
 log = { version = "0.4.17" }
+mdcat = { version = "1.0.0", default-features = false }
 notify = { version = "5.0.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache"] }
+pulldown-cmark = { version = "0.9.2", default-features = false, features = ['simd'] }
 quick-junit = { version = "0.3.2" }
 rayon = { version = "1.5.3" }
 regex = { version = "1.6.0" }
@@ -50,9 +52,10 @@ rustc-hash = { version = "1.1.0" }
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }
 similar = { version = "2.2.1" }
+strum = { version = "0.24.1" }
+syntect = { version = "5.0.0", default-features = false, features = ["parsing", "regex-fancy", "default-themes", "default-syntaxes"] }
 textwrap = { version = "0.16.0" }
 walkdir = { version = "2.3.2" }
-strum = "0.24.1"
 
 [dev-dependencies]
 assert_cmd = { version = "2.0.4" }
@@ -61,3 +64,9 @@ ureq = { version = "2.5.0", features = [] }
 
 [package.metadata.maturin]
 name = "ruff"
+
+[target.'cfg(windows)'.dependencies]
+mimalloc = "0.1.29"
+
+[target.'cfg(not(windows))'.dependencies]
+tikv-jemallocator = "0.5.0"

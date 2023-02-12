@@ -231,7 +231,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.244'
+  rev: 'v0.0.245'
   hooks:
     - id: ruff
 ```
@@ -393,6 +393,7 @@ Usage: ruff [OPTIONS] <COMMAND>
 Commands:
   check   Run Ruff on the given files or directories (default)
   rule    Explain a rule
+  config  List or describe the available configuration options
   linter  List all supported upstream linters
   clean   Clear any caches in the current directory and any subdirectories
   help    Print this message or the help of the given subcommand(s)
@@ -620,7 +621,7 @@ configuration.
 See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
 
-#### Exit codes
+### Exit codes
 
 By default, Ruff exits with the following status codes:
 
@@ -638,6 +639,25 @@ Ruff supports two command-line flags that alter its exit code behavior:
   found, _even if_ all such violations were fixed automatically. Note that the use of
   `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
   autofixing.
+
+### Autocompletion
+
+Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
+by `ruff completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
+`powershell`, or `zsh`.
+
+The exact steps required to enable autocompletion will vary by shell. For example instructions,
+see the [Poetry](https://python-poetry.org/docs/#enable-tab-completion-for-bash-fish-or-zsh) or
+[ripgrep](https://github.com/BurntSushi/ripgrep/blob/master/FAQ.md#complete) documentation.
+
+As an example: to enable autocompletion for Zsh, run
+`ruff generate-shell-completion zsh > ~/.zfunc/_ruff`. Then add the following line to your
+`~/.zshrc` file, if they're not already present:
+
+```zsh
+fpath+=~/.zfunc
+autoload -Uz compinit && compinit
+```
 
 <!-- End section: Configuration -->
 
@@ -683,7 +703,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F523 | string-dot-format-extra-positional-arguments | `.format` call has unused arguments at position(s): {message} |  |
 | F524 | string-dot-format-missing-arguments | `.format` call is missing argument(s) for placeholder(s): {message} |  |
 | F525 | string-dot-format-mixing-automatic | `.format` string mixes automatic and manual numbering |  |
-| F541 | f-string-missing-placeholders | f-string without any placeholders | 🛠 |
+| F541 | [f-string-missing-placeholders](https://github.com/charliermarsh/ruff/blob/main/docs/rules/f-string-missing-placeholders.md) | f-string without any placeholders | 🛠 |
 | F601 | multi-value-repeated-key-literal | Dictionary key literal `{name}` repeated | 🛠 |
 | F602 | multi-value-repeated-key-variable | Dictionary key `{name}` repeated | 🛠 |
 | F621 | expressions-in-star-assignment | Too many expressions in star-unpacking assignment |  |
@@ -702,7 +722,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F821 | undefined-name | Undefined name `{name}` |  |
 | F822 | undefined-export | Undefined name `{name}` in `__all__` |  |
 | F823 | undefined-local | Local variable `{name}` referenced before assignment |  |
-| F841 | unused-variable | Local variable `{name}` is assigned to but never used | 🛠 |
+| F841 | [unused-variable](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unused-variable.md) | Local variable `{name}` is assigned to but never used | 🛠 |
 | F842 | unused-annotation | Local variable `{name}` is annotated but never used |  |
 | F901 | raise-not-implemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
@@ -721,7 +741,6 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | E701 | multiple-statements-on-one-line-colon | Multiple statements on one line (colon) |  |
 | E702 | multiple-statements-on-one-line-semicolon | Multiple statements on one line (semicolon) |  |
 | E703 | useless-semicolon | Statement ends with an unnecessary semicolon |  |
-| E704 | multiple-statements-on-one-line-def | Multiple statements on one line (def) |  |
 | E711 | none-comparison | Comparison to `None` should be `cond is None` | 🛠 |
 | E712 | true-false-comparison | Comparison to `True` should be `cond is True` | 🛠 |
 | E713 | not-in-test | Test for membership should be `not in` | 🛠 |
@@ -749,7 +768,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C901 | [function-is-too-complex](https://github.com/charliermarsh/ruff/blob/main/docs/rules/function-is-too-complex.md) | `{name}` is too complex ({complexity}) |  |
+| C901 | [complex-structure](https://github.com/charliermarsh/ruff/blob/main/docs/rules/complex-structure.md) | `{name}` is too complex ({complexity}) |  |
 
 ### isort (I)
 
@@ -818,7 +837,7 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
 | D403 | first-line-capitalized | First word of the first line should be properly capitalized |  |
-| D404 | no-this-prefix | First word of the docstring should not be "This" |  |
+| D404 | docstring-starts-with-this | First word of the docstring should not be "This" |  |
 | D405 | capitalize-section-name | Section name should be properly capitalized ("{name}") | 🛠 |
 | D406 | new-line-after-section-name | Section name should end with a newline ("{name}") | 🛠 |
 | D407 | dashed-underline-after-section | Missing dashed underline after section ("{name}") | 🛠 |
@@ -828,12 +847,12 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D411 | blank-line-before-section | Missing blank line before section ("{name}") | 🛠 |
 | D412 | no-blank-lines-between-header-and-content | No blank lines allowed between a section header and its content ("{name}") | 🛠 |
 | D413 | blank-line-after-last-section | Missing blank line after last section ("{name}") | 🛠 |
-| D414 | non-empty-section | Section has no content ("{name}") |  |
+| D414 | empty-docstring-section | Section has no content ("{name}") |  |
 | D415 | ends-in-punctuation | First line should end with a period, question mark, or exclamation point | 🛠 |
 | D416 | section-name-ends-in-colon | Section name should end with a colon ("{name}") | 🛠 |
-| D417 | document-all-arguments | Missing argument description in the docstring: `{name}` |  |
-| D418 | skip-docstring | Function decorated with `@overload` shouldn't contain a docstring |  |
-| D419 | non-empty | Docstring is empty |  |
+| D417 | undocumented-param | Missing argument description in the docstring: `{name}` |  |
+| D418 | overload-with-docstring | Function decorated with `@overload` shouldn't contain a docstring |  |
+| D419 | empty-docstring | Docstring is empty |  |
 
 ### pyupgrade (UP)
 
@@ -845,10 +864,10 @@ For more, see [pyupgrade](https://pypi.org/project/pyupgrade/) on PyPI.
 | UP003 | type-of-primitive | Use `{}` instead of `type(...)` | 🛠 |
 | UP004 | useless-object-inheritance | Class `{name}` inherits from `object` | 🛠 |
 | UP005 | deprecated-unittest-alias | `{alias}` is deprecated, use `{target}` | 🛠 |
-| UP006 | use-pep585-annotation | Use `{}` instead of `{}` for type annotations | 🛠 |
-| UP007 | use-pep604-annotation | Use `X \| Y` for type annotations | 🛠 |
+| UP006 | deprecated-collection-type | Use `{}` instead of `{}` for type annotations | 🛠 |
+| UP007 | typing-union | Use `X \| Y` for type annotations | 🛠 |
 | UP008 | super-call-with-parameters | Use `super()` instead of `super(__class__, self)` | 🛠 |
-| UP009 | pep3120-unnecessary-coding-comment | UTF-8 encoding declaration is unnecessary | 🛠 |
+| UP009 | utf8-encoding-declaration | UTF-8 encoding declaration is unnecessary | 🛠 |
 | UP010 | unnecessary-future-import | Unnecessary `__future__` import `{import}` for target Python version | 🛠 |
 | UP011 | lru-cache-without-parameters | Unnecessary parameters to `functools.lru_cache` | 🛠 |
 | UP012 | unnecessary-encode-utf8 | Unnecessary call to `encode` as UTF-8 | 🛠 |
@@ -910,7 +929,7 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/)
 | ANN204 | [missing-return-type-special-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-special-method.md) | Missing return type annotation for special method `{name}` | 🛠 |
 | ANN205 | [missing-return-type-static-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-static-method.md) | Missing return type annotation for staticmethod `{name}` |  |
 | ANN206 | [missing-return-type-class-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-class-method.md) | Missing return type annotation for classmethod `{name}` |  |
-| ANN401 | [dynamically-typed-expression](https://github.com/charliermarsh/ruff/blob/main/docs/rules/dynamically-typed-expression.md) | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
+| ANN401 | [any-type](https://github.com/charliermarsh/ruff/blob/main/docs/rules/any-type.md) | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
 
 ### flake8-bandit (S)
 
@@ -934,7 +953,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S506 | unsafe-yaml-load | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 | S508 | snmp-insecure-version | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
 | S509 | snmp-weak-cryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
-| S608 | [hardcoded-sql-expression](https://github.com/charliermarsh/ruff/blob/main/docs/rules/hardcoded-sql-expression.md) | Possible SQL injection vector through string-based query construction: "{}" |  |
+| S608 | [hardcoded-sql-expression](https://github.com/charliermarsh/ruff/blob/main/docs/rules/hardcoded-sql-expression.md) | Possible SQL injection vector through string-based query construction |  |
 | S612 | logging-config-insecure-listen | Use of insecure `logging.config.listen` detected |  |
 | S701 | jinja2-autoescape-false | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
 
@@ -1127,11 +1146,11 @@ For more, see [flake8-pie](https://pypi.org/project/flake8-pie/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PIE790 | no-unnecessary-pass | Unnecessary `pass` statement | 🛠 |
+| PIE790 | unnecessary-pass | Unnecessary `pass` statement | 🛠 |
 | PIE794 | dupe-class-field-definitions | Class field `{name}` is defined multiple times | 🛠 |
 | PIE796 | prefer-unique-enums | Enum contains duplicate value: `{value}` |  |
-| PIE800 | no-unnecessary-spread | Unnecessary spread `**` |  |
-| PIE804 | no-unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
+| PIE800 | unnecessary-spread | Unnecessary spread `**` |  |
+| PIE804 | unnecessary-dict-kwargs | Unnecessary `dict` kwargs |  |
 | PIE807 | prefer-list-builtin | Prefer `list` over useless lambda | 🛠 |
 | PIE810 | single-starts-ends-with | Call `{attr}` once with a `tuple` |  |
 
@@ -1217,8 +1236,8 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | SIM101 | duplicate-isinstance-call | Multiple `isinstance` calls for `{name}`, merge into a single call | 🛠 |
-| SIM102 | nested-if-statements | Use a single `if` statement instead of nested `if` statements | 🛠 |
-| SIM103 | return-bool-condition-directly | Return the condition `{condition}` directly | 🛠 |
+| SIM102 | collapsible-if | Use a single `if` statement instead of nested `if` statements | 🛠 |
+| SIM103 | needless-bool | Return the condition `{condition}` directly | 🛠 |
 | SIM105 | use-contextlib-suppress | Use `contextlib.suppress({exception})` instead of try-except-pass |  |
 | SIM107 | return-in-try-except-finally | Don't use `return` in `try`/`except` and `finally` |  |
 | SIM108 | use-ternary-operator | Use ternary operator `{contents}` instead of if-else-block | 🛠 |
@@ -1249,7 +1268,7 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | TID251 | banned-api | `{name}` is banned: {message} |  |
-| TID252 | relative-imports | Relative imports from parent modules are banned |  |
+| TID252 | [relative-imports](https://github.com/charliermarsh/ruff/blob/main/docs/rules/relative-imports.md) | Relative imports from parent modules are banned | 🛠 |
 
 ### flake8-type-checking (TCH)
 
@@ -3415,7 +3434,7 @@ alias (e.g., `import A as B`) to wrap such that every line contains
 exactly one member. For example, this formatting would be retained,
 rather than condensing to a single line:
 
-```py
+```python
 from .utils import (
     test_directory as test_directory,
     test_id as test_id
@@ -3480,8 +3499,7 @@ known-first-party = ["src"]
 #### [`known-local-folder`](#known-local-folder)
 
 A list of modules to consider being a local folder.
-Generally, this is reserved for relative
-imports (from . import module).
+Generally, this is reserved for relative imports (`from . import module`).
 
 **Default value**: `[]`
 
@@ -3517,7 +3535,7 @@ known-third-party = ["src"]
 #### [`lines-after-imports`](#lines-after-imports)
 
 The number of blank lines to place after imports.
--1 for automatic determination.
+Use `-1` for automatic determination.
 
 **Default value**: `-1`
 
@@ -3529,6 +3547,24 @@ The number of blank lines to place after imports.
 [tool.ruff.isort]
 # Use a single line after each import block.
 lines-after-imports = 1
+```
+
+---
+
+#### [`lines-between-types`](#lines-between-types)
+
+The number of lines to place between "direct" and `import from` imports.
+
+**Default value**: `0`
+
+**Type**: `int`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+# Use a single line between direct and from import
+lines-between-types = 1
 ```
 
 ---

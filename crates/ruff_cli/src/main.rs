@@ -24,6 +24,14 @@ mod iterators;
 mod printer;
 mod resolve;
 
+#[cfg(target_os = "windows")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+#[cfg(not(target_os = "windows"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 enum ExitStatus {
     /// Linting was successful and there were no linting errors.
     Success,
@@ -93,7 +101,8 @@ quoting the executed command, along with the relevant file contents and `pyproje
 
     match command {
         Command::Rule { rule, format } => commands::rule(&rule, format)?,
-        Command::Linter { format } => commands::linter::linter(format),
+        Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
+        Command::Linter { format } => commands::linter(format)?,
         Command::Clean => commands::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut io::stdout());

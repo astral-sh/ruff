@@ -1,9 +1,9 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoThisPrefix: ~
+    DocstringStartsWithThis: ~
   location:
     row: 631
     column: 4
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoThisPrefix: ~
+    DocstringStartsWithThis: ~
   location:
     row: 636
     column: 4

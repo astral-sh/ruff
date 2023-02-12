@@ -3,6 +3,7 @@
 crates/ruff/resources/test/cpython
 docs/*
 !docs/rules
+!docs/assets
 mkdocs.yml
 .overrides
 

@@ -1,9 +1,9 @@
 ---
-source: src/rules/flake8_pie/mod.rs
+source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoUnnecessaryDictKwargs: ~
+    UnnecessaryDictKwargs: ~
   location:
     row: 1
     column: 0
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoUnnecessaryDictKwargs: ~
+    UnnecessaryDictKwargs: ~
   location:
     row: 3
     column: 0
@@ -23,7 +23,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoUnnecessaryDictKwargs: ~
+    UnnecessaryDictKwargs: ~
   location:
     row: 5
     column: 0
@@ -33,7 +33,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoUnnecessaryDictKwargs: ~
+    UnnecessaryDictKwargs: ~
   location:
     row: 7
     column: 0
@@ -43,7 +43,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoUnnecessaryDictKwargs: ~
+    UnnecessaryDictKwargs: ~
   location:
     row: 9
     column: 0

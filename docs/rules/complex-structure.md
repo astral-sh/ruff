@@ -1,8 +1,8 @@
-# function-is-too-complex (C901)
+# complex-structure (C901)
 
 Derived from the **mccabe** linter.
 
-### What it does
+## What it does
 Checks for functions with a high `McCabe` complexity.
 
 The `McCabe` complexity of a function is a measure of the complexity of the
@@ -10,10 +10,10 @@ control flow graph of the function. It is calculated by adding one to the
 number of decision points in the function. A decision point is a place in
 the code where the program has a choice of two or more paths to follow.
 
-### Why is this bad?
+## Why is this bad?
 Functions with a high complexity are hard to understand and maintain.
 
-### Example
+## Example
 ```python
 def foo(a, b, c):
     if a:

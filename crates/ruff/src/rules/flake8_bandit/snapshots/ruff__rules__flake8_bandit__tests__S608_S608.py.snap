@@ -3,8 +3,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HardcodedSQLExpression:
-      string: "\"SELECT %s FROM table\" % (var,)"
+    HardcodedSQLExpression: ~
   location:
     row: 2
     column: 9
@@ -14,8 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"SELECT var FROM \" + table"
+    HardcodedSQLExpression: ~
   location:
     row: 3
     column: 9
@@ -25,8 +23,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"SELECT \" + val + \" FROM \" + table"
+    HardcodedSQLExpression: ~
   location:
     row: 4
     column: 9
@@ -36,8 +33,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"SELECT {} FROM table;\".format(var)"
+    HardcodedSQLExpression: ~
   location:
     row: 5
     column: 9
@@ -47,8 +43,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"SELECT * FROM table WHERE var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 6
     column: 9
@@ -58,8 +53,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"DELETE FROM table WHERE var = %s\" % (var,)"
+    HardcodedSQLExpression: ~
   location:
     row: 8
     column: 9
@@ -69,8 +63,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"DELETE FROM table WHERE VAR = \" + var"
+    HardcodedSQLExpression: ~
   location:
     row: 9
     column: 9
@@ -80,8 +73,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"DELETE FROM \" + table + \"WHERE var = \" + var"
+    HardcodedSQLExpression: ~
   location:
     row: 10
     column: 9
@@ -91,8 +83,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"DELETE FROM table WHERE var = {}\".format(var)"
+    HardcodedSQLExpression: ~
   location:
     row: 11
     column: 9
@@ -102,8 +93,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"DELETE FROM table WHERE var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 12
     column: 10
@@ -113,8 +103,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"INSERT INTO table VALUES (%s)\" % (var,)"
+    HardcodedSQLExpression: ~
   location:
     row: 14
     column: 10
@@ -124,8 +113,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"INSERT INTO TABLE VALUES (\" + var + \")\""
+    HardcodedSQLExpression: ~
   location:
     row: 15
     column: 10
@@ -135,8 +123,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"INSERT INTO {} VALUES ({})\".format(table, var)"
+    HardcodedSQLExpression: ~
   location:
     row: 16
     column: 10
@@ -146,8 +133,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"INSERT INTO {table} VALUES var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 17
     column: 10
@@ -157,8 +143,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"UPDATE %s SET var = %s\" % (table, var)"
+    HardcodedSQLExpression: ~
   location:
     row: 19
     column: 10
@@ -168,8 +153,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"UPDATE \" + table + \" SET var = \" + var"
+    HardcodedSQLExpression: ~
   location:
     row: 20
     column: 10
@@ -179,8 +163,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"UPDATE {} SET var = {}\".format(table, var)"
+    HardcodedSQLExpression: ~
   location:
     row: 21
     column: 10
@@ -190,8 +173,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"UPDATE {table} SET var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 22
     column: 10
@@ -201,8 +183,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"select %s from table\" % (var,)"
+    HardcodedSQLExpression: ~
   location:
     row: 24
     column: 10
@@ -212,8 +193,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"select var from \" + table"
+    HardcodedSQLExpression: ~
   location:
     row: 25
     column: 10
@@ -223,8 +203,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"select \" + val + \" from \" + table"
+    HardcodedSQLExpression: ~
   location:
     row: 26
     column: 10
@@ -234,8 +213,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"select {} from table;\".format(var)"
+    HardcodedSQLExpression: ~
   location:
     row: 27
     column: 10
@@ -245,8 +223,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"select * from table where var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 28
     column: 10
@@ -256,8 +233,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"delete from table where var = %s\" % (var,)"
+    HardcodedSQLExpression: ~
   location:
     row: 30
     column: 10
@@ -267,8 +243,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"delete from table where var = \" + var"
+    HardcodedSQLExpression: ~
   location:
     row: 31
     column: 10
@@ -278,8 +253,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"delete from \" + table + \"where var = \" + var"
+    HardcodedSQLExpression: ~
   location:
     row: 32
     column: 10
@@ -289,8 +263,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"delete from table where var = {}\".format(var)"
+    HardcodedSQLExpression: ~
   location:
     row: 33
     column: 10
@@ -300,8 +273,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"delete from table where var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 34
     column: 10
@@ -311,8 +283,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"insert into table values (%s)\" % (var,)"
+    HardcodedSQLExpression: ~
   location:
     row: 36
     column: 10
@@ -322,8 +293,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"insert into table values (\" + var + \")\""
+    HardcodedSQLExpression: ~
   location:
     row: 37
     column: 10
@@ -333,8 +303,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"insert into {} values ({})\".format(table, var)"
+    HardcodedSQLExpression: ~
   location:
     row: 38
     column: 10
@@ -344,8 +313,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"insert into {table} values var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 39
     column: 10
@@ -355,8 +323,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"update %s set var = %s\" % (table, var)"
+    HardcodedSQLExpression: ~
   location:
     row: 41
     column: 10
@@ -366,8 +333,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"update \" + table + \" set var = \" + var"
+    HardcodedSQLExpression: ~
   location:
     row: 42
     column: 10
@@ -377,8 +343,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"update {} set var = {}\".format(table, var)"
+    HardcodedSQLExpression: ~
   location:
     row: 43
     column: 10
@@ -388,8 +353,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"update {table} set var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 44
     column: 10
@@ -399,8 +363,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"\\n    SELECT *\\n    FROM table\\n    WHERE var = %s\\n    \" % var"
+    HardcodedSQLExpression: ~
   location:
     row: 48
     column: 11
@@ -410,8 +373,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"\\n    SELECT *\\n    FROM TABLE\\n    WHERE var =\\n    \" + var"
+    HardcodedSQLExpression: ~
   location:
     row: 55
     column: 11
@@ -421,8 +383,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"\\n    SELECT *\\n    FROM table\\n    WHERE var = {}\\n    \".format(var)"
+    HardcodedSQLExpression: ~
   location:
     row: 62
     column: 11
@@ -432,8 +393,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"\\n    SELECT *\\n    FROM table\\n    WHERE var = {var}\\n    \""
+    HardcodedSQLExpression: ~
   location:
     row: 69
     column: 11
@@ -443,8 +403,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"SELECT *FROM tableWHERE var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 77
     column: 8
@@ -454,8 +413,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"SELECT * FROM table WHERE var = %s\" % var"
+    HardcodedSQLExpression: ~
   location:
     row: 83
     column: 25
@@ -465,8 +423,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "f\"SELECT * FROM table WHERE var = {var}\""
+    HardcodedSQLExpression: ~
   location:
     row: 84
     column: 25
@@ -476,8 +433,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"SELECT * FROM table WHERE var = {}\".format(var)"
+    HardcodedSQLExpression: ~
   location:
     row: 85
     column: 25
@@ -487,8 +443,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression:
-      string: "\"SELECT * FROM table WHERE var = %s\" % var"
+    HardcodedSQLExpression: ~
   location:
     row: 86
     column: 29

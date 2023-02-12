@@ -282,10 +282,6 @@ mod tests {
                 pattern: "examples/*".to_string(),
                 prefix: RuleCodePrefix::F841.into(),
             },
-            PatternPrefixPair {
-                pattern: "*.pyi".to_string(),
-                prefix: RuleCodePrefix::E704.into(),
-            },
         ];
         assert_eq!(actual, expected);
 

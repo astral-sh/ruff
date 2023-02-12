@@ -38,16 +38,12 @@ pub fn check_physical_lines(
     let enforce_doc_line_too_long = settings.rules.enabled(&Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(&Rule::LineTooLong);
     let enforce_no_newline_at_end_of_file = settings.rules.enabled(&Rule::NoNewLineAtEndOfFile);
-    let enforce_unnecessary_coding_comment = settings
-        .rules
-        .enabled(&Rule::PEP3120UnnecessaryCodingComment);
+    let enforce_unnecessary_coding_comment = settings.rules.enabled(&Rule::UTF8EncodingDeclaration);
     let enforce_mixed_spaces_and_tabs = settings.rules.enabled(&Rule::MixedSpacesAndTabs);
     let enforce_bidirectional_unicode = settings.rules.enabled(&Rule::BidirectionalUnicode);
 
     let fix_unnecessary_coding_comment = matches!(autofix, flags::Autofix::Enabled)
-        && settings
-            .rules
-            .should_fix(&Rule::PEP3120UnnecessaryCodingComment);
+        && settings.rules.should_fix(&Rule::UTF8EncodingDeclaration);
     let fix_shebang_whitespace = matches!(autofix, flags::Autofix::Enabled)
         && settings.rules.should_fix(&Rule::ShebangWhitespace);
 
