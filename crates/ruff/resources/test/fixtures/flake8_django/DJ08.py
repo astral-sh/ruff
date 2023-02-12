@@ -7,8 +7,8 @@ class TestModel1(models.Model):
     new_field = models.CharField(max_length=10)
 
     class Meta:
-        verbose_name = 'test model'
-        verbose_name_plural = 'test models'
+        verbose_name = "test model"
+        verbose_name_plural = "test models"
 
     @property
     def my_brand_new_property(self):
@@ -22,8 +22,8 @@ class TestModel2(Model):
     new_field = models.CharField(max_length=10)
 
     class Meta:
-        verbose_name = 'test model'
-        verbose_name_plural = 'test models'
+        verbose_name = "test model"
+        verbose_name_plural = "test models"
 
     @property
     def my_brand_new_property(self):
@@ -52,8 +52,8 @@ class TestModel4(Model):
     new_field = models.CharField(max_length=10)
 
     class Meta:
-        verbose_name = 'test model'
-        verbose_name_plural = 'test models'
+        verbose_name = "test model"
+        verbose_name_plural = "test models"
 
     def __str__(self):
         return self.new_field
@@ -70,8 +70,8 @@ class TestModel5(models.Model):
     new_field = models.CharField(max_length=10)
 
     class Meta:
-        verbose_name = 'test model'
-        verbose_name_plural = 'test models'
+        verbose_name = "test model"
+        verbose_name_plural = "test models"
 
     def __str__(self):
         return self.new_field
@@ -114,6 +114,7 @@ class AbstractTestModel2(Model):
 
 
 # Abstract models with __str__
+
 
 class AbstractTestModel3(Model):
     new_field = models.CharField(max_length=10)

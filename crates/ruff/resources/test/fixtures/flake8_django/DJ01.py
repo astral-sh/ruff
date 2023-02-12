@@ -33,5 +33,7 @@ class CorrectModel(models.Model):
     textfieldu = models.TextField(max_length=255, null=True, blank=True, unique=True)
     slugfieldu = models.SlugField(max_length=255, null=True, blank=True, unique=True)
     emailfieldu = models.EmailField(max_length=255, null=True, blank=True, unique=True)
-    filepathfieldu = models.FilePathField(max_length=255, null=True, blank=True, unique=True)
+    filepathfieldu = models.FilePathField(
+        max_length=255, null=True, blank=True, unique=True
+    )
     urlfieldu = models.URLField(max_length=255, null=True, blank=True, unique=True)
