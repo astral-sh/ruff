@@ -53,6 +53,10 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
     let mut while_ = None;
     let mut with = None;
 
+    // As a special-case, track whether we're at the first token after a colon.
+    // This is used to allow `class C: ...`-style definitions in stubs.
+    let mut allow_ellipsis = false;
+
     // Track the bracket depth.
     let mut par_count = 0;
     let mut sqb_count = 0;
@@ -118,12 +122,17 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
                     || with.is_some()
                 {
                     colon = Some((start, end));
+                    allow_ellipsis = true;
                 }
             }
             Tok::Semi => {
                 semi = Some((start, end));
             }
             Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
+            Tok::Ellipsis if allow_ellipsis => {
+                // Allow `class C: ...`-style definitions in stubs.
+                allow_ellipsis = false;
+            }
             _ => {
                 if let Some((start, end)) = semi {
                     diagnostics.push(Diagnostic::new(
