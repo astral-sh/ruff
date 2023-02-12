@@ -6,133 +6,133 @@ expression: diagnostics
     UnnecessaryMap:
       obj_type: generator
   location:
-    row: 2
+    row: 3
     column: 0
   end_location:
-    row: 2
+    row: 3
     column: 26
   fix:
     content:
       - (x + 1 for x in nums)
     location:
-      row: 2
+      row: 3
       column: 0
     end_location:
-      row: 2
+      row: 3
       column: 26
   parent: ~
 - kind:
     UnnecessaryMap:
       obj_type: generator
   location:
-    row: 3
+    row: 4
     column: 0
   end_location:
-    row: 3
+    row: 4
     column: 27
   fix:
     content:
       - (str(x) for x in nums)
     location:
-      row: 3
+      row: 4
       column: 0
     end_location:
-      row: 3
+      row: 4
       column: 27
   parent: ~
 - kind:
     UnnecessaryMap:
       obj_type: list
   location:
-    row: 4
+    row: 5
     column: 0
   end_location:
-    row: 4
+    row: 5
     column: 32
   fix:
     content:
       - "[x * 2 for x in nums]"
     location:
-      row: 4
+      row: 5
       column: 0
     end_location:
-      row: 4
+      row: 5
       column: 32
   parent: ~
 - kind:
     UnnecessaryMap:
       obj_type: set
   location:
-    row: 5
+    row: 6
     column: 0
   end_location:
-    row: 5
+    row: 6
     column: 36
   fix:
     content:
       - "{x % 2 == 0 for x in nums}"
     location:
-      row: 5
+      row: 6
       column: 0
     end_location:
-      row: 5
+      row: 6
       column: 36
   parent: ~
 - kind:
     UnnecessaryMap:
       obj_type: dict
   location:
-    row: 6
+    row: 7
     column: 0
   end_location:
-    row: 6
+    row: 7
     column: 36
   fix:
     content:
       - "{v: v**2 for v in nums}"
     location:
-      row: 6
+      row: 7
       column: 0
     end_location:
-      row: 6
+      row: 7
       column: 36
   parent: ~
 - kind:
     UnnecessaryMap:
       obj_type: generator
   location:
-    row: 7
+    row: 8
     column: 0
   end_location:
-    row: 7
+    row: 8
     column: 26
   fix:
     content:
       - "(\"const\" for _ in nums)"
     location:
-      row: 7
+      row: 8
       column: 0
     end_location:
-      row: 7
+      row: 8
       column: 26
   parent: ~
 - kind:
     UnnecessaryMap:
       obj_type: generator
   location:
-    row: 8
+    row: 9
     column: 0
   end_location:
-    row: 8
+    row: 9
     column: 24
   fix:
     content:
       - (3.0 for _ in nums)
     location:
-      row: 8
+      row: 9
       column: 0
     end_location:
-      row: 8
+      row: 9
       column: 24
   parent: ~
 - kind:
@@ -146,7 +146,7 @@ expression: diagnostics
     column: 63
   fix:
     content:
-      - "(x in nums and '1' or '0' for x in range(123))"
+      - "(x in nums and \"1\" or \"0\" for x in range(123))"
     location:
       row: 10
       column: 12

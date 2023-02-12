@@ -1,34 +1,50 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use super::helpers;
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
+use super::helpers;
+
 define_violation!(
     /// ## What it does
-    /// Checks for unnecessary `list/reversed/set/sorted/tuple` call within `list/set/sorted/tuple`.
+    /// Checks for unnecessary `list`, `reversed`, `set`, `sorted`, and `tuple`
+    /// call within `list`, `set`, `sorted`, and `tuple` calls.
     ///
     /// ## Why is this bad?
-    /// It's unnecessary to double-cast or double-process iterables by wrapping the listed functions within `list/set/sorted/tuple`.
+    /// It's unnecessary to double-cast or double-process iterables by wrapping
+    /// the listed functions within an additional `list`, `set`, `sorted`, or
+    /// `tuple` call. Doing so is redundant and can be confusing for readers.
     ///
     /// ## Examples
-    /// Rewrite `list(list(iterable))` as `list(iterable)`
-    /// Rewrite `list(tuple(iterable))` as `list(iterable)`
-    /// Rewrite `tuple(list(iterable))` as `tuple(iterable)`
-    /// Rewrite `tuple(tuple(iterable))` as `tuple(iterable)`
-    /// Rewrite `set(set(iterable))` as `set(iterable)`
-    /// Rewrite `set(list(iterable))` as `set(iterable)`
-    /// Rewrite `set(tuple(iterable))` as `set(iterable)`
-    /// Rewrite `set(sorted(iterable))` as `set(iterable)`
-    /// Rewrite `set(reversed(iterable))` as `set(iterable)`
-    /// Rewrite `sorted(list(iterable))` as `sorted(iterable)`
-    /// Rewrite `sorted(tuple(iterable))` as `sorted(iterable)`
-    /// Rewrite `sorted(sorted(iterable))` as `sorted(iterable)`
-    /// Rewrite `sorted(reversed(iterable))` as `sorted(iterable)`
+    /// ```python
+    /// list(tuple(iterable))
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// list(iterable)
+    /// ```
+    ///
+    /// This rule applies to a variety of functions, including `list`, `reversed`,
+    /// `set`, `sorted`, and `tuple`. For example:
+    /// * Instead of `list(list(iterable))`, use `list(iterable)`.
+    /// * Instead of `list(tuple(iterable))`, use `list(iterable)`.
+    /// * Instead of `tuple(list(iterable))`, use `tuple(iterable)`.
+    /// * Instead of `tuple(tuple(iterable))`, use `tuple(iterable)`.
+    /// * Instead of `set(set(iterable))`, use `set(iterable)`.
+    /// * Instead of `set(list(iterable))`, use `set(iterable)`.
+    /// * Instead of `set(tuple(iterable))`, use `set(iterable)`.
+    /// * Instead of `set(sorted(iterable))`, use `set(iterable)`.
+    /// * Instead of `set(reversed(iterable))`, use `set(iterable)`.
+    /// * Instead of `sorted(list(iterable))`, use `sorted(iterable)`.
+    /// * Instead of `sorted(tuple(iterable))`, use `sorted(iterable)`.
+    /// * Instead of `sorted(sorted(iterable))`, use `sorted(iterable)`.
+    /// * Instead of `sorted(reversed(iterable))`, use `sorted(iterable)`.
     pub struct UnnecessaryDoubleCastOrProcess {
         pub inner: String,
         pub outer: String,
@@ -43,7 +59,7 @@ impl AlwaysAutofixableViolation for UnnecessaryDoubleCastOrProcess {
 
     fn autofix_title(&self) -> String {
         let UnnecessaryDoubleCastOrProcess { inner, .. } = self;
-        format!("Remove the `{inner}()` call")
+        format!("Remove the inner `{inner}` call")
     }
 }
 
