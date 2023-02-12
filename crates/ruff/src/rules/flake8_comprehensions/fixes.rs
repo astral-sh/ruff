@@ -743,6 +743,7 @@ pub fn fix_unnecessary_call_around_sorted(
         if outer_name.value == "list" {
             body.value = Expression::Call(inner_call.clone());
         } else {
+            // If the `reverse` argument is used
             let args = if inner_call.args.iter().any(|arg| {
                 matches!(
                     arg.keyword,
@@ -752,7 +753,46 @@ pub fn fix_unnecessary_call_around_sorted(
                     })
                 )
             }) {
-                inner_call.args.clone()
+                // Negate the `reverse` argument
+                inner_call
+                    .args
+                    .clone()
+                    .into_iter()
+                    .map(|mut arg| {
+                        if matches!(
+                            arg.keyword,
+                            Some(Name {
+                                value: "reverse",
+                                ..
+                            })
+                        ) {
+                            if let Expression::Name(ref val) = arg.value {
+                                if val.value == "True" {
+                                    // TODO: even better would be to drop the argument, as False is the default
+                                    arg.value = Expression::Name(Box::new(Name {
+                                        value: "False",
+                                        lpar: vec![],
+                                        rpar: vec![],
+                                    }));
+                                    arg
+                                } else if val.value == "False" {
+                                    arg.value = Expression::Name(Box::new(Name {
+                                        value: "True",
+                                        lpar: vec![],
+                                        rpar: vec![],
+                                    }));
+                                    arg
+                                } else {
+                                    arg
+                                }
+                            } else {
+                                arg
+                            }
+                        } else {
+                            arg
+                        }
+                    })
+                    .collect_vec()
             } else {
                 let mut args = inner_call.args.clone();
                 args.push(Arg {
