@@ -1,6 +1,0 @@
-import sys
-
-if sys.platform.startswith("darwin"):
-    ...
-else:
-    ...
