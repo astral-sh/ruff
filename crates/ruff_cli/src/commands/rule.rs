@@ -27,7 +27,7 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let mut output = String::new();
 
     match format {
-        HelpFormat::Text | HelpFormat::Markdown => {
+        HelpFormat::Text | HelpFormat::Pretty => {
             output.push_str(&format!("# {} ({})", rule.as_ref(), rule.code()));
             output.push('\n');
             output.push('\n');
@@ -69,7 +69,7 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
         HelpFormat::Json | HelpFormat::Text => {
             writeln!(stdout, "{output}")?;
         }
-        HelpFormat::Markdown => {
+        HelpFormat::Pretty => {
             let parser = Parser::new_ext(
                 &output,
                 Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH,

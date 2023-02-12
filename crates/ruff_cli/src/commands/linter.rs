@@ -64,7 +64,7 @@ pub fn linter(format: HelpFormat) -> Result<()> {
             output.push('\n');
         }
 
-        HelpFormat::Markdown => {
+        HelpFormat::Pretty => {
             output.push_str(&format!("| {:>6} | {:<27} |\n", "Prefix", "Name"));
             output.push_str(&format!("| {:>6} | {:<27} |\n", "------", "-".repeat(27)));
 
