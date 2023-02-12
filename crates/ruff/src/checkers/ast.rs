@@ -35,9 +35,9 @@ use crate::registry::{Diagnostic, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
-    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format,
-    flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return,
-    flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
+    flake8_django, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
+    flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise,
+    flake8_return, flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
     pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
@@ -464,6 +464,15 @@ where
                 body,
                 ..
             } => {
+                if self.settings.rules.enabled(&Rule::ReceiverDecoratorChecker) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::receiver_decorator_checker(decorator_list, |expr| {
+                            self.resolve_call_path(expr)
+                        })
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.rules.enabled(&Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {
@@ -771,6 +780,19 @@ where
                 decorator_list,
                 body,
             } => {
+                if self.settings.rules.enabled(&Rule::ModelStringFieldNullable) {
+                    self.diagnostics
+                        .extend(flake8_django::rules::model_string_field_nullable(
+                            self, bases, body,
+                        ));
+                }
+                if self.settings.rules.enabled(&Rule::ModelDunderStr) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::model_dunder_str(self, bases, body, stmt)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.rules.enabled(&Rule::UselessObjectInheritance) {
                     pyupgrade::rules::useless_object_inheritance(self, stmt, name, bases, keywords);
                 }

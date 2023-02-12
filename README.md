@@ -137,6 +137,7 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [flake8-comprehensions (C4)](#flake8-comprehensions-c4)
    1. [flake8-datetimez (DTZ)](#flake8-datetimez-dtz)
    1. [flake8-debugger (T10)](#flake8-debugger-t10)
+   1. [flake8-django (DJ)](#flake8-django-dj)
    1. [flake8-errmsg (EM)](#flake8-errmsg-em)
    1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [flake8-implicit-str-concat (ISC)](#flake8-implicit-str-concat-isc)
@@ -1077,6 +1078,16 @@ For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/) on Py
 | ---- | ---- | ------- | --- |
 | T100 | debugger | Trace found: `{name}` used |  |
 
+### flake8-django (DJ)
+
+For more, see [flake8-django](https://pypi.org/project/flake8-django/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| DJ001 | [model-string-field-nullable](https://github.com/charliermarsh/ruff/blob/main/docs/rules/model-string-field-nullable.md) | Avoid using `null=True` on string-based fields such as {field_name} |  |
+| DJ008 | [model-dunder-str](https://github.com/charliermarsh/ruff/blob/main/docs/rules/model-dunder-str.md) | Model does not define `__str__` method |  |
+| DJ013 | [receiver-decorator-checker](https://github.com/charliermarsh/ruff/blob/main/docs/rules/receiver-decorator-checker.md) | `@receiver` decorator must be on top of all the other decorators |  |
+
 ### flake8-errmsg (EM)
 
 For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/) on PyPI.
@@ -1722,6 +1733,7 @@ natively, including:
 * [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
 * [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 * [flake8-debugger](https://pypi.org/project/flake8-debugger/)
+* [flake8-django](https://pypi.org/project/flake8-django/) ([#2817](https://github.com/charliermarsh/ruff/issues/2817))
 * [flake8-docstrings](https://pypi.org/project/flake8-docstrings/)
 * [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
 * [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
@@ -1820,6 +1832,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 * [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
 * [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 * [flake8-debugger](https://pypi.org/project/flake8-debugger/)
+* [flake8-django](https://pypi.org/project/flake8-django/) ([#2817](https://github.com/charliermarsh/ruff/issues/2817))
 * [flake8-docstrings](https://pypi.org/project/flake8-docstrings/)
 * [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
 * [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
