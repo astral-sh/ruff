@@ -20,7 +20,7 @@ impl Violation for VerboseRaise {
 
 #[derive(Default)]
 struct RaiseStatementVisitor<'a> {
-    raises: Vec<Option<&'a Expr>>,
+    raises: Vec<(Option<&'a Expr>, Option<&'a Expr>)>,
 }
 
 impl<'a, 'b> Visitor<'b> for RaiseStatementVisitor<'a>
@@ -29,7 +29,7 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match &stmt.node {
-            StmtKind::Raise { exc, .. } => self.raises.push(exc.as_ref().map(|expr| &**expr)),
+            StmtKind::Raise { exc, cause } => self.raises.push((exc.as_deref(), cause.as_deref())),
             StmtKind::Try {
                 body, finalbody, ..
             } => {
@@ -59,13 +59,18 @@ pub fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
                 }
                 visitor.raises
             };
-            for expr in raises.into_iter().flatten() {
-                // ...and the raised object is bound to the same name...
-                if let ExprKind::Name { id, .. } = &expr.node {
-                    if id == exception_name {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(VerboseRaise, Range::from_located(expr)));
+            for (exc, cause) in raises {
+                if cause.is_some() {
+                    continue;
+                }
+                if let Some(exc) = exc {
+                    // ...and the raised object is bound to the same name...
+                    if let ExprKind::Name { id, .. } = &exc.node {
+                        if id == exception_name {
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(VerboseRaise, Range::from_located(exc)));
+                        }
                     }
                 }
             }

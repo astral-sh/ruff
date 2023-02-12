@@ -27,12 +27,21 @@ def good():
         logger.exception("process failed")
         raise
 
+
 def still_good():
     try:
         process()
     except MyException as e:
         print(e)
         raise
+
+
+def still_good_too():
+    try:
+        process()
+    except MyException as e:
+        print(e)
+        raise e from None
 
 
 def still_actually_good():
@@ -60,5 +69,6 @@ def bad_that_needs_recursion_2():
     except MyException as e:
         logger.exception("process failed")
         if True:
+
             def foo():
                 raise e

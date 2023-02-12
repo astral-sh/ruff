@@ -137,6 +137,7 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [flake8-comprehensions (C4)](#flake8-comprehensions-c4)
    1. [flake8-datetimez (DTZ)](#flake8-datetimez-dtz)
    1. [flake8-debugger (T10)](#flake8-debugger-t10)
+   1. [flake8-django (DJ)](#flake8-django-dj)
    1. [flake8-errmsg (EM)](#flake8-errmsg-em)
    1. [flake8-executable (EXE)](#flake8-executable-exe)
    1. [flake8-implicit-str-concat (ISC)](#flake8-implicit-str-concat-isc)
@@ -746,7 +747,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | E713 | not-in-test | Test for membership should be `not in` | 🛠 |
 | E714 | not-is-test | Test for object identity should be `is not` | 🛠 |
 | E721 | type-comparison | Do not compare types, use `isinstance()` |  |
-| E722 | bare-except | Do not use bare `except` |  |
+| E722 | [bare-except](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bare-except.md) | Do not use bare `except` |  |
 | E731 | lambda-assignment | Do not assign a `lambda` expression, use a `def` | 🛠 |
 | E741 | ambiguous-variable-name | Ambiguous variable name: `{name}` |  |
 | E742 | ambiguous-class-name | Ambiguous class name: `{name}` |  |
@@ -1036,9 +1037,9 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C400 | unnecessary-generator-list | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
-| C401 | unnecessary-generator-set | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
-| C402 | unnecessary-generator-dict | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
+| C400 | [unnecessary-generator-list](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-generator-list.md) | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
+| C401 | [unnecessary-generator-set](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-generator-set.md) | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
+| C402 | [unnecessary-generator-dict](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-generator-dict.md) | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
 | C403 | unnecessary-list-comprehension-set | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
 | C404 | unnecessary-list-comprehension-dict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) | 🛠 |
 | C405 | unnecessary-literal-set | Unnecessary `{obj_type}` literal (rewrite as a `set` literal) | 🛠 |
@@ -1047,7 +1048,7 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C409 | unnecessary-literal-within-tuple-call | Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` literal) | 🛠 |
 | C410 | unnecessary-literal-within-list-call | Unnecessary `{literal}` literal passed to `list()` (remove the outer call to `list()`) | 🛠 |
 | C411 | unnecessary-list-call | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
-| C413 | unnecessary-call-around-sorted | Unnecessary `{func}` call around `sorted()` | 🛠 |
+| C413 | [unnecessary-call-around-sorted](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-call-around-sorted.md) | Unnecessary `{func}` call around `sorted()` | 🛠 |
 | C414 | [unnecessary-double-cast-or-process](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-double-cast-or-process.md) | Unnecessary `{inner}` call within `{outer}()` | 🛠 |
 | C415 | unnecessary-subscript-reversal | Unnecessary subscript reversal of iterable within `{func}()` |  |
 | C416 | unnecessary-comprehension | Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`) | 🛠 |
@@ -1076,6 +1077,16 @@ For more, see [flake8-debugger](https://pypi.org/project/flake8-debugger/) on Py
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | T100 | debugger | Trace found: `{name}` used |  |
+
+### flake8-django (DJ)
+
+For more, see [flake8-django](https://pypi.org/project/flake8-django/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| DJ001 | [model-string-field-nullable](https://github.com/charliermarsh/ruff/blob/main/docs/rules/model-string-field-nullable.md) | Avoid using `null=True` on string-based fields such as {field_name} |  |
+| DJ008 | [model-dunder-str](https://github.com/charliermarsh/ruff/blob/main/docs/rules/model-dunder-str.md) | Model does not define `__str__` method |  |
+| DJ013 | [receiver-decorator-checker](https://github.com/charliermarsh/ruff/blob/main/docs/rules/receiver-decorator-checker.md) | `@receiver` decorator must be on top of all the other decorators |  |
 
 ### flake8-errmsg (EM)
 
@@ -1724,6 +1735,7 @@ natively, including:
 * [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
 * [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 * [flake8-debugger](https://pypi.org/project/flake8-debugger/)
+* [flake8-django](https://pypi.org/project/flake8-django/) ([#2817](https://github.com/charliermarsh/ruff/issues/2817))
 * [flake8-docstrings](https://pypi.org/project/flake8-docstrings/)
 * [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
 * [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
@@ -1822,6 +1834,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 * [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
 * [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 * [flake8-debugger](https://pypi.org/project/flake8-debugger/)
+* [flake8-django](https://pypi.org/project/flake8-django/) ([#2817](https://github.com/charliermarsh/ruff/issues/2817))
 * [flake8-docstrings](https://pypi.org/project/flake8-docstrings/)
 * [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
 * [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)

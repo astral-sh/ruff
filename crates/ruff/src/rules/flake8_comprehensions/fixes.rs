@@ -79,6 +79,7 @@ pub fn fix_unnecessary_generator_set(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
+    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -113,8 +114,18 @@ pub fn fix_unnecessary_generator_set(
     };
     tree.codegen(&mut state);
 
+    let mut content = state.to_string();
+
+    // If the expression is embedded in an f-string, surround it with spaces to avoid
+    // syntax errors.
+    if let Some(parent_element) = parent {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+            content = format!(" {content} ");
+        }
+    }
+
     Ok(Fix::replacement(
-        state.to_string(),
+        content,
         expr.location,
         expr.end_location.unwrap(),
     ))
@@ -126,6 +137,7 @@ pub fn fix_unnecessary_generator_dict(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
+    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
@@ -176,8 +188,18 @@ pub fn fix_unnecessary_generator_dict(
     };
     tree.codegen(&mut state);
 
+    let mut content = state.to_string();
+
+    // If the expression is embedded in an f-string, surround it with spaces to avoid
+    // syntax errors.
+    if let Some(parent_element) = parent {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+            content = format!(" {content} ");
+        }
+    }
+
     Ok(Fix::replacement(
-        state.to_string(),
+        content,
         expr.location,
         expr.end_location.unwrap(),
     ))
@@ -743,6 +765,7 @@ pub fn fix_unnecessary_call_around_sorted(
         if outer_name.value == "list" {
             body.value = Expression::Call(inner_call.clone());
         } else {
+            // If the `reverse` argument is used
             let args = if inner_call.args.iter().any(|arg| {
                 matches!(
                     arg.keyword,
@@ -752,7 +775,46 @@ pub fn fix_unnecessary_call_around_sorted(
                     })
                 )
             }) {
-                inner_call.args.clone()
+                // Negate the `reverse` argument
+                inner_call
+                    .args
+                    .clone()
+                    .into_iter()
+                    .map(|mut arg| {
+                        if matches!(
+                            arg.keyword,
+                            Some(Name {
+                                value: "reverse",
+                                ..
+                            })
+                        ) {
+                            if let Expression::Name(ref val) = arg.value {
+                                if val.value == "True" {
+                                    // TODO: even better would be to drop the argument, as False is the default
+                                    arg.value = Expression::Name(Box::new(Name {
+                                        value: "False",
+                                        lpar: vec![],
+                                        rpar: vec![],
+                                    }));
+                                    arg
+                                } else if val.value == "False" {
+                                    arg.value = Expression::Name(Box::new(Name {
+                                        value: "True",
+                                        lpar: vec![],
+                                        rpar: vec![],
+                                    }));
+                                    arg
+                                } else {
+                                    arg
+                                }
+                            } else {
+                                arg
+                            }
+                        } else {
+                            arg
+                        }
+                    })
+                    .collect_vec()
             } else {
                 let mut args = inner_call.args.clone();
                 args.push(Arg {
@@ -921,6 +983,7 @@ pub fn fix_unnecessary_map(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
+    parent: Option<&rustpython_parser::ast::Expr>,
     kind: &str,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -1061,8 +1124,22 @@ pub fn fix_unnecessary_map(
         };
         tree.codegen(&mut state);
 
+        let mut content = state.to_string();
+
+        // If the expression is embedded in an f-string, surround it with spaces to avoid
+        // syntax errors.
+        if kind == "set" || kind == "dict" {
+            if let Some(parent_element) = parent {
+                if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } =
+                    &parent_element.node
+                {
+                    content = format!(" {content} ");
+                }
+            }
+        }
+
         Ok(Fix::replacement(
-            state.to_string(),
+            content,
             expr.location,
             expr.end_location.unwrap(),
         ))

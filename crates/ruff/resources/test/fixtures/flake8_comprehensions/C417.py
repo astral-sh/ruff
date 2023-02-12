@@ -11,6 +11,10 @@ _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 all(map(lambda v: isinstance(v, dict), nums))
 filter(func, map(lambda v: v, nums))
 
+# When inside f-string, then the fix should be surrounded by whitespace
+_ = f"{set(map(lambda x: x % 2 == 0, nums))}"
+_ = f"{dict(map(lambda v: (v, v**2), nums))}"
+
 # Error, but unfixable.
 # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
 # For more complex expressions, this would differ: `(x + 2 if x else 3 for x in nums)`.

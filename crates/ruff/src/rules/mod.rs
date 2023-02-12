@@ -11,6 +11,7 @@ pub mod flake8_commas;
 pub mod flake8_comprehensions;
 pub mod flake8_datetimez;
 pub mod flake8_debugger;
+pub mod flake8_django;
 pub mod flake8_errmsg;
 pub mod flake8_executable;
 pub mod flake8_implicit_str_concat;

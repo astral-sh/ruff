@@ -38,13 +38,13 @@ class Foo(metaclass=BazMeta):
         return self.bar
 
     def public_func(self):
-        pass
+        super().public_func()
 
     def _private_func(self):
-        pass
+        super()._private_func()
 
     def __really_private_func(self, arg):
-        pass
+        super().__really_private_func(arg)
 
 
 foo = Foo()
