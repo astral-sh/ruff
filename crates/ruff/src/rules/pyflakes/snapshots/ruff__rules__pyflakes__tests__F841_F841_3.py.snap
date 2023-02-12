@@ -187,13 +187,13 @@ expression: diagnostics
     column: 22
   fix:
     content:
-      - "(x2, y2) = (1, 2)"
+      - ""
     location:
       row: 33
-      column: 4
+      column: 15
     end_location:
       row: 33
-      column: 31
+      column: 25
   parent: ~
 - kind:
     UnusedVariable:
@@ -206,13 +206,13 @@ expression: diagnostics
     column: 11
   fix:
     content:
-      - "(x3, y3) = (1, 2)"
+      - ""
     location:
       row: 34
       column: 4
     end_location:
       row: 34
-      column: 31
+      column: 14
   parent: ~
 - kind:
     UnusedVariable:
@@ -377,13 +377,13 @@ expression: diagnostics
     column: 12
   fix:
     content:
-      - tt = lexer.get_token()
+      - ""
     location:
       row: 87
       column: 4
     end_location:
       row: 87
-      column: 37
+      column: 15
   parent: ~
 - kind:
     UnusedVariable:
@@ -396,13 +396,13 @@ expression: diagnostics
     column: 12
   fix:
     content:
-      - tt = lexer.get_token()
+      - ""
     location:
       row: 93
       column: 4
     end_location:
       row: 93
-      column: 37
+      column: 15
   parent: ~
 - kind:
     UnusedVariable:
@@ -415,13 +415,13 @@ expression: diagnostics
     column: 17
   fix:
     content:
-      - toplevel = lexer.get_token()
+      - ""
     location:
       row: 93
-      column: 4
+      column: 15
     end_location:
       row: 93
-      column: 37
+      column: 20
   parent: ~
 - kind:
     UnusedVariable:
@@ -434,13 +434,13 @@ expression: diagnostics
     column: 12
   fix:
     content:
-      - "(a, b) = lexer.get_token()"
+      - ""
     location:
       row: 97
       column: 4
     end_location:
       row: 97
-      column: 41
+      column: 15
   parent: ~
 - kind:
     UnusedVariable:
@@ -453,13 +453,13 @@ expression: diagnostics
     column: 21
   fix:
     content:
-      - "(a, b) = lexer.get_token()"
+      - ""
     location:
       row: 101
-      column: 4
+      column: 13
     end_location:
       row: 101
-      column: 41
+      column: 24
   parent: ~
 - kind:
     UnusedVariable:
@@ -472,13 +472,13 @@ expression: diagnostics
     column: 12
   fix:
     content:
-      - tt = 1
+      - ""
     location:
       row: 105
       column: 4
     end_location:
       row: 105
-      column: 21
+      column: 15
   parent: ~
 - kind:
     UnusedVariable:
@@ -491,12 +491,12 @@ expression: diagnostics
     column: 17
   fix:
     content:
-      - toplevel = 1
+      - ""
     location:
       row: 105
-      column: 4
+      column: 15
     end_location:
       row: 105
-      column: 21
+      column: 20
   parent: ~
 
