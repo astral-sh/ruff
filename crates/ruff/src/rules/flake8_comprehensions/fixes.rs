@@ -79,6 +79,7 @@ pub fn fix_unnecessary_generator_set(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
+    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -113,8 +114,17 @@ pub fn fix_unnecessary_generator_set(
     };
     tree.codegen(&mut state);
 
+    let mut content = state.to_string();
+
+    // If parent is f-string then surround with spaces
+    if let Some(parent_element) = parent {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+            content = format!(" {content} ");
+        }
+    }
+
     Ok(Fix::replacement(
-        state.to_string(),
+        content,
         expr.location,
         expr.end_location.unwrap(),
     ))
@@ -126,6 +136,7 @@ pub fn fix_unnecessary_generator_dict(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
+    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
@@ -176,8 +187,17 @@ pub fn fix_unnecessary_generator_dict(
     };
     tree.codegen(&mut state);
 
+    let mut content = state.to_string();
+
+    // If parent is f-string then surround with spaces
+    if let Some(parent_element) = parent {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+            content = format!(" {content} ");
+        }
+    }
+
     Ok(Fix::replacement(
-        state.to_string(),
+        content,
         expr.location,
         expr.end_location.unwrap(),
     ))
@@ -921,6 +941,7 @@ pub fn fix_unnecessary_map(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
+    parent: Option<&rustpython_parser::ast::Expr>,
     kind: &str,
 ) -> Result<Fix> {
     let module_text = locator.slice_source_code_range(&Range::from_located(expr));
@@ -1061,8 +1082,21 @@ pub fn fix_unnecessary_map(
         };
         tree.codegen(&mut state);
 
+        let mut content = state.to_string();
+
+        // If parent is f-string then surround with spaces
+        if kind == "set" || kind == "dict" {
+            if let Some(parent_element) = parent {
+                if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } =
+                    &parent_element.node
+                {
+                    content = format!(" {content} ");
+                }
+            }
+        }
+
         Ok(Fix::replacement(
-            state.to_string(),
+            content,
             expr.location,
             expr.end_location.unwrap(),
         ))

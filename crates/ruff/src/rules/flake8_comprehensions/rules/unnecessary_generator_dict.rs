@@ -10,6 +10,23 @@ use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
+    /// ## What it does
+    /// Checks for unnecessary generator that can be rewritten as `dict` comprehension.
+    ///
+    /// ## Why is this bad?
+    /// It is unnecessary to use `dict` around a generator expression, since there are
+    /// equivalent comprehensions for these types.
+    ///
+    /// ## Examples
+    /// ```python
+    /// dict((x, f(x)) for x in foo)
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// {x: f(x) for x in foo}
+    /// ```
+    ///
     pub struct UnnecessaryGeneratorDict;
 );
 impl AlwaysAutofixableViolation for UnnecessaryGeneratorDict {
@@ -27,6 +44,7 @@ impl AlwaysAutofixableViolation for UnnecessaryGeneratorDict {
 pub fn unnecessary_generator_dict(
     checker: &mut Checker,
     expr: &Expr,
+    parent: Option<&Expr>,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
@@ -44,6 +62,7 @@ pub fn unnecessary_generator_dict(
                         checker.locator,
                         checker.stylist,
                         expr,
+                        parent,
                     ) {
                         Ok(fix) => {
                             diagnostic.amend(fix);

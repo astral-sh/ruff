@@ -110,6 +110,7 @@ pub fn unnecessary_map(
                         checker.locator,
                         checker.stylist,
                         expr,
+                        parent,
                         "generator",
                     ) {
                         Ok(fix) => {
@@ -141,6 +142,7 @@ pub fn unnecessary_map(
                                 checker.locator,
                                 checker.stylist,
                                 expr,
+                                parent,
                                 id,
                             ) {
                                 Ok(fix) => {
@@ -173,6 +175,7 @@ pub fn unnecessary_map(
                                     checker.locator,
                                     checker.stylist,
                                     expr,
+                                    parent,
                                     id,
                                 ) {
                                     Ok(fix) => {

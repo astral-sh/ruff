@@ -10,6 +10,23 @@ use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
+    /// ## What it does
+    /// Checks for unnecessary generator that can be rewritten as `list` comprehension.
+    ///
+    /// ## Why is this bad?
+    /// It is unnecessary to use `list` around a generator expression, since there are
+    /// equivalent comprehensions for these types.
+    ///
+    /// ## Examples
+    /// ```python
+    /// list(f(x) for x in foo)
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// [f(x) for x in foo]
+    /// ```
+    ///
     pub struct UnnecessaryGeneratorList;
 );
 impl AlwaysAutofixableViolation for UnnecessaryGeneratorList {

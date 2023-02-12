@@ -10,6 +10,23 @@ use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
+    /// ## What it does
+    /// Checks for unnecessary generator that can be rewritten as `set` comprehension.
+    ///
+    /// ## Why is this bad?
+    /// It is unnecessary to use `set` around a generator expression, since there are
+    /// equivalent comprehensions for these types.
+    ///
+    /// ## Examples
+    /// ```python
+    /// set(f(x) for x in foo)
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// {f(x) for x in foo}
+    /// ```
+    ///
     pub struct UnnecessaryGeneratorSet;
 );
 impl AlwaysAutofixableViolation for UnnecessaryGeneratorSet {
@@ -27,6 +44,7 @@ impl AlwaysAutofixableViolation for UnnecessaryGeneratorSet {
 pub fn unnecessary_generator_set(
     checker: &mut Checker,
     expr: &Expr,
+    parent: Option<&Expr>,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
@@ -40,7 +58,12 @@ pub fn unnecessary_generator_set(
     if let ExprKind::GeneratorExp { .. } = argument {
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, Range::from_located(expr));
         if checker.patch(diagnostic.kind.rule()) {
-            match fixes::fix_unnecessary_generator_set(checker.locator, checker.stylist, expr) {
+            match fixes::fix_unnecessary_generator_set(
+                checker.locator,
+                checker.stylist,
+                expr,
+                parent,
+            ) {
                 Ok(fix) => {
                     diagnostic.amend(fix);
                 }
