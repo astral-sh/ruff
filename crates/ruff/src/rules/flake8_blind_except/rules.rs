@@ -31,6 +31,15 @@ define_violation!(
     ///    print("And now you won't.")
     ///```
     ///
+    ///Or:
+    ///```python
+    ///try:
+    ///   assert False, "You probably don't want to catch AssertionErrors."
+    ///except Exception:
+    ///   logger.Exception("Catch and log errors in a top level module.")
+    ///   raise
+    ///```
+    ///
     ///## References
     ///- [Python Exception Hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
     ///- [Google Python Style Guide on Exceptions](https://google.github.io/styleguide/pyguide.html#24-exceptions)
