@@ -1320,7 +1320,7 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PD002 | use-of-inplace-argument | `inplace=True` should be avoided; it has inconsistent behavior | 🛠 |
+| PD002 | [use-of-inplace-argument](https://github.com/charliermarsh/ruff/blob/main/docs/rules/use-of-inplace-argument.md) | `inplace=True` should be avoided; it has inconsistent behavior | 🛠 |
 | PD003 | use-of-dot-is-null | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
 | PD004 | use-of-dot-not-null | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
 | PD007 | use-of-dot-ix | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
