@@ -746,7 +746,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | E713 | not-in-test | Test for membership should be `not in` | 🛠 |
 | E714 | not-is-test | Test for object identity should be `is not` | 🛠 |
 | E721 | type-comparison | Do not compare types, use `isinstance()` |  |
-| E722 | bare-except | Do not use bare `except` |  |
+| E722 | [bare-except](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bare-except.md) | Do not use bare `except` |  |
 | E731 | lambda-assignment | Do not assign a `lambda` expression, use a `def` | 🛠 |
 | E741 | ambiguous-variable-name | Ambiguous variable name: `{name}` |  |
 | E742 | ambiguous-class-name | Ambiguous class name: `{name}` |  |
