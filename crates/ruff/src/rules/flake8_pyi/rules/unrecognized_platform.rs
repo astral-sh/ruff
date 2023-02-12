@@ -7,23 +7,25 @@ use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
+    /// Check for unrecognized `sys.platform` checks. Platform checks should be
+    /// simple string comparisons.
     ///
-    /// xxxx
+    /// > **Note**
+    /// >
+    /// > This rule only supports the stub file.
+    ///
+    /// ## Why is this bad?
+    /// Some checks are too complex for type checkers to understand. Please use
+    /// simple string comparisons. Such as `sys.platform == "linux"`.
     ///
     /// ## Example
-    ///
+    /// Use a simple string comparison instead. Such as `==` or `!=`.
     /// ```python
-    /// from typing import TypeVar
-    ///
-    /// T = TypeVar("T")
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// from typing import TypeVar
-    ///
-    /// _T = TypeVar("_T")
+    /// if sys.platform == 'win32':
+    ///     # Windows specific definitions
+    /// else:
+    ///     # Posix specific definitions
     /// ```
     pub struct UnrecognizedPlatformCheck;
 );
@@ -35,30 +37,34 @@ impl Violation for UnrecognizedPlatformCheck {
 }
 
 define_violation!(
-    /// ### What it does
-    /// xxxx
+    /// ## What it does
+    /// Check for unrecognized platform names in `sys.platform` checks.
+    ///
+    /// > **Note**
+    /// >
+    /// > This rule only supports the stub file.
+    ///
+    /// ## Why is this bad?
+    /// To prevent you from typos, we warn if you use a platform name outside a
+    /// small set of known platforms (e.g. "linux" and "win32").
     ///
     /// ## Example
+    /// Use a platform name from the list of known platforms. Currently, the
+    /// list of known platforms is: "linux", "win32", "cygwin", "darwin".
     /// ```python
-    /// from typing import TypeVar
-    ///
-    /// T = TypeVar("T")
+    /// if sys.platform == 'win32':
+    ///    # Windows specific definitions
+    /// else:
+    ///    # Posix specific definitions
     /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// from typing import TypeVar
-    ///
-    /// _T = TypeVar("_T")
-    /// ```
-    pub struct UnrecognizedPlatformValue {
+    pub struct UnrecognizedPlatformName {
         pub platform: String,
     }
 );
-impl Violation for UnrecognizedPlatformValue {
+impl Violation for UnrecognizedPlatformName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnrecognizedPlatformValue { platform } = self;
+        let UnrecognizedPlatformName { platform } = self;
         format!("Unrecognized platform `{platform}`")
     }
 }
@@ -107,10 +113,10 @@ pub fn unrecognized_platform(
                 && checker
                     .settings
                     .rules
-                    .enabled(&Rule::UnrecognizedPlatformValue)
+                    .enabled(&Rule::UnrecognizedPlatformName)
             {
                 checker.diagnostics.push(Diagnostic::new(
-                    UnrecognizedPlatformValue {
+                    UnrecognizedPlatformName {
                         platform: value.clone(),
                     },
                     Range::from_located(right),

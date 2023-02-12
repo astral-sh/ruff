@@ -447,7 +447,7 @@ ruff_macros::define_rule_mapping!(
     // flake8-pyi
     PYI001 => rules::flake8_pyi::rules::PrefixTypeParams,
     PYI007 => rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
-    PYI008 => rules::flake8_pyi::rules::UnrecognizedPlatformValue,
+    PYI008 => rules::flake8_pyi::rules::UnrecognizedPlatformName,
     // flake8-pytest-style
     PT001 => rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     PT002 => rules::flake8_pytest_style::rules::FixturePositionalArgs,

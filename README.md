@@ -1151,7 +1151,7 @@ For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
 | ---- | ---- | ------- | --- |
 | PYI001 | [prefix-type-params](https://github.com/charliermarsh/ruff/blob/main/docs/rules/prefix-type-params.md) | Name of private `{kind}` must start with _ |  |
 | PYI007 | [unrecognized-platform-check](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unrecognized-platform-check.md) | Unrecognized sys.platform check |  |
-| PYI008 | [unrecognized-platform-value](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unrecognized-platform-value.md) | Unrecognized platform `{platform}` |  |
+| PYI008 | [unrecognized-platform-name](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unrecognized-platform-name.md) | Unrecognized platform `{platform}` |  |
 
 ### flake8-pytest-style (PT)
 

@@ -3122,10 +3122,7 @@ where
                     .settings
                     .rules
                     .enabled(&Rule::UnrecognizedPlatformCheck)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(&Rule::UnrecognizedPlatformValue)
+                    || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
                 {
                     if self.path.extension().map_or(false, |ext| ext == "pyi") {
                         flake8_pyi::rules::unrecognized_platform(

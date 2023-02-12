@@ -16,8 +16,8 @@ mod tests {
     #[test_case(Rule::PrefixTypeParams, Path::new("PYI001.py"))]
     #[test_case(Rule::UnrecognizedPlatformCheck, Path::new("PYI007.pyi"))]
     #[test_case(Rule::UnrecognizedPlatformCheck, Path::new("PYI007.py"))]
-    #[test_case(Rule::UnrecognizedPlatformValue, Path::new("PYI008.pyi"))]
-    #[test_case(Rule::UnrecognizedPlatformValue, Path::new("PYI008.py"))]
+    #[test_case(Rule::UnrecognizedPlatformName, Path::new("PYI008.pyi"))]
+    #[test_case(Rule::UnrecognizedPlatformName, Path::new("PYI008.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(
