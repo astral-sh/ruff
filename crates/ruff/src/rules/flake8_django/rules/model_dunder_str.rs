@@ -1,13 +1,15 @@
-use super::helpers;
 use rustpython_parser::ast::Constant::Bool;
 use rustpython_parser::ast::{Expr, StmtKind};
 use rustpython_parser::ast::{ExprKind, Stmt};
+
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::{define_violation, derive_message_formats};
+
+use super::helpers;
 
 define_violation!(
     pub struct ModelDunderStr;
@@ -19,6 +21,7 @@ impl Violation for ModelDunderStr {
     }
 }
 
+/// DJ008
 pub fn model_dunder_str(
     checker: &Checker,
     bases: &[Expr],

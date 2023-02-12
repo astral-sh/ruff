@@ -3,7 +3,8 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ModelStringFieldNullable: CharField
+    ModelStringFieldNullable:
+      field_name: CharField
   location:
     row: 7
     column: 16
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: TextField
+    ModelStringFieldNullable:
+      field_name: TextField
   location:
     row: 8
     column: 16
@@ -23,7 +25,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: SlugField
+    ModelStringFieldNullable:
+      field_name: SlugField
   location:
     row: 9
     column: 16
@@ -33,7 +36,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: EmailField
+    ModelStringFieldNullable:
+      field_name: EmailField
   location:
     row: 10
     column: 17
@@ -43,7 +47,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: FilePathField
+    ModelStringFieldNullable:
+      field_name: FilePathField
   location:
     row: 11
     column: 20
@@ -53,7 +58,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: URLField
+    ModelStringFieldNullable:
+      field_name: URLField
   location:
     row: 12
     column: 15
@@ -63,7 +69,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: CharField
+    ModelStringFieldNullable:
+      field_name: CharField
   location:
     row: 16
     column: 16
@@ -73,7 +80,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: CharField
+    ModelStringFieldNullable:
+      field_name: CharField
   location:
     row: 17
     column: 16
@@ -83,7 +91,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: SlugField
+    ModelStringFieldNullable:
+      field_name: SlugField
   location:
     row: 18
     column: 16
@@ -93,7 +102,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: EmailField
+    ModelStringFieldNullable:
+      field_name: EmailField
   location:
     row: 19
     column: 17
@@ -103,7 +113,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: FilePathField
+    ModelStringFieldNullable:
+      field_name: FilePathField
   location:
     row: 20
     column: 20
@@ -113,7 +124,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable: URLField
+    ModelStringFieldNullable:
+      field_name: URLField
   location:
     row: 21
     column: 15

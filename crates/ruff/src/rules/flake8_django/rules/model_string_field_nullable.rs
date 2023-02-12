@@ -8,15 +8,18 @@ use rustpython_parser::ast::Constant::Bool;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 define_violation!(
-    pub struct ModelStringFieldNullable(pub String);
+    pub struct ModelStringFieldNullable {
+        pub field_name: String,
+    }
 );
 impl Violation for ModelStringFieldNullable {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ModelStringFieldNullable(field) = self;
-        format!("Avoid using null=True on string-based fields such as {field}.")
+        let ModelStringFieldNullable { field_name } = self;
+        format!("Avoid using `null=True` on string-based fields such as {field_name}")
     }
 }
+
 const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
     "CharField",
     "TextField",
@@ -25,6 +28,8 @@ const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
     "FilePathField",
     "URLField",
 ];
+
+/// DJ001
 pub fn model_string_field_nullable(
     checker: &Checker,
     bases: &[Expr],
@@ -40,7 +45,9 @@ pub fn model_string_field_nullable(
         };
         if let Some(field_name) = check_nullable_field(checker, value) {
             errors.push(Diagnostic::new(
-                ModelStringFieldNullable(field_name.to_string()),
+                ModelStringFieldNullable {
+                    field_name: field_name.to_string(),
+                },
                 Range::from_located(value),
             ));
         }
