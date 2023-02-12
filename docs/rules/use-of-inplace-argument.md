@@ -5,15 +5,16 @@ Derived from the **pandas-vet** linter.
 Autofix is always available.
 
 ## What it does
-Checks for `inplace=True` in code using the `pandas` library.
+Checks for `inplace=True` usages in `pandas` function and method
+calls.
 
 ## Why is this bad?
-- `inplace=True` often does not provide a performance benefit. It is
-likely to copy dataframes in the background.
-- It encourages mutation rather than immutable data, which is harder to
-reason about and may cause bugs.
-- It removes the ability to use the method chaining style for `pandas`
-code.
+Using `inplace=True` encourages mutation rather than immutable data,
+which is harder to reason about and may cause bugs. It also removes the
+ability to use the method chaining style for `pandas` operations.
+
+Further, in many cases, `inplace=True` does not provide a performance
+benefit, as Pandas will often copy DataFrames in the background.
 
 ## Example
 ```python
