@@ -35,10 +35,11 @@ pub fn model_string_field_nullable(
     bases: &[Expr],
     body: &[Stmt],
 ) -> Vec<Diagnostic> {
-    let mut errors = Vec::new();
     if !bases.iter().any(|base| helpers::is_model(checker, base)) {
-        return errors;
+        return vec![];
     }
+
+    let mut errors = Vec::new();
     for statement in body.iter() {
         let StmtKind::Assign {value, ..} = &statement.node else {
             continue
@@ -63,6 +64,7 @@ fn check_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a
     let Some(valid_field_name) = helpers::get_model_field_name(checker, func) else {
         return None;
     };
+
     if !NOT_NULL_TRUE_FIELDS.contains(&valid_field_name) {
         return None;
     }
@@ -87,8 +89,8 @@ fn check_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a
     if blank_key && unique_key {
         return None;
     }
-    if null_key {
-        return Some(valid_field_name);
+    if !null_key {
+        return None;
     }
-    None
+    Some(valid_field_name)
 }

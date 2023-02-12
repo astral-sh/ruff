@@ -1,5 +1,4 @@
-use rustpython_parser::ast::Constant::Bool;
-use rustpython_parser::ast::{Expr, StmtKind};
+use rustpython_parser::ast::{Constant, Expr, StmtKind};
 use rustpython_parser::ast::{ExprKind, Stmt};
 
 use ruff_macros::{define_violation, derive_message_formats};
@@ -64,25 +63,27 @@ fn checker_applies(checker: &Checker, bases: &[Expr], body: &[Stmt]) -> bool {
     false
 }
 
-/// Check if class is abstract in terms of django model inheritance
+/// Check if class is abstract, in terms of Django model inheritance.
 fn is_model_abstract(body: &[Stmt]) -> bool {
     for element in body.iter() {
-        let StmtKind::ClassDef{name, body, ..} = &element.node else {
+        let StmtKind::ClassDef {name, body, ..} = &element.node else {
             continue
         };
         if name != "Meta" {
             continue;
         }
         for element in body.iter() {
-            let StmtKind::Assign{targets, value, ..} = &element.node else {
-                continue
+            let StmtKind::Assign {targets, value, ..} = &element.node else {
+                continue;
             };
             for target in targets.iter() {
-                let ExprKind::Name {id , ..} = &target.node else {continue};
+                let ExprKind::Name {id , ..} = &target.node else {
+                    continue;
+                };
                 if id != "abstract" {
                     continue;
                 }
-                let ExprKind::Constant{value: Bool(true), ..} = &value.node else {
+                let ExprKind::Constant{value: Constant::Bool(true), ..} = &value.node else {
                     continue;
                 };
                 return true;

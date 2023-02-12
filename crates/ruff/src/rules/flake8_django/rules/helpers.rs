@@ -15,7 +15,6 @@ pub fn get_model_field_name<'a>(checker: &'a Checker, expr: &'a Expr) -> Option<
         if !call_path.starts_with(&["django", "db", "models"]) {
             return None;
         }
-
         call_path.last().copied()
     })
 }
