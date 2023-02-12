@@ -18,4 +18,7 @@ This rule enforces certain import conventions project-wide in an
 automatic way.
 
 ## Options
-* `flake8-tidy-imports.banned-api`
+* [`flake8-tidy-imports.banned-api`]
+
+
+[`flake8-tidy-imports.banned-api`]: ../../settings#banned-api
