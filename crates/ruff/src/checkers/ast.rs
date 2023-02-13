@@ -465,13 +465,11 @@ where
                 ..
             } => {
                 if self.settings.rules.enabled(&Rule::ReceiverDecoratorChecker) {
-                    if let Some(diagnostic) =
-                        flake8_django::rules::receiver_decorator_checker(decorator_list, |expr| {
-                            self.resolve_call_path(expr)
-                        })
-                    {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    self.diagnostics
+                        .extend(flake8_django::rules::receiver_decorator_checker(
+                            decorator_list,
+                            |expr| self.resolve_call_path(expr),
+                        ));
                 }
                 if self.settings.rules.enabled(&Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
