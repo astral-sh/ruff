@@ -269,7 +269,7 @@ impl<L: Language> SyntaxNodeCast<L> for SyntaxNode<L> {
     }
 }
 
-/// List of homogenous nodes
+/// List of homogeneous nodes
 pub trait AstNodeList {
     type Language: Language;
     type Node: AstNode<Language = Self::Language>;

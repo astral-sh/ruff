@@ -107,7 +107,7 @@ where
     /// Push a change to replace the "prev_node" with "next_node".
     /// Trivia from "prev_node" is automatically copied to "next_node".
     ///
-    /// Changes to take effect must be commited.
+    /// Changes to take effect must be committed.
     pub fn replace_node<T>(&mut self, prev_node: T, next_node: T)
     where
         T: AstNode<Language = L>,
@@ -121,7 +121,7 @@ where
     /// Push a change to replace the "prev_token" with "next_token".
     /// Trivia from "prev_token" is automatically copied to "next_token".
     ///
-    /// Changes to take effect must be commited.
+    /// Changes to take effect must be committed.
     pub fn replace_token(&mut self, prev_token: SyntaxToken<L>, next_token: SyntaxToken<L>) {
         self.replace_element(prev_token.into(), next_token.into())
     }
@@ -129,7 +129,7 @@ where
     /// Push a change to replace the "prev_element" with "next_element".
     /// Trivia from "prev_element" is automatically copied to "next_element".
     ///
-    /// Changes to take effect must be commited.
+    /// Changes to take effect must be committed.
     pub fn replace_element(
         &mut self,
         prev_element: SyntaxElement<L>,

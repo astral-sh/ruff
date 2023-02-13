@@ -14,7 +14,7 @@ pub trait AstNodeExt: AstNode {
         Self: Sized;
 
     /// Return a new version of this node with the node `prev_node` replaced with `next_node`,
-    /// transfering the leading and trailing trivia of `prev_node` to `next_node`
+    /// transferring the leading and trailing trivia of `prev_node` to `next_node`
     ///
     /// `prev_node` can be a direct child of this node, or an indirect child through any descendant node
     ///
@@ -38,7 +38,7 @@ pub trait AstNodeExt: AstNode {
         Self: Sized;
 
     /// Return a new version of this node with the token `prev_token` replaced with `next_token`,
-    /// transfering the leading and trailing trivia of `prev_token` to `next_token`
+    /// transferring the leading and trailing trivia of `prev_token` to `next_token`
     ///
     /// `prev_token` can be a direct child of this node, or an indirect child through any descendant node
     ///

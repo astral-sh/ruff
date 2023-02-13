@@ -376,7 +376,7 @@ impl<L: Language> SyntaxNode<L> {
     }
 
     /// Find a token in the subtree corresponding to this node, which covers the offset.
-    /// Precondition: offset must be withing node's range.
+    /// Precondition: offset must be within node's range.
     pub fn token_at_offset(&self, offset: TextSize) -> TokenAtOffset<SyntaxToken<L>> {
         self.raw.token_at_offset(offset).map(SyntaxToken::from)
     }
@@ -384,7 +384,7 @@ impl<L: Language> SyntaxNode<L> {
     /// Return the deepest node or token in the current subtree that fully
     /// contains the range. If the range is empty and is contained in two leaf
     /// nodes, either one can be returned. Precondition: range must be contained
-    /// withing the current node
+    /// within the current node
     pub fn covering_element(&self, range: TextRange) -> SyntaxElement<L> {
         NodeOrToken::from(self.raw.covering_element(range))
     }
