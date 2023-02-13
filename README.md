@@ -1111,9 +1111,9 @@ For more, see [flake8-django](https://pypi.org/project/flake8-django/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| DJ001 | [model-string-field-nullable](https://github.com/charliermarsh/ruff/blob/main/docs/rules/model-string-field-nullable.md) | Avoid using `null=True` on string-based fields such as {field_name} |  |
-| DJ008 | [model-dunder-str](https://github.com/charliermarsh/ruff/blob/main/docs/rules/model-dunder-str.md) | Model does not define `__str__` method |  |
-| DJ013 | [receiver-decorator-checker](https://github.com/charliermarsh/ruff/blob/main/docs/rules/receiver-decorator-checker.md) | `@receiver` decorator must be on top of all the other decorators |  |
+| DJ001 | [nullable-model-string-field](https://github.com/charliermarsh/ruff/blob/main/docs/rules/nullable-model-string-field.md) | Avoid using `null=True` on string-based fields such as {field_name} |  |
+| DJ008 | [model-without-dunder-str](https://github.com/charliermarsh/ruff/blob/main/docs/rules/model-without-dunder-str.md) | Model does not define `__str__` method |  |
+| DJ013 | [non-leading-receiver-decorator](https://github.com/charliermarsh/ruff/blob/main/docs/rules/non-leading-receiver-decorator.md) | `@receiver` decorator must be on top of all the other decorators |  |
 
 ### flake8-errmsg (EM)
 

@@ -40,9 +40,9 @@ define_violation!(
     ///   def __str__(self):
     ///      return f"{self.field}"
     /// ```
-    pub struct ModelDunderStr;
+    pub struct ModelWithoutDunderStr;
 );
-impl Violation for ModelDunderStr {
+impl Violation for ModelWithoutDunderStr {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Model does not define `__str__` method")
@@ -50,7 +50,7 @@ impl Violation for ModelDunderStr {
 }
 
 /// DJ008
-pub fn model_dunder_str(
+pub fn model_without_dunder_str(
     checker: &Checker,
     bases: &[Expr],
     body: &[Stmt],
@@ -61,7 +61,7 @@ pub fn model_dunder_str(
     }
     if !has_dunder_method(body) {
         return Some(Diagnostic::new(
-            ModelDunderStr,
+            ModelWithoutDunderStr,
             Range::from_located(class_location),
         ));
     }

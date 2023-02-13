@@ -1,4 +1,4 @@
-# receiver-decorator-checker (DJ013)
+# non-leading-receiver-decorator (DJ013)
 
 Derived from the **flake8-django** linter.
 

@@ -1,4 +1,4 @@
-# model-string-field-nullable (DJ001)
+# nullable-model-string-field (DJ001)
 
 Derived from the **flake8-django** linter.
 

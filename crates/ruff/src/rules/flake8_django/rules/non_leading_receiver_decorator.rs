@@ -38,9 +38,9 @@ define_violation!(
     /// def my_handler(sender, instance, created, **kwargs):
     ///     pass
     /// ```
-    pub struct ReceiverDecoratorChecker;
+    pub struct NonLeadingReceiverDecorator;
 );
-impl Violation for ReceiverDecoratorChecker {
+impl Violation for NonLeadingReceiverDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`@receiver` decorator must be on top of all the other decorators")
@@ -48,7 +48,7 @@ impl Violation for ReceiverDecoratorChecker {
 }
 
 /// DJ013
-pub fn receiver_decorator_checker<'a, F>(
+pub fn non_leading_receiver_decorator<'a, F>(
     decorator_list: &'a [Expr],
     resolve_call_path: F,
 ) -> Vec<Diagnostic>
@@ -66,7 +66,7 @@ where
         };
         if i > 0 && is_receiver && !seen_receiver {
             diagnostics.push(Diagnostic::new(
-                ReceiverDecoratorChecker,
+                NonLeadingReceiverDecorator,
                 Range::from_located(decorator),
             ));
         }
