@@ -46,11 +46,12 @@ def main() -> None:
         "rules/",
     )
 
-    Path("docs").mkdir(parents=True, exist_ok=True)
+    docs_path = Path("docs")
+    docs_path.mkdir(parents=True, exist_ok=True)
 
     # Split the README.md into sections.
     for title, filename in SECTIONS:
-        with Path(f"docs/{filename}").open("w+") as f:
+        with docs_path.joinpath(filename).open("w+") as f:
             block = content.split(f"<!-- Begin section: {title} -->")
             if len(block) != 2:
                 msg = f"Section {title} not found in README.md"
@@ -64,7 +65,7 @@ def main() -> None:
             f.write(block[0])
 
     # Copy the CONTRIBUTING.md.
-    shutil.copy("CONTRIBUTING.md", "docs/contributing.md")
+    shutil.copy("CONTRIBUTING.md", docs_path / "contributing.md")
 
     # Add the nav section to mkdocs.yml.
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
