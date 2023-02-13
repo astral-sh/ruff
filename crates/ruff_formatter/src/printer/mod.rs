@@ -121,7 +121,7 @@ impl<'a> Printer<'a> {
                     }
 
                     // Print a second line break if this is an empty line
-                    if line_mode == &LineMode::Empty && !self.state.has_empty_line {
+                    if line_mode == &LineMode::Empty {
                         self.print_str("\n");
                         self.state.has_empty_line = true;
                     }
@@ -1443,7 +1443,7 @@ two lines`,
     }
 
     #[test]
-    fn it_prints_consecutive_empty_lines_as_one() {
+    fn it_prints_consecutive_empty_lines_as_many() {
         let result = format(&format_args![
             text("a"),
             empty_line(),
@@ -1452,11 +1452,11 @@ two lines`,
             text("b"),
         ]);
 
-        assert_eq!("a\n\nb", result.as_code())
+        assert_eq!("a\n\n\n\nb", result.as_code())
     }
 
     #[test]
-    fn it_prints_consecutive_mixed_lines_as_one() {
+    fn it_prints_consecutive_mixed_lines_as_many() {
         let result = format(&format_args![
             text("a"),
             empty_line(),
@@ -1466,7 +1466,7 @@ two lines`,
             text("b"),
         ]);
 
-        assert_eq!("a\n\nb", result.as_code())
+        assert_eq!("a\n\n\nb", result.as_code())
     }
 
     #[test]
