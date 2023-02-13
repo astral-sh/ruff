@@ -1477,7 +1477,7 @@ For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
 | RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
 | RUF004 | keyword-argument-before-star-argument | Keyword argument `{name}` must come after starred arguments |  |
 | RUF005 | unpack-instead-of-concatenating-to-collection-literal | Consider `{expr}` instead of concatenation | 🛠 |
-| RUF100 | unused-noqa | Unused blanket `noqa` directive | 🛠 |
+| RUF100 | unused-noqa | Unused `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
 
