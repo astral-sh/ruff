@@ -2,6 +2,7 @@ use std::path::Path;
 
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::flake8_no_pep420::rules::implicit_namespace_package;
+use crate::rules::pep8_naming::rules::invalid_module_name;
 use crate::settings::Settings;
 
 pub fn check_file_path(
@@ -16,6 +17,13 @@ pub fn check_file_path(
         if let Some(diagnostic) =
             implicit_namespace_package(path, package, &settings.project_root, &settings.src)
         {
+            diagnostics.push(diagnostic);
+        }
+    }
+
+    // pep8-naming
+    if settings.rules.enabled(&Rule::InvalidModuleName) {
+        if let Some(diagnostic) = invalid_module_name(path, package) {
             diagnostics.push(diagnostic);
         }
     }

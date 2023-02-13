@@ -1,0 +1,6 @@
+---
+source: crates/ruff/src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+[]
+

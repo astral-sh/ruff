@@ -817,21 +817,22 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| N801 | invalid-class-name | Class name `{name}` should use CapWords convention  |  |
-| N802 | invalid-function-name | Function name `{name}` should be lowercase |  |
+| N801 | [invalid-class-name](https://beta.ruff.rs/docs/rules/invalid-class-name/) | Class name `{name}` should use CapWords convention  |  |
+| N802 | [invalid-function-name](https://beta.ruff.rs/docs/rules/invalid-function-name/) | Function name `{name}` should be lowercase |  |
 | N803 | invalid-argument-name | Argument name `{name}` should be lowercase |  |
-| N804 | invalid-first-argument-name-for-class-method | First argument of a class method should be named `cls` |  |
-| N805 | invalid-first-argument-name-for-method | First argument of a method should be named `self` |  |
-| N806 | non-lowercase-variable-in-function | Variable `{name}` in function should be lowercase |  |
-| N807 | dunder-function-name | Function name should not start and end with `__` |  |
-| N811 | constant-imported-as-non-constant | Constant `{name}` imported as non-constant `{asname}` |  |
-| N812 | lowercase-imported-as-non-lowercase | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
-| N813 | camelcase-imported-as-lowercase | Camelcase `{name}` imported as lowercase `{asname}` |  |
-| N814 | camelcase-imported-as-constant | Camelcase `{name}` imported as constant `{asname}` |  |
+| N804 | [invalid-first-argument-name-for-class-method](https://beta.ruff.rs/docs/rules/invalid-first-argument-name-for-class-method/) | First argument of a class method should be named `cls` |  |
+| N805 | [invalid-first-argument-name-for-method](https://beta.ruff.rs/docs/rules/invalid-first-argument-name-for-method/) | First argument of a method should be named `self` |  |
+| N806 | [non-lowercase-variable-in-function](https://beta.ruff.rs/docs/rules/non-lowercase-variable-in-function/) | Variable `{name}` in function should be lowercase |  |
+| N807 | [dunder-function-name](https://beta.ruff.rs/docs/rules/dunder-function-name/) | Function name should not start and end with `__` |  |
+| N811 | [constant-imported-as-non-constant](https://beta.ruff.rs/docs/rules/constant-imported-as-non-constant/) | Constant `{name}` imported as non-constant `{asname}` |  |
+| N812 | [lowercase-imported-as-non-lowercase](https://beta.ruff.rs/docs/rules/lowercase-imported-as-non-lowercase/) | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
+| N813 | [camelcase-imported-as-lowercase](https://beta.ruff.rs/docs/rules/camelcase-imported-as-lowercase/) | Camelcase `{name}` imported as lowercase `{asname}` |  |
+| N814 | [camelcase-imported-as-constant](https://beta.ruff.rs/docs/rules/camelcase-imported-as-constant/) | Camelcase `{name}` imported as constant `{asname}` |  |
 | N815 | mixed-case-variable-in-class-scope | Variable `{name}` in class scope should not be mixedCase |  |
 | N816 | mixed-case-variable-in-global-scope | Variable `{name}` in global scope should not be mixedCase |  |
-| N817 | camelcase-imported-as-acronym | Camelcase `{name}` imported as acronym `{asname}` |  |
-| N818 | error-suffix-on-exception-name | Exception name `{name}` should be named with an Error suffix |  |
+| N817 | [camelcase-imported-as-acronym](https://beta.ruff.rs/docs/rules/camelcase-imported-as-acronym/) | Camelcase `{name}` imported as acronym `{asname}` |  |
+| N818 | [error-suffix-on-exception-name](https://beta.ruff.rs/docs/rules/error-suffix-on-exception-name/) | Exception name `{name}` should be named with an Error suffix |  |
+| N999 | [invalid-module-name](https://beta.ruff.rs/docs/rules/invalid-module-name/) | Invalid module name: '{name}' |  |
 
 ### pydocstyle (D)
 

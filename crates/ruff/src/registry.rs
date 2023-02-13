@@ -377,6 +377,7 @@ ruff_macros::register_rules!(
     rules::pep8_naming::rules::MixedCaseVariableInGlobalScope,
     rules::pep8_naming::rules::CamelcaseImportedAsAcronym,
     rules::pep8_naming::rules::ErrorSuffixOnExceptionName,
+    rules::pep8_naming::rules::InvalidModuleName,
     // isort
     rules::isort::rules::UnsortedImports,
     rules::isort::rules::MissingRequiredImport,
@@ -796,7 +797,7 @@ impl Rule {
             | Rule::TrailingCommaProhibited => &LintSource::Tokens,
             Rule::IOError => &LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
-            Rule::ImplicitNamespacePackage => &LintSource::Filesystem,
+            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => &LintSource::Filesystem,
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
