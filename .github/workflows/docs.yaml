@@ -1,4 +1,4 @@
-name: mkdocs
+name: mdbook
 
 on:
   release:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  mkdocs:
+  mdbook:
     runs-on: ubuntu-latest
     env:
       CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
@@ -18,16 +18,16 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: "Install dependencies"
         run: |
-          pip install -r docs/requirements.txt
-      - name: "Copy README File"
+          cargo install mdbook
+      - name: "Generate the website"
         run: |
           python scripts/transform_readme.py --target mkdocs
-          python scripts/generate_mkdocs.py
-          mkdocs build --strict
+          python scripts/generate_book.py
+          cd docs && mdbook build
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
         uses: cloudflare/wrangler-action@2.0.0
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages publish site --project-name=ruff-docs --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}
+          command: pages publish docs/book/ --project-name=ruff-docs --branch ${GITHUB_HEAD_REF} --commit-hash ${GITHUB_SHA}

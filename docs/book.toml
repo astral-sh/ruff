@@ -1,0 +1,13 @@
+[book]
+authors = ["The Ruff Developers"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Ruff Documentation"
+
+[output.html]
+git-repository-url = "https://github.com/charliermarsh/ruff"
+
+[output.html.fold]
+enable = true
+level = 0

@@ -9,7 +9,7 @@ Welcome! We're happy to have you here. Thank you in advance for your contributio
   - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
     - [Rule naming convention](#rule-naming-convention)
   - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
-- [MkDocs](#mkdocs)
+- [mdBook](#mdbook)
 - [Release Process](#release-process)
 - [Benchmarks](#benchmarks)
 
@@ -181,21 +181,21 @@ lives in `crates/ruff/src/flake8_to_ruff/converter.rs`.
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
-## MkDocs
+## mdBook
 
 To preview any changes to the documentation locally:
 
-1. Install MkDocs and Material for MkDocs with:
+1. Install mdBook with:
    ```shell
-   pip install -r docs/requirements.txt
+   cargo install mdbook
    ```
-2. Generate the MkDocs site with:
+2. Generate the markdown files with:
    ```shell
-   python scripts/generate_mkdocs.py
+   python scripts/generate_book.py
    ```
 3. Run the development server with:
    ```shell
-   mkdocs serve
+   cd docs && mdbook serve
    ```
 
 The documentation should then be available locally at

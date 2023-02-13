@@ -19,7 +19,7 @@ pub struct Args {
 }
 
 pub fn main(args: &Args) -> Result<()> {
-    let out_dir = Path::new("docs/rules");
+    let out_dir = Path::new("docs/src/rules");
     if !args.dry_run {
         fs::create_dir_all(out_dir)?;
     }
@@ -74,7 +74,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
 
                 let anchor = option.rsplit('.').next().unwrap();
                 out.push_str(&format!("* [`{option}`]\n"));
-                after.push_str(&format!("[`{option}`]: ../../settings#{anchor}"));
+                after.push_str(&format!("[`{option}`]: ../settings.html#{anchor}"));
 
                 continue;
             }

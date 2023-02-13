@@ -1,10 +1,8 @@
-"""Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
+"""Generate the Markdown files for mdbook in `docs/src`."""
 import argparse
 import shutil
 import subprocess
 from pathlib import Path
-
-import yaml
 
 SECTIONS: list[tuple[str, str]] = [
     ("Overview", "index.md"),
@@ -20,14 +18,9 @@ DOCUMENTATION_LINK: str = (
     "This README is also available as [documentation](https://beta.ruff.rs/docs/)."
 )
 
-FATHOM_SCRIPT: str = (
-    '<script src="https://cdn.usefathom.com/script.js" data-site="DUAEBFLB" defer>'
-    "</script>"
-)
-
 
 def main() -> None:
-    """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
+    """Generate the Markdown files for mdbook in `docs/src`."""
 
     subprocess.run(["cargo", "dev", "generate-docs"], check=True)
 
@@ -46,12 +39,24 @@ def main() -> None:
         "rules/",
     )
 
-    docs_path = Path("docs")
+    docs_path = Path("docs/src")
     docs_path.mkdir(parents=True, exist_ok=True)
+
+    with (docs_path.parent / "SUMMARY.md").open("r") as f:
+        text = f.read()
+
+    rules_item = "- [Rules](./rules.md)\n"
+    assert rules_item in text
+    rule_items = (f"    - [{f.stem}](rules/{f.name})\n" for f in sorted(docs_path.joinpath("rules").iterdir()))
+    text = text.replace(rules_item, rules_item + "".join(rule_items))
+
+    with (docs_path / "SUMMARY.md").open("w") as f:
+        f.write(text)
 
     # Split the README.md into sections.
     for title, filename in SECTIONS:
         with docs_path.joinpath(filename).open("w+") as f:
+            f.write(f"# {title}\n")
             block = content.split(f"<!-- Begin section: {title} -->")
             if len(block) != 2:
                 msg = f"Section {title} not found in README.md"
@@ -67,37 +72,10 @@ def main() -> None:
     # Copy the CONTRIBUTING.md.
     shutil.copy("CONTRIBUTING.md", docs_path / "contributing.md")
 
-    # Add the nav section to mkdocs.yml.
-    with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
-        config = yaml.safe_load(fp)
-    config["nav"] = [
-        {"Overview": "index.md"},
-        {"Installation and Usage": "installation-and-usage.md"},
-        {"Configuration": "configuration.md"},
-        {"Rules": "rules.md"},
-        {"Settings": "settings.md"},
-        {"Editor Integrations": "editor-integrations.md"},
-        {"FAQ": "faq.md"},
-        {"Contributing": "contributing.md"},
-    ]
-    config["extra"] = {"analytics": {"provider": "fathom"}}
-
-    Path(".overrides/partials/integrations/analytics").mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-    with Path(".overrides/partials/integrations/analytics/fathom.html").open(
-        "w+",
-    ) as fp:
-        fp.write(FATHOM_SCRIPT)
-
-    with Path("mkdocs.yml").open("w+") as fp:
-        yaml.safe_dump(config, fp)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate an MkDocs-compatible `docs` and `mkdocs.yml`.",
+        description=__doc__,
     )
     args = parser.parse_args()
     main()

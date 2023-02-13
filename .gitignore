@@ -1,7 +1,6 @@
 # Local cache
 .ruff_cache
 crates/ruff/resources/test/cpython
-mkdocs.yml
 .overrides
 
 ###
@@ -159,9 +158,6 @@ venv.bak/
 
 # Rope project settings
 .ropeproject
-
-# mkdocs documentation
-/site
 
 # mypy
 .mypy_cache/
