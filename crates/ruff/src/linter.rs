@@ -211,7 +211,7 @@ pub fn check_path(
             indexer.commented_lines(),
             &directives.noqa_line_for,
             settings,
-            autofix,
+            error.as_ref().map_or(autofix, |_| flags::Autofix::Disabled),
         );
     }
 
