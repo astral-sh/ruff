@@ -19,7 +19,7 @@ pub struct Args {
 }
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
-    output.push_str(&format!("#### [`{0}`](#{0})\n", name));
+    output.push_str(&format!("#### `{name}`\n"));
     output.push('\n');
     output.push_str(field.doc);
     output.push_str("\n\n");
