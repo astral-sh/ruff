@@ -1,9 +1,14 @@
+//! Control in the different modes by which a source file can be parsed.
 use crate::token::Tok;
 
+/// The mode argument specifies in what way code must be parsed.
 #[derive(Clone, Copy)]
 pub enum Mode {
+    /// The code consists of a sequence of statements.
     Module,
+    /// The code consists of a sequence of interactive statement.
     Interactive,
+    /// The code consists of a single expression.
     Expression,
 }
 
@@ -39,6 +44,7 @@ impl std::str::FromStr for Mode {
     }
 }
 
+/// Returned when a given mode is not valid.
 #[derive(Debug)]
 pub struct ModeParseError {
     _priv: (),
