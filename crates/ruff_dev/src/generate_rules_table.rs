@@ -14,8 +14,6 @@ const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 const TOC_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated table of contents. -->";
 const TOC_END_PRAGMA: &str = "<!-- End auto-generated table of contents. -->";
 
-const URL_PREFIX: &str = "https://beta.ruff.rs/docs/rules";
-
 #[derive(clap::Args)]
 pub struct Args {
     /// Write the generated table to stdout (rather than to `README.md`).
@@ -42,7 +40,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>)
             rule.code(),
             rule.explanation()
                 .is_some()
-                .then_some(format_args!("[{rule_name}]({URL_PREFIX}/{rule_name}/)",))
+                .then_some(format_args!("[{rule_name}](rules/{rule_name}.html)",))
                 .unwrap_or(format_args!("{rule_name}")),
             rule.message_formats()[0].replace('|', r"\|"),
             fix_token
