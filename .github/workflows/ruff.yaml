@@ -2,8 +2,9 @@ name: "[ruff] Release"
 
 on:
   workflow_dispatch:
-  release:
-    types: [published]
+  push:
+    tags:
+      - '**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
