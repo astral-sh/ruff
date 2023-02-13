@@ -465,9 +465,13 @@ where
                 body,
                 ..
             } => {
-                if self.settings.rules.enabled(&Rule::ReceiverDecoratorChecker) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::NonLeadingReceiverDecorator)
+                {
                     self.diagnostics
-                        .extend(flake8_django::rules::receiver_decorator_checker(
+                        .extend(flake8_django::rules::non_leading_receiver_decorator(
                             decorator_list,
                             |expr| self.resolve_call_path(expr),
                         ));
@@ -779,15 +783,15 @@ where
                 decorator_list,
                 body,
             } => {
-                if self.settings.rules.enabled(&Rule::ModelStringFieldNullable) {
+                if self.settings.rules.enabled(&Rule::NullableModelStringField) {
                     self.diagnostics
-                        .extend(flake8_django::rules::model_string_field_nullable(
+                        .extend(flake8_django::rules::nullable_model_string_field(
                             self, bases, body,
                         ));
                 }
-                if self.settings.rules.enabled(&Rule::ModelDunderStr) {
+                if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
                     if let Some(diagnostic) =
-                        flake8_django::rules::model_dunder_str(self, bases, body, stmt)
+                        flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
                     {
                         self.diagnostics.push(diagnostic);
                     }

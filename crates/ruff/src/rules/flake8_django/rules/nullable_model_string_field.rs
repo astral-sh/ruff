@@ -36,14 +36,14 @@ define_violation!(
     /// class MyModel(models.Model):
     ///     field = models.CharField(max_length=255, default="")
     /// ```
-    pub struct ModelStringFieldNullable {
+    pub struct NullableModelStringField {
         pub field_name: String,
     }
 );
-impl Violation for ModelStringFieldNullable {
+impl Violation for NullableModelStringField {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ModelStringFieldNullable { field_name } = self;
+        let NullableModelStringField { field_name } = self;
         format!("Avoid using `null=True` on string-based fields such as {field_name}")
     }
 }
@@ -58,7 +58,7 @@ const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
 ];
 
 /// DJ001
-pub fn model_string_field_nullable(
+pub fn nullable_model_string_field(
     checker: &Checker,
     bases: &[Expr],
     body: &[Stmt],
@@ -74,7 +74,7 @@ pub fn model_string_field_nullable(
         };
         if let Some(field_name) = check_nullable_field(checker, value) {
             errors.push(Diagnostic::new(
-                ModelStringFieldNullable {
+                NullableModelStringField {
                     field_name: field_name.to_string(),
                 },
                 Range::from_located(value),

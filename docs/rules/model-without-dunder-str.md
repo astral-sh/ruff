@@ -1,4 +1,4 @@
-# model-dunder-str (DJ008)
+# model-without-dunder-str (DJ008)
 
 Derived from the **flake8-django** linter.
 

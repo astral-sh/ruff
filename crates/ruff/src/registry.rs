@@ -557,9 +557,9 @@ ruff_macros::define_rule_mapping!(
     RUF005 => rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     RUF100 => rules::ruff::rules::UnusedNOQA,
     // flake8-django
-    DJ001 => rules::flake8_django::rules::ModelStringFieldNullable,
-    DJ008 => rules::flake8_django::rules::ModelDunderStr,
-    DJ013 => rules::flake8_django::rules::ReceiverDecoratorChecker,
+    DJ001 => rules::flake8_django::rules::NullableModelStringField,
+    DJ008 => rules::flake8_django::rules::ModelWithoutDunderStr,
+    DJ013 => rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
 
 #[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
