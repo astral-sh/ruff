@@ -8,8 +8,7 @@ Prevents shadowing builtin variables in function arguments.
 
 ### Why is this bad?
 
-Shadowing can make your code harder to understand. Shadowing will also cause type errors
-if you use a shadowed variable as a type.
+Shadowing can obfuscate the purpose of a variable in your code.
 
 ### Example
 
@@ -18,7 +17,7 @@ def foo(id):
     ...
 ```
 
-Instead, use a more specific variable name or suffix with an underscore:
+Instead, use a more specific variable name or suffix the variable with an underscore:
 
 ```python
 def foo(bar_id):
