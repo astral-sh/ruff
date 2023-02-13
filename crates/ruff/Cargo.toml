@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
-anyhow = { version = "1.0.66" }
+anyhow = { workspace = true }
 bisection = { version = "0.1.0" }
 bitflags = { version = "1.3.2" }
 cfg-if = { version = "1.0.0" }
@@ -29,32 +29,32 @@ glob = { version = "0.3.0" }
 globset = { version = "0.4.9" }
 ignore = { version = "0.4.18" }
 imperative = { version = "1.0.3" }
-itertools = { version = "0.10.5" }
+itertools = { workspace = true }
 libcst = { workspace = true }
 log = { version = "0.4.17" }
 natord = { version = "1.0.9" }
 nohash-hasher = { version = "0.2.0" }
 num-bigint = { version = "0.4.3" }
 num-traits = "0.2.15"
-once_cell = { version = "1.16.0" }
+once_cell = { workspace = true }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
-regex = { version = "1.6.0" }
+regex = { workspace = true }
 ruff_macros = { version = "0.0.246", path = "../ruff_macros" }
 ruff_python = { version = "0.0.246", path = "../ruff_python" }
-rustc-hash = { version = "1.1.0" }
+rustc-hash = { workspace = true }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
-schemars = { version = "0.8.11" }
+schemars = { workspace = true }
 semver = { version = "1.0.16" }
-serde = { version = "1.0.147", features = ["derive"] }
+serde = { workspace = true }
 shellexpand = { version = "3.0.0" }
 smallvec = { version = "1.10.0" }
-strum = { version = "0.24.1", features = ["strum_macros"] }
-strum_macros = { version = "0.24.3" }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 textwrap = { version = "0.16.0" }
 thiserror = { version = "1.0" }
 titlecase = { version = "2.2.1" }
-toml = { version = "0.6.0" }
+toml = { workspace = true }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 # For (future) wasm-pack support
