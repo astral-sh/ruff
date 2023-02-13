@@ -120,6 +120,7 @@ pub fn format_imports(
     force_single_line: bool,
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
+    force_to_top: &BTreeSet<String>,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     known_local_folder: &BTreeSet<String>,
@@ -155,6 +156,7 @@ pub fn format_imports(
             force_single_line,
             force_sort_within_sections,
             force_wrap_aliases,
+            force_to_top,
             known_first_party,
             known_third_party,
             known_local_folder,
@@ -214,6 +216,7 @@ fn format_import_block(
     force_single_line: bool,
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
+    force_to_top: &BTreeSet<String>,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     known_local_folder: &BTreeSet<String>,
@@ -252,6 +255,7 @@ fn format_import_block(
             classes,
             constants,
             variables,
+            force_to_top,
         );
 
         if force_single_line {
@@ -267,7 +271,7 @@ fn format_import_block(
                 .collect::<Vec<EitherImport>>();
             if force_sort_within_sections {
                 imports.sort_by(|import1, import2| {
-                    cmp_either_import(import1, import2, relative_imports_order)
+                    cmp_either_import(import1, import2, relative_imports_order, force_to_top)
                 });
             };
             imports
@@ -348,6 +352,7 @@ mod tests {
     #[test_case(Path::new("fit_line_length_comment.py"))]
     #[test_case(Path::new("force_sort_within_sections.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
+    #[test_case(Path::new("force_to_top.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("inline_comments.py"))]
     #[test_case(Path::new("insert_empty_lines.py"))]
@@ -388,6 +393,15 @@ mod tests {
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
                 isort: super::settings::Settings {
+                    force_to_top: vec![
+                        "z".to_string(),
+                        "lib1".to_string(),
+                        "lib3".to_string(),
+                        "lib5".to_string(),
+                        "lib3.lib4".to_string(),
+                    ]
+                    .into_iter()
+                    .collect::<BTreeSet<_>>(),
                     known_local_folder: vec!["ruff".to_string()]
                         .into_iter()
                         .collect::<BTreeSet<_>>(),
