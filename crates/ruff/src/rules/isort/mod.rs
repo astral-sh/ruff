@@ -122,6 +122,7 @@ pub fn format_imports(
     force_wrap_aliases: bool,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
+    known_local_folder: &BTreeSet<String>,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
@@ -131,6 +132,7 @@ pub fn format_imports(
     variables: &BTreeSet<String>,
     no_lines_before: &BTreeSet<ImportType>,
     lines_after_imports: isize,
+    lines_between_types: usize,
     forced_separate: &[String],
     target_version: PythonVersion,
 ) -> String {
@@ -155,6 +157,7 @@ pub fn format_imports(
             force_wrap_aliases,
             known_first_party,
             known_third_party,
+            known_local_folder,
             order_by_type,
             relative_imports_order,
             single_line_exclusions,
@@ -163,6 +166,7 @@ pub fn format_imports(
             constants,
             variables,
             no_lines_before,
+            lines_between_types,
             target_version,
         );
 
@@ -212,6 +216,7 @@ fn format_import_block(
     force_wrap_aliases: bool,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
+    known_local_folder: &BTreeSet<String>,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
@@ -220,6 +225,7 @@ fn format_import_block(
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
     no_lines_before: &BTreeSet<ImportType>,
+    lines_between_types: usize,
     target_version: PythonVersion,
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
@@ -229,6 +235,7 @@ fn format_import_block(
         package,
         known_first_party,
         known_third_party,
+        known_local_folder,
         extra_standard_library,
         target_version,
     );
@@ -273,6 +280,8 @@ fn format_import_block(
             output.push_str(stylist.line_ending());
         }
 
+        let mut lines_inserted = false;
+        let mut has_direct_import = false;
         let mut is_first_statement = true;
         for import in imports {
             match import {
@@ -283,8 +292,20 @@ fn format_import_block(
                         is_first_statement,
                         stylist,
                     ));
+
+                    has_direct_import = true;
                 }
+
                 ImportFrom((import_from, comments, trailing_comma, aliases)) => {
+                    // Add a blank lines between direct and from imports
+                    if lines_between_types > 0 && has_direct_import && !lines_inserted {
+                        for _ in 0..lines_between_types {
+                            output.push_str(stylist.line_ending());
+                        }
+
+                        lines_inserted = true;
+                    }
+
                     output.push_str(&format::format_import_from(
                         &import_from,
                         &comments,
@@ -366,6 +387,12 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    known_local_folder: vec!["ruff".to_string()]
+                        .into_iter()
+                        .collect::<BTreeSet<_>>(),
+                    ..super::settings::Settings::default()
+                },
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -731,6 +758,25 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     lines_after_imports: 3,
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("lines_between_types.py"))]
+    fn lines_between_types(path: &Path) -> Result<()> {
+        let snapshot = format!("lines_between_types{}", path.to_string_lossy());
+        let mut diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    lines_between_types: 2,
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],

@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_comprehensions/mod.rs
+source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -70,12 +70,69 @@ expression: diagnostics
     column: 33
   fix:
     content:
-      - "sorted(x, reverse=True)"
+      - "sorted(x, reverse=False)"
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 33
+  parent: ~
+- kind:
+    UnnecessaryCallAroundSorted:
+      func: reversed
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 50
+  fix:
+    content:
+      - "sorted(x, key=lambda e: e, reverse=False)"
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 50
+  parent: ~
+- kind:
+    UnnecessaryCallAroundSorted:
+      func: reversed
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 50
+  fix:
+    content:
+      - "sorted(x, reverse=False, key=lambda e: e)"
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 50
+  parent: ~
+- kind:
+    UnnecessaryCallAroundSorted:
+      func: reversed
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 34
+  fix:
+    content:
+      - "sorted(x, reverse=True)"
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 34
   parent: ~
 

@@ -41,9 +41,11 @@ pub enum Command {
         rule: Rule,
 
         /// Output format
-        #[arg(long, value_enum, default_value = "text")]
+        #[arg(long, value_enum, default_value = "pretty")]
         format: HelpFormat,
     },
+    /// List or describe the available configuration options
+    Config { option: Option<String> },
     /// List all supported upstream linters
     Linter {
         /// Output format
@@ -73,9 +75,14 @@ pub struct CheckArgs {
     show_source: bool,
     #[clap(long, overrides_with("show_source"), hide = true)]
     no_show_source: bool,
+    /// Show an enumeration of all autofixed lint violations.
+    #[arg(long, overrides_with("no_show_fixes"))]
+    show_fixes: bool,
+    #[clap(long, overrides_with("show_fixes"), hide = true)]
+    no_show_fixes: bool,
     /// Avoid writing any fixed files back; instead, output a diff for each
     /// changed file to stdout.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "show_fixes")]
     pub diff: bool,
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
@@ -284,6 +291,7 @@ pub struct CheckArgs {
 pub enum HelpFormat {
     Text,
     Json,
+    Pretty,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -377,6 +385,7 @@ impl CheckArgs {
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 format: self.format,
+                show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
                 update_check: resolve_bool_arg(self.update_check, self.no_update_check),
             },
         )
@@ -435,6 +444,7 @@ pub struct Overrides {
     pub fix_only: Option<bool>,
     pub force_exclude: Option<bool>,
     pub format: Option<SerializationFormat>,
+    pub show_fixes: Option<bool>,
     pub update_check: Option<bool>,
 }
 
@@ -488,6 +498,9 @@ impl ConfigProcessor for &Overrides {
         }
         if let Some(show_source) = &self.show_source {
             config.show_source = Some(*show_source);
+        }
+        if let Some(show_fixes) = &self.show_fixes {
+            config.show_fixes = Some(*show_fixes);
         }
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);

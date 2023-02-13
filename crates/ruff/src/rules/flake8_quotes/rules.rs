@@ -12,16 +12,19 @@ use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for inline strings that use single quotes or double quotes,
-    /// depending on the value of the [`inline-quotes`](https://github.com/charliermarsh/ruff#inline-quotes)
-    /// setting.
+    /// depending on the value of the [`flake8-quotes.inline-quotes`] option.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Consistency is good. Use either single or double quotes for inline
     /// strings, but be consistent.
     ///
-    /// ### Example
+    /// ## Options
+    ///
+    /// * `flake8-quotes.inline-quotes`
+    ///
+    /// ## Example
     /// ```python
     /// foo = 'bar'
     /// ```
@@ -54,16 +57,20 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for multiline strings that use single quotes or double quotes,
-    /// depending on the value of the [`multiline-quotes`](https://github.com/charliermarsh/ruff#multiline-quotes)
+    /// depending on the value of the [`flake8-quotes.multiline-quotes`]
     /// setting.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Consistency is good. Use either single or double quotes for multiline
     /// strings, but be consistent.
     ///
-    /// ### Example
+    /// ## Options
+    ///
+    /// * `flake8-quotes.multiline-quotes`
+    ///
+    /// ## Example
     /// ```python
     /// foo = '''
     /// bar
@@ -100,15 +107,19 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
 }
 
 define_violation!(
-    /// ### What it does
-    /// Checks for docstrings that use single quotes or double quotes, depending on the value of the [`docstring-quotes`](https://github.com/charliermarsh/ruff#docstring-quotes)
-    /// setting.
+    /// ## What it does
+    /// Checks for docstrings that use single quotes or double quotes, depending
+    /// on the value of the [`flake8-quotes.docstring-quotes`] setting.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Consistency is good. Use either single or double quotes for docstring
     /// strings, but be consistent.
     ///
-    /// ### Example
+    /// ## Options
+    ///
+    /// * `flake8-quotes.docstring-quotes`
+    ///
+    /// ## Example
     /// ```python
     /// '''
     /// bar
@@ -145,15 +156,15 @@ impl AlwaysAutofixableViolation for BadQuotesDocstring {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for strings that include escaped quotes, and suggests changing
     /// the quote style to avoid the need to escape them.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// It's preferable to avoid escaped quotes in strings. By changing the
     /// outer quote style, you can avoid escaping inner quotes.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// foo = 'bar\'s'
     /// ```
@@ -162,9 +173,9 @@ define_violation!(
     /// ```python
     /// foo = "bar's"
     /// ```
-    pub struct AvoidQuoteEscape;
+    pub struct AvoidableEscapedQuote;
 );
-impl AlwaysAutofixableViolation for AvoidQuoteEscape {
+impl AlwaysAutofixableViolation for AvoidableEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Change outer quotes to avoid escaping inner quotes")
@@ -379,9 +390,9 @@ fn strings(
                     && !string_contents.contains(bad_single(&quotes_settings.inline_quotes))
                 {
                     let mut diagnostic =
-                        Diagnostic::new(AvoidQuoteEscape, Range::new(*start, *end));
+                        Diagnostic::new(AvoidableEscapedQuote, Range::new(*start, *end));
                     if matches!(autofix, flags::Autofix::Enabled)
-                        && settings.rules.should_fix(&Rule::AvoidQuoteEscape)
+                        && settings.rules.should_fix(&Rule::AvoidableEscapedQuote)
                     {
                         let quote = bad_single(&quotes_settings.inline_quotes);
 

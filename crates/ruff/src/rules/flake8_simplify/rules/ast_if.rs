@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt,
 
 use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::comparable::ComparableExpr;
+use crate::ast::comparable::{ComparableExpr, ComparableStmt};
 use crate::ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
@@ -13,15 +13,32 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
-use crate::violation::{Availability, Violation};
-use crate::AutofixKind;
+use crate::violation::{AutofixKind, Availability, Violation};
+
+fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
+    expr1.eq(expr2)
+}
+
+fn compare_stmt(stmt1: &ComparableStmt, stmt2: &ComparableStmt) -> bool {
+    stmt1.eq(stmt2)
+}
+
+fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
+    if body1.len() != body2.len() {
+        return false;
+    }
+    body1
+        .iter()
+        .zip(body2.iter())
+        .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
+}
 
 define_violation!(
-    pub struct NestedIfStatements {
+    pub struct CollapsibleIf {
         pub fixable: bool,
     }
 );
-impl Violation for NestedIfStatements {
+impl Violation for CollapsibleIf {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
@@ -30,7 +47,7 @@ impl Violation for NestedIfStatements {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let NestedIfStatements { fixable, .. } = self;
+        let CollapsibleIf { fixable, .. } = self;
         if *fixable {
             Some(|_| format!("Combine `if` statements using `and`"))
         } else {
@@ -40,26 +57,24 @@ impl Violation for NestedIfStatements {
 }
 
 define_violation!(
-    pub struct ReturnBoolConditionDirectly {
+    pub struct NeedlessBool {
         pub condition: String,
         pub fixable: bool,
     }
 );
-impl Violation for ReturnBoolConditionDirectly {
+impl Violation for NeedlessBool {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReturnBoolConditionDirectly { condition, .. } = self;
+        let NeedlessBool { condition, .. } = self;
         format!("Return the condition `{condition}` directly")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let ReturnBoolConditionDirectly { fixable, .. } = self;
+        let NeedlessBool { fixable, .. } = self;
         if *fixable {
-            Some(|ReturnBoolConditionDirectly { condition, .. }| {
-                format!("Replace with `return {condition}`")
-            })
+            Some(|NeedlessBool { condition, .. }| format!("Replace with `return {condition}`"))
         } else {
             None
         }
@@ -90,6 +105,36 @@ impl Violation for UseTernaryOperator {
         } else {
             None
         }
+    }
+}
+
+define_violation!(
+    /// ### What it does
+    /// Checks for `if` branches with identical arm bodies.
+    ///
+    /// ### Why is this bad?
+    /// If multiple arms of an `if` statement have the same body, using `or`
+    /// better signals the intent of the statement.
+    ///
+    /// ### Example
+    /// ```python
+    /// if x = 1:
+    ///     print("Hello")
+    /// elif x = 2:
+    ///     print("Hello")
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// if x = 1 or x = 2:
+    ///     print("Hello")
+    /// ```
+    pub struct IfWithSameArms;
+);
+impl Violation for IfWithSameArms {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Combine `if` branches using logical `or` operator")
     }
 }
 
@@ -212,7 +257,7 @@ pub fn nested_if_statements(
     );
 
     let mut diagnostic = Diagnostic::new(
-        NestedIfStatements { fixable },
+        CollapsibleIf { fixable },
         colon.map_or_else(
             || Range::from_located(stmt),
             |colon| Range::new(stmt.location, colon.end_location),
@@ -289,7 +334,7 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
         && (matches!(test.node, ExprKind::Compare { .. }) || checker.is_builtin("bool"));
 
     let mut diagnostic = Diagnostic::new(
-        ReturnBoolConditionDirectly { condition, fixable },
+        NeedlessBool { condition, fixable },
         Range::from_located(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
@@ -452,8 +497,76 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     checker.diagnostics.push(diagnostic);
 }
 
-fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
-    expr1.eq(expr2)
+fn get_if_body_pairs<'a>(
+    test: &'a Expr,
+    body: &'a [Stmt],
+    orelse: &'a [Stmt],
+) -> Vec<(&'a Expr, &'a [Stmt])> {
+    let mut pairs = vec![(test, body)];
+    let mut orelse = orelse;
+    loop {
+        if orelse.len() != 1 {
+            break;
+        }
+        let StmtKind::If { test, body, orelse: orelse_orelse, .. } = &orelse[0].node else {
+            break;
+        };
+        pairs.push((test, body));
+        orelse = orelse_orelse;
+    }
+    pairs
+}
+
+/// SIM114
+pub fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
+    let StmtKind::If { test, body, orelse } = &stmt.node else {
+        return;
+    };
+
+    // It's part of a bigger if-elif block:
+    // https://github.com/MartinThoma/flake8-simplify/issues/115
+    if let Some(StmtKind::If {
+        orelse: parent_orelse,
+        ..
+    }) = parent.map(|parent| &parent.node)
+    {
+        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
+            // TODO(charlie): These two cases have the same AST:
+            //
+            // if True:
+            //     pass
+            // elif a:
+            //     b = 1
+            // else:
+            //     b = 2
+            //
+            // if True:
+            //     pass
+            // else:
+            //     if a:
+            //         b = 1
+            //     else:
+            //         b = 2
+            //
+            // We want to flag the latter, but not the former. Right now, we flag neither.
+            return;
+        }
+    }
+
+    let if_body_pairs = get_if_body_pairs(test, body, orelse);
+    for i in 0..(if_body_pairs.len() - 1) {
+        let (test, body) = &if_body_pairs[i];
+        let (.., next_body) = &if_body_pairs[i + 1];
+        if compare_body(body, next_body) {
+            checker.diagnostics.push(Diagnostic::new(
+                IfWithSameArms,
+                Range::new(
+                    if i == 0 { stmt.location } else { test.location },
+                    next_body.last().unwrap().end_location.unwrap(),
+                ),
+            ));
+        }
+    }
 }
 
 /// SIM401

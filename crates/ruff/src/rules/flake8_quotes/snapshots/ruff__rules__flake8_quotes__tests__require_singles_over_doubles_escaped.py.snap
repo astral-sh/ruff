@@ -1,9 +1,9 @@
 ---
-source: src/rules/flake8_quotes/mod.rs
+source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AvoidQuoteEscape: ~
+    AvoidableEscapedQuote: ~
   location:
     row: 1
     column: 25
@@ -21,7 +21,7 @@ expression: diagnostics
       column: 47
   parent: ~
 - kind:
-    AvoidQuoteEscape: ~
+    AvoidableEscapedQuote: ~
   location:
     row: 2
     column: 25
@@ -39,7 +39,7 @@ expression: diagnostics
       column: 52
   parent: ~
 - kind:
-    AvoidQuoteEscape: ~
+    AvoidableEscapedQuote: ~
   location:
     row: 10
     column: 4

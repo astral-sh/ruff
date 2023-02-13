@@ -1,6 +1,6 @@
-pub use assert_used::{assert_used, AssertUsed};
+pub use assert_used::{assert_used, Assert};
 pub use bad_file_permissions::{bad_file_permissions, BadFilePermissions};
-pub use exec_used::{exec_used, ExecUsed};
+pub use exec_used::{exec_used, ExecBuiltin};
 pub use hardcoded_bind_all_interfaces::{
     hardcoded_bind_all_interfaces, HardcodedBindAllInterfaces,
 };
@@ -9,6 +9,7 @@ pub use hardcoded_password_func_arg::{hardcoded_password_func_arg, HardcodedPass
 pub use hardcoded_password_string::{
     assign_hardcoded_password_string, compare_to_hardcoded_password_string, HardcodedPasswordString,
 };
+pub use hardcoded_sql_expression::{hardcoded_sql_expression, HardcodedSQLExpression};
 pub use hardcoded_tmp_directory::{hardcoded_tmp_directory, HardcodedTempFile};
 pub use hashlib_insecure_hash_functions::{
     hashlib_insecure_hash_functions, HashlibInsecureHashFunction,
@@ -34,6 +35,7 @@ mod hardcoded_bind_all_interfaces;
 mod hardcoded_password_default;
 mod hardcoded_password_func_arg;
 mod hardcoded_password_string;
+mod hardcoded_sql_expression;
 mod hardcoded_tmp_directory;
 mod hashlib_insecure_hash_functions;
 mod jinja2_autoescape_false;

@@ -23,7 +23,7 @@ mod tests {
     #[test_case(Rule::FunctionCallArgumentDefault, Path::new("B006_B008.py"); "B008")]
     #[test_case(Rule::GetAttrWithConstant, Path::new("B009_B010.py"); "B009")]
     #[test_case(Rule::SetAttrWithConstant, Path::new("B009_B010.py"); "B010")]
-    #[test_case(Rule::DoNotAssertFalse, Path::new("B011.py"); "B011")]
+    #[test_case(Rule::AssertFalse, Path::new("B011.py"); "B011")]
     #[test_case(Rule::JumpStatementInFinally, Path::new("B012.py"); "B012")]
     #[test_case(Rule::RedundantTupleInExceptionHandler, Path::new("B013.py"); "B013")]
     #[test_case(Rule::DuplicateHandlerException, Path::new("B014.py"); "B014")]

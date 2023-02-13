@@ -47,7 +47,7 @@ pub struct Options {
     /// exactly one member. For example, this formatting would be retained,
     /// rather than condensing to a single line:
     ///
-    /// ```py
+    /// ```python
     /// from .utils import (
     ///     test_directory as test_directory,
     ///     test_id as test_id
@@ -142,6 +142,16 @@ pub struct Options {
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
+            known-local-folder = ["src"]
+        "#
+    )]
+    /// A list of modules to consider being a local folder.
+    /// Generally, this is reserved for relative imports (`from . import module`).
+    pub known_local_folder: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
             extra-standard-library = ["path"]
         "#
     )]
@@ -222,8 +232,18 @@ pub struct Options {
         "#
     )]
     /// The number of blank lines to place after imports.
-    /// -1 for automatic determination.
+    /// Use `-1` for automatic determination.
     pub lines_after_imports: Option<isize>,
+    #[option(
+        default = r#"0"#,
+        value_type = "int",
+        example = r#"
+            # Use a single line between direct and from import
+            lines-between-types = 1
+        "#
+    )]
+    /// The number of lines to place between "direct" and `import from` imports.
+    pub lines_between_types: Option<usize>,
     #[option(
         default = r#"[]"#,
         value_type = "Vec<String>",
@@ -247,6 +267,7 @@ pub struct Settings {
     pub force_wrap_aliases: bool,
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
+    pub known_local_folder: BTreeSet<String>,
     pub order_by_type: bool,
     pub relative_imports_order: RelativeImportsOrder,
     pub single_line_exclusions: BTreeSet<String>,
@@ -256,6 +277,7 @@ pub struct Settings {
     pub variables: BTreeSet<String>,
     pub no_lines_before: BTreeSet<ImportType>,
     pub lines_after_imports: isize,
+    pub lines_between_types: usize,
     pub forced_separate: Vec<String>,
 }
 
@@ -270,6 +292,7 @@ impl Default for Settings {
             force_wrap_aliases: false,
             known_first_party: BTreeSet::new(),
             known_third_party: BTreeSet::new(),
+            known_local_folder: BTreeSet::new(),
             order_by_type: true,
             relative_imports_order: RelativeImportsOrder::default(),
             single_line_exclusions: BTreeSet::new(),
@@ -279,6 +302,7 @@ impl Default for Settings {
             variables: BTreeSet::new(),
             no_lines_before: BTreeSet::new(),
             lines_after_imports: -1,
+            lines_between_types: 0,
             forced_separate: Vec::new(),
         }
     }
@@ -297,6 +321,7 @@ impl From<Options> for Settings {
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
             known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
             known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
+            known_local_folder: BTreeSet::from_iter(options.known_local_folder.unwrap_or_default()),
             order_by_type: options.order_by_type.unwrap_or(true),
             relative_imports_order: options.relative_imports_order.unwrap_or_default(),
             single_line_exclusions: BTreeSet::from_iter(
@@ -308,6 +333,7 @@ impl From<Options> for Settings {
             variables: BTreeSet::from_iter(options.variables.unwrap_or_default()),
             no_lines_before: BTreeSet::from_iter(options.no_lines_before.unwrap_or_default()),
             lines_after_imports: options.lines_after_imports.unwrap_or(-1),
+            lines_between_types: options.lines_between_types.unwrap_or_default(),
             forced_separate: Vec::from_iter(options.forced_separate.unwrap_or_default()),
         }
     }
@@ -324,6 +350,7 @@ impl From<Settings> for Options {
             force_wrap_aliases: Some(settings.force_wrap_aliases),
             known_first_party: Some(settings.known_first_party.into_iter().collect()),
             known_third_party: Some(settings.known_third_party.into_iter().collect()),
+            known_local_folder: Some(settings.known_local_folder.into_iter().collect()),
             order_by_type: Some(settings.order_by_type),
             relative_imports_order: Some(settings.relative_imports_order),
             single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
@@ -333,6 +360,7 @@ impl From<Settings> for Options {
             variables: Some(settings.variables.into_iter().collect()),
             no_lines_before: Some(settings.no_lines_before.into_iter().collect()),
             lines_after_imports: Some(settings.lines_after_imports),
+            lines_between_types: Some(settings.lines_between_types),
             forced_separate: Some(settings.forced_separate.into_iter().collect()),
         }
     }

@@ -1,12 +1,8 @@
 name: mkdocs
 
 on:
-  push:
-    paths:
-      - README.md
-      - mkdocs.template.yml
-      - .github/workflows/docs.yaml
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -19,7 +15,7 @@ jobs:
       - uses: actions/setup-python@v4
       - name: "Install dependencies"
         run: |
-          pip install "mkdocs~=1.4.2" "mkdocs-material~=9.0.6"
+          pip install -r docs/requirements.txt
       - name: "Copy README File"
         run: |
           python scripts/transform_readme.py --target mkdocs

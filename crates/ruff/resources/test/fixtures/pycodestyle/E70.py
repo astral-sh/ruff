@@ -21,5 +21,36 @@ def f(x): return 2*x
 #: E704:2:5 E226:2:23
 while all is round:
     def f(x): return 2*x
-#:
+#: E704:1:8 E702:1:11 E703:1:14
 if True: x; y;
+#: E701:1:8
+if True: lambda a: b
+#: E701:1:10
+if a := 1: pass
+# E701:1:4 E701:2:18 E701:3:8
+try: lambda foo: bar
+except ValueError: pass
+finally: pass
+# E701:1:7
+class C: pass
+# E701:1:7
+with C(): pass
+# E701:1:14
+async with C(): pass
+#:
+lambda a: b
+#:
+a: List[str] = []
+#:
+if a := 1:
+    pass
+#:
+func = lambda x: x** 2 if cond else lambda x:x
+#:
+class C: ...
+#:
+def f(): ...
+#: E701:1:8 E702:1:13
+class C: ...; x = 1
+#: E701:1:8 E702:1:13
+class C: ...; ...

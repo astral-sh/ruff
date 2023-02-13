@@ -1,9 +1,9 @@
 ---
-source: src/rules/mccabe/mod.rs
+source: crates/ruff/src/rules/mccabe/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: try_else
       complexity: 4
   location:
@@ -15,7 +15,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionIsTooComplex:
+    ComplexStructure:
       name: handle
       complexity: 9
   location:

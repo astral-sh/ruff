@@ -16,15 +16,15 @@ use crate::visibility;
 use crate::visibility::Visibility;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that function arguments have type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// def foo(x):
     ///     ...
@@ -48,15 +48,15 @@ impl Violation for MissingTypeFunctionArgument {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that function `*args` arguments have type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// def foo(*args):
     ///     ...
@@ -80,15 +80,15 @@ impl Violation for MissingTypeArgs {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that function `**kwargs` arguments have type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// def foo(**kwargs):
     ///     ...
@@ -112,10 +112,10 @@ impl Violation for MissingTypeKwargs {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that instance method `self` arguments have type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
@@ -123,7 +123,7 @@ define_violation!(
     /// Note that many type checkers will infer the type of `self` automatically, so this
     /// annotation is not strictly necessary.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// class Foo:
     ///     def bar(self):
@@ -149,10 +149,10 @@ impl Violation for MissingTypeSelf {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that class method `cls` arguments have type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
@@ -160,7 +160,7 @@ define_violation!(
     /// Note that many type checkers will infer the type of `cls` automatically, so this
     /// annotation is not strictly necessary.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// class Foo:
     ///     @classmethod
@@ -188,15 +188,15 @@ impl Violation for MissingTypeCls {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that public functions and methods have return type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// def add(a, b):
     ///     return a + b
@@ -220,15 +220,15 @@ impl Violation for MissingReturnTypePublicFunction {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that private functions and methods have return type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// def _add(a, b):
     ///     return a + b
@@ -252,11 +252,11 @@ impl Violation for MissingReturnTypePrivateFunction {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that "special" methods, like `__init__`, `__new__`, and `__call__`, have
     /// return type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
@@ -271,7 +271,7 @@ define_violation!(
     /// mypy-init-return = true
     /// ```
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// class Foo:
     ///     def __init__(self, x: int):
@@ -301,15 +301,15 @@ impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that static methods have return type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// class Foo:
     ///     @staticmethod
@@ -337,15 +337,15 @@ impl Violation for MissingReturnTypeStaticMethod {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks that class methods have return type annotations.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// class Foo:
     ///     @classmethod
@@ -373,15 +373,19 @@ impl Violation for MissingReturnTypeClassMethod {
 }
 
 define_violation!(
-    /// ### What it does
-    /// Checks that an expression is annotated with a more specific type than `Any`.
+    /// ## What it does
+    /// Checks that an expression is annotated with a more specific type than
+    /// `Any`.
     ///
-    /// ### Why is this bad?
-    /// `Any` is a type that can be anything, and it is the default type for
-    /// unannotated expressions. It is better to be explicit about the type of an
-    /// expression, and to use `Any` only when it is really needed.
+    /// ## Why is this bad?
+    /// `Any` is a special type indicating an unconstrained type. When an
+    /// expression is annotated with type `Any`, type checkers will allow all
+    /// operations on it.
     ///
-    /// ### Example
+    /// It's better to be explicit about the type of an expression, and to use
+    /// `Any` as an "escape hatch" only when it is really needed.
+    ///
+    /// ## Example
     /// ```python
     /// def foo(x: Any):
     ///     ...
@@ -392,14 +396,19 @@ define_violation!(
     /// def foo(x: int):
     ///     ...
     /// ```
-    pub struct DynamicallyTypedExpression {
+    ///
+    /// ## References
+    /// * [PEP 484](https://www.python.org/dev/peps/pep-0484/#the-any-type)
+    /// * [`typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
+    /// * [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
+    pub struct AnyType {
         pub name: String,
     }
 );
-impl Violation for DynamicallyTypedExpression {
+impl Violation for AnyType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DynamicallyTypedExpression { name } = self;
+        let AnyType { name } = self;
         format!("Dynamically typed expressions (typing.Any) are disallowed in `{name}`")
     }
 }
@@ -434,7 +443,7 @@ fn check_dynamically_typed<F>(
 {
     if checker.match_typing_expr(annotation, "Any") {
         diagnostics.push(Diagnostic::new(
-            DynamicallyTypedExpression { name: func() },
+            AnyType { name: func() },
             Range::from_located(annotation),
         ));
     };
@@ -480,11 +489,7 @@ pub fn definition(
             // ANN401 for dynamically typed arguments
             if let Some(annotation) = &arg.node.annotation {
                 has_any_typed_arg = true;
-                if checker
-                    .settings
-                    .rules
-                    .enabled(&Rule::DynamicallyTypedExpression)
-                {
+                if checker.settings.rules.enabled(&Rule::AnyType) {
                     check_dynamically_typed(
                         checker,
                         annotation,
@@ -517,11 +522,7 @@ pub fn definition(
             if let Some(expr) = &arg.node.annotation {
                 has_any_typed_arg = true;
                 if !checker.settings.flake8_annotations.allow_star_arg_any {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(&Rule::DynamicallyTypedExpression)
-                    {
+                    if checker.settings.rules.enabled(&Rule::AnyType) {
                         let name = &arg.node.arg;
                         check_dynamically_typed(
                             checker,
@@ -552,11 +553,7 @@ pub fn definition(
             if let Some(expr) = &arg.node.annotation {
                 has_any_typed_arg = true;
                 if !checker.settings.flake8_annotations.allow_star_arg_any {
-                    if checker
-                        .settings
-                        .rules
-                        .enabled(&Rule::DynamicallyTypedExpression)
-                    {
+                    if checker.settings.rules.enabled(&Rule::AnyType) {
                         let name = &arg.node.arg;
                         check_dynamically_typed(
                             checker,
@@ -614,11 +611,7 @@ pub fn definition(
         // ANN201, ANN202, ANN401
         if let Some(expr) = &returns {
             has_typed_return = true;
-            if checker
-                .settings
-                .rules
-                .enabled(&Rule::DynamicallyTypedExpression)
-            {
+            if checker.settings.rules.enabled(&Rule::AnyType) {
                 check_dynamically_typed(checker, expr, || name.to_string(), &mut diagnostics);
             }
         } else if !(

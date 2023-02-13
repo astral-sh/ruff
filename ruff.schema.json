@@ -414,6 +414,13 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "show-fixes": {
+      "description": "Whether to show an enumeration of all autofixed lint violations (overridden by the `--show-fixes` command-line flag).",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "show-source": {
       "description": "Whether to show source code snippets when reporting lint violations (overridden by the `--show-source` command-line flag).",
       "type": [
@@ -938,7 +945,7 @@
           ]
         },
         "force-wrap-aliases": {
-          "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```py from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
+          "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```python from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
           "type": [
             "boolean",
             "null"
@@ -964,6 +971,16 @@
             "type": "string"
           }
         },
+        "known-local-folder": {
+          "description": "A list of modules to consider being a local folder. Generally, this is reserved for relative imports (`from . import module`).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "known-third-party": {
           "description": "A list of modules to consider third-party, regardless of whether they can be identified as such via introspection of the local filesystem.",
           "type": [
@@ -975,12 +992,21 @@
           }
         },
         "lines-after-imports": {
-          "description": "The number of blank lines to place after imports. -1 for automatic determination.",
+          "description": "The number of blank lines to place after imports. Use `-1` for automatic determination.",
           "type": [
             "integer",
             "null"
           ],
           "format": "int"
+        },
+        "lines-between-types": {
+          "description": "The number of lines to place between \"direct\" and `import from` imports.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         },
         "no-lines-before": {
           "description": "A list of sections that should _not_ be delineated from the previous section via empty lines.",
@@ -1436,6 +1462,13 @@
         "D417",
         "D418",
         "D419",
+        "DJ",
+        "DJ0",
+        "DJ00",
+        "DJ001",
+        "DJ008",
+        "DJ01",
+        "DJ013",
         "DTZ",
         "DTZ0",
         "DTZ00",
@@ -1465,7 +1498,6 @@
         "E701",
         "E702",
         "E703",
-        "E704",
         "E71",
         "E711",
         "E712",
@@ -1677,6 +1709,8 @@
         "PLE",
         "PLE0",
         "PLE01",
+        "PLE010",
+        "PLE0100",
         "PLE011",
         "PLE0117",
         "PLE0118",
@@ -1689,6 +1723,8 @@
         "PLE114",
         "PLE1142",
         "PLE13",
+        "PLE130",
+        "PLE1307",
         "PLE131",
         "PLE1310",
         "PLE2",
@@ -1790,6 +1826,12 @@
         "PTH122",
         "PTH123",
         "PTH124",
+        "PYI",
+        "PYI0",
+        "PYI00",
+        "PYI001",
+        "PYI007",
+        "PYI008",
         "Q",
         "Q0",
         "Q00",
@@ -1848,6 +1890,8 @@
         "S508",
         "S509",
         "S6",
+        "S60",
+        "S608",
         "S61",
         "S612",
         "S7",
@@ -1867,6 +1911,7 @@
         "SIM110",
         "SIM111",
         "SIM112",
+        "SIM114",
         "SIM115",
         "SIM117",
         "SIM118",

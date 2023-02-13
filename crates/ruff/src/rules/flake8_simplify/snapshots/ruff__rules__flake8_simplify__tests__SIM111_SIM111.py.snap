@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_simplify/mod.rs
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -106,6 +106,44 @@ expression: diagnostics
       column: 4
     end_location:
       row: 157
+      column: 15
+  parent: ~
+- kind:
+    ConvertLoopToAll:
+      all: return all(x in y for x in iterable)
+  location:
+    row: 162
+    column: 4
+  end_location:
+    row: 164
+    column: 24
+  fix:
+    content:
+      - return all(x in y for x in iterable)
+    location:
+      row: 162
+      column: 4
+    end_location:
+      row: 165
+      column: 15
+  parent: ~
+- kind:
+    ConvertLoopToAll:
+      all: return all(x <= y for x in iterable)
+  location:
+    row: 170
+    column: 4
+  end_location:
+    row: 172
+    column: 24
+  fix:
+    content:
+      - return all(x <= y for x in iterable)
+    location:
+      row: 170
+      column: 4
+    end_location:
+      row: 173
       column: 15
   parent: ~
 

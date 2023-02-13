@@ -1,4 +1,6 @@
+use std::cmp::Reverse;
 use std::collections::BTreeMap;
+use std::fmt::Display;
 use std::io;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -6,23 +8,30 @@ use std::path::Path;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use anyhow::Result;
+use colored::control::SHOULD_COLORIZE;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
+use rustc_hash::FxHashMap;
+use serde::Serialize;
+use serde_json::json;
+
+use bitflags::bitflags;
 use ruff::fs::relativize_path;
+use ruff::linter::FixTable;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
 use ruff::registry::Rule;
 use ruff::settings::types::SerializationFormat;
 use ruff::{fix, notify_user};
-use serde::Serialize;
-use serde_json::json;
 
 use crate::diagnostics::Diagnostics;
 
-/// Enum to control whether lint violations are shown to the user.
-pub enum Violations {
-    Show,
-    Hide,
+bitflags! {
+    #[derive(Default)]
+    pub struct Flags: u32 {
+        const SHOW_VIOLATIONS = 0b0000_0001;
+        const SHOW_FIXES = 0b0000_0010;
+    }
 }
 
 #[derive(Serialize)]
@@ -48,6 +57,7 @@ struct ExpandedStatistics<'a> {
     count: usize,
     code: &'a str,
     message: String,
+    fixable: bool,
 }
 
 struct SerializeRuleAsCode<'a>(&'a Rule);
@@ -67,76 +77,81 @@ impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
     }
 }
 
-pub struct Printer<'a> {
-    format: &'a SerializationFormat,
-    log_level: &'a LogLevel,
-    autofix: &'a fix::FixMode,
-    violations: &'a Violations,
+pub struct Printer {
+    format: SerializationFormat,
+    log_level: LogLevel,
+    autofix_level: fix::FixMode,
+    flags: Flags,
 }
 
-impl<'a> Printer<'a> {
+impl Printer {
     pub const fn new(
-        format: &'a SerializationFormat,
-        log_level: &'a LogLevel,
-        autofix: &'a fix::FixMode,
-        violations: &'a Violations,
+        format: SerializationFormat,
+        log_level: LogLevel,
+        autofix_level: fix::FixMode,
+        flags: Flags,
     ) -> Self {
         Self {
             format,
             log_level,
-            autofix,
-            violations,
+            autofix_level,
+            flags,
         }
     }
 
     pub fn write_to_user(&self, message: &str) {
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             notify_user!("{}", message);
         }
     }
 
     fn post_text<T: Write>(&self, stdout: &mut T, diagnostics: &Diagnostics) -> Result<()> {
-        if self.log_level >= &LogLevel::Default {
-            match self.violations {
-                Violations::Show => {
-                    let fixed = diagnostics.fixed;
-                    let remaining = diagnostics.messages.len();
-                    let total = fixed + remaining;
-                    if fixed > 0 {
-                        let s = if total == 1 { "" } else { "s" };
+        if self.log_level >= LogLevel::Default {
+            if self.flags.contains(Flags::SHOW_VIOLATIONS) {
+                let fixed = diagnostics
+                    .fixed
+                    .values()
+                    .flat_map(std::collections::HashMap::values)
+                    .sum::<usize>();
+                let remaining = diagnostics.messages.len();
+                let total = fixed + remaining;
+                if fixed > 0 {
+                    let s = if total == 1 { "" } else { "s" };
+                    writeln!(
+                        stdout,
+                        "Found {total} error{s} ({fixed} fixed, {remaining} remaining)."
+                    )?;
+                } else if remaining > 0 {
+                    let s = if remaining == 1 { "" } else { "s" };
+                    writeln!(stdout, "Found {remaining} error{s}.")?;
+                }
+
+                if show_fix_status(self.autofix_level) {
+                    let num_fixable = diagnostics
+                        .messages
+                        .iter()
+                        .filter(|message| message.kind.fixable())
+                        .count();
+                    if num_fixable > 0 {
                         writeln!(
                             stdout,
-                            "Found {total} error{s} ({fixed} fixed, {remaining} remaining)."
+                            "[{}] {num_fixable} potentially fixable with the --fix option.",
+                            "*".cyan(),
                         )?;
-                    } else if remaining > 0 {
-                        let s = if remaining == 1 { "" } else { "s" };
-                        writeln!(stdout, "Found {remaining} error{s}.")?;
-                    }
-
-                    if !matches!(self.autofix, fix::FixMode::Apply) {
-                        let num_fixable = diagnostics
-                            .messages
-                            .iter()
-                            .filter(|message| message.kind.fixable())
-                            .count();
-                        if num_fixable > 0 {
-                            writeln!(
-                                stdout,
-                                "[{}] {num_fixable} potentially fixable with the --fix option.",
-                                "*".cyan(),
-                            )?;
-                        }
                     }
                 }
-                Violations::Hide => {
-                    let fixed = diagnostics.fixed;
-                    if fixed > 0 {
-                        let s = if fixed == 1 { "" } else { "s" };
-                        if matches!(self.autofix, fix::FixMode::Apply) {
-                            writeln!(stdout, "Fixed {fixed} error{s}.")?;
-                        } else if matches!(self.autofix, fix::FixMode::Diff) {
-                            writeln!(stdout, "Would fix {fixed} error{s}.")?;
-                        }
+            } else {
+                let fixed = diagnostics
+                    .fixed
+                    .values()
+                    .flat_map(std::collections::HashMap::values)
+                    .sum::<usize>();
+                if fixed > 0 {
+                    let s = if fixed == 1 { "" } else { "s" };
+                    if matches!(self.autofix_level, fix::FixMode::Apply) {
+                        writeln!(stdout, "Fixed {fixed} error{s}.")?;
+                    } else if matches!(self.autofix_level, fix::FixMode::Diff) {
+                        writeln!(stdout, "Would fix {fixed} error{s}.")?;
                     }
                 }
             }
@@ -149,7 +164,7 @@ impl<'a> Printer<'a> {
             return Ok(());
         }
 
-        if matches!(self.violations, Violations::Hide) {
+        if !self.flags.contains(Flags::SHOW_VIOLATIONS) {
             let mut stdout = BufWriter::new(io::stdout().lock());
             if matches!(
                 self.format,
@@ -226,9 +241,15 @@ impl<'a> Printer<'a> {
             }
             SerializationFormat::Text => {
                 for message in &diagnostics.messages {
-                    print_message(&mut stdout, message)?;
+                    print_message(&mut stdout, message, self.autofix_level)?;
                 }
-
+                if self.flags.contains(Flags::SHOW_FIXES) {
+                    if !diagnostics.fixed.is_empty() {
+                        writeln!(stdout)?;
+                        print_fixed(&mut stdout, &diagnostics.fixed)?;
+                        writeln!(stdout)?;
+                    }
+                }
                 self.post_text(&mut stdout, diagnostics)?;
             }
             SerializationFormat::Grouped => {
@@ -259,9 +280,23 @@ impl<'a> Printer<'a> {
 
                     // Print each message.
                     for message in messages {
-                        print_grouped_message(&mut stdout, message, row_length, column_length)?;
+                        print_grouped_message(
+                            &mut stdout,
+                            message,
+                            self.autofix_level,
+                            row_length,
+                            column_length,
+                        )?;
                     }
                     writeln!(stdout)?;
+                }
+
+                if self.flags.contains(Flags::SHOW_FIXES) {
+                    if !diagnostics.fixed.is_empty() {
+                        writeln!(stdout)?;
+                        print_fixed(&mut stdout, &diagnostics.fixed)?;
+                        writeln!(stdout)?;
+                    }
                 }
 
                 self.post_text(&mut stdout, diagnostics)?;
@@ -371,6 +406,12 @@ impl<'a> Printer<'a> {
                     .find(|message| message.kind.rule() == *rule)
                     .map(|message| message.kind.body())
                     .unwrap(),
+                fixable: diagnostics
+                    .messages
+                    .iter()
+                    .find(|message| message.kind.rule() == *rule)
+                    .iter()
+                    .any(|message| message.kind.fixable()),
             })
             .collect::<Vec<_>>();
 
@@ -391,13 +432,28 @@ impl<'a> Printer<'a> {
                     .map(|statistic| statistic.code.len())
                     .max()
                     .unwrap();
+                let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
+
+                let fixable = format!("[{}] ", "*".cyan());
+                let unfixable = "[ ] ";
 
                 // By default, we mimic Flake8's `--statistics` format.
-                for msg in statistics {
+                for statistic in statistics {
                     writeln!(
                         stdout,
-                        "{:>count_width$}\t{:<code_width$}\t{}",
-                        msg.count, msg.code, msg.message
+                        "{:>count_width$}\t{:<code_width$}\t{}{}",
+                        statistic.count.to_string().bold(),
+                        statistic.code.red().bold(),
+                        if any_fixable {
+                            if statistic.fixable {
+                                &fixable
+                            } else {
+                                unfixable
+                            }
+                        } else {
+                            ""
+                        },
+                        statistic.message,
                     )?;
                 }
                 return Ok(());
@@ -423,7 +479,7 @@ impl<'a> Printer<'a> {
             return Ok(());
         }
 
-        if self.log_level >= &LogLevel::Default {
+        if self.log_level >= LogLevel::Default {
             let s = if diagnostics.messages.len() == 1 {
                 ""
             } else {
@@ -437,11 +493,11 @@ impl<'a> Printer<'a> {
 
         let mut stdout = BufWriter::new(io::stdout().lock());
         if !diagnostics.messages.is_empty() {
-            if self.log_level >= &LogLevel::Default {
+            if self.log_level >= LogLevel::Default {
                 writeln!(stdout)?;
             }
             for message in &diagnostics.messages {
-                print_message(&mut stdout, message)?;
+                print_message(&mut stdout, message, self.autofix_level)?;
             }
         }
         stdout.flush()?;
@@ -474,34 +530,53 @@ fn num_digits(n: usize) -> usize {
         .max(1)
 }
 
+struct CodeAndBody<'a>(&'a Message, fix::FixMode);
+
+impl Display for CodeAndBody<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if show_fix_status(self.1) && self.0.kind.fixable() {
+            write!(
+                f,
+                "{code} {autofix}{body}",
+                code = self.0.kind.rule().code().red().bold(),
+                autofix = format_args!("[{}] ", "*".cyan()),
+                body = self.0.kind.body(),
+            )
+        } else {
+            write!(
+                f,
+                "{code} {body}",
+                code = self.0.kind.rule().code().red().bold(),
+                body = self.0.kind.body(),
+            )
+        }
+    }
+}
+
+/// Return `true` if the [`Printer`] should indicate that a rule is fixable.
+fn show_fix_status(autofix_level: fix::FixMode) -> bool {
+    // If we're in application mode, avoid indicating that a rule is fixable.
+    // If the specific violation were truly fixable, it would've been fixed in
+    // this pass! (We're occasionally unable to determine whether a specific
+    // violation is fixable without trying to fix it, so if autofix is not
+    // enabled, we may inadvertently indicate that a rule is fixable.)
+    !matches!(autofix_level, fix::FixMode::Apply)
+}
+
 /// Print a single `Message` with full details.
-fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
-    let label = if message.kind.fixable() {
-        format!(
-            "{}{}{}{}{}{} {} [{}] {}",
-            relativize_path(Path::new(&message.filename)).bold(),
-            ":".cyan(),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            ":".cyan(),
-            message.kind.rule().code().red().bold(),
-            "*".cyan(),
-            message.kind.body(),
-        )
-    } else {
-        format!(
-            "{}{}{}{}{}{} {} {}",
-            relativize_path(Path::new(&message.filename)).bold(),
-            ":".cyan(),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            ":".cyan(),
-            message.kind.rule().code().red().bold(),
-            message.kind.body(),
-        )
-    };
+fn print_message<T: Write>(
+    stdout: &mut T,
+    message: &Message,
+    autofix_level: fix::FixMode,
+) -> Result<()> {
+    let label = format!(
+        "{path}{sep}{row}{sep}{col}{sep} {code_and_body}",
+        path = relativize_path(Path::new(&message.filename)).bold(),
+        sep = ":".cyan(),
+        row = message.location.row(),
+        col = message.location.column(),
+        code_and_body = CodeAndBody(message, autofix_level)
+    );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
         let commit = message.kind.commit();
@@ -536,7 +611,7 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
                 fold: false,
             }],
             opt: FormatOptions {
-                color: true,
+                color: SHOULD_COLORIZE.should_colorize(),
                 ..FormatOptions::default()
             },
         };
@@ -548,38 +623,65 @@ fn print_message<T: Write>(stdout: &mut T, message: &Message) -> Result<()> {
     Ok(())
 }
 
+fn print_fixed<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) -> Result<()> {
+    let total = fixed
+        .values()
+        .map(|table| table.values().sum::<usize>())
+        .sum::<usize>();
+    assert!(total > 0);
+    let num_digits = num_digits(
+        *fixed
+            .values()
+            .filter_map(|table| table.values().max())
+            .max()
+            .unwrap(),
+    );
+
+    let s = if total == 1 { "" } else { "s" };
+    let label = format!("Fixed {total} error{s}:", total = total, s = s);
+    writeln!(stdout, "{}", label.bold().green())?;
+
+    for (filename, table) in fixed
+        .iter()
+        .sorted_by_key(|(filename, ..)| filename.as_str())
+    {
+        writeln!(
+            stdout,
+            "{} {}{}",
+            "-".cyan(),
+            relativize_path(Path::new(filename)).bold(),
+            ":".cyan()
+        )?;
+        for (rule, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
+            writeln!(
+                stdout,
+                "    {count:>num_digits$} × {} ({})",
+                rule.code().red().bold(),
+                rule.as_ref(),
+            )?;
+        }
+    }
+    Ok(())
+}
+
 /// Print a grouped `Message`, assumed to be printed in a group with others from
 /// the same file.
 fn print_grouped_message<T: Write>(
     stdout: &mut T,
     message: &Message,
+    autofix_level: fix::FixMode,
     row_length: usize,
     column_length: usize,
 ) -> Result<()> {
-    let label = if message.kind.fixable() {
-        format!(
-            "  {}{}{}{}{}  {}  [{}] {}",
-            " ".repeat(row_length - num_digits(message.location.row())),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            " ".repeat(column_length - num_digits(message.location.column())),
-            message.kind.rule().code().red().bold(),
-            "*".cyan(),
-            message.kind.body(),
-        )
-    } else {
-        format!(
-            "  {}{}{}{}{}  {}  {}",
-            " ".repeat(row_length - num_digits(message.location.row())),
-            message.location.row(),
-            ":".cyan(),
-            message.location.column(),
-            " ".repeat(column_length - num_digits(message.location.column())),
-            message.kind.rule().code().red().bold(),
-            message.kind.body(),
-        )
-    };
+    let label = format!(
+        "  {row_padding}{row}{sep}{col}{col_padding}  {code_and_body}",
+        row_padding = " ".repeat(row_length - num_digits(message.location.row())),
+        row = message.location.row(),
+        sep = ":".cyan(),
+        col = message.location.column(),
+        col_padding = " ".repeat(column_length - num_digits(message.location.column())),
+        code_and_body = CodeAndBody(message, autofix_level),
+    );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
         let commit = message.kind.commit();
@@ -614,7 +716,7 @@ fn print_grouped_message<T: Write>(
                 fold: false,
             }],
             opt: FormatOptions {
-                color: true,
+                color: SHOULD_COLORIZE.should_colorize(),
                 ..FormatOptions::default()
             },
         };

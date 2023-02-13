@@ -2,7 +2,18 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
-## The basics
+- [The Basics](#the-basics)
+  - [Prerequisites](#prerequisites)
+  - [Development](#development)
+  - [Project Structure](#project-structure)
+  - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
+    - [Rule naming convention](#rule-naming-convention)
+  - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
+- [MkDocs](#mkdocs)
+- [Release Process](#release-process)
+- [Benchmarks](#benchmarks)
+
+## The Basics
 
 Ruff welcomes contributions in the form of Pull Requests.
 
@@ -21,6 +32,9 @@ existing Python plugins, which can be used as a reference implementation.
 As a concrete example: consider taking on one of the rules from the [`tryceratops`](https://github.com/charliermarsh/ruff/issues/2056)
 plugin, and looking to the originating [Python source](https://github.com/guilatrova/tryceratops)
 for guidance.
+
+Alternatively, we've started work on the [`flake8-pyi`](https://github.com/charliermarsh/ruff/issues/848)
+plugin (see the [Python source](https://github.com/PyCQA/flake8-pyi)) -- another good place to start.
 
 ### Prerequisites
 
@@ -70,7 +84,7 @@ pre-commit run --all-files
 Your Pull Request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
 
-### Project structure
+### Project Structure
 
 Ruff is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
 such that all crates are contained in a flat `crates` directory.
@@ -91,15 +105,16 @@ At time of writing, the repository includes the following crates:
 
 At a high level, the steps involved in adding a new lint rule are as follows:
 
-1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
-2. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
-3. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
-4. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast.rs` (for AST-based
+1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention).
+2. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
+3. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
+4. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
+5. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast.rs` (for AST-based
    checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks), `crates/ruff/src/checkers/lines.rs`
    (for text-based checks), or `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based
    checks).
-5. Add a test fixture.
-6. Update the generated files (documentation and generated code).
+6. Add a test fixture.
+7. Update the generated files (documentation and generated code).
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate
 rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
@@ -129,6 +144,17 @@ generated snapshot, then commit the snapshot file alongside the rest of your cha
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
+#### Rule naming convention
+
+The rule name should make sense when read as "allow *rule-name*" or "allow *rule-name* items".
+
+This implies that rule names:
+
+* should state the bad thing being checked for
+
+* should not contain instructions on what you what you should use instead
+  (these belong in the rule documentation and the `autofix_title` for rules that have autofix)
+
 ### Example: Adding a new configuration option
 
 Ruff's user-facing settings live in a few different places.
@@ -155,7 +181,27 @@ lives in `crates/ruff/src/flake8_to_ruff/converter.rs`.
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
-## Release process
+## MkDocs
+
+To preview any changes to the documentation locally:
+
+1. Install MkDocs and Material for MkDocs with:
+   ```shell
+   pip install -r docs/requirements.txt
+   ```
+2. Generate the MkDocs site with:
+   ```shell
+   python scripts/generate_mkdocs.py
+   ```
+3. Run the development server with:
+   ```shell
+   mkdocs serve
+   ```
+
+The documentation should then be available locally at
+[http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
+
+## Release Process
 
 As of now, Ruff has an ad hoc release process: releases are cut with high frequency via GitHub
 Actions, which automatically generates the appropriate wheels across architectures and publishes

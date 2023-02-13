@@ -1,12 +1,11 @@
 pub use ambiguous_class_name::{ambiguous_class_name, AmbiguousClassName};
 pub use ambiguous_function_name::{ambiguous_function_name, AmbiguousFunctionName};
 pub use ambiguous_variable_name::{ambiguous_variable_name, AmbiguousVariableName};
+pub use bare_except::{bare_except, BareExcept};
 pub use compound_statements::{
-    compound_statements, MultipleStatementsOnOneLineColon, MultipleStatementsOnOneLineDef,
-    MultipleStatementsOnOneLineSemicolon, UselessSemicolon,
+    compound_statements, MultipleStatementsOnOneLineColon, MultipleStatementsOnOneLineSemicolon,
+    UselessSemicolon,
 };
-pub use do_not_assign_lambda::{do_not_assign_lambda, DoNotAssignLambda};
-pub use do_not_use_bare_except::{do_not_use_bare_except, DoNotUseBareExcept};
 pub use doc_line_too_long::{doc_line_too_long, DocLineTooLong};
 pub use errors::{syntax_error, IOError, SyntaxError};
 pub use extraneous_whitespace::{
@@ -23,6 +22,7 @@ pub use indentation::{
     UnexpectedIndentationComment,
 };
 pub use invalid_escape_sequence::{invalid_escape_sequence, InvalidEscapeSequence};
+pub use lambda_assignment::{lambda_assignment, LambdaAssignment};
 pub use line_too_long::{line_too_long, LineTooLong};
 pub use literal_comparisons::{literal_comparisons, NoneComparison, TrueFalseComparison};
 pub use mixed_spaces_and_tabs::{mixed_spaces_and_tabs, MixedSpacesAndTabs};
@@ -45,15 +45,15 @@ pub use whitespace_before_comment::{
 mod ambiguous_class_name;
 mod ambiguous_function_name;
 mod ambiguous_variable_name;
+mod bare_except;
 mod compound_statements;
-mod do_not_assign_lambda;
-mod do_not_use_bare_except;
 mod doc_line_too_long;
 mod errors;
 mod extraneous_whitespace;
 mod imports;
 mod indentation;
 mod invalid_escape_sequence;
+mod lambda_assignment;
 mod line_too_long;
 mod literal_comparisons;
 mod mixed_spaces_and_tabs;

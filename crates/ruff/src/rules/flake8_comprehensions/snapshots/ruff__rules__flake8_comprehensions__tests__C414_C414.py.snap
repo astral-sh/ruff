@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_comprehensions/mod.rs
+source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,7 +12,15 @@ expression: diagnostics
   end_location:
     row: 2
     column: 13
-  fix: ~
+  fix:
+    content:
+      - list(x)
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 13
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -24,7 +32,15 @@ expression: diagnostics
   end_location:
     row: 3
     column: 14
-  fix: ~
+  fix:
+    content:
+      - list(x)
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 14
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -36,7 +52,15 @@ expression: diagnostics
   end_location:
     row: 4
     column: 14
-  fix: ~
+  fix:
+    content:
+      - tuple(x)
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 14
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -48,7 +72,15 @@ expression: diagnostics
   end_location:
     row: 5
     column: 15
-  fix: ~
+  fix:
+    content:
+      - tuple(x)
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 15
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -60,7 +92,15 @@ expression: diagnostics
   end_location:
     row: 6
     column: 11
-  fix: ~
+  fix:
+    content:
+      - set(x)
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 11
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -72,7 +112,15 @@ expression: diagnostics
   end_location:
     row: 7
     column: 12
-  fix: ~
+  fix:
+    content:
+      - set(x)
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 12
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -84,7 +132,15 @@ expression: diagnostics
   end_location:
     row: 8
     column: 13
-  fix: ~
+  fix:
+    content:
+      - set(x)
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 13
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -96,7 +152,15 @@ expression: diagnostics
   end_location:
     row: 9
     column: 14
-  fix: ~
+  fix:
+    content:
+      - set(x)
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 14
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -108,7 +172,15 @@ expression: diagnostics
   end_location:
     row: 10
     column: 16
-  fix: ~
+  fix:
+    content:
+      - set(x)
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 16
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -120,7 +192,15 @@ expression: diagnostics
   end_location:
     row: 11
     column: 15
-  fix: ~
+  fix:
+    content:
+      - sorted(x)
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 15
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -132,7 +212,15 @@ expression: diagnostics
   end_location:
     row: 12
     column: 16
-  fix: ~
+  fix:
+    content:
+      - sorted(x)
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 12
+      column: 16
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -144,7 +232,15 @@ expression: diagnostics
   end_location:
     row: 13
     column: 17
-  fix: ~
+  fix:
+    content:
+      - sorted(x)
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 17
   parent: ~
 - kind:
     UnnecessaryDoubleCastOrProcess:
@@ -156,6 +252,37 @@ expression: diagnostics
   end_location:
     row: 14
     column: 19
-  fix: ~
+  fix:
+    content:
+      - sorted(x)
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 14
+      column: 19
+  parent: ~
+- kind:
+    UnnecessaryDoubleCastOrProcess:
+      inner: list
+      outer: tuple
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 20
+    column: 1
+  fix:
+    content:
+      - tuple(
+      - "    [x, 3, \"hell\"\\"
+      - "        \"o\"]"
+      - "    )"
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 20
+      column: 1
   parent: ~
 

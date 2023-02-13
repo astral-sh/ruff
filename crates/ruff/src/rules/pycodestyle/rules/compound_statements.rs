@@ -36,23 +36,26 @@ impl Violation for UselessSemicolon {
     }
 }
 
-define_violation!(
-    pub struct MultipleStatementsOnOneLineDef;
-);
-impl Violation for MultipleStatementsOnOneLineDef {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Multiple statements on one line (def)")
-    }
-}
-
 pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     // Track the last seen instance of a variety of tokens.
-    let mut def = None;
     let mut colon = None;
     let mut semi = None;
+    let mut class = None;
+    let mut elif = None;
+    let mut else_ = None;
+    let mut except = None;
+    let mut finally = None;
+    let mut for_ = None;
+    let mut if_ = None;
+    let mut try_ = None;
+    let mut while_ = None;
+    let mut with = None;
+
+    // As a special-case, track whether we're at the first token after a colon.
+    // This is used to allow `class C: ...`-style definitions in stubs.
+    let mut allow_ellipsis = false;
 
     // Track the bracket depth.
     let mut par_count = 0;
@@ -93,20 +96,43 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
                 }
 
                 // Reset.
-                def = None;
                 colon = None;
                 semi = None;
-            }
-            Tok::Def => {
-                def = Some((start, end));
+                class = None;
+                elif = None;
+                else_ = None;
+                except = None;
+                finally = None;
+                for_ = None;
+                if_ = None;
+                try_ = None;
+                while_ = None;
+                with = None;
             }
             Tok::Colon => {
-                colon = Some((start, end));
+                if class.is_some()
+                    || elif.is_some()
+                    || else_.is_some()
+                    || except.is_some()
+                    || finally.is_some()
+                    || for_.is_some()
+                    || if_.is_some()
+                    || try_.is_some()
+                    || while_.is_some()
+                    || with.is_some()
+                {
+                    colon = Some((start, end));
+                    allow_ellipsis = true;
+                }
             }
             Tok::Semi => {
                 semi = Some((start, end));
             }
             Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
+            Tok::Ellipsis if allow_ellipsis => {
+                // Allow `class C: ...`-style definitions in stubs.
+                allow_ellipsis = false;
+            }
             _ => {
                 if let Some((start, end)) = semi {
                     diagnostics.push(Diagnostic::new(
@@ -119,24 +145,74 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
                 }
 
                 if let Some((start, end)) = colon {
-                    if let Some((start, end)) = def {
-                        diagnostics.push(Diagnostic::new(
-                            MultipleStatementsOnOneLineDef,
-                            Range::new(start, end),
-                        ));
-                    } else {
-                        diagnostics.push(Diagnostic::new(
-                            MultipleStatementsOnOneLineColon,
-                            Range::new(start, end),
-                        ));
-                    }
+                    diagnostics.push(Diagnostic::new(
+                        MultipleStatementsOnOneLineColon,
+                        Range::new(start, end),
+                    ));
 
                     // Reset.
-                    def = None;
                     colon = None;
+                    class = None;
+                    elif = None;
+                    else_ = None;
+                    except = None;
+                    finally = None;
+                    for_ = None;
+                    if_ = None;
+                    try_ = None;
+                    while_ = None;
+                    with = None;
                 }
             }
         }
+
+        match tok {
+            Tok::Lambda => {
+                // Reset.
+                colon = None;
+                class = None;
+                elif = None;
+                else_ = None;
+                except = None;
+                finally = None;
+                for_ = None;
+                if_ = None;
+                try_ = None;
+                while_ = None;
+                with = None;
+            }
+            Tok::If => {
+                if_ = Some((start, end));
+            }
+            Tok::While => {
+                while_ = Some((start, end));
+            }
+            Tok::For => {
+                for_ = Some((start, end));
+            }
+            Tok::Try => {
+                try_ = Some((start, end));
+            }
+            Tok::Except => {
+                except = Some((start, end));
+            }
+            Tok::Finally => {
+                finally = Some((start, end));
+            }
+            Tok::Elif => {
+                elif = Some((start, end));
+            }
+            Tok::Else => {
+                else_ = Some((start, end));
+            }
+            Tok::Class => {
+                class = Some((start, end));
+            }
+            Tok::With => {
+                with = Some((start, end));
+            }
+            _ => {}
+        };
     }
 
     diagnostics

@@ -57,6 +57,7 @@ pub struct Configuration {
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
     pub show_source: Option<bool>,
+    pub show_fixes: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub task_tags: Option<Vec<String>>,
@@ -165,6 +166,7 @@ impl Configuration {
             required_version: options.required_version,
             respect_gitignore: options.respect_gitignore,
             show_source: options.show_source,
+            show_fixes: options.show_fixes,
             src: options
                 .src
                 .map(|src| resolve_src(&src, project_root))
@@ -229,6 +231,7 @@ impl Configuration {
             required_version: self.required_version.or(config.required_version),
             respect_gitignore: self.respect_gitignore.or(config.respect_gitignore),
             show_source: self.show_source.or(config.show_source),
+            show_fixes: self.show_fixes.or(config.show_fixes),
             src: self.src.or(config.src),
             target_version: self.target_version.or(config.target_version),
             task_tags: self.task_tags.or(config.task_tags),
