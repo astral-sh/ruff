@@ -191,3 +191,7 @@ cython_debug/
 
 # Visual Studio Code
 .vscode/
+
+# VIM
+.*.sw?
+.sw?
