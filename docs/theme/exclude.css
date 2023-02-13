@@ -1,0 +1,19 @@
+/* From https://github.com/rust-lang/mdBook/pull/1991 */
+.light .no-light,
+.rust .no-rust,
+.navy .no-navy,
+.ayu .no-ayu,
+.coal .no-coal {
+    display: none;
+}
+
+.light .no-light-themes,
+.rust .no-light-themes {
+    display: none;
+}
+
+.navy .no-dark-themes,
+.ayu .no-dark-themes,
+.coal .no-dark-themes {
+    display: none;
+}

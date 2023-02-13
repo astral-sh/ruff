@@ -29,14 +29,14 @@ PYPI = f"""
 </p>
 """
 
-# https://squidfunk.github.io/mkdocs-material/reference/images/#light-and-dark-mode
-MK_DOCS = f"""
+# The CSS classes are defined in docs/theme/exclude.css
+MDBOOK = f"""
 <p align="center">
-  <img alt="Shows a bar chart with benchmark results." src="{URL_LIGHT}#only-light">
+  <img alt="Shows a bar chart with benchmark results." src="{URL_LIGHT}" class="no-dark-themes">
 </p>
 
 <p align="center">
-  <img alt="Shows a bar chart with benchmark results." src="{URL_DARK}#only-dark">
+  <img alt="Shows a bar chart with benchmark results." src="{URL_DARK} class="no-light-themes">
 </p>
 """
 
@@ -52,9 +52,9 @@ def main(target: str) -> None:
     if target == "pypi":
         with Path("README.md").open("w", encoding="utf8") as fp:
             fp.write(content.replace(GITHUB, PYPI))
-    elif target == "mkdocs":
+    elif target == "mdbook":
         with Path("README.md").open("w", encoding="utf8") as fp:
-            fp.write(content.replace(GITHUB, MK_DOCS))
+            fp.write(content.replace(GITHUB, MDBOOK))
     else:
         msg = f"Unknown target: {target}"
         raise ValueError(msg)
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         "--target",
         type=str,
         required=True,
-        choices=("pypi", "mkdocs"),
+        choices=("pypi", "mdbook"),
     )
     args = parser.parse_args()
 

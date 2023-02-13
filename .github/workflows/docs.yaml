@@ -21,7 +21,7 @@ jobs:
           cargo install mdbook
       - name: "Generate the website"
         run: |
-          python scripts/transform_readme.py --target mkdocs
+          python scripts/transform_readme.py --target mdbook
           python scripts/generate_book.py
           cd docs && mdbook build
       - name: "Deploy to Cloudflare Pages"
