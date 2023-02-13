@@ -94,6 +94,9 @@ impl<'a> Printer<'a> {
                 }
             }
 
+            FormatElement::StaticTextSlice { text, start, end } => {
+                self.print_text(&text[*start..*end], None)
+            }
             FormatElement::StaticText { text } => self.print_text(text, None),
             FormatElement::DynamicText {
                 text,
@@ -999,6 +1002,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 }
             }
 
+            FormatElement::StaticTextSlice { text, start, end } => {
+                return Ok(self.fits_text(&text[*start..*end]))
+            }
             FormatElement::StaticText { text } => return Ok(self.fits_text(text)),
             FormatElement::DynamicText { text, .. } => return Ok(self.fits_text(text)),
             FormatElement::SyntaxTokenTextSlice { slice, .. } => return Ok(self.fits_text(slice)),

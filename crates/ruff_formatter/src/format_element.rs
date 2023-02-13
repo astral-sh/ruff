@@ -47,6 +47,13 @@ pub enum FormatElement {
         slice: SyntaxTokenText,
     },
 
+    /// Token constructed by slicing a defined range from a static string
+    StaticTextSlice {
+        text: Rc<str>,
+        start: usize,
+        end: usize,
+    },
+
     /// Prevents that line suffixes move past this boundary. Forces the printer to print any pending
     /// line suffixes, potentially by inserting a hard line break.
     LineSuffixBoundary,
@@ -66,6 +73,9 @@ pub enum FormatElement {
 impl std::fmt::Debug for FormatElement {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            FormatElement::StaticTextSlice { text, .. } => {
+                fmt.debug_tuple("Text").field(text).finish()
+            }
             FormatElement::Space => write!(fmt, "Space"),
             FormatElement::Line(mode) => fmt.debug_tuple("Line").field(mode).finish(),
             FormatElement::ExpandParent => write!(fmt, "ExpandParent"),
@@ -225,6 +235,7 @@ impl FormatElement {
         matches!(
             self,
             FormatElement::SyntaxTokenTextSlice { .. }
+                | FormatElement::StaticTextSlice { .. }
                 | FormatElement::DynamicText { .. }
                 | FormatElement::StaticText { .. }
         )
@@ -238,6 +249,9 @@ impl FormatElement {
 impl FormatElements for FormatElement {
     fn will_break(&self) -> bool {
         match self {
+            FormatElement::StaticTextSlice { text, start, end } => {
+                text[*start..*end].contains('\n')
+            }
             FormatElement::ExpandParent => true,
             FormatElement::Tag(Tag::StartGroup(group)) => !group.mode().is_flat(),
             FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
