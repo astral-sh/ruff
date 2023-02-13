@@ -1,0 +1,10 @@
+---
+source: crates/ruff_formatter/src/diagnostics.rs
+expression: content
+---
+example.js format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Syntax error.
+
+
+

@@ -1,0 +1,12 @@
+---
+source: crates/ruff_formatter/src/diagnostics.rs
+expression: content
+---
+example.js format  INTERNAL  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Poor layout: The formatter wasn't able to pick a good layout for your document.
+
+  ! This diagnostic was derived from an internal Rome error. Potential bug, please report it if necessary.
+
+
+

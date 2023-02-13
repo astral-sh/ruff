@@ -1,0 +1,16 @@
+[package]
+name = "ruff_text_edit"
+version = "0.0.0"
+authors = ["RSLint developers"]
+edition = "2021"
+license = "MIT"
+description = "Simple text editing crate ported from rust-analyzer for the RSLint project"
+
+[dependencies]
+ruff_text_size = { path = "../ruff_text_size", features = ["serde"] }
+serde = { version = "1.0.136", features = ["derive"] }
+schemars = { version = "0.8.10", optional = true }
+similar = { version = "2.1.0", features = ["unicode"] }
+
+[features]
+schemars = ["dep:schemars", "ruff_text_size/schemars"]

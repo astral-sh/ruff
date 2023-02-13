@@ -1,0 +1,25 @@
+[package]
+name = "ruff_formatter"
+version = "0.0.0"
+edition = "2021"
+authors = ["Rome Tools Developers and Contributors"]
+repository = "https://github.com/charliermarsh/ruff"
+license = "MIT"
+
+[dependencies]
+cfg-if = { version = "1.0.0" }
+countme = { version = "3.0.1" }
+drop_bomb = { version = "0.1.5" }
+indexmap = { version = "1.9.1" }
+ruff_rowan = { path = "../ruff_rowan" }
+rustc-hash = { workspace = true }
+schemars = { version = "0.8.10", optional = true }
+serde = { version = "1.0.136", features = ["derive"], optional = true }
+tracing = { version = "0.1.31", default-features = false, features = ["std"] }
+unicode-width = { version = "0.1.9" }
+
+[dev-dependencies]
+insta = { version = "1.19.0" }
+
+[features]
+serde = ["dep:serde", "schemars", "ruff_rowan/serde"]
