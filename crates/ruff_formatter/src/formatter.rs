@@ -1,10 +1,7 @@
 use crate::buffer::BufferSnapshot;
-use crate::builders::{FillBuilder, JoinBuilder, JoinNodesBuilder, Line};
+use crate::builders::{FillBuilder, JoinBuilder};
 use crate::prelude::*;
-use crate::{
-    Arguments, Buffer, Comments, CstFormatContext, FormatContext, FormatState, FormatStateSnapshot,
-    GroupId, VecBuffer,
-};
+use crate::{Arguments, Buffer, FormatContext, FormatState, GroupId, VecBuffer};
 
 /// Handles the formatting of a CST and stores the context how the CST should be formatted (user preferences).
 /// The formatter is passed to the [Format] implementation of every node in the CST so that they
@@ -111,28 +108,6 @@ impl<'buf, Context> Formatter<'buf, Context> {
         JoinBuilder::with_separator(self, joiner)
     }
 
-    /// Specialized version of [crate::Formatter::join_with] for joining SyntaxNodes separated by a space, soft
-    /// line break or empty line depending on the input file.
-    ///
-    /// This functions inspects the input source and separates consecutive elements with either
-    /// a [crate::builders::soft_line_break_or_space] or [crate::builders::empty_line] depending on how many line breaks were
-    /// separating the elements in the original file.
-    pub fn join_nodes_with_soft_line<'a>(
-        &'a mut self,
-    ) -> JoinNodesBuilder<'a, 'buf, Line, Context> {
-        JoinNodesBuilder::new(soft_line_break_or_space(), self)
-    }
-
-    /// Specialized version of [crate::Formatter::join_with] for joining SyntaxNodes separated by one or more
-    /// line breaks depending on the input file.
-    ///
-    /// This functions inspects the input source and separates consecutive elements with either
-    /// a [crate::builders::hard_line_break] or [crate::builders::empty_line] depending on how many line breaks were separating the
-    /// elements in the original file.
-    pub fn join_nodes_with_hardline<'a>(&'a mut self) -> JoinNodesBuilder<'a, 'buf, Line, Context> {
-        JoinNodesBuilder::new(hard_line_break(), self)
-    }
-
     /// Concatenates a list of [crate::Format] objects with spaces and line breaks to fit
     /// them on as few lines as possible. Each element introduces a conceptual group. The printer
     /// first tries to print the item in flat mode but then prints it in expanded mode if it doesn't fit.
@@ -217,25 +192,13 @@ where
     pub fn state_snapshot(&self) -> FormatterSnapshot {
         FormatterSnapshot {
             buffer: self.buffer.snapshot(),
-            state: self.state().snapshot(),
         }
     }
 
     #[inline]
     /// Restore the state of the formatter to a previous snapshot
     pub fn restore_state_snapshot(&mut self, snapshot: FormatterSnapshot) {
-        self.state_mut().restore_snapshot(snapshot.state);
         self.buffer.restore_snapshot(snapshot.buffer);
-    }
-}
-
-impl<Context> Formatter<'_, Context>
-where
-    Context: CstFormatContext,
-{
-    /// Returns the comments from the context.
-    pub fn comments(&self) -> &Comments<Context::Language> {
-        self.context().comments()
     }
 }
 
@@ -284,5 +247,4 @@ impl<Context> Buffer for Formatter<'_, Context> {
 /// mode and compiled to nothing in release mode
 pub struct FormatterSnapshot {
     buffer: BufferSnapshot,
-    state: FormatStateSnapshot,
 }

@@ -1,10 +1,10 @@
 use crate::format_element::tag::{Condition, Tag};
 use crate::prelude::tag::{DedentMode, GroupMode, LabelId};
 use crate::prelude::*;
-use crate::{format_element, write, Argument, Arguments, GroupId, TextRange, TextSize};
+use crate::{format_element, write, Argument, Arguments, GroupId, TextSize};
 use crate::{Buffer, VecBuffer};
-use ruff_rowan::{Language, SyntaxNode, SyntaxToken, SyntaxTokenText, TextLen};
-use std::borrow::Cow;
+
+use ruff_text_size::TextRange;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::num::NonZeroU8;
@@ -329,93 +329,6 @@ impl<Context> Format<Context> for StaticTextSlice {
 impl std::fmt::Debug for StaticTextSlice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::write!(f, "StaticTextSlice({})", &self.text[self.range])
-    }
-}
-
-/// String that is the same as in the input source text if `text` is [`Cow::Borrowed`] or
-/// some replaced content if `text` is [`Cow::Owned`].
-pub fn syntax_token_cow_slice<'a, L: Language>(
-    text: Cow<'a, str>,
-    token: &'a SyntaxToken<L>,
-    start: TextSize,
-) -> SyntaxTokenCowSlice<'a, L> {
-    debug_assert_no_newlines(&text);
-
-    SyntaxTokenCowSlice { text, token, start }
-}
-
-pub struct SyntaxTokenCowSlice<'a, L: Language> {
-    text: Cow<'a, str>,
-    token: &'a SyntaxToken<L>,
-    start: TextSize,
-}
-
-impl<L: Language, Context> Format<Context> for SyntaxTokenCowSlice<'_, L> {
-    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        match &self.text {
-            Cow::Borrowed(text) => {
-                let range = TextRange::at(self.start, text.text_len());
-                debug_assert_eq!(
-                    *text,
-                    &self.token.text()[range - self.token.text_range().start()],
-                    "The borrowed string doesn't match the specified token substring. Does the borrowed string belong to this token and range?"
-                );
-
-                let relative_range = range - self.token.text_range().start();
-                let slice = self.token.token_text().slice(relative_range);
-
-                f.write_element(FormatElement::SyntaxTokenTextSlice {
-                    slice,
-                    source_position: self.start,
-                })
-            }
-            Cow::Owned(text) => f.write_element(FormatElement::DynamicText {
-                text: text.to_string().into_boxed_str(),
-                source_position: self.start,
-            }),
-        }
-    }
-}
-
-impl<L: Language> std::fmt::Debug for SyntaxTokenCowSlice<'_, L> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "SyntaxTokenCowSlice({})", self.text)
-    }
-}
-
-/// Copies a source text 1:1 into the output text.
-pub fn syntax_token_text_slice<L: Language>(
-    token: &SyntaxToken<L>,
-    range: TextRange,
-) -> SyntaxTokenTextSlice {
-    let relative_range = range - token.text_range().start();
-    let slice = token.token_text().slice(relative_range);
-
-    debug_assert_no_newlines(&slice);
-
-    SyntaxTokenTextSlice {
-        text: slice,
-        source_position: range.start(),
-    }
-}
-
-pub struct SyntaxTokenTextSlice {
-    text: SyntaxTokenText,
-    source_position: TextSize,
-}
-
-impl<Context> Format<Context> for SyntaxTokenTextSlice {
-    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        f.write_element(FormatElement::SyntaxTokenTextSlice {
-            slice: self.text.clone(),
-            source_position: self.source_position,
-        })
-    }
-}
-
-impl std::fmt::Debug for SyntaxTokenTextSlice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "SyntaxTokenTextSlice({})", self.text)
     }
 }
 
@@ -1853,7 +1766,7 @@ impl<Context, T> std::fmt::Debug for FormatWith<Context, T> {
 /// ```
 /// use ruff_formatter::prelude::*;
 /// use ruff_formatter::{SimpleFormatContext, format, write};
-/// use ruff_rowan::TextSize;
+/// use ruff_text_size::TextSize;
 ///
 /// struct MyFormat {
 ///     items: Vec<&'static str>,
@@ -1948,7 +1861,7 @@ where
 /// ```panics
 /// use ruff_formatter::prelude::*;
 /// use ruff_formatter::{SimpleFormatContext, format, write, Buffer};
-/// use ruff_rowan::TextSize;
+/// use ruff_text_size::TextSize;
 ///
 /// let mut count = 0;
 ///
@@ -2061,99 +1974,6 @@ where
     pub fn finish(&mut self) -> FormatResult<()> {
         self.result
     }
-}
-
-/// Builder to join together nodes that ensures that nodes separated by empty lines continue
-/// to be separated by empty lines in the formatted output.
-#[must_use = "must eventually call `finish()` on Format builders"]
-pub struct JoinNodesBuilder<'fmt, 'buf, Separator, Context> {
-    result: FormatResult<()>,
-    /// The separator to insert between nodes. Either a soft or hard line break
-    separator: Separator,
-    fmt: &'fmt mut Formatter<'buf, Context>,
-    has_elements: bool,
-}
-
-impl<'fmt, 'buf, Separator, Context> JoinNodesBuilder<'fmt, 'buf, Separator, Context>
-where
-    Separator: Format<Context>,
-{
-    pub(super) fn new(separator: Separator, fmt: &'fmt mut Formatter<'buf, Context>) -> Self {
-        Self {
-            result: Ok(()),
-            separator,
-            fmt,
-            has_elements: false,
-        }
-    }
-
-    /// Adds a new node with the specified formatted content to the output, respecting any new lines
-    /// that appear before the node in the input source.
-    pub fn entry<L: Language>(&mut self, node: &SyntaxNode<L>, content: &dyn Format<Context>) {
-        self.result = self.result.and_then(|_| {
-            if self.has_elements {
-                if get_lines_before(node) > 1 {
-                    write!(self.fmt, [empty_line()])?;
-                } else {
-                    self.separator.fmt(self.fmt)?;
-                }
-            }
-
-            self.has_elements = true;
-
-            write!(self.fmt, [content])
-        });
-    }
-
-    /// Writes an entry without adding a separating line break or empty line.
-    pub fn entry_no_separator(&mut self, content: &dyn Format<Context>) {
-        self.result = self.result.and_then(|_| {
-            self.has_elements = true;
-
-            write!(self.fmt, [content])
-        })
-    }
-
-    /// Adds an iterator of entries to the output. Each entry is a `(node, content)` tuple.
-    pub fn entries<L, F, I>(&mut self, entries: I) -> &mut Self
-    where
-        L: Language,
-        F: Format<Context>,
-        I: IntoIterator<Item = (SyntaxNode<L>, F)>,
-    {
-        for (node, content) in entries {
-            self.entry(&node, &content)
-        }
-
-        self
-    }
-
-    pub fn finish(&mut self) -> FormatResult<()> {
-        self.result
-    }
-}
-
-/// Get the number of line breaks between two consecutive SyntaxNodes in the tree
-pub fn get_lines_before<L: Language>(next_node: &SyntaxNode<L>) -> usize {
-    // Count the newlines in the leading trivia of the next node
-    if let Some(token) = next_node.first_token() {
-        get_lines_before_token(&token)
-    } else {
-        0
-    }
-}
-
-pub fn get_lines_before_token<L: Language>(token: &SyntaxToken<L>) -> usize {
-    token
-        .leading_trivia()
-        .pieces()
-        .take_while(|piece| {
-            // Stop at the first comment or skipped piece, the comment printer
-            // will handle newlines between the comment and the node
-            !(piece.is_comments() || piece.is_skipped())
-        })
-        .filter(|piece| piece.is_newline())
-        .count()
 }
 
 /// Builder to fill as many elements as possible on a single line.

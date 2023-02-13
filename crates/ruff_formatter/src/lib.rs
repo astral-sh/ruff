@@ -25,22 +25,14 @@
 mod arguments;
 mod buffer;
 mod builders;
-pub mod comments;
 pub mod diagnostics;
 pub mod format_element;
-mod format_extensions;
 pub mod formatter;
 pub mod group_id;
 pub mod macros;
 pub mod prelude;
-#[cfg(debug_assertions)]
-pub mod printed_tokens;
 pub mod printer;
-pub mod separated;
-mod source_map;
-pub mod token;
-pub mod trivia;
-mod verbatim;
+mod utility_types;
 
 use crate::formatter::Formatter;
 use crate::group_id::UniqueGroupIdBuilder;
@@ -48,8 +40,6 @@ use crate::prelude::TagKind;
 use std::fmt::Debug;
 
 use crate::format_element::document::Document;
-#[cfg(debug_assertions)]
-use crate::printed_tokens::PrintedTokens;
 use crate::printer::{Printer, PrinterOptions};
 pub use arguments::{Argument, Arguments};
 pub use buffer::{
@@ -58,18 +48,10 @@ pub use buffer::{
 };
 pub use builders::BestFitting;
 
-use crate::builders::syntax_token_cow_slice;
-use crate::comments::{CommentStyle, Comments, SourceComment};
 pub use crate::diagnostics::{ActualStart, FormatError, InvalidDocumentError, PrintError};
-use crate::trivia::{format_skipped_token_trivia, format_trimmed_token};
 pub use format_element::{normalize_newlines, FormatElement, LINE_TERMINATORS};
 pub use group_id::GroupId;
-use ruff_rowan::{
-    Language, SyntaxElement, SyntaxNode, SyntaxResult, SyntaxToken, SyntaxTriviaPiece, TextLen,
-    TextRange, TextSize, TokenAtOffset,
-};
-pub use source_map::{TransformSourceMap, TransformSourceMapBuilder};
-use std::marker::PhantomData;
+use ruff_text_size::{TextRange, TextSize};
 use std::num::ParseIntError;
 use std::str::FromStr;
 
@@ -220,13 +202,6 @@ pub trait FormatContext {
 
     /// Returns the formatting options
     fn options(&self) -> &Self::Options;
-
-    /// Returns [None] if the CST has not been pre-processed.
-    ///
-    /// Returns [Some] if the CST has been pre-processed to simplify formatting.
-    /// The source map can be used to map positions of the formatted nodes back to their original
-    /// source locations or to resolve the source text.
-    fn source_map(&self) -> Option<&TransformSourceMap>;
 }
 
 /// Options customizing how the source code should be formatted.
@@ -239,21 +214,6 @@ pub trait FormatOptions {
 
     /// Derives the print options from the these format options
     fn as_print_options(&self) -> PrinterOptions;
-}
-
-/// The [CstFormatContext] is an extension of the CST unaware [FormatContext] and must be implemented
-/// by every language.
-///
-/// The context customizes the comments formatting and stores the comments of the CST.
-pub trait CstFormatContext: FormatContext {
-    type Language: Language;
-    type Style: CommentStyle<Language = Self::Language>;
-
-    /// Rule for formatting comments.
-    type CommentRule: FormatRule<SourceComment<Self::Language>, Context = Self> + Default;
-
-    /// Returns a reference to the program's comments.
-    fn comments(&self) -> &Comments<Self::Language>;
 }
 
 #[derive(Debug, Default, Eq, PartialEq)]
@@ -272,10 +232,6 @@ impl FormatContext for SimpleFormatContext {
 
     fn options(&self) -> &Self::Options {
         &self.options
-    }
-
-    fn source_map(&self) -> Option<&TransformSourceMap> {
-        None
     }
 }
 
@@ -347,13 +303,7 @@ where
 {
     pub fn print(&self) -> PrintResult<Printed> {
         let print_options = self.context.options().as_print_options();
-
         let printed = Printer::new(print_options).print(&self.document)?;
-
-        let printed = match self.context.source_map() {
-            Some(source_map) => source_map.map_printed(printed),
-            None => printed,
-        };
 
         Ok(printed)
     }
@@ -361,11 +311,6 @@ where
     pub fn print_with_indent(&self, indent: u16) -> PrintResult<Printed> {
         let print_options = self.context.options().as_print_options();
         let printed = Printer::new(print_options).print_with_indent(&self.document, indent)?;
-
-        let printed = match self.context.source_map() {
-            Some(source_map) => source_map.map_printed(printed),
-            None => printed,
-        };
 
         Ok(printed)
     }
@@ -474,7 +419,7 @@ pub type FormatResult<F> = Result<F, FormatError>;
 /// ```
 /// use ruff_formatter::{format, write, IndentStyle, LineWidth};
 /// use ruff_formatter::prelude::*;
-/// use ruff_rowan::TextSize;
+/// use ruff_text_size::TextSize;
 ///
 /// struct Paragraph(String);
 ///
@@ -533,18 +478,6 @@ where
     }
 }
 
-impl<T, Context> Format<Context> for SyntaxResult<T>
-where
-    T: Format<Context>,
-{
-    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        match self {
-            Ok(value) => value.fmt(f),
-            Err(err) => Err(err.into()),
-        }
-    }
-}
-
 impl<Context> Format<Context> for () {
     #[inline]
     fn fmt(&self, _: &mut Formatter<Context>) -> FormatResult<()> {
@@ -567,43 +500,6 @@ pub trait FormatRule<T> {
     type Context;
 
     fn fmt(&self, item: &T, f: &mut Formatter<Self::Context>) -> FormatResult<()>;
-}
-
-/// Default implementation for formatting a token
-pub struct FormatToken<C> {
-    context: PhantomData<C>,
-}
-
-impl<C> Default for FormatToken<C> {
-    fn default() -> Self {
-        Self {
-            context: PhantomData,
-        }
-    }
-}
-
-impl<C> FormatRule<SyntaxToken<C::Language>> for FormatToken<C>
-where
-    C: CstFormatContext,
-    C::Language: 'static,
-{
-    type Context = C;
-
-    fn fmt(
-        &self,
-        token: &SyntaxToken<C::Language>,
-        f: &mut Formatter<Self::Context>,
-    ) -> FormatResult<()> {
-        f.state_mut().track_token(token);
-
-        crate::write!(
-            f,
-            [
-                format_skipped_token_trivia(token),
-                format_trimmed_token(token),
-            ]
-        )
-    }
 }
 
 /// Rule that supports customizing how it formats an object of type `T`.
@@ -855,448 +751,6 @@ where
     Ok(Formatted::new(document, state.into_context()))
 }
 
-/// Entry point for formatting a [SyntaxNode] for a specific language.
-pub trait FormatLanguage {
-    type SyntaxLanguage: Language;
-
-    /// The type of the formatting context
-    type Context: CstFormatContext<Language = Self::SyntaxLanguage>;
-
-    /// The rule type that can format a [SyntaxNode] of this language
-    type FormatRule: FormatRule<SyntaxNode<Self::SyntaxLanguage>, Context = Self::Context> + Default;
-
-    /// Performs an optional pre-processing of the tree. This can be useful to remove nodes
-    /// that otherwise complicate formatting.
-    ///
-    /// Return [None] if the tree shouldn't be processed. Return [Some] with the transformed
-    /// tree and the source map otherwise.
-    fn transform(
-        &self,
-        _root: &SyntaxNode<Self::SyntaxLanguage>,
-    ) -> Option<(SyntaxNode<Self::SyntaxLanguage>, TransformSourceMap)> {
-        None
-    }
-
-    /// This is used to select appropriate "root nodes" for the
-    /// range formatting process: for instance in JavaScript the function returns
-    /// true for statement and declaration nodes, to ensure the entire statement
-    /// gets formatted instead of the smallest sub-expression that fits the range
-    fn is_range_formatting_node(&self, _node: &SyntaxNode<Self::SyntaxLanguage>) -> bool {
-        true
-    }
-
-    /// Returns the formatting options
-    fn options(&self) -> &<Self::Context as FormatContext>::Options;
-
-    /// Creates the [FormatContext] with the given `source map` and `comments`
-    fn create_context(
-        self,
-        root: &SyntaxNode<Self::SyntaxLanguage>,
-        source_map: Option<TransformSourceMap>,
-    ) -> Self::Context;
-}
-
-/// Formats a syntax node file based on its features.
-///
-/// It returns a [Formatted] result, which the user can use to override a file.
-pub fn format_node<L: FormatLanguage>(
-    root: &SyntaxNode<L::SyntaxLanguage>,
-    language: L,
-) -> FormatResult<Formatted<L::Context>> {
-    tracing::trace_span!("format_node").in_scope(move || {
-        let (root, source_map) = match language.transform(root) {
-            Some((root, source_map)) => (root, Some(source_map)),
-            None => (root.clone(), None),
-        };
-
-        let context = language.create_context(&root, source_map);
-        let format_node = FormatRefWithRule::new(&root, L::FormatRule::default());
-
-        let mut state = FormatState::new(context);
-        let mut buffer = VecBuffer::new(&mut state);
-
-        write!(buffer, [format_node])?;
-
-        let mut document = Document::from(buffer.into_vec());
-        document.propagate_expand();
-
-        state.assert_formatted_all_tokens(&root);
-
-        let context = state.into_context();
-        let comments = context.comments();
-
-        comments.assert_checked_all_suppressions(&root);
-        comments.assert_formatted_all_comments();
-
-        Ok(Formatted::new(document, context))
-    })
-}
-
-/// Returns the [TextRange] for this [SyntaxElement] with the leading and
-/// trailing whitespace trimmed (but keeping comments or skipped trivias)
-fn text_non_whitespace_range<E, L>(elem: &E) -> TextRange
-where
-    E: Into<SyntaxElement<L>> + Clone,
-    L: Language,
-{
-    let elem: SyntaxElement<L> = elem.clone().into();
-
-    let start = elem
-        .leading_trivia()
-        .into_iter()
-        .flat_map(|trivia| trivia.pieces())
-        .find_map(|piece| {
-            if piece.is_whitespace() || piece.is_newline() {
-                None
-            } else {
-                Some(piece.text_range().start())
-            }
-        })
-        .unwrap_or_else(|| elem.text_trimmed_range().start());
-
-    let end = elem
-        .trailing_trivia()
-        .into_iter()
-        .flat_map(|trivia| trivia.pieces().rev())
-        .find_map(|piece| {
-            if piece.is_whitespace() || piece.is_newline() {
-                None
-            } else {
-                Some(piece.text_range().end())
-            }
-        })
-        .unwrap_or_else(|| elem.text_trimmed_range().end());
-
-    TextRange::new(start, end)
-}
-
-/// Formats a range within a file, supported by Rome
-///
-/// This runs a simple heuristic to determine the initial indentation
-/// level of the node based on the provided [FormatContext], which
-/// must match currently the current initial of the file. Additionally,
-/// because the reformatting happens only locally the resulting code
-/// will be indented with the same level as the original selection,
-/// even if it's a mismatch from the rest of the block the selection is in
-///
-/// It returns a [Formatted] result with a range corresponding to the
-/// range of the input that was effectively overwritten by the formatter
-pub fn format_range<Language: FormatLanguage>(
-    root: &SyntaxNode<Language::SyntaxLanguage>,
-    mut range: TextRange,
-    language: Language,
-) -> FormatResult<Printed> {
-    if range.is_empty() {
-        return Ok(Printed::new(
-            String::new(),
-            Some(range),
-            Vec::new(),
-            Vec::new(),
-        ));
-    }
-
-    let root_range = root.text_range();
-    if range.start() < root_range.start() || range.end() > root_range.end() {
-        return Err(FormatError::RangeError {
-            input: range,
-            tree: root_range,
-        });
-    }
-
-    // Find the tokens corresponding to the start and end of the range
-    let start_token = root.token_at_offset(range.start());
-    let end_token = root.token_at_offset(range.end());
-
-    // If these tokens were not found this means either:
-    // 1. The input [SyntaxNode] was empty
-    // 2. The input node was not the root [SyntaxNode] of the file
-    // In the first case we can return an empty result immediately,
-    // otherwise default to the first and last tokens in the root node
-    let mut start_token = match start_token {
-        // If the start of the range lies between two tokens,
-        // start at the rightmost one
-        TokenAtOffset::Between(_, token) => token,
-        TokenAtOffset::Single(token) => token,
-        TokenAtOffset::None => match root.first_token() {
-            Some(token) => token,
-            // root node is empty
-            None => return Ok(Printed::new_empty()),
-        },
-    };
-    let mut end_token = match end_token {
-        // If the end of the range lies between two tokens,
-        // end at the leftmost one
-        TokenAtOffset::Between(token, _) => token,
-        TokenAtOffset::Single(token) => token,
-        TokenAtOffset::None => match root.last_token() {
-            Some(token) => token,
-            // root node is empty
-            None => return Ok(Printed::new_empty()),
-        },
-    };
-
-    // Trim leading and trailing whitespace off from the formatting range
-    let mut trimmed_start = range.start();
-
-    let start_token_range = text_non_whitespace_range(&start_token);
-    let start_token_trimmed_start = start_token_range.start();
-    let start_token_trimmed_end = start_token_range.end();
-
-    if start_token_trimmed_start >= range.start() && start_token_trimmed_start <= range.end() {
-        // If the range starts before the trimmed start of the token, move the
-        // start towards that position
-        trimmed_start = start_token_trimmed_start;
-    } else if start_token_trimmed_end <= range.start() {
-        // If the range starts after the trimmed end of the token, move the
-        // start to the trimmed start of the next token if it exists
-        if let Some(next_token) = start_token.next_token() {
-            let next_token_start = text_non_whitespace_range(&next_token).start();
-            if next_token_start <= range.end() {
-                trimmed_start = next_token_start;
-                start_token = next_token;
-            }
-        }
-    }
-
-    let end_token_range = text_non_whitespace_range(&end_token);
-    let end_token_trimmed_start = end_token_range.start();
-
-    // If the range ends before the trimmed start of the token, move the
-    // end to the trimmed end of the previous token if it exists
-    if end_token_trimmed_start >= range.end() {
-        if let Some(next_token) = end_token.prev_token() {
-            let next_token_end = text_non_whitespace_range(&next_token).end();
-            if next_token_end >= trimmed_start {
-                end_token = next_token;
-            }
-        }
-    }
-
-    // Find suitable formatting-root nodes (matching the predicate provided by
-    // the language implementation) in the ancestors of the start and end tokens
-    let start_node = start_token
-        .ancestors()
-        .find(|node| language.is_range_formatting_node(node))
-        .unwrap_or_else(|| root.clone());
-    let end_node = end_token
-        .ancestors()
-        .find(|node| language.is_range_formatting_node(node))
-        .unwrap_or_else(|| root.clone());
-
-    let common_root = if start_node == end_node {
-        range = text_non_whitespace_range(&start_node);
-        Some(start_node)
-    } else {
-        // Find the two highest sibling nodes that satisfy the formatting range
-        // from the ancestors of the start and end nodes (this is roughly the
-        // same algorithm as the findSiblingAncestors function in Prettier, see
-        // https://github.com/prettier/prettier/blob/cae195187f524dd74e60849e0a4392654423415b/src/main/range-util.js#L36)
-        let start_node_start = start_node.text_range().start();
-        let end_node_end = end_node.text_range().end();
-
-        let result_end_node = end_node
-            .ancestors()
-            .take_while(|end_parent| end_parent.text_range().start() >= start_node_start)
-            .last()
-            .unwrap_or(end_node);
-
-        let result_start_node = start_node
-            .ancestors()
-            .take_while(|start_parent| start_parent.text_range().end() <= end_node_end)
-            .last()
-            .unwrap_or(start_node);
-
-        range = text_non_whitespace_range(&result_start_node)
-            .cover(text_non_whitespace_range(&result_end_node));
-
-        // Find the lowest common ancestor node for the previously selected
-        // sibling nodes by building the path to the root node from both
-        // nodes and iterating along the two paths at once to find the first
-        // divergence (the ancestors have to be collected into vectors first
-        // since the ancestor iterator isn't double ended)
-        #[allow(clippy::needless_collect)]
-        let start_to_root: Vec<_> = result_start_node.ancestors().collect();
-        #[allow(clippy::needless_collect)]
-        let end_to_root: Vec<_> = result_end_node.ancestors().collect();
-
-        start_to_root
-            .into_iter()
-            .rev()
-            .zip(end_to_root.into_iter().rev())
-            .map_while(|(lhs, rhs)| if lhs == rhs { Some(lhs) } else { None })
-            .last()
-    };
-
-    // Logically this should always return at least the root node,
-    // fallback to said node just in case
-    let common_root = common_root.as_ref().unwrap_or(root);
-
-    // Perform the actual formatting of the root node with
-    // an appropriate indentation level
-    let mut printed = format_sub_tree(common_root, language)?;
-
-    // This finds the closest marker to the beginning of the source
-    // starting before or at said starting point, and the closest
-    // marker to the end of the source range starting after or at
-    // said ending point respectively
-    let mut range_start = None;
-    let mut range_end = None;
-
-    let sourcemap = printed.sourcemap();
-    for marker in sourcemap {
-        // marker.source <= range.start()
-        if let Some(start_dist) = range.start().checked_sub(marker.source) {
-            range_start = match range_start {
-                Some((prev_marker, prev_dist)) => {
-                    if start_dist < prev_dist {
-                        Some((marker, start_dist))
-                    } else {
-                        Some((prev_marker, prev_dist))
-                    }
-                }
-                None => Some((marker, start_dist)),
-            }
-        }
-
-        // marker.source >= range.end()
-        if let Some(end_dist) = marker.source.checked_sub(range.end()) {
-            range_end = match range_end {
-                Some((prev_marker, prev_dist)) => {
-                    if end_dist <= prev_dist {
-                        Some((marker, end_dist))
-                    } else {
-                        Some((prev_marker, prev_dist))
-                    }
-                }
-                None => Some((marker, end_dist)),
-            }
-        }
-    }
-
-    // If no start or end were found, this means that the edge of the formatting
-    // range was near the edge of the input, and no marker were emitted before
-    // the start (or after the end) of the formatting range: in this case
-    // the start/end marker default to the start/end of the input
-    let (start_source, start_dest) = match range_start {
-        Some((start_marker, _)) => (start_marker.source, start_marker.dest),
-        None => (common_root.text_range().start(), TextSize::from(0)),
-    };
-    let (end_source, end_dest) = match range_end {
-        Some((end_marker, _)) => (end_marker.source, end_marker.dest),
-        None => (
-            common_root.text_range().end(),
-            TextSize::try_from(printed.as_code().len()).expect("code length out of bounds"),
-        ),
-    };
-
-    let input_range = TextRange::new(start_source, end_source);
-    let output_range = TextRange::new(start_dest, end_dest);
-    let sourcemap = printed.take_sourcemap();
-    let verbatim_ranges = printed.take_verbatim_ranges();
-    let code = &printed.into_code()[output_range];
-    Ok(Printed::new(
-        code.into(),
-        Some(input_range),
-        sourcemap,
-        verbatim_ranges,
-    ))
-}
-
-/// Formats a single node within a file, supported by Rome.
-///
-/// This runs a simple heuristic to determine the initial indentation
-/// level of the node based on the provided [FormatContext], which
-/// must match currently the current initial of the file. Additionally,
-/// because the reformatting happens only locally the resulting code
-/// will be indented with the same level as the original selection,
-/// even if it's a mismatch from the rest of the block the selection is in
-///
-/// It returns a [Formatted] result
-pub fn format_sub_tree<L: FormatLanguage>(
-    root: &SyntaxNode<L::SyntaxLanguage>,
-    language: L,
-) -> FormatResult<Printed> {
-    // Determine the initial indentation level for the printer by inspecting the trivia pieces
-    // of each token from the first token of the common root towards the start of the file
-    let mut tokens = std::iter::successors(root.first_token(), |token| token.prev_token());
-
-    // From the iterator of tokens, build an iterator of trivia pieces (once again the iterator is
-    // reversed, starting from the last trailing trivia towards the first leading trivia).
-    // The first token is handled specially as we only wan to consider its leading trivia pieces
-    let first_token = tokens.next();
-    let first_token_trivias = first_token
-        .into_iter()
-        .flat_map(|token| token.leading_trivia().pieces().rev());
-
-    let next_tokens_trivias = tokens.flat_map(|token| {
-        token
-            .trailing_trivia()
-            .pieces()
-            .rev()
-            .chain(token.leading_trivia().pieces().rev())
-    });
-
-    let trivias = first_token_trivias
-        .chain(next_tokens_trivias)
-        .filter(|piece| {
-            // We're only interested in newline and whitespace trivias, skip over comments
-            let is_newline = piece.is_newline();
-            let is_whitespace = piece.is_whitespace();
-            is_newline || is_whitespace
-        });
-
-    // Finally run the iterator until a newline trivia is found, and get the last whitespace trivia before it
-    let last_whitespace = trivias.map_while(|piece| piece.as_whitespace()).last();
-    let initial_indent = match last_whitespace {
-        Some(trivia) => {
-            // This logic is based on the formatting options passed in
-            // the be user (or the editor) as we do not have any kind
-            // of indentation type detection yet. Unfortunately this
-            // may not actually match the current content of the file
-            let length = trivia.text().len() as u16;
-            match language.options().indent_style() {
-                IndentStyle::Tab => length,
-                IndentStyle::Space(width) => length / u16::from(width),
-            }
-        }
-        // No whitespace was found between the start of the range
-        // and the start of the file
-        None => 0,
-    };
-
-    let formatted = format_node(root, language)?;
-    let mut printed = formatted.print_with_indent(initial_indent)?;
-    let sourcemap = printed.take_sourcemap();
-    let verbatim_ranges = printed.take_verbatim_ranges();
-
-    Ok(Printed::new(
-        printed.into_code(),
-        Some(root.text_range()),
-        sourcemap,
-        verbatim_ranges,
-    ))
-}
-
-impl<L: Language, Context> Format<Context> for SyntaxTriviaPiece<L> {
-    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
-        let range = self.text_range();
-
-        // Trim start/end and update the range
-        let trimmed = self.text().trim_start();
-        let trimmed_start = range.start() + (range.len() - trimmed.text_len());
-        let trimmed = trimmed.trim_end();
-
-        write!(
-            f,
-            [syntax_token_cow_slice(
-                normalize_newlines(trimmed, LINE_TERMINATORS),
-                &self.token(),
-                trimmed_start
-            )]
-        )
-    }
-}
-
 /// This structure stores the state that is relevant for the formatting of the whole document.
 ///
 /// This structure is different from [crate::Formatter] in that the formatting infrastructure
@@ -1306,11 +760,6 @@ pub struct FormatState<Context> {
     context: Context,
 
     group_id_builder: UniqueGroupIdBuilder,
-
-    // This is using a RefCell as it only exists in debug mode,
-    // the Formatter is still completely immutable in release builds
-    #[cfg(debug_assertions)]
-    pub printed_tokens: PrintedTokens,
 }
 
 impl<Context> std::fmt::Debug for FormatState<Context>
@@ -1330,9 +779,6 @@ impl<Context> FormatState<Context> {
         Self {
             context,
             group_id_builder: Default::default(),
-
-            #[cfg(debug_assertions)]
-            printed_tokens: Default::default(),
         }
     }
 
@@ -1356,81 +802,4 @@ impl<Context> FormatState<Context> {
     pub fn group_id(&self, debug_name: &'static str) -> GroupId {
         self.group_id_builder.group_id(debug_name)
     }
-
-    /// Tracks the given token as formatted
-    #[inline]
-    pub fn track_token<L: Language>(&mut self, #[allow(unused_variables)] token: &SyntaxToken<L>) {
-        cfg_if::cfg_if! {
-            if #[cfg(debug_assertions)] {
-                self.printed_tokens.track_token(token);
-            }
-        }
-    }
-
-    #[cfg(not(debug_assertions))]
-    #[inline]
-    pub fn set_token_tracking_disabled(&mut self, _: bool) {}
-
-    /// Disables or enables token tracking for a portion of the code.
-    ///
-    /// It can be useful to disable the token tracking when it is necessary to re-format a node with different parameters.
-    #[cfg(debug_assertions)]
-    pub fn set_token_tracking_disabled(&mut self, enabled: bool) {
-        self.printed_tokens.set_disabled(enabled)
-    }
-
-    #[cfg(not(debug_assertions))]
-    #[inline]
-    pub fn is_token_tracking_disabled(&self) -> bool {
-        false
-    }
-
-    /// Returns `true` if token tracking is currently disabled.
-    #[cfg(debug_assertions)]
-    pub fn is_token_tracking_disabled(&self) -> bool {
-        self.printed_tokens.is_disabled()
-    }
-
-    /// Asserts in debug builds that all tokens have been printed.
-    #[inline]
-    pub fn assert_formatted_all_tokens<L: Language>(
-        &self,
-        #[allow(unused_variables)] root: &SyntaxNode<L>,
-    ) {
-        cfg_if::cfg_if! {
-            if #[cfg(debug_assertions)] {
-                self.printed_tokens.assert_all_tracked(root);
-            }
-        }
-    }
-}
-
-impl<Context> FormatState<Context>
-where
-    Context: FormatContext,
-{
-    pub fn snapshot(&self) -> FormatStateSnapshot {
-        FormatStateSnapshot {
-            #[cfg(debug_assertions)]
-            printed_tokens: self.printed_tokens.snapshot(),
-        }
-    }
-
-    pub fn restore_snapshot(&mut self, snapshot: FormatStateSnapshot) {
-        let FormatStateSnapshot {
-            #[cfg(debug_assertions)]
-            printed_tokens,
-        } = snapshot;
-
-        cfg_if::cfg_if! {
-            if #[cfg(debug_assertions)] {
-                self.printed_tokens.restore(printed_tokens);
-            }
-        }
-    }
-}
-
-pub struct FormatStateSnapshot {
-    #[cfg(debug_assertions)]
-    printed_tokens: printed_tokens::PrintedTokensSnapshot,
 }

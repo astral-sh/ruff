@@ -1,5 +1,5 @@
 use crate::prelude::TagKind;
-use ruff_rowan::{SyntaxError, TextRange};
+use ruff_text_size::TextRange;
 use std::error::Error;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -42,20 +42,6 @@ impl std::fmt::Display for FormatError {
 }
 
 impl Error for FormatError {}
-
-impl From<SyntaxError> for FormatError {
-    fn from(error: SyntaxError) -> Self {
-        FormatError::from(&error)
-    }
-}
-
-impl From<&SyntaxError> for FormatError {
-    fn from(syntax_error: &SyntaxError) -> Self {
-        match syntax_error {
-            SyntaxError::MissingRequiredChild => FormatError::SyntaxError,
-        }
-    }
-}
 
 impl From<PrintError> for FormatError {
     fn from(error: PrintError) -> Self {
