@@ -30,6 +30,7 @@ impl TextLen for &'_ String {
 impl Sealed for char {}
 impl TextLen for char {
     #[inline]
+    #[allow(clippy::cast_possible_truncation)]
     fn text_len(self) -> TextSize {
         (self.len_utf8() as u32).into()
     }

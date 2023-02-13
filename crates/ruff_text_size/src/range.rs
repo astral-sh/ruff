@@ -243,6 +243,7 @@ impl TextRange {
     /// );
     /// ```
     #[inline]
+    #[must_use]
     pub fn cover(self, other: TextRange) -> TextRange {
         let start = cmp::min(self.start(), other.start());
         let end = cmp::max(self.end(), other.end());
@@ -261,6 +262,7 @@ impl TextRange {
     /// )
     /// ```
     #[inline]
+    #[must_use]
     pub fn cover_offset(self, offset: TextSize) -> TextRange {
         self.cover(TextRange::empty(offset))
     }
@@ -356,6 +358,7 @@ impl TextRange {
     /// assert_eq!(range.sub_start(TextSize::from(2)), TextRange::new(TextSize::from(3), TextSize::from(10)));
     /// ```
     #[inline]
+    #[must_use]
     pub fn sub_start(&self, amount: TextSize) -> TextRange {
         TextRange::new(self.start() - amount, self.end())
     }
@@ -374,6 +377,7 @@ impl TextRange {
     /// assert_eq!(range.add_start(TextSize::from(3)), TextRange::new(TextSize::from(8), TextSize::from(10)));
     /// ```
     #[inline]
+    #[must_use]
     pub fn add_start(&self, amount: TextSize) -> TextRange {
         TextRange::new(self.start() + amount, self.end())
     }
@@ -393,6 +397,7 @@ impl TextRange {
     /// assert_eq!(range.sub_end(TextSize::from(2)), TextRange::new(TextSize::from(5), TextSize::from(8)));
     /// ```
     #[inline]
+    #[must_use]
     pub fn sub_end(&self, amount: TextSize) -> TextRange {
         TextRange::new(self.start(), self.end() - amount)
     }
@@ -412,6 +417,7 @@ impl TextRange {
     /// assert_eq!(range.add_end(TextSize::from(2)), TextRange::new(TextSize::from(5), TextSize::from(12)));
     /// ```
     #[inline]
+    #[must_use]
     pub fn add_end(&self, amount: TextSize) -> TextRange {
         TextRange::new(self.start(), self.end() + amount)
     }
@@ -516,7 +522,7 @@ where
 {
     #[inline]
     fn add_assign(&mut self, rhs: A) {
-        *self = *self + rhs
+        *self = *self + rhs;
     }
 }
 
@@ -526,6 +532,6 @@ where
 {
     #[inline]
     fn sub_assign(&mut self, rhs: S) {
-        *self = *self - rhs
+        *self = *self - rhs;
     }
 }

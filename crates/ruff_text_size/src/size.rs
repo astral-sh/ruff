@@ -136,7 +136,7 @@ where
 {
     #[inline]
     fn add_assign(&mut self, rhs: A) {
-        *self = *self + rhs
+        *self = *self + rhs;
     }
 }
 
@@ -146,7 +146,7 @@ where
 {
     #[inline]
     fn sub_assign(&mut self, rhs: S) {
-        *self = *self - rhs
+        *self = *self - rhs;
     }
 }
 

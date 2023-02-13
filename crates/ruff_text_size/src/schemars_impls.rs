@@ -1,5 +1,5 @@
-//! This module implements the [JsonSchema] trait from the [schemars] crate for
-//! [TextSize] and [TextRange] if the `schemars` feature is enabled. This trait
+//! This module implements the [`JsonSchema`] trait from the `schemars` crate for
+//! [`TextSize`] and [`TextRange`] if the `schemars` feature is enabled. This trait
 //! exposes meta-information on how a given type is serialized and deserialized
 //! using `serde`, and is currently used to generate autocomplete information
 //! for the `rome.json` configuration file and TypeScript types for the node.js

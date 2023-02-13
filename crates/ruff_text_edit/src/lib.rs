@@ -218,28 +218,25 @@ impl TextEditBuilder {
     }
 
     pub fn equal(&mut self, text: &str) {
-        match compress_equal_op(text) {
-            Some((start, mid, end)) => {
-                let start = self.intern(start);
-                self.edit
-                    .ops
-                    .push(CompressedOp::DiffOp(DiffOp::Equal { range: start }));
+        if let Some((start, mid, end)) = compress_equal_op(text) {
+            let start = self.intern(start);
+            self.edit
+                .ops
+                .push(CompressedOp::DiffOp(DiffOp::Equal { range: start }));
 
-                self.edit
-                    .ops
-                    .push(CompressedOp::EqualLines { line_count: mid });
+            self.edit
+                .ops
+                .push(CompressedOp::EqualLines { line_count: mid });
 
-                let end = self.intern(end);
-                self.edit
-                    .ops
-                    .push(CompressedOp::DiffOp(DiffOp::Equal { range: end }));
-            }
-            None => {
-                let range = self.intern(text);
-                self.edit
-                    .ops
-                    .push(CompressedOp::DiffOp(DiffOp::Equal { range }));
-            }
+            let end = self.intern(end);
+            self.edit
+                .ops
+                .push(CompressedOp::DiffOp(DiffOp::Equal { range: end }));
+        } else {
+            let range = self.intern(text);
+            self.edit
+                .ops
+                .push(CompressedOp::DiffOp(DiffOp::Equal { range }));
         }
     }
 
