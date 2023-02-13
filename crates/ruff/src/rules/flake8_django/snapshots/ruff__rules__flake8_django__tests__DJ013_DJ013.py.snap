@@ -12,4 +12,14 @@ expression: diagnostics
     column: 35
   fix: ~
   parent: ~
+- kind:
+    ReceiverDecoratorChecker: ~
+  location:
+    row: 35
+    column: 1
+  end_location:
+    row: 35
+    column: 35
+  fix: ~
+  parent: ~
 

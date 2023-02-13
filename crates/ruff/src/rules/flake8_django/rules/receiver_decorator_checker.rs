@@ -51,25 +51,30 @@ impl Violation for ReceiverDecoratorChecker {
 pub fn receiver_decorator_checker<'a, F>(
     decorator_list: &'a [Expr],
     resolve_call_path: F,
-) -> Option<Diagnostic>
+) -> Vec<Diagnostic>
 where
     F: Fn(&'a Expr) -> Option<CallPath<'a>>,
 {
+    let mut diagnostics = vec![];
+    let mut seen_receiver = false;
     for (i, decorator) in decorator_list.iter().enumerate() {
-        if i == 0 {
-            continue;
-        }
-        let ExprKind::Call{ func, ..} = &decorator.node else {
-            continue;
+        let is_receiver = match &decorator.node {
+            ExprKind::Call { func, .. } => resolve_call_path(func).map_or(false, |call_path| {
+                call_path.as_slice() == ["django", "dispatch", "receiver"]
+            }),
+            _ => false,
         };
-        if resolve_call_path(func).map_or(false, |call_path| {
-            call_path.as_slice() == ["django", "dispatch", "receiver"]
-        }) {
-            return Some(Diagnostic::new(
+        if i > 0 && is_receiver && !seen_receiver {
+            diagnostics.push(Diagnostic::new(
                 ReceiverDecoratorChecker,
                 Range::from_located(decorator),
             ));
         }
+        if !is_receiver && seen_receiver {
+            seen_receiver = false;
+        } else if is_receiver {
+            seen_receiver = true;
+        }
     }
-    None
+    diagnostics
 }
