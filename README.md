@@ -149,7 +149,9 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [flake8-pyi (PYI)](#flake8-pyi-pyi)
    1. [flake8-pytest-style (PT)](#flake8-pytest-style-pt)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
+   1. [flake8-raise (RSE)](#flake8-raise-rse)
    1. [flake8-return (RET)](#flake8-return-ret)
+   1. [flake8-self (SLF)](#flake8-self-slf)
    1. [flake8-simplify (SIM)](#flake8-simplify-sim)
    1. [flake8-tidy-imports (TID)](#flake8-tidy-imports-tid)
    1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
@@ -160,8 +162,6 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PL)](#pylint-pl)
    1. [tryceratops (TRY)](#tryceratops-try)
-   1. [flake8-raise (RSE)](#flake8-raise-rse)
-   1. [flake8-self (SLF)](#flake8-self-slf)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1254,6 +1254,14 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/) on PyPI.
 | Q002 | [bad-quotes-docstring](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | Double quote docstring found but single quotes preferred | 🛠 |
 | Q003 | [avoidable-escaped-quote](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoidable-escaped-quote.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
 
+### flake8-raise (RSE)
+
+For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception | 🛠 |
+
 ### flake8-return (RET)
 
 For more, see [flake8-return](https://pypi.org/project/flake8-return/) on PyPI.
@@ -1268,6 +1276,14 @@ For more, see [flake8-return](https://pypi.org/project/flake8-return/) on PyPI.
 | RET506 | superfluous-else-raise | Unnecessary `{branch}` after `raise` statement |  |
 | RET507 | superfluous-else-continue | Unnecessary `{branch}` after `continue` statement |  |
 | RET508 | superfluous-else-break | Unnecessary `{branch}` after `break` statement |  |
+
+### flake8-self (SLF)
+
+For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| SLF001 | private-member-access | Private member accessed: `{access}` |  |
 
 ### flake8-simplify (SIM)
 
@@ -1466,22 +1482,6 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | TRY300 | try-consider-else | Consider moving this statement to an `else` block |  |
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 | TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
-
-### flake8-raise (RSE)
-
-For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception | 🛠 |
-
-### flake8-self (SLF)
-
-For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| SLF001 | private-member-access | Private member accessed: `{access}` |  |
 
 ### Ruff-specific rules (RUF)
 
