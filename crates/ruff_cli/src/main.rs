@@ -24,14 +24,6 @@ mod iterators;
 mod printer;
 mod resolve;
 
-#[cfg(target_os = "windows")]
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-
-#[cfg(not(target_os = "windows"))]
-#[global_allocator]
-static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-
 enum ExitStatus {
     /// Linting was successful and there were no linting errors.
     Success,
