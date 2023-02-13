@@ -26,9 +26,11 @@ pub fn main(args: &Args) -> Result<()> {
             output.push('\n');
 
             let (linter, _) = Linter::parse_code(rule.code()).unwrap();
-            output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
-            output.push('\n');
-            output.push('\n');
+            if linter.url().is_some() {
+                output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+                output.push('\n');
+                output.push('\n');
+            }
 
             if let Some(autofix) = rule.autofixable() {
                 output.push_str(match autofix.available {
