@@ -1,5 +1,7 @@
 //! A generic library for lossless syntax trees.
 //! See `examples/s_expressions.rs` for a tutorial.
+
+#![allow(clippy::pedantic)]
 #![forbid(
     // missing_debug_implementations,
     unconditional_recursion,

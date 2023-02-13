@@ -19,6 +19,7 @@
 //! * [`format_args!`]: Concatenates a sequence of Format objects.
 //! * [`write!`]: Writes a sequence of formatable objects into an output buffer.
 
+#![allow(clippy::pedantic)]
 #![deny(rustdoc::broken_intra_doc_links)]
 
 mod arguments;
