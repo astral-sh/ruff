@@ -1,6 +1,6 @@
 use {
-    ruff_text_size::*,
-    static_assertions::*,
+    ruff_text_size::{TextRange, TextSize},
+    static_assertions::assert_impl_all,
     std::{
         fmt::Debug,
         hash::Hash,

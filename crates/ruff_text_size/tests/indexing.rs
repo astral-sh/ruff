@@ -1,4 +1,4 @@
-use ruff_text_size::*;
+use ruff_text_size::TextRange;
 
 #[test]
 fn main() {

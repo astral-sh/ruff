@@ -1,6 +1,6 @@
 //! Representation of a `TextEdit`.
 //!
-//! This is taken from [rust-analyzer's text_edit crate](https://rust-analyzer.github.io/rust-analyzer/text_edit/index.html)
+//! This is taken from [rust-analyzer's `text_edit` crate](https://rust-analyzer.github.io/rust-analyzer/text_edit/index.html)
 
 #![warn(
     rust_2018_idioms,
@@ -64,7 +64,7 @@ pub struct TextEditBuilder {
 }
 
 impl TextEdit {
-    /// Convenience method for creating a new [TextEditBuilder]
+    /// Convenience method for creating a new [`TextEditBuilder`]
     pub fn builder() -> TextEditBuilder {
         TextEditBuilder::default()
     }
@@ -96,29 +96,29 @@ impl TextEdit {
         builder.finish()
     }
 
-    /// Returns the number of [DiffOp] in this [TextEdit]
+    /// Returns the number of [`DiffOp`] in this [`TextEdit`]
     pub fn len(&self) -> usize {
         self.ops.len()
     }
 
-    /// Return `true` is this [TextEdit] doesn't contain any [DiffOp]
+    /// Return `true` is this [`TextEdit`] doesn't contain any [`DiffOp`]
     pub fn is_empty(&self) -> bool {
         self.ops.is_empty()
     }
 
-    /// Returns an [Iterator] over the [DiffOp] of this [TextEdit]
+    /// Returns an [Iterator] over the [`DiffOp`] of this [`TextEdit`]
     pub fn iter(&self) -> std::slice::Iter<'_, CompressedOp> {
         self.into_iter()
     }
 
-    /// Return the text value of range interned in this [TextEdit] dictionnary
+    /// Return the text value of range interned in this [`TextEdit`] dictionnary
     pub fn get_text(&self, range: TextRange) -> &str {
         &self.dictionary[range]
     }
 
     /// Return the content of the "new" revision of the text represented in
-    /// this [TextEdit]. This methods needs to be provided with the "old"
-    /// revision of the string since [TextEdit] doesn't store the content of
+    /// this [`TextEdit`]. This methods needs to be provided with the "old"
+    /// revision of the string since [`TextEdit`] doesn't store the content of
     /// text sections that are equal between revisions
     pub fn new_string(&self, old_string: &str) -> String {
         let mut output = String::new();
@@ -267,8 +267,8 @@ impl TextEditBuilder {
     }
 }
 
-/// Number of lines to keep as [DiffOp::Equal] operations around a
-/// [CompressedOp::EqualCompressedLines] operation. This has the effect of
+/// Number of lines to keep as [`DiffOp::Equal`] operations around a
+/// [`CompressedOp::EqualCompressedLines`] operation. This has the effect of
 /// making the compressed diff retain a few line of equal content around
 /// changes, which is useful for display as it makes it possible to print a few
 /// context lines around changes without having to keep the full original text
