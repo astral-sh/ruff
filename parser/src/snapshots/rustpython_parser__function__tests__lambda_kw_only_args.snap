@@ -1,0 +1,121 @@
+---
+source: compiler/parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        Located {
+            location: Location {
+                row: 1,
+                column: 0,
+            },
+            end_location: Some(
+                Location {
+                    row: 1,
+                    column: 20,
+                },
+            ),
+            custom: (),
+            node: Expr {
+                value: Located {
+                    location: Location {
+                        row: 1,
+                        column: 0,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 20,
+                        },
+                    ),
+                    custom: (),
+                    node: Lambda {
+                        args: Arguments {
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 10,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 11,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: ArgData {
+                                        arg: "a",
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                },
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 13,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 14,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: ArgData {
+                                        arg: "b",
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                },
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 16,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 17,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: ArgData {
+                                        arg: "c",
+                                        annotation: None,
+                                        type_comment: None,
+                                    },
+                                },
+                            ],
+                            kw_defaults: [],
+                            kwarg: None,
+                            defaults: [],
+                        },
+                        body: Located {
+                            location: Location {
+                                row: 1,
+                                column: 19,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 20,
+                                },
+                            ),
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    1,
+                                ),
+                                kind: None,
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    ],
+)

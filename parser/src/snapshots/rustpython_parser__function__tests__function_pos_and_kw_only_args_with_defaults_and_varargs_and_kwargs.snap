@@ -1,0 +1,239 @@
+---
+source: compiler/parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        Located {
+            location: Location {
+                row: 1,
+                column: 0,
+            },
+            end_location: Some(
+                Location {
+                    row: 1,
+                    column: 52,
+                },
+            ),
+            custom: (),
+            node: FunctionDef {
+                name: "f",
+                args: Arguments {
+                    posonlyargs: [],
+                    args: [
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 6,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 7,
+                                },
+                            ),
+                            custom: (),
+                            node: ArgData {
+                                arg: "a",
+                                annotation: None,
+                                type_comment: None,
+                            },
+                        },
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 9,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 10,
+                                },
+                            ),
+                            custom: (),
+                            node: ArgData {
+                                arg: "b",
+                                annotation: None,
+                                type_comment: None,
+                            },
+                        },
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 12,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 13,
+                                },
+                            ),
+                            custom: (),
+                            node: ArgData {
+                                arg: "c",
+                                annotation: None,
+                                type_comment: None,
+                            },
+                        },
+                    ],
+                    vararg: Some(
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 16,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 20,
+                                },
+                            ),
+                            custom: (),
+                            node: ArgData {
+                                arg: "args",
+                                annotation: None,
+                                type_comment: None,
+                            },
+                        },
+                    ),
+                    kwonlyargs: [
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 22,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 23,
+                                },
+                            ),
+                            custom: (),
+                            node: ArgData {
+                                arg: "d",
+                                annotation: None,
+                                type_comment: None,
+                            },
+                        },
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 25,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 26,
+                                },
+                            ),
+                            custom: (),
+                            node: ArgData {
+                                arg: "e",
+                                annotation: None,
+                                type_comment: None,
+                            },
+                        },
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 31,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 32,
+                                },
+                            ),
+                            custom: (),
+                            node: ArgData {
+                                arg: "f",
+                                annotation: None,
+                                type_comment: None,
+                            },
+                        },
+                    ],
+                    kw_defaults: [
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 27,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 29,
+                                },
+                            ),
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    20,
+                                ),
+                                kind: None,
+                            },
+                        },
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 33,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 35,
+                                },
+                            ),
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    30,
+                                ),
+                                kind: None,
+                            },
+                        },
+                    ],
+                    kwarg: Some(
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 39,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 45,
+                                },
+                            ),
+                            custom: (),
+                            node: ArgData {
+                                arg: "kwargs",
+                                annotation: None,
+                                type_comment: None,
+                            },
+                        },
+                    ),
+                    defaults: [],
+                },
+                body: [
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 48,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 52,
+                            },
+                        ),
+                        custom: (),
+                        node: Pass,
+                    },
+                ],
+                decorator_list: [],
+                returns: None,
+                type_comment: None,
+            },
+        },
+    ],
+)

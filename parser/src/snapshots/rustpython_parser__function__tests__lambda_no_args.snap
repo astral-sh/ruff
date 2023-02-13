@@ -1,0 +1,66 @@
+---
+source: compiler/parser/src/function.rs
+expression: parse_ast
+---
+Ok(
+    [
+        Located {
+            location: Location {
+                row: 1,
+                column: 0,
+            },
+            end_location: Some(
+                Location {
+                    row: 1,
+                    column: 9,
+                },
+            ),
+            custom: (),
+            node: Expr {
+                value: Located {
+                    location: Location {
+                        row: 1,
+                        column: 0,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 9,
+                        },
+                    ),
+                    custom: (),
+                    node: Lambda {
+                        args: Arguments {
+                            posonlyargs: [],
+                            args: [],
+                            vararg: None,
+                            kwonlyargs: [],
+                            kw_defaults: [],
+                            kwarg: None,
+                            defaults: [],
+                        },
+                        body: Located {
+                            location: Location {
+                                row: 1,
+                                column: 8,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 9,
+                                },
+                            ),
+                            custom: (),
+                            node: Constant {
+                                value: Int(
+                                    1,
+                                ),
+                                kind: None,
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    ],
+)
