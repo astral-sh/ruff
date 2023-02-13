@@ -1,4 +1,7 @@
-use {ruff_text_size::{TextRange, TextSize}, std::ops};
+use {
+    ruff_text_size::{TextRange, TextSize},
+    std::ops,
+};
 
 fn size(x: u32) -> TextSize {
     TextSize::from(x)

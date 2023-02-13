@@ -1,4 +1,8 @@
-use {ruff_text_size::{TextRange, TextSize}, serde_test::{Token, assert_de_tokens_error, assert_tokens}, std::ops};
+use {
+    ruff_text_size::{TextRange, TextSize},
+    serde_test::{assert_de_tokens_error, assert_tokens, Token},
+    std::ops,
+};
 
 fn size(x: u32) -> TextSize {
     TextSize::from(x)
