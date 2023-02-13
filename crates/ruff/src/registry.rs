@@ -549,6 +549,8 @@ ruff_macros::define_rule_mapping!(
     RSE102 => rules::flake8_raise::rules::UnnecessaryParenOnRaiseException,
     // flake8-self
     SLF001 => rules::flake8_self::rules::PrivateMemberAccess,
+    // numpy
+    NPY001 => rules::numpy::rules::DeprecatedTypeAlias,
     // ruff
     RUF001 => rules::ruff::rules::AmbiguousUnicodeCharacterString,
     RUF002 => rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,
@@ -694,6 +696,9 @@ pub enum Linter {
     /// [flake8-self](https://pypi.org/project/flake8-self/)
     #[prefix = "SLF"]
     Flake8Self,
+    /// Numpy-specific rules
+    #[prefix = "NPY"]
+    Numpy,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

@@ -162,6 +162,7 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [tryceratops (TRY)](#tryceratops-try)
    1. [flake8-raise (RSE)](#flake8-raise-rse)
    1. [flake8-self (SLF)](#flake8-self-slf)
+   1. [Numpy-specific rules (NPY)](#numpy-specific-rules-npy)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1482,6 +1483,12 @@ For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | SLF001 | private-member-access | Private member accessed: `{access}` |  |
+
+### Numpy-specific rules (NPY)
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| NPY001 | [deprecated-type-alias](https://github.com/charliermarsh/ruff/blob/main/docs/rules/deprecated-type-alias.md) | Numpy type alias `numpy.{type_name}` is deprecated, replace with builtin type | 🛠 |
 
 ### Ruff-specific rules (RUF)
 
