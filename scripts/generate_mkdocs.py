@@ -1,6 +1,7 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
 import argparse
 import shutil
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -27,6 +28,9 @@ FATHOM_SCRIPT: str = (
 
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
+
+    subprocess.run(["cargo", "dev", "generate-docs"], check=True)
+
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
 
