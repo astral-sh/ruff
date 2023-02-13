@@ -50,6 +50,7 @@ use crate::{autofix, docstrings, noqa, visibility};
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
 type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
+type AnnotationContext = (bool, bool);
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
@@ -84,8 +85,8 @@ pub struct Checker<'a> {
     pub(crate) scopes: Vec<Scope<'a>>,
     pub(crate) scope_stack: Vec<usize>,
     pub(crate) dead_scopes: Vec<(usize, Vec<usize>)>,
-    deferred_string_type_definitions: Vec<(Range, &'a str, bool, DeferralContext<'a>)>,
-    deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext<'a>)>,
+    deferred_string_type_definitions: Vec<(Range, &'a str, AnnotationContext, DeferralContext<'a>)>,
+    deferred_type_definitions: Vec<(&'a Expr, AnnotationContext, DeferralContext<'a>)>,
     deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, DeferralContext<'a>)>,
     deferred_for_loops: Vec<(&'a Stmt, DeferralContext<'a>)>,
@@ -2065,13 +2066,13 @@ where
                 self.deferred_string_type_definitions.push((
                     Range::from_located(expr),
                     value,
-                    self.in_annotation,
+                    (self.in_annotation, self.in_type_checking_block),
                     (self.scope_stack.clone(), self.parents.clone()),
                 ));
             } else {
                 self.deferred_type_definitions.push((
                     expr,
-                    self.in_annotation,
+                    (self.in_annotation, self.in_type_checking_block),
                     (self.scope_stack.clone(), self.parents.clone()),
                 ));
             }
@@ -3186,7 +3187,7 @@ where
                     self.deferred_string_type_definitions.push((
                         Range::from_located(expr),
                         value,
-                        self.in_annotation,
+                        (self.in_annotation, self.in_type_checking_block),
                         (self.scope_stack.clone(), self.parents.clone()),
                     ));
                 }
@@ -4491,12 +4492,13 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_type_definitions(&mut self) {
         self.deferred_type_definitions.reverse();
-        while let Some((expr, in_annotation, (scopes, parents))) =
+        while let Some((expr, (in_annotation, in_type_checking_block), (scopes, parents))) =
             self.deferred_type_definitions.pop()
         {
             self.scope_stack = scopes;
             self.parents = parents;
             self.in_annotation = in_annotation;
+            self.in_type_checking_block = in_type_checking_block;
             self.in_type_definition = true;
             self.in_deferred_type_definition = true;
             self.visit_expr(expr);
@@ -4511,7 +4513,7 @@ impl<'a> Checker<'a> {
     {
         let mut stacks = vec![];
         self.deferred_string_type_definitions.reverse();
-        while let Some((range, expression, in_annotation, context)) =
+        while let Some((range, expression, (in_annotation, in_type_checking_block), deferral)) =
             self.deferred_string_type_definitions.pop()
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
@@ -4522,7 +4524,7 @@ impl<'a> Checker<'a> {
                 }
                 relocate_expr(&mut expr, range);
                 allocator.push(expr);
-                stacks.push((in_annotation, context));
+                stacks.push(((in_annotation, in_type_checking_block), deferral));
             } else {
                 if self
                     .settings
@@ -4538,10 +4540,13 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        for (expr, (in_annotation, (scopes, parents))) in allocator.iter().zip(stacks) {
+        for (expr, ((in_annotation, in_type_checking_block), (scopes, parents))) in
+            allocator.iter().zip(stacks)
+        {
             self.scope_stack = scopes;
             self.parents = parents;
             self.in_annotation = in_annotation;
+            self.in_type_checking_block = in_type_checking_block;
             self.in_type_definition = true;
             self.in_deferred_string_type_definition = true;
             self.visit_expr(expr);
