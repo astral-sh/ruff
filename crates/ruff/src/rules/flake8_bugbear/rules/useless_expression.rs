@@ -16,7 +16,7 @@ impl Violation for UselessExpression {
     }
 }
 
-// B018
+/// B018
 pub fn useless_expression(checker: &mut Checker, body: &[Stmt]) {
     for stmt in body {
         if let StmtKind::Expr { value } = &stmt.node {
