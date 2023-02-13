@@ -437,19 +437,34 @@ Arguments:
   [FILES]...  List of files or directories to check
 
 Options:
-      --fix              Attempt to automatically fix lint violations
-      --show-source      Show violations with source code
-      --show-fixes       Show an enumeration of all autofixed lint violations
-      --diff             Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
-  -w, --watch            Run in watch mode by re-running whenever files change
-      --fix-only         Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
-      --format <FORMAT>  Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
-      --config <CONFIG>  Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-      --statistics       Show counts for every rule with at least one violation
-      --add-noqa         Enable automatic additions of `noqa` directives to failing lines
-      --show-files       See the files Ruff will be run against with the current settings
-      --show-settings    See the settings Ruff will use to lint a given Python file
-  -h, --help             Print help
+      --fix
+          Attempt to automatically fix lint violations
+      --show-source
+          Show violations with source code
+      --show-fixes
+          Show an enumeration of all autofixed lint violations
+      --diff
+          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
+  -w, --watch
+          Run in watch mode by re-running whenever files change
+      --fix-only
+          Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
+      --format <FORMAT>
+          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
+      --target-version <TARGET_VERSION>
+          The minimum Python version that should be supported
+      --config <CONFIG>
+          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
+      --statistics
+          Show counts for every rule with at least one violation
+      --add-noqa
+          Enable automatic additions of `noqa` directives to failing lines
+      --show-files
+          See the files Ruff will be run against with the current settings
+      --show-settings
+          See the settings Ruff will use to lint a given Python file
+  -h, --help
+          Print help
 
 Rule selection:
       --select <RULE_CODE>
