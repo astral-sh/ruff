@@ -1,4 +1,4 @@
-use rome_formatter::{FormatContext, SimpleFormatOptions, TransformSourceMap};
+use ruff_formatter::{FormatContext, SimpleFormatOptions};
 
 use crate::core::locator::Locator;
 
@@ -18,10 +18,6 @@ impl FormatContext for ASTFormatContext<'_> {
 
     fn options(&self) -> &Self::Options {
         &self.options
-    }
-
-    fn source_map(&self) -> Option<&TransformSourceMap> {
-        None
     }
 }
 

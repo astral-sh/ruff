@@ -2,7 +2,7 @@
 
 /// Used to get an object that knows how to format this object.
 pub trait AsFormat<Context> {
-    type Format<'a>: rome_formatter::Format<Context>
+    type Format<'a>: ruff_formatter::Format<Context>
     where
         Self: 'a;
 
@@ -41,7 +41,7 @@ where
 ///
 /// The difference to [`AsFormat`] is that this trait takes ownership of `self`.
 pub trait IntoFormat<Context> {
-    type Format: rome_formatter::Format<Context>;
+    type Format: ruff_formatter::Format<Context>;
 
     fn into_format(self) -> Self::Format;
 }

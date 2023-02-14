@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rome_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
+use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
 use rustpython_parser::lexer::LexResult;
 
 use crate::attachment::attach;
@@ -84,7 +84,7 @@ mod tests {
     fn passing_modulo_string_normalization(path: &Path) -> Result<()> {
         fn adjust_quotes(contents: &str) -> String {
             // Replace all single quotes with double quotes.
-            contents.replace("'", "\"")
+            contents.replace('\'', "\"")
         }
 
         let snapshot = format!("{}", path.display());
@@ -123,7 +123,7 @@ mod tests {
     k: v for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
 }
 "#;
-        let formatted = fmt(&src).unwrap();
+        let formatted = fmt(src).unwrap();
 
         // Uncomment the `dbg` to print the IR.
         // Use `dbg_write!(f, []) instead of `write!(f, [])` in your formatting code to print some IR

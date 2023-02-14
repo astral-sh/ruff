@@ -3,15 +3,6 @@
 version = 3
 
 [[package]]
-name = "addr2line"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a76fd60b23679b7d19bd066031410fb7e458ccc5e958eb5c325888ce4baedc97"
-dependencies = [
- "gimli",
-]
-
-[[package]]
 name = "adler"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -157,21 +148,6 @@ name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
-
-[[package]]
-name = "backtrace"
-version = "0.3.67"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "233d376d6d185f2a3093e58f283f60f880315b6c60075b01f36b3b85154564ca"
-dependencies = [
- "addr2line",
- "cc",
- "cfg-if",
- "libc",
- "miniz_oxide",
- "object",
- "rustc-demangle",
-]
 
 [[package]]
 name = "base64"
@@ -644,7 +620,7 @@ dependencies = [
  "autocfg",
  "cfg-if",
  "crossbeam-utils",
- "memoffset 0.7.1",
+ "memoffset",
  "scopeguard",
 ]
 
@@ -1079,12 +1055,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gimli"
-version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "221996f774192f0f718773def8201c4ae31f02616a54ccfc2d358bb0e5cefdec"
-
-[[package]]
 name = "glob"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1485,7 +1455,7 @@ dependencies = [
  "itertools",
  "lalrpop-util",
  "petgraph",
- "pico-args 0.4.2",
+ "pico-args",
  "regex",
  "regex-syntax",
  "string_cache",
@@ -1681,15 +1651,6 @@ name = "memchr"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
-
-[[package]]
-name = "memoffset"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
-dependencies = [
- "autocfg",
-]
 
 [[package]]
 name = "memoffset"
@@ -1912,15 +1873,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "object"
-version = "0.30.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea86265d3d3dcb6a27fc51bd29a4bf387fae9d2986b823079d4986af253eb439"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2130,12 +2082,6 @@ name = "pico-args"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db8bcd96cb740d03149cbad5518db9fd87126a10ab519c011893b1754134c468"
-
-[[package]]
-name = "pico-args"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315"
 
 [[package]]
 name = "pin-project"
@@ -2499,109 +2445,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rome_console"
-version = "0.0.0"
-dependencies = [
- "atty",
- "rome_markup",
- "rome_text_size",
- "schemars",
- "serde",
- "termcolor",
- "unicode-width",
-]
-
-[[package]]
-name = "rome_diagnostics"
-version = "0.0.0"
-dependencies = [
- "backtrace",
- "bitflags",
- "pico-args 0.5.0",
- "rome_console",
- "rome_diagnostics_categories",
- "rome_diagnostics_macros",
- "rome_rowan",
- "rome_text_edit",
- "rome_text_size",
- "serde",
- "termcolor",
- "unicode-width",
-]
-
-[[package]]
-name = "rome_diagnostics_categories"
-version = "0.0.0"
-dependencies = [
- "quote",
- "serde",
-]
-
-[[package]]
-name = "rome_diagnostics_macros"
-version = "0.0.0"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "rome_formatter"
-version = "0.0.0"
-dependencies = [
- "cfg-if",
- "countme",
- "drop_bomb",
- "indexmap",
- "rome_console",
- "rome_diagnostics",
- "rome_rowan",
- "rustc-hash",
- "tracing",
- "unicode-width",
-]
-
-[[package]]
-name = "rome_markup"
-version = "0.0.0"
-dependencies = [
- "proc-macro-error",
- "proc-macro2",
- "quote",
-]
-
-[[package]]
-name = "rome_rowan"
-version = "0.0.0"
-dependencies = [
- "countme",
- "hashbrown",
- "memoffset 0.6.5",
- "rome_text_edit",
- "rome_text_size",
- "rustc-hash",
- "tracing",
-]
-
-[[package]]
-name = "rome_text_edit"
-version = "0.0.0"
-dependencies = [
- "rome_text_size",
- "serde",
- "similar",
-]
-
-[[package]]
-name = "rome_text_size"
-version = "0.0.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "ruff"
 version = "0.0.246"
 dependencies = [
@@ -2762,8 +2605,8 @@ dependencies = [
  "clap 4.1.4",
  "insta",
  "once_cell",
- "rome_formatter",
- "rome_text_size",
+ "ruff_formatter",
+ "ruff_text_size",
  "rustc-hash",
  "rustpython-common",
  "rustpython-parser",
@@ -2789,12 +2632,6 @@ dependencies = [
  "serde",
  "serde_derive",
 ]
-
-[[package]]
-name = "rustc-demangle"
-version = "0.1.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ef03e0a2b150c7a90d01faf6254c9c48a41e95fb2a8c2ac1c6f0d2b9aefc342"
 
 [[package]]
 name = "rustc-hash"
@@ -3118,10 +2955,6 @@ name = "similar"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "420acb44afdae038210c99e69aae24109f32f15500aa708e81d46c9f29d55fcf"
-dependencies = [
- "bstr 0.2.17",
- "unicode-segmentation",
-]
 
 [[package]]
 name = "siphasher"
@@ -3740,12 +3573,6 @@ checksum = "5c5713f0fc4b5db668a2ac63cdb7bb4469d8c9fed047b1d0292cc7b0ce2ba921"
 dependencies = [
  "tinyvec",
 ]
-
-[[package]]
-name = "unicode-segmentation"
-version = "1.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1dd624098567895118886609431a7c3b8f516e41d30e0643f03d94592a147e36"
 
 [[package]]
 name = "unicode-width"

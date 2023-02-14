@@ -7,8 +7,8 @@ edition = "2021"
 anyhow = "1.0.68"
 clap = { version = "4.0.1", features = ["derive"] }
 once_cell = "1.17.0"
-rome_formatter = { path = "../../../tools/crates/rome_formatter" }
-rome_text_size = { path = "../../../tools/crates/rome_text_size" }
+ruff_formatter = { path = "../ruff_formatter" }
+ruff_text_size = { path = "../ruff_text_size" }
 rustc-hash = "1.1.0"
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }

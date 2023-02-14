@@ -1,5 +1,6 @@
-use rome_formatter::prelude::*;
-use rome_formatter::{write, Format};
+use ruff_formatter::prelude::*;
+use ruff_formatter::{write, Format};
+use ruff_text_size::TextRange;
 
 use crate::context::ASTFormatContext;
 use crate::core::types::Range;
@@ -13,7 +14,10 @@ pub struct Literal {
 impl Format<ASTFormatContext<'_>> for Literal {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         let (text, start, end) = f.context().locator().slice(self.range);
-        f.write_element(FormatElement::Text { text, start, end })
+        f.write_element(FormatElement::StaticTextSlice {
+            text,
+            range: TextRange::new(start.try_into().unwrap(), end.try_into().unwrap()),
+        })
     }
 }
 

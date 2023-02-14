@@ -1,6 +1,6 @@
-use rome_formatter::prelude::*;
-use rome_formatter::{write, Format};
-use rome_text_size::TextSize;
+use ruff_formatter::prelude::*;
+use ruff_formatter::{write, Format};
+use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::Stmt;

@@ -161,7 +161,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer {
 /// visitor normalizes parentheses via a top-down traversal, which simplifies the formatting
 /// code later on.
 ///
-/// TODO(charlie): It's weird that we have both `TriviaKind::Parenthese` (which aren't used
+/// TODO(charlie): It's weird that we have both `TriviaKind::Parentheses` (which aren't used
 /// during formatting) and `Parenthesize` (which are used during formatting).
 pub fn normalize_parentheses(python_cst: &mut [Stmt]) {
     let mut normalizer = ParenthesesNormalizer {};

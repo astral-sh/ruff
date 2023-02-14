@@ -1,8 +1,8 @@
 #![allow(unused_variables, clippy::too_many_arguments)]
 
-use rome_formatter::prelude::*;
-use rome_formatter::{format_args, write};
-use rome_text_size::TextSize;
+use ruff_formatter::prelude::*;
+use ruff_formatter::{format_args, write};
+use ruff_text_size::TextSize;
 
 use crate::builders::literal;
 use crate::context::ASTFormatContext;
