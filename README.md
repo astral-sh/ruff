@@ -377,7 +377,7 @@ ignore = ["E501"]
 unfixable = ["B"]
 
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-[tool.ruff.per-file-ignores]
+[per-file-ignores]
 "__init__.py" = ["E402"]
 "path/to/file.py" = ["E402"]
 ```
