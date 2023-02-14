@@ -127,6 +127,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         per_file_ignores: None,
         required_version: None,
         respect_gitignore: None,
+        show_fixes: None,
         show_source: None,
         src: None,
         task_tags: None,

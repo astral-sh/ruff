@@ -7,7 +7,7 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for `self.assertRaises(Exception)`.
     ///
     /// ## Why is this bad?
@@ -16,9 +16,19 @@ define_violation!(
     ///
     /// Either assert for a more specific exception (builtin or custom), use
     /// `assertRaisesRegex` or the context manager form of `assertRaises`.
-    pub struct NoAssertRaisesException;
+    ///
+    /// ## Example
+    /// ```python
+    /// self.assertRaises(Exception, foo)
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// self.assertRaises(SomeSpecificException, foo)
+    /// ```
+    pub struct AssertRaisesException;
 );
-impl Violation for NoAssertRaisesException {
+impl Violation for AssertRaisesException {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`assertRaises(Exception)` should be considered evil")
@@ -51,7 +61,7 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
     }
 
     checker.diagnostics.push(Diagnostic::new(
-        NoAssertRaisesException,
+        AssertRaisesException,
         Range::from_located(stmt),
     ));
 }

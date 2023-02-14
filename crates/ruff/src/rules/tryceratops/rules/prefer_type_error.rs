@@ -1,25 +1,21 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::violation::Violation;
 
 define_violation!(
     pub struct PreferTypeError;
 );
-impl AlwaysAutofixableViolation for PreferTypeError {
+impl Violation for PreferTypeError {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `TypeError` exception for invalid type")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Use `TypeError` exception type".to_string()
     }
 }
 
@@ -84,23 +80,8 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
             .iter()
             .all(|expr| check_type_check_test(checker, expr)),
         ExprKind::UnaryOp { operand, .. } => check_type_check_test(checker, operand),
-        ExprKind::Call { .. } => check_type_check_call(checker, test),
+        ExprKind::Call { func, .. } => check_type_check_call(checker, func),
         _ => false,
-    }
-}
-
-/// Returns the [`Expr`] representing the name of the exception.
-const fn match_name(exc: &Expr) -> Option<&Expr> {
-    match &exc.node {
-        ExprKind::Name { .. } => Some(exc),
-        ExprKind::Call { func, .. } => {
-            if let ExprKind::Name { .. } = &func.node {
-                Some(func)
-            } else {
-                None
-            }
-        }
-        _ => None,
     }
 }
 
@@ -146,19 +127,9 @@ fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
 
 fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
     if check_raise_type(checker, exc) {
-        let mut diagnostic = Diagnostic::new(PreferTypeError, Range::from_located(item));
-
-        if checker.patch(diagnostic.kind.rule()) {
-            if let Some(name) = match_name(exc) {
-                diagnostic.amend(Fix::replacement(
-                    "TypeError".to_string(),
-                    name.location,
-                    name.end_location.unwrap(),
-                ));
-            }
-        }
-
-        checker.diagnostics.push(diagnostic);
+        checker
+            .diagnostics
+            .push(Diagnostic::new(PreferTypeError, Range::from_located(item)));
     }
 }
 

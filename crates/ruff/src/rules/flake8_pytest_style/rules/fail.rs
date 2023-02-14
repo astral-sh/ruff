@@ -18,8 +18,8 @@ impl Violation for FailWithoutMessage {
     }
 }
 
-pub fn fail_call(checker: &mut Checker, call: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if is_pytest_fail(call, checker) {
+pub fn fail_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+    if is_pytest_fail(func, checker) {
         let call_args = SimpleCallArgs::new(args, keywords);
         let msg = call_args.get_argument("msg", Some(0));
 
@@ -27,13 +27,13 @@ pub fn fail_call(checker: &mut Checker, call: &Expr, args: &[Expr], keywords: &[
             if is_empty_or_null_string(msg) {
                 checker.diagnostics.push(Diagnostic::new(
                     FailWithoutMessage,
-                    Range::from_located(call),
+                    Range::from_located(func),
                 ));
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 FailWithoutMessage,
-                Range::from_located(call),
+                Range::from_located(func),
             ));
         }
     }

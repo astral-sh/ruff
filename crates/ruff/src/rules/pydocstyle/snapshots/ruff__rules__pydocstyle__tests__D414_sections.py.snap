@@ -1,9 +1,9 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NonEmptySection:
+    EmptyDocstringSection:
       name: Returns
   location:
     row: 54
@@ -14,7 +14,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonEmptySection:
+    EmptyDocstringSection:
       name: Returns
   location:
     row: 67
@@ -25,7 +25,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonEmptySection:
+    EmptyDocstringSection:
       name: Yields
   location:
     row: 67
@@ -36,7 +36,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonEmptySection:
+    EmptyDocstringSection:
       name: Returns
   location:
     row: 161
@@ -47,7 +47,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonEmptySection:
+    EmptyDocstringSection:
       name: Returns
   location:
     row: 252

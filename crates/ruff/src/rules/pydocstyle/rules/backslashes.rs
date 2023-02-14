@@ -9,9 +9,9 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct UsesRPrefixForBackslashedContent;
+    pub struct EscapeSequenceInDocstring;
 );
-impl Violation for UsesRPrefixForBackslashedContent {
+impl Violation for EscapeSequenceInDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(r#"Use r""" if any backslashes in a docstring"#)
@@ -31,7 +31,7 @@ pub fn backslashes(checker: &mut Checker, docstring: &Docstring) {
 
     if BACKSLASH_REGEX.is_match(contents) {
         checker.diagnostics.push(Diagnostic::new(
-            UsesRPrefixForBackslashedContent,
+            EscapeSequenceInDocstring,
             Range::from_located(docstring.expr),
         ));
     }

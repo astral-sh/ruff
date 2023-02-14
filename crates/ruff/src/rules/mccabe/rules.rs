@@ -7,15 +7,55 @@ use crate::source_code::Locator;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct FunctionIsTooComplex {
+    /// ## What it does
+    /// Checks for functions with a high `McCabe` complexity.
+    ///
+    /// The `McCabe` complexity of a function is a measure of the complexity of the
+    /// control flow graph of the function. It is calculated by adding one to the
+    /// number of decision points in the function. A decision point is a place in
+    /// the code where the program has a choice of two or more paths to follow.
+    ///
+    /// ## Why is this bad?
+    /// Functions with a high complexity are hard to understand and maintain.
+    ///
+    /// ## Options
+    /// * `mccabe.max-complexity`
+    ///
+    /// ## Example
+    /// ```python
+    /// def foo(a, b, c):
+    ///     if a:
+    ///         if b:
+    ///             if c:
+    ///                 return 1
+    ///             else:
+    ///                 return 2
+    ///         else:
+    ///             return 3
+    ///     else:
+    ///         return 4
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def foo(a, b, c):
+    ///     if not a:
+    ///         return 4
+    ///     if not b:
+    ///         return 3
+    ///     if not c:
+    ///         return 2
+    ///     return 1
+    /// ```
+    pub struct ComplexStructure {
         pub name: String,
         pub complexity: usize,
     }
 );
-impl Violation for FunctionIsTooComplex {
+impl Violation for ComplexStructure {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionIsTooComplex { name, complexity } = self;
+        let ComplexStructure { name, complexity } = self;
         format!("`{name}` is too complex ({complexity})")
     }
 }
@@ -81,7 +121,7 @@ pub fn function_is_too_complex(
     let complexity = get_complexity_number(body) + 1;
     if complexity > max_complexity {
         Some(Diagnostic::new(
-            FunctionIsTooComplex {
+            ComplexStructure {
                 name: name.to_string(),
                 complexity,
             },

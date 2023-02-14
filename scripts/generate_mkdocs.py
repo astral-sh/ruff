@@ -1,6 +1,7 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
 import argparse
 import shutil
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -27,6 +28,9 @@ FATHOM_SCRIPT: str = (
 
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
+
+    subprocess.run(["cargo", "dev", "generate-docs"], check=True)
+
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
 
@@ -35,6 +39,12 @@ def main() -> None:
         msg = "README.md is not in the expected format."
         raise ValueError(msg)
     content = content.replace(DOCUMENTATION_LINK, "")
+
+    # Replace all GitHub links with relative links.
+    content = content.replace(
+        "https://github.com/charliermarsh/ruff/blob/main/docs/rules/",
+        "rules/",
+    )
 
     Path("docs").mkdir(parents=True, exist_ok=True)
 
@@ -71,8 +81,13 @@ def main() -> None:
     ]
     config["extra"] = {"analytics": {"provider": "fathom"}}
 
-    Path(".overrides/partials/integrations/analytics").mkdir(parents=True, exist_ok=True)
-    with Path(".overrides/partials/integrations/analytics/fathom.html").open("w+") as fp:
+    Path(".overrides/partials/integrations/analytics").mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    with Path(".overrides/partials/integrations/analytics/fathom.html").open(
+        "w+",
+    ) as fp:
         fp.write(FATHOM_SCRIPT)
 
     with Path("mkdocs.yml").open("w+") as fp:

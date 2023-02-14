@@ -1,10 +1,11 @@
 ---
-source: src/rules/flake8_simplify/mod.rs
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
     DictGetWithDefault:
       contents: "var = a_dict.get(key, \"default1\")"
+      fixable: true
   location:
     row: 6
     column: 0
@@ -24,6 +25,7 @@ expression: diagnostics
 - kind:
     DictGetWithDefault:
       contents: "var = a_dict.get(key, \"default2\")"
+      fixable: true
   location:
     row: 12
     column: 0
@@ -43,6 +45,7 @@ expression: diagnostics
 - kind:
     DictGetWithDefault:
       contents: "var = a_dict.get(key, val1 + val2)"
+      fixable: true
   location:
     row: 18
     column: 0
@@ -62,6 +65,7 @@ expression: diagnostics
 - kind:
     DictGetWithDefault:
       contents: "var = a_dict.get(keys[idx], \"default\")"
+      fixable: true
   location:
     row: 24
     column: 0
@@ -81,6 +85,7 @@ expression: diagnostics
 - kind:
     DictGetWithDefault:
       contents: "var = dicts[idx].get(key, \"default\")"
+      fixable: true
   location:
     row: 30
     column: 0
@@ -100,6 +105,7 @@ expression: diagnostics
 - kind:
     DictGetWithDefault:
       contents: "vars[idx] = a_dict.get(key, \"default\")"
+      fixable: true
   location:
     row: 36
     column: 0

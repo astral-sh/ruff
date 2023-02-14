@@ -1,6 +1,8 @@
 site_name: Ruff
 theme:
   name: material
+  logo: assets/ruff.svg
+  favicon: assets/ruff-favicon.png
   features:
     - navigation.instant
     - navigation.tracking
@@ -9,6 +11,7 @@ theme:
     - toc.follow
     - navigation.path
     - navigation.top
+    - navigation.footer
     - content.code.copy
   palette:
     - media: "(prefers-color-scheme: light)"

@@ -1,10 +1,11 @@
 ---
-source: src/rules/ruff/mod.rs
+source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "[1, 2, 3, *foo]"
+      fixable: true
   location:
     row: 10
     column: 6
@@ -24,6 +25,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "(7, 8, 9, *zoob)"
+      fixable: true
   location:
     row: 12
     column: 7
@@ -43,6 +45,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "(*quux, 10, 11, 12)"
+      fixable: true
   location:
     row: 13
     column: 7
@@ -62,6 +65,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "[*spom, 13, 14, 15]"
+      fixable: true
   location:
     row: 15
     column: 7
@@ -81,6 +85,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "(\"we all say\", *yay())"
+      fixable: true
   location:
     row: 16
     column: 12
@@ -100,6 +105,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "(\"we all think\", *Fun().yay())"
+      fixable: true
   location:
     row: 17
     column: 13
@@ -119,6 +125,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "(\"we all feel\", *Fun.words)"
+      fixable: true
   location:
     row: 18
     column: 15
@@ -138,6 +145,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "[\"a\", \"b\", \"c\", *eggs]"
+      fixable: true
   location:
     row: 20
     column: 8
@@ -157,6 +165,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "(\"yes\", \"no\", \"pants\", *zoob)"
+      fixable: true
   location:
     row: 20
     column: 38
@@ -176,6 +185,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "(*zoob,)"
+      fixable: true
   location:
     row: 22
     column: 6
@@ -195,6 +205,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "[*first, 4, 5, 6]"
+      fixable: false
   location:
     row: 32
     column: 9
@@ -206,6 +217,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "[*foo]"
+      fixable: true
   location:
     row: 41
     column: 0
@@ -225,6 +237,7 @@ expression: diagnostics
 - kind:
     UnpackInsteadOfConcatenatingToCollectionLiteral:
       expr: "[*foo]"
+      fixable: true
   location:
     row: 44
     column: 0

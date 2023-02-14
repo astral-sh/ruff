@@ -41,9 +41,11 @@ pub enum Command {
         rule: Rule,
 
         /// Output format
-        #[arg(long, value_enum, default_value = "text")]
+        #[arg(long, value_enum, default_value = "pretty")]
         format: HelpFormat,
     },
+    /// List or describe the available configuration options
+    Config { option: Option<String> },
     /// List all supported upstream linters
     Linter {
         /// Output format
@@ -73,9 +75,14 @@ pub struct CheckArgs {
     show_source: bool,
     #[clap(long, overrides_with("show_source"), hide = true)]
     no_show_source: bool,
+    /// Show an enumeration of all autofixed lint violations.
+    #[arg(long, overrides_with("no_show_fixes"))]
+    show_fixes: bool,
+    #[clap(long, overrides_with("show_fixes"), hide = true)]
+    no_show_fixes: bool,
     /// Avoid writing any fixed files back; instead, output a diff for each
     /// changed file to stdout.
-    #[arg(long)]
+    #[arg(long, conflicts_with = "show_fixes")]
     pub diff: bool,
     /// Run in watch mode by re-running whenever files change.
     #[arg(short, long)]
@@ -89,6 +96,9 @@ pub struct CheckArgs {
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
+    /// The minimum Python version that should be supported.
+    #[arg(long)]
+    pub target_version: Option<PythonVersion>,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for
     /// configuration.
     #[arg(long, conflicts_with = "isolated")]
@@ -186,15 +196,12 @@ pub struct CheckArgs {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
-    /// The minimum Python version that should be supported.
-    #[arg(long, help_heading = "Rule configuration")]
-    pub target_version: Option<PythonVersion>,
     /// Set the line-length for length-associated rules and automatic
     /// formatting.
-    #[arg(long, help_heading = "Rule configuration")]
+    #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub line_length: Option<usize>,
     /// Regular expression matching the name of dummy variables.
-    #[arg(long, help_heading = "Rule configuration")]
+    #[arg(long, help_heading = "Rule configuration", hide = true)]
     pub dummy_variable_rgx: Option<Regex>,
     /// Disable cache reads.
     #[arg(short, long, help_heading = "Miscellaneous")]
@@ -209,8 +216,17 @@ pub struct CheckArgs {
     #[arg(long, help_heading = "Miscellaneous")]
     pub stdin_filename: Option<PathBuf>,
     /// Exit with status code "0", even upon detecting lint violations.
-    #[arg(short, long, help_heading = "Miscellaneous")]
+    #[arg(
+        short,
+        long,
+        help_heading = "Miscellaneous",
+        conflicts_with = "exit_non_zero_on_fix"
+    )]
     pub exit_zero: bool,
+    /// Exit with a non-zero status code if any files were modified via
+    /// autofix, even if no lint violations remain.
+    #[arg(long, help_heading = "Miscellaneous", conflicts_with = "exit_zero")]
+    pub exit_non_zero_on_fix: bool,
     /// Does nothing and will be removed in the future.
     #[arg(
         long,
@@ -275,6 +291,7 @@ pub struct CheckArgs {
 pub enum HelpFormat {
     Text,
     Json,
+    Pretty,
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -334,6 +351,7 @@ impl CheckArgs {
                 config: self.config,
                 diff: self.diff,
                 exit_zero: self.exit_zero,
+                exit_non_zero_on_fix: self.exit_non_zero_on_fix,
                 files: self.files,
                 isolated: self.isolated,
                 no_cache: self.no_cache,
@@ -367,6 +385,7 @@ impl CheckArgs {
                 fix_only: resolve_bool_arg(self.fix_only, self.no_fix_only),
                 force_exclude: resolve_bool_arg(self.force_exclude, self.no_force_exclude),
                 format: self.format,
+                show_fixes: resolve_bool_arg(self.show_fixes, self.no_show_fixes),
                 update_check: resolve_bool_arg(self.update_check, self.no_update_check),
             },
         )
@@ -390,6 +409,7 @@ pub struct Arguments {
     pub config: Option<PathBuf>,
     pub diff: bool,
     pub exit_zero: bool,
+    pub exit_non_zero_on_fix: bool,
     pub files: Vec<PathBuf>,
     pub isolated: bool,
     pub no_cache: bool,
@@ -424,6 +444,7 @@ pub struct Overrides {
     pub fix_only: Option<bool>,
     pub force_exclude: Option<bool>,
     pub format: Option<SerializationFormat>,
+    pub show_fixes: Option<bool>,
     pub update_check: Option<bool>,
 }
 
@@ -477,6 +498,9 @@ impl ConfigProcessor for &Overrides {
         }
         if let Some(show_source) = &self.show_source {
             config.show_source = Some(*show_source);
+        }
+        if let Some(show_fixes) = &self.show_fixes {
+            config.show_fixes = Some(*show_fixes);
         }
         if let Some(target_version) = &self.target_version {
             config.target_version = Some(*target_version);

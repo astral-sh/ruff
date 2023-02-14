@@ -1,6 +1,6 @@
 """
 Should emit:
-B904 - on lines 10, 11 and 16
+B904 - on lines 10, 11, 16, 62, and 64
 """
 
 try:
@@ -53,3 +53,12 @@ except ImportError:
                 raise ValueError
             except ValueError:
                 raise
+
+
+try:
+    ...
+except Exception as e:
+    if ...:
+        raise RuntimeError("boom!")
+    else:
+        raise RuntimeError("bang!")

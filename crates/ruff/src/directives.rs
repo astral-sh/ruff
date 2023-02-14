@@ -59,6 +59,7 @@ pub fn extract_directives(lxr: &[LexResult], flags: Flags) -> Directives {
 /// Extract a mapping from logical line to noqa line.
 pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
     let mut noqa_line_for: IntMap<usize, usize> = IntMap::default();
+    let mut prev_non_newline: Option<(&Location, &Tok, &Location)> = None;
     for (start, tok, end) in lxr.iter().flatten() {
         if matches!(tok, Tok::EndOfFile) {
             break;
@@ -69,6 +70,21 @@ pub fn extract_noqa_line_for(lxr: &[LexResult]) -> IntMap<usize, usize> {
             for i in start.row()..end.row() {
                 noqa_line_for.insert(i, end.row());
             }
+        }
+        // For continuations, we expect `noqa` directives on the last line of the
+        // continuation.
+        if matches!(
+            tok,
+            Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(..)
+        ) {
+            if let Some((.., end)) = prev_non_newline {
+                for i in end.row()..start.row() {
+                    noqa_line_for.insert(i, start.row());
+                }
+            }
+            prev_non_newline = None;
+        } else if prev_non_newline.is_none() {
+            prev_non_newline = Some((start, tok, end));
         }
     }
     noqa_line_for
@@ -193,11 +209,11 @@ z = x + 1",
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
-        y = '''abc
-        def
-        ghi
-        '''
-        z = 2",
+y = '''abc
+def
+ghi
+'''
+z = 2",
         )
         .collect();
         assert_eq!(
@@ -207,15 +223,50 @@ z = x + 1",
 
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             "x = 1
-        y = '''abc
-        def
-        ghi
-        '''",
+y = '''abc
+def
+ghi
+'''",
         )
         .collect();
         assert_eq!(
             extract_noqa_line_for(&lxr),
             IntMap::from_iter([(2, 5), (3, 5), (4, 5)])
+        );
+
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+            r#"x = \
+    1"#,
+        )
+        .collect();
+        assert_eq!(extract_noqa_line_for(&lxr), IntMap::from_iter([(1, 2)]));
+
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+            r#"from foo import \
+    bar as baz, \
+    qux as quux"#,
+        )
+        .collect();
+        assert_eq!(
+            extract_noqa_line_for(&lxr),
+            IntMap::from_iter([(1, 3), (2, 3)])
+        );
+
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+            r#"
+# Foo
+from foo import \
+    bar as baz, \
+    qux as quux # Baz
+x = \
+    1
+y = \
+    2"#,
+        )
+        .collect();
+        assert_eq!(
+            extract_noqa_line_for(&lxr),
+            IntMap::from_iter([(3, 5), (4, 5), (6, 7), (8, 9)])
         );
     }
 

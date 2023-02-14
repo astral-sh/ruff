@@ -1,9 +1,9 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DoNotAssertFalse: ~
+    AssertFalse: ~
   location:
     row: 8
     column: 7
@@ -21,7 +21,7 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    DoNotAssertFalse: ~
+    AssertFalse: ~
   location:
     row: 10
     column: 7

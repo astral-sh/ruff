@@ -39,6 +39,8 @@ enum Command {
     GenerateOptions(generate_options::Args),
     /// Generate CLI help.
     GenerateCliHelp(generate_cli_help::Args),
+    /// Generate Markdown docs.
+    GenerateDocs(generate_docs::Args),
     /// Print the AST for a given Python file.
     PrintAST(print_ast::Args),
     /// Print the LibCST CST for a given Python file.
@@ -57,6 +59,7 @@ fn main() -> Result<()> {
         Command::GenerateRulesTable(args) => generate_rules_table::main(args)?,
         Command::GenerateOptions(args) => generate_options::main(args)?,
         Command::GenerateCliHelp(args) => generate_cli_help::main(args)?,
+        Command::GenerateDocs(args) => generate_docs::main(args)?,
         Command::PrintAST(args) => print_ast::main(args)?,
         Command::PrintCST(args) => print_cst::main(args)?,
         Command::PrintTokens(args) => print_tokens::main(args)?,

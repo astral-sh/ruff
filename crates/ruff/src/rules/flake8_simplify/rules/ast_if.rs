@@ -1,8 +1,9 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
-use crate::ast::comparable::ComparableExpr;
+use ruff_macros::{define_violation, derive_message_formats};
+
+use crate::ast::comparable::{ComparableExpr, ComparableStmt};
 use crate::ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
@@ -12,44 +13,78 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
-use crate::violation::{AlwaysAutofixableViolation, Availability, Violation};
-use crate::AutofixKind;
+use crate::violation::{AutofixKind, Availability, Violation};
+
+fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
+    expr1.eq(expr2)
+}
+
+fn compare_stmt(stmt1: &ComparableStmt, stmt2: &ComparableStmt) -> bool {
+    stmt1.eq(stmt2)
+}
+
+fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
+    if body1.len() != body2.len() {
+        return false;
+    }
+    body1
+        .iter()
+        .zip(body2.iter())
+        .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
+}
 
 define_violation!(
-    pub struct NestedIfStatements;
+    pub struct CollapsibleIf {
+        pub fixable: bool,
+    }
 );
-impl AlwaysAutofixableViolation for NestedIfStatements {
+impl Violation for CollapsibleIf {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a single `if` statement instead of nested `if` statements")
     }
 
-    fn autofix_title(&self) -> String {
-        "Combine `if` statements using `and`".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let CollapsibleIf { fixable, .. } = self;
+        if *fixable {
+            Some(|_| format!("Combine `if` statements using `and`"))
+        } else {
+            None
+        }
     }
 }
 
 define_violation!(
-    pub struct ReturnBoolConditionDirectly {
-        pub cond: String,
+    pub struct NeedlessBool {
+        pub condition: String,
+        pub fixable: bool,
     }
 );
-impl AlwaysAutofixableViolation for ReturnBoolConditionDirectly {
+impl Violation for NeedlessBool {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ReturnBoolConditionDirectly { cond } = self;
-        format!("Return the condition `{cond}` directly")
+        let NeedlessBool { condition, .. } = self;
+        format!("Return the condition `{condition}` directly")
     }
 
-    fn autofix_title(&self) -> String {
-        let ReturnBoolConditionDirectly { cond } = self;
-        format!("Replace with `return {cond}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let NeedlessBool { fixable, .. } = self;
+        if *fixable {
+            Some(|NeedlessBool { condition, .. }| format!("Replace with `return {condition}`"))
+        } else {
+            None
+        }
     }
 }
 
 define_violation!(
     pub struct UseTernaryOperator {
         pub contents: String,
+        pub fixable: bool,
     }
 );
 impl Violation for UseTernaryOperator {
@@ -57,30 +92,74 @@ impl Violation for UseTernaryOperator {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UseTernaryOperator { contents } = self;
+        let UseTernaryOperator { contents, .. } = self;
         format!("Use ternary operator `{contents}` instead of if-else-block")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|UseTernaryOperator { contents }| format!("Replace if-else-block with `{contents}`"))
+        let UseTernaryOperator { fixable, .. } = self;
+        if *fixable {
+            Some(|UseTernaryOperator { contents, .. }| {
+                format!("Replace if-else-block with `{contents}`")
+            })
+        } else {
+            None
+        }
+    }
+}
+
+define_violation!(
+    /// ### What it does
+    /// Checks for `if` branches with identical arm bodies.
+    ///
+    /// ### Why is this bad?
+    /// If multiple arms of an `if` statement have the same body, using `or`
+    /// better signals the intent of the statement.
+    ///
+    /// ### Example
+    /// ```python
+    /// if x == 1:
+    ///     print("Hello")
+    /// elif x == 2:
+    ///     print("Hello")
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// if x == 1 or x == 2:
+    ///     print("Hello")
+    /// ```
+    pub struct IfWithSameArms;
+);
+impl Violation for IfWithSameArms {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Combine `if` branches using logical `or` operator")
     }
 }
 
 define_violation!(
     pub struct DictGetWithDefault {
         pub contents: String,
+        pub fixable: bool,
     }
 );
-impl AlwaysAutofixableViolation for DictGetWithDefault {
+impl Violation for DictGetWithDefault {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DictGetWithDefault { contents } = self;
+        let DictGetWithDefault { contents, .. } = self;
         format!("Use `{contents}` instead of an `if` block")
     }
 
-    fn autofix_title(&self) -> String {
-        let DictGetWithDefault { contents } = self;
-        format!("Replace with `{contents}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let DictGetWithDefault { fixable, .. } = self;
+        if *fixable {
+            Some(|DictGetWithDefault { contents, .. }| format!("Replace with `{contents}`"))
+        } else {
+            None
+        }
     }
 }
 
@@ -163,37 +242,39 @@ pub fn nested_if_statements(
     let Some((test, first_stmt)) = find_last_nested_if(body) else {
         return;
     };
+
     let colon = first_colon_range(
         Range::new(test.end_location.unwrap(), first_stmt.location),
         checker.locator,
     );
+
+    // The fixer preserves comments in the nested body, but removes comments between
+    // the outer and inner if statements.
+    let nested_if = &body[0];
+    let fixable = !has_comments_in(
+        Range::new(stmt.location, nested_if.location),
+        checker.locator,
+    );
+
     let mut diagnostic = Diagnostic::new(
-        NestedIfStatements,
+        CollapsibleIf { fixable },
         colon.map_or_else(
             || Range::from_located(stmt),
             |colon| Range::new(stmt.location, colon.end_location),
         ),
     );
-    if checker.patch(diagnostic.kind.rule()) {
-        // The fixer preserves comments in the nested body, but removes comments between
-        // the outer and inner if statements.
-        let nested_if = &body[0];
-        if !has_comments_in(
-            Range::new(stmt.location, nested_if.location),
-            checker.locator,
-        ) {
-            match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
-                Ok(fix) => {
-                    if fix
-                        .content
-                        .lines()
-                        .all(|line| line.len() <= checker.settings.line_length)
-                    {
-                        diagnostic.amend(fix);
-                    }
+    if fixable && checker.patch(diagnostic.kind.rule()) {
+        match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
+            Ok(fix) => {
+                if fix
+                    .content
+                    .lines()
+                    .all(|line| line.len() <= checker.settings.line_length)
+                {
+                    diagnostic.amend(fix);
                 }
-                Err(err) => error!("Failed to fix nested if: {err}"),
             }
+            Err(err) => error!("Failed to fix nested if: {err}"),
         }
     }
     checker.diagnostics.push(diagnostic);
@@ -247,16 +328,18 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
     }
 
     let condition = unparse_expr(test, checker.stylist);
-    let mut diagnostic = Diagnostic::new(
-        ReturnBoolConditionDirectly { cond: condition },
-        Range::from_located(stmt),
-    );
-    if checker.patch(diagnostic.kind.rule())
-        && matches!(if_return, Bool::True)
+    let fixable = matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
-    {
+        && (matches!(test.node, ExprKind::Compare { .. }) || checker.is_builtin("bool"));
+
+    let mut diagnostic = Diagnostic::new(
+        NeedlessBool { condition, fixable },
+        Range::from_located(stmt),
+    );
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
+            // If the condition is a comparison, we can replace it with the condition.
             diagnostic.amend(Fix::replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
@@ -267,7 +350,9 @@ pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
                 stmt.location,
                 stmt.end_location.unwrap(),
             ));
-        } else if checker.is_builtin("bool") {
+        } else {
+            // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
+            // verified, above, that `bool` is a builtin.)
             diagnostic.amend(Fix::replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
@@ -394,13 +479,15 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         return;
     }
 
+    let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
         UseTernaryOperator {
             contents: contents.clone(),
+            fixable,
         },
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.rule()) && !has_comments(stmt, checker.locator) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,
@@ -410,8 +497,76 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     checker.diagnostics.push(diagnostic);
 }
 
-fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
-    expr1.eq(expr2)
+fn get_if_body_pairs<'a>(
+    test: &'a Expr,
+    body: &'a [Stmt],
+    orelse: &'a [Stmt],
+) -> Vec<(&'a Expr, &'a [Stmt])> {
+    let mut pairs = vec![(test, body)];
+    let mut orelse = orelse;
+    loop {
+        if orelse.len() != 1 {
+            break;
+        }
+        let StmtKind::If { test, body, orelse: orelse_orelse, .. } = &orelse[0].node else {
+            break;
+        };
+        pairs.push((test, body));
+        orelse = orelse_orelse;
+    }
+    pairs
+}
+
+/// SIM114
+pub fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stmt>) {
+    let StmtKind::If { test, body, orelse } = &stmt.node else {
+        return;
+    };
+
+    // It's part of a bigger if-elif block:
+    // https://github.com/MartinThoma/flake8-simplify/issues/115
+    if let Some(StmtKind::If {
+        orelse: parent_orelse,
+        ..
+    }) = parent.map(|parent| &parent.node)
+    {
+        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
+            // TODO(charlie): These two cases have the same AST:
+            //
+            // if True:
+            //     pass
+            // elif a:
+            //     b = 1
+            // else:
+            //     b = 2
+            //
+            // if True:
+            //     pass
+            // else:
+            //     if a:
+            //         b = 1
+            //     else:
+            //         b = 2
+            //
+            // We want to flag the latter, but not the former. Right now, we flag neither.
+            return;
+        }
+    }
+
+    let if_body_pairs = get_if_body_pairs(test, body, orelse);
+    for i in 0..(if_body_pairs.len() - 1) {
+        let (test, body) = &if_body_pairs[i];
+        let (.., next_body) = &if_body_pairs[i + 1];
+        if compare_body(body, next_body) {
+            checker.diagnostics.push(Diagnostic::new(
+                IfWithSameArms,
+                Range::new(
+                    if i == 0 { stmt.location } else { test.location },
+                    next_body.last().unwrap().end_location.unwrap(),
+                ),
+            ));
+        }
+    }
 }
 
 /// SIM401
@@ -525,13 +680,15 @@ pub fn use_dict_get_with_default(
         return;
     }
 
+    let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
         DictGetWithDefault {
             contents: contents.clone(),
+            fixable,
         },
         Range::from_located(stmt),
     );
-    if checker.patch(diagnostic.kind.rule()) && !has_comments(stmt, checker.locator) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,

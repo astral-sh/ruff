@@ -3,17 +3,18 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
+use anyhow::Result;
+use clap::{CommandFactory, Parser, Subcommand};
+use colored::Colorize;
+use notify::{recommended_watcher, RecursiveMode, Watcher};
+
 use ::ruff::logging::{set_up_logging, LogLevel};
 use ::ruff::resolver::PyprojectDiscovery;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::CliSettings;
 use ::ruff::{fix, fs, warn_user_once};
-use anyhow::Result;
 use args::{Args, CheckArgs, Command};
-use clap::{CommandFactory, Parser, Subcommand};
-use colored::Colorize;
-use notify::{recommended_watcher, RecursiveMode, Watcher};
-use printer::{Printer, Violations};
+use printer::{Flags as PrinterFlags, Printer};
 
 pub(crate) mod args;
 mod cache;
@@ -23,7 +24,41 @@ mod iterators;
 mod printer;
 mod resolve;
 
-fn inner_main() -> Result<ExitCode> {
+#[cfg(target_os = "windows")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+#[cfg(all(
+    not(target_os = "windows"),
+    any(
+        target_arch = "x86_64",
+        target_arch = "aarch64",
+        target_arch = "powerpc64"
+    )
+))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+enum ExitStatus {
+    /// Linting was successful and there were no linting errors.
+    Success,
+    /// Linting was successful but there were linting errors.
+    Failure,
+    /// Linting failed.
+    Error,
+}
+
+impl From<ExitStatus> for ExitCode {
+    fn from(status: ExitStatus) -> Self {
+        match status {
+            ExitStatus::Success => ExitCode::from(0),
+            ExitStatus::Failure => ExitCode::from(1),
+            ExitStatus::Error => ExitCode::from(2),
+        }
+    }
+}
+
+fn inner_main() -> Result<ExitStatus> {
     let mut args: Vec<_> = std::env::args_os().collect();
 
     // Clap doesn't support default subcommands but we want to run `check` by
@@ -72,20 +107,20 @@ quoting the executed command, along with the relevant file contents and `pyproje
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, format } => commands::rule(&rule, format)?,
-        Command::Linter { format } => commands::linter::linter(format),
-        Command::Clean => commands::clean(log_level)?,
+        Command::Rule { rule, format } => commands::rule::rule(&rule, format)?,
+        Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
+        Command::Linter { format } => commands::linter::linter(format)?,
+        Command::Clean => commands::clean::clean(log_level)?,
         Command::GenerateShellCompletion { shell } => {
             shell.generate(&mut Args::command(), &mut io::stdout());
         }
-
         Command::Check(args) => return check(args, log_level),
     }
 
-    Ok(ExitCode::SUCCESS)
+    Ok(ExitStatus::Success)
 }
 
-fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
+fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -98,12 +133,12 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
     )?;
 
     if cli.show_settings {
-        commands::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
-        return Ok(ExitCode::SUCCESS);
+        commands::show_settings::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
+        return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files(&cli.files, &pyproject_strategy, &overrides)?;
-        return Ok(ExitCode::SUCCESS);
+        commands::show_files::show_files(&cli.files, &pyproject_strategy, &overrides)?;
+        return Ok(ExitStatus::Success);
     }
 
     // Extract options that are included in `Settings`, but only apply at the top
@@ -112,6 +147,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
         fix,
         fix_only,
         format,
+        show_fixes,
         update_check,
         ..
     } = match &pyproject_strategy {
@@ -138,12 +174,14 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
     } else {
         fix::FixMode::None
     };
-    let violations = if cli.diff || fix_only {
-        Violations::Hide
-    } else {
-        Violations::Show
-    };
     let cache = !cli.no_cache;
+    let mut printer_flags = PrinterFlags::empty();
+    if !(cli.diff || fix_only) {
+        printer_flags |= PrinterFlags::SHOW_VIOLATIONS;
+    }
+    if show_fixes {
+        printer_flags |= PrinterFlags::SHOW_FIXES;
+    }
 
     #[cfg(debug_assertions)]
     if cache {
@@ -156,17 +194,18 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
         if !matches!(autofix, fix::FixMode::None) {
             warn_user_once!("--fix is incompatible with --add-noqa.");
         }
-        let modifications = commands::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
+        let modifications =
+            commands::add_noqa::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             #[allow(clippy::print_stderr)]
             {
                 eprintln!("Added {modifications} noqa directives.");
             }
         }
-        return Ok(ExitCode::SUCCESS);
+        return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(&format, &log_level, &autofix, &violations);
+    let printer = Printer::new(format, log_level, autofix, printer_flags);
 
     if cli.watch {
         if !matches!(autofix, fix::FixMode::None) {
@@ -180,7 +219,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
         Printer::clear_screen()?;
         printer.write_to_user("Starting linter in watch mode...\n");
 
-        let messages = commands::run(
+        let messages = commands::run::run(
             &cli.files,
             &pyproject_strategy,
             &overrides,
@@ -209,7 +248,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
                         Printer::clear_screen()?;
                         printer.write_to_user("File change detected...\n");
 
-                        let messages = commands::run(
+                        let messages = commands::run::run(
                             &cli.files,
                             &pyproject_strategy,
                             &overrides,
@@ -227,14 +266,14 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
 
         // Generate lint violations.
         let diagnostics = if is_stdin {
-            commands::run_stdin(
+            commands::run_stdin::run_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_strategy,
                 &overrides,
                 autofix,
             )?
         } else {
-            commands::run(
+            commands::run::run(
                 &cli.files,
                 &pyproject_strategy,
                 &overrides,
@@ -263,15 +302,21 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitCode> {
 
         if !cli.exit_zero {
             if cli.diff || fix_only {
-                if diagnostics.fixed > 0 {
-                    return Ok(ExitCode::FAILURE);
+                if !diagnostics.fixed.is_empty() {
+                    return Ok(ExitStatus::Failure);
                 }
-            } else if !diagnostics.messages.is_empty() {
-                return Ok(ExitCode::FAILURE);
+            } else if cli.exit_non_zero_on_fix {
+                if !diagnostics.fixed.is_empty() || !diagnostics.messages.is_empty() {
+                    return Ok(ExitStatus::Failure);
+                }
+            } else {
+                if !diagnostics.messages.is_empty() {
+                    return Ok(ExitStatus::Failure);
+                }
             }
         }
     }
-    Ok(ExitCode::SUCCESS)
+    Ok(ExitStatus::Success)
 }
 
 fn rewrite_legacy_subcommand(cmd: &str) -> &str {
@@ -286,13 +331,13 @@ fn rewrite_legacy_subcommand(cmd: &str) -> &str {
 #[must_use]
 pub fn main() -> ExitCode {
     match inner_main() {
-        Ok(code) => code,
+        Ok(code) => code.into(),
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
                 eprintln!("{}{} {err:?}", "error".red().bold(), ":".bold());
             }
-            ExitCode::FAILURE
+            ExitStatus::Error.into()
         }
     }
 }

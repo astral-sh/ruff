@@ -15,13 +15,14 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::AssertUsed, Path::new("S101.py"); "S101")]
-    #[test_case(Rule::ExecUsed, Path::new("S102.py"); "S102")]
+    #[test_case(Rule::Assert, Path::new("S101.py"); "S101")]
+    #[test_case(Rule::ExecBuiltin, Path::new("S102.py"); "S102")]
     #[test_case(Rule::BadFilePermissions, Path::new("S103.py"); "S103")]
     #[test_case(Rule::HardcodedBindAllInterfaces, Path::new("S104.py"); "S104")]
     #[test_case(Rule::HardcodedPasswordString, Path::new("S105.py"); "S105")]
     #[test_case(Rule::HardcodedPasswordFuncArg, Path::new("S106.py"); "S106")]
     #[test_case(Rule::HardcodedPasswordDefault, Path::new("S107.py"); "S107")]
+    #[test_case(Rule::HardcodedSQLExpression, Path::new("S608.py"); "S608")]
     #[test_case(Rule::HardcodedTempFile, Path::new("S108.py"); "S108")]
     #[test_case(Rule::RequestWithoutTimeout, Path::new("S113.py"); "S113")]
     #[test_case(Rule::HashlibInsecureHashFunction, Path::new("S324.py"); "S324")]
@@ -32,6 +33,7 @@ mod tests {
     #[test_case(Rule::LoggingConfigInsecureListen, Path::new("S612.py"); "S612")]
     #[test_case(Rule::Jinja2AutoescapeFalse, Path::new("S701.py"); "S701")]
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"); "S110")]
+    #[test_case(Rule::TryExceptContinue, Path::new("S112.py"); "S112")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
         let diagnostics = test_path(

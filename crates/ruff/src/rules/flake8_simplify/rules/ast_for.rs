@@ -1,6 +1,6 @@
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{
-    Comprehension, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Unaryop,
+    Cmpop, Comprehension, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Unaryop,
 };
 
 use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
@@ -260,6 +260,36 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     } = &loop_info.test.node
                     {
                         *operand.clone()
+                    } else if let ExprKind::Compare {
+                        left,
+                        ops,
+                        comparators,
+                    } = &loop_info.test.node
+                    {
+                        if ops.len() == 1 && comparators.len() == 1 {
+                            let op = match &ops[0] {
+                                Cmpop::Eq => Cmpop::NotEq,
+                                Cmpop::NotEq => Cmpop::Eq,
+                                Cmpop::Lt => Cmpop::GtE,
+                                Cmpop::LtE => Cmpop::Gt,
+                                Cmpop::Gt => Cmpop::LtE,
+                                Cmpop::GtE => Cmpop::Lt,
+                                Cmpop::Is => Cmpop::IsNot,
+                                Cmpop::IsNot => Cmpop::Is,
+                                Cmpop::In => Cmpop::NotIn,
+                                Cmpop::NotIn => Cmpop::In,
+                            };
+                            create_expr(ExprKind::Compare {
+                                left: left.clone(),
+                                ops: vec![op],
+                                comparators: vec![comparators[0].clone()],
+                            })
+                        } else {
+                            create_expr(ExprKind::UnaryOp {
+                                op: Unaryop::Not,
+                                operand: Box::new(loop_info.test.clone()),
+                            })
+                        }
                     } else {
                         create_expr(ExprKind::UnaryOp {
                             op: Unaryop::Not,

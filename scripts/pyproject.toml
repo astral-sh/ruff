@@ -11,6 +11,7 @@ ignore = [
   "PL",     # pylint
   "S101",   # assert-used
   "EM",     # errmgs
+  "D202",   # no-blank-line-after-function
 ]
 unfixable = [
   "RUF100", # unused-noqa

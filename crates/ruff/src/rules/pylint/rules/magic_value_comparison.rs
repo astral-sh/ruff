@@ -1,8 +1,8 @@
-use crate::ast::helpers::unparse_constant;
 use itertools::Itertools;
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
+use crate::ast::helpers::unparse_constant;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;

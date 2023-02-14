@@ -30,19 +30,13 @@ impl Parse for LintMeta {
     fn parse(input: ParseStream) -> Result<Self> {
         let attrs = input.call(Attribute::parse_outer)?;
 
-        let mut in_code = false;
         let mut explanation = String::new();
         for attr in &attrs {
             if let Some(lit) = parse_attr(["doc"], attr) {
                 let value = lit.value();
                 let line = value.strip_prefix(' ').unwrap_or(&value);
-                if line.starts_with("```") {
-                    explanation += "```\n";
-                    in_code = !in_code;
-                } else if !(in_code && line.starts_with("# ")) {
-                    explanation += line;
-                    explanation.push('\n');
-                }
+                explanation.push_str(line);
+                explanation.push('\n');
             } else {
                 return Err(Error::new_spanned(attr, "unexpected attribute"));
             }
@@ -61,15 +55,21 @@ impl Parse for LintMeta {
 
 pub fn define_violation(input: &TokenStream, meta: LintMeta) -> TokenStream {
     let LintMeta { explanation, name } = meta;
-    let output = quote! {
-        #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-        #input
+    if explanation.is_empty() {
+        quote! {
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            #input
+        }
+    } else {
+        quote! {
+            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            #input
 
-        impl #name {
-            pub fn explanation() -> Option<&'static str> {
-                Some(#explanation)
+            impl #name {
+                pub fn explanation() -> Option<&'static str> {
+                    Some(#explanation)
+                }
             }
         }
-    };
-    output
+    }
 }

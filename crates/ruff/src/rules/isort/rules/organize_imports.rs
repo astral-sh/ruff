@@ -19,6 +19,24 @@ use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
+    /// ## What it does
+    /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
+    ///
+    /// ## Why is this bad?
+    /// Consistency is good. Use a common convention for imports to make your code
+    /// more readable and idiomatic.
+    ///
+    /// ## Example
+    /// ```python
+    /// import pandas
+    /// import numpy as np
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// import numpy as np
+    /// import pandas
+    /// ```
     pub struct UnsortedImports;
 );
 impl AlwaysAutofixableViolation for UnsortedImports {
@@ -109,6 +127,7 @@ pub fn organize_imports(
         settings.isort.force_wrap_aliases,
         &settings.isort.known_first_party,
         &settings.isort.known_third_party,
+        &settings.isort.known_local_folder,
         settings.isort.order_by_type,
         settings.isort.relative_imports_order,
         &settings.isort.single_line_exclusions,
@@ -118,6 +137,7 @@ pub fn organize_imports(
         &settings.isort.variables,
         &settings.isort.no_lines_before,
         settings.isort.lines_after_imports,
+        settings.isort.lines_between_types,
         &settings.isort.forced_separate,
         settings.target_version,
     );

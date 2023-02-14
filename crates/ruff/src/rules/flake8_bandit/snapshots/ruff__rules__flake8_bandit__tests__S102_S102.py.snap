@@ -1,9 +1,9 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ExecUsed: ~
+    ExecBuiltin: ~
   location:
     row: 3
     column: 4
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ExecUsed: ~
+    ExecBuiltin: ~
   location:
     row: 5
     column: 0
