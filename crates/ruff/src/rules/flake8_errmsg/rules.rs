@@ -12,7 +12,7 @@ define_violation!(
     ///
     /// ## Why is this bad?
     /// Python includes the line with the raise in the default traceback (and most
-    /// other formatters, like Rich and IPython to too).
+    /// other formatters, like Rich and `IPython` to too).
     ///
     /// ## Example
     ///
@@ -67,7 +67,7 @@ define_violation!(
     ///
     /// ## Why is this bad?
     /// Python includes the line with the raise in the default traceback (and most
-    /// other formatters, like Rich and IPython to too).
+    /// other formatters, like Rich and `IPython` to too).
     ///
     /// ## Example
     ///
@@ -124,7 +124,7 @@ define_violation!(
     ///
     /// ## Why is this bad?
     /// Python includes the line with the raise in the default traceback (and most
-    /// other formatters, like Rich and IPython to too).
+    /// other formatters, like Rich and `IPython` to too).
     ///
     /// ## Example
     ///
