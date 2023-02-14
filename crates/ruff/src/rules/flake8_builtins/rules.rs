@@ -9,25 +9,20 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for any variable (and function) assignments that have the same
-    /// name as a builtin.
-    ///
-    /// Keep in mind that this also takes into account the [`builtins`] and
-    /// [`flake8-builtins.builtins-ignorelist`] configuration options.
+    /// Checks for variable (and function) assignments that use the same name
+    /// as a builtin.
     ///
     /// ## Why is this bad?
-    /// Using a builtin name as the name of a variable increases
-    /// the difficulty of reading and maintaining the code, can cause
-    /// non-obvious code errors, and can mess up code highlighters.
+    /// Reusing a builtin name for the name of a variable increases the
+    /// difficulty of reading and maintaining the code, and can cause
+    /// non-obvious errors, as readers may mistake the variable for the
+    /// builtin and vice versa.
     ///
-    /// Instead, the variable should be renamed to something else
-    /// that is not considered a builtin. If you are sure that you want
-    /// to name the variable this way, you can also edit the [`flake8-builtins.builtins-ignorelist`]
-    /// configuration option.
+    /// Builtins can be marked as exceptions to this rule via the
+    /// [`flake8-builtins.builtins-ignorelist`] configuration option.
     ///
     /// ## Options
     ///
-    /// * `builtins`
     /// * `flake8-builtins.builtins-ignorelist`
     ///
     /// ## Example
@@ -36,7 +31,6 @@ define_violation!(
     ///     max = 0
     ///     for flat_list in list_of_lists:
     ///         for value in flat_list:
-    ///             # This is confusing, and causes an error!
     ///             max = max(max, value)  # TypeError: 'int' object is not callable
     ///     return max
     /// ```
@@ -51,7 +45,7 @@ define_violation!(
     ///     return result
     /// ```
     ///
-    /// * [StackOverflow - Why is it a bad idea to name a variable `id` in Python?](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
+    /// * [Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
     pub struct BuiltinVariableShadowing {
         pub name: String,
     }
@@ -66,24 +60,19 @@ impl Violation for BuiltinVariableShadowing {
 
 define_violation!(
     /// ## What it does
-    /// Checks for any function arguments that have the same name as a builtin.
-    ///
-    /// Keep in mind that this also takes into account the [`builtins`] and
-    /// [`flake8-builtins.builtins-ignorelist`] configuration options.
+    /// Checks for any function arguments that use the same name as a builtin.
     ///
     /// ## Why is this bad?
-    /// Using a builtin name as the name of an argument name increases
-    /// the difficulty of reading and maintaining the code, can cause
-    /// non-obvious code errors, and can mess up code highlighters.
+    /// Reusing a builtin name for the name of an argument increases the
+    /// difficulty of reading and maintaining the code, and can cause
+    /// non-obvious errors, as readers may mistake the argument for the
+    /// builtin and vice versa.
     ///
-    /// Instead, the function argument should be renamed to something else
-    /// that is not considered a builtin. If you are sure that you want
-    /// to name the argument this way, you can also edit the [`flake8-builtins.builtins-ignorelist`]
-    /// configuration option.
+    /// Builtins can be marked as exceptions to this rule via the
+    /// [`flake8-builtins.builtins-ignorelist`] configuration option.
     ///
     /// ## Options
     ///
-    /// * `builtins`
     /// * `flake8-builtins.builtins-ignorelist`
     ///
     /// ## Example
@@ -105,12 +94,12 @@ define_violation!(
     ///         result.add(value)
     ///     for value in list2:
     ///         result.add(value)
-    ///     return list(result)  
+    ///     return list(result)
     /// ```
     ///
     /// ## References
-    /// - [StackOverflow - Is it bad practice to use a built-in function name as an attribute or method identifier?](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
-    /// - [StackOverflow - Why is it a bad idea to name a variable `id` in Python?](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
+    /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
+    /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
     pub struct BuiltinArgumentShadowing {
         pub name: String,
     }
@@ -125,24 +114,20 @@ impl Violation for BuiltinArgumentShadowing {
 
 define_violation!(
     /// ## What it does
-    /// Checks for any class attributes that have the same name as a builtin.
-    ///
-    /// Keep in mind that this also takes into account the [`builtins`] and
-    /// [`flake8-builtins.builtins-ignorelist`] configuration options.
+    /// Checks for any class attributes that use the same name as a builtin.
     ///
     /// ## Why is this bad?
-    /// Using a builtin name as the name of a class attribute increases
-    /// the difficulty of reading and maintaining the code, can cause
-    /// non-obvious code errors, and can mess up code highlighters.
+    /// Reusing a builtin name for the name of an attribute increases the
+    /// difficulty of reading and maintaining the code, and can cause
+    /// non-obvious errors, as readers may mistake the attribute for the
+    /// builtin and vice versa.
     ///
-    /// Instead, the attribute should be renamed to something else
-    /// that is not considered a builtin or converted to the related dunder
-    /// (aka magic) method.If you are sure that you want to name the attribute
-    /// this way, you can also edit the [`flake8-builtins.builtins-ignorelist`] configuration option.
+    /// Builtins can be marked as exceptions to this rule via the
+    /// [`flake8-builtins.builtins-ignorelist`] configuration option, or
+    /// converted to the appropriate dunder method.
     ///
     /// ## Options
     ///
-    /// * `builtins`
     /// * `flake8-builtins.builtins-ignorelist`
     ///
     /// ## Example
@@ -157,14 +142,19 @@ define_violation!(
     /// class Shadow:
     ///     def to_int():
     ///         return 0
-    ///     # OR (keep in mind you will have to use `int(shadow)` instead of `shadow.int()`)
+    /// ```
+    ///
+    /// Or:
+    /// ```python
+    /// class Shadow:
+    ///     # Callable as `int(shadow)`
     ///     def __int__():
     ///         return 0
     /// ```
     ///
     /// ## References
-    /// - [StackOverflow - Is it bad practice to use a built-in function name as an attribute or method identifier?](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
-    /// - [StackOverflow - Why is it a bad idea to name a variable `id` in Python?](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
+    /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
+    /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
     pub struct BuiltinAttributeShadowing {
         pub name: String,
     }
