@@ -39,8 +39,8 @@ num-traits = "0.2.15"
 once_cell = { workspace = true }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 regex = { workspace = true }
-ruff_macros = { version = "0.0.246", path = "../ruff_macros" }
-ruff_python = { version = "0.0.246", path = "../ruff_python" }
+ruff_macros = { path = "../ruff_macros" }
+ruff_python = { path = "../ruff_python" }
 rustc-hash = { workspace = true }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
