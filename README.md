@@ -1492,7 +1492,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| NPY001 | [numpy-deprecated-type-alias](https://beta.ruff.rs/docs/rules/numpy-deprecated-type-alias/) | NumPy type alias `np.{type_name}` is deprecated, replace with builtin type | 🛠 |
+| NPY001 | [numpy-deprecated-type-alias](https://beta.ruff.rs/docs/rules/numpy-deprecated-type-alias/) | Type alias `np.{type_name}` is deprecated, replace with builtin type | 🛠 |
 
 ### Ruff-specific rules (RUF)
 
