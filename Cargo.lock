@@ -2545,6 +2545,7 @@ dependencies = [
  "itertools",
  "libcst",
  "once_cell",
+ "regex",
  "ruff",
  "ruff_cli",
  "rustpython-common",
