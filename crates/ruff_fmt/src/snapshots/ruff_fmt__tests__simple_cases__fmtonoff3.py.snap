@@ -1,3 +1,8 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
 # fmt: off
 x = [
     1, 2,
@@ -12,6 +17,5 @@ x = [
 ]
 # fmt: on
 
-x = [
-    1, 2, 3, 4
-]
+x = [1, 2, 3, 4]
+

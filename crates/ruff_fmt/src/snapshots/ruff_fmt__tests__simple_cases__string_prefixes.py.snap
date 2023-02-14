@@ -1,13 +1,18 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
 #!/usr/bin/env python3
 
 name = "Łukasz"
-(f"hello {name}", F"hello {name}")
-(b"", B"")
-(u"", U"")
+(f"hello {name}", f"hello {name}")
+(b"", b"")
+("", "")
 (r"", R"")
 
-(rf"", fr"", Rf"", fR"", rF"", Fr"", RF"", FR"")
-(rb"", br"", Rb"", bR"", rB"", Br"", RB"", BR"")
+(rf"", rf"", Rf"", Rf"", rf"", rf"", Rf"", Rf"")
+(rb"", rb"", Rb"", Rb"", rb"", rb"", Rb"", Rb"")
 
 
 def docstring_singleline():
@@ -18,3 +23,4 @@ def docstring_multiline():
     R"""
     clear out all of the issues opened in that time :p
     """
+

@@ -1,3 +1,8 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
 if True:
     if True:
         if True:
@@ -6,3 +11,4 @@ if True:
                 + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
                 "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
             ) % {"reported_username": reported_username, "report_reason": report_reason}
+

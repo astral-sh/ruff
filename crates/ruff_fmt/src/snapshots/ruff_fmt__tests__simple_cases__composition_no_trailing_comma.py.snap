@@ -1,3 +1,8 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
 class C:
     def test(self) -> None:
         with patch("black.out", print):
@@ -34,7 +39,7 @@ class C:
         xxxxxxxxxxxxxxxx = Yyyy2YyyyyYyyyyy(
             push_manager=context.request.resource_manager,
             max_items_to_push=num_items,
-            batch_size=Yyyy2YyyyYyyyyYyyy.FULL_SIZE
+            batch_size=Yyyy2YyyyYyyyyYyyy.FULL_SIZE,
         ).push(
             # Only send the first n items.
             items=items[:num_items]
@@ -68,7 +73,7 @@ class C:
             key6: value6,
             key7: value7,
             key8: value8,
-            key9: value9
+            key9: value9,
         } == expected, "Not what we expected"
 
         assert expected == {
@@ -80,7 +85,7 @@ class C:
             key6: value6,
             key7: value7,
             key8: value8,
-            key9: value9
+            key9: value9,
         }, "Not what we expected"
 
         assert expected == {
@@ -92,7 +97,7 @@ class C:
             key6: value6,
             key7: value7,
             key8: value8,
-            key9: value9
+            key9: value9,
         }
 
     def tricky_asserts(self) -> None:
@@ -105,7 +110,7 @@ class C:
             key6: value6,
             key7: value7,
             key8: value8,
-            key9: value9
+            key9: value9,
         } == expected(
             value, is_going_to_be="too long to fit in a single line", srsly=True
         ), "Not what we expected"
@@ -119,7 +124,7 @@ class C:
             key6: value6,
             key7: value7,
             key8: value8,
-            key9: value9
+            key9: value9,
         } == expected, (
             "Not what we expected and the message is too long to fit in one line"
         )
@@ -135,7 +140,7 @@ class C:
             key6: value6,
             key7: value7,
             key8: value8,
-            key9: value9
+            key9: value9,
         }, "Not what we expected"
 
         assert expected == {
@@ -147,7 +152,7 @@ class C:
             key6: value6,
             key7: value7,
             key8: value8,
-            key9: value9
+            key9: value9,
         }, (
             "Not what we expected and the message is too long to fit in one line"
             " because it's too long"
@@ -176,6 +181,7 @@ class C:
                 key6: value6,
                 key7: value7,
                 key8: value8,
-                key9: value9
+                key9: value9,
             }
         )
+
