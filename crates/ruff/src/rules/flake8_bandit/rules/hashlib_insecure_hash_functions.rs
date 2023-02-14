@@ -17,10 +17,7 @@ impl Violation for HashlibInsecureHashFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         let HashlibInsecureHashFunction { string } = self;
-        format!(
-            "Probable use of insecure hash functions in `hashlib`: \"{}\"",
-            string.escape_debug()
-        )
+        format!("Probable use of insecure hash functions in `hashlib`: `{string}`")
     }
 }
 
