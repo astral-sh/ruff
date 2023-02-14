@@ -36,7 +36,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
+    /// * [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
     pub struct UnrecognizedPlatformCheck;
 );
 impl Violation for UnrecognizedPlatformCheck {
@@ -72,7 +72,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
+    /// * [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
     pub struct UnrecognizedPlatformName {
         pub platform: String,
     }
