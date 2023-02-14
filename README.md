@@ -1044,9 +1044,9 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/) on Py
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| A001 | builtin-variable-shadowing | Variable `{name}` is shadowing a python builtin |  |
-| A002 | builtin-argument-shadowing | Argument `{name}` is shadowing a python builtin |  |
-| A003 | builtin-attribute-shadowing | Class attribute `{name}` is shadowing a python builtin |  |
+| A001 | [builtin-variable-shadowing](https://beta.ruff.rs/docs/rules/builtin-variable-shadowing/) | Variable `{name}` is shadowing a python builtin |  |
+| A002 | [builtin-argument-shadowing](https://beta.ruff.rs/docs/rules/builtin-argument-shadowing/) | Argument `{name}` is shadowing a python builtin |  |
+| A003 | [builtin-attribute-shadowing](https://beta.ruff.rs/docs/rules/builtin-attribute-shadowing/) | Class attribute `{name}` is shadowing a python builtin |  |
 
 ### flake8-commas (COM)
 
