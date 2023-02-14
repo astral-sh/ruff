@@ -196,6 +196,23 @@ pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     let mut rule_noqa_code_match_arms = quote!();
 
     for (rule, codes) in rule_to_codes {
+        assert!(
+            codes.len() == 1,
+            "
+            The mapping of multiple codes to one rule has been disabled due to UX concerns (it would
+            be confusing if violations were reported under a different code than the code you selected).
+
+            We firstly want to allow rules to be selected by their names (and report them by name),
+            and before we can do that we have to rename all our rules to match our naming convention
+            (see CONTRIBUTING.md) because after that change every rule rename will be a breaking change.
+
+            See also https://github.com/charliermarsh/ruff/issues/2186.
+
+            (this was triggered by {} being mapped to multiple codes)
+            ",
+            rule.segments.last().unwrap().ident
+        );
+
         let (linter, code, attrs) = codes
             .iter()
             .sorted_by_key(|(l, ..)| *l == "Pylint") // TODO: more sophisticated sorting
