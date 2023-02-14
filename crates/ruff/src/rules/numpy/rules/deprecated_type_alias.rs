@@ -9,27 +9,27 @@ use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     /// ## What it does
-    ///
-    /// Checks for deprecated numpy type aliases.
+    /// Checks for deprecated NumPy type aliases.
     ///
     /// ## Why is this bad?
+    /// NumPy's `np.int` has long been an alias of the builtin `int`. The same
+    /// goes for `np.float`, `np.bool`, and others. These aliases exist
+    /// primarily primarily for historic reasons, and have been a cause of
+    /// frequent confusion for newcomers.
     ///
-    /// For a long time, np.int has been an alias of the builtin int.
-    /// This is repeatedly a cause of confusion for newcomers, and existed mainly for historic reasons.
-    /// These aliases have been deprecated in 1.20, and removed in 1.24.
+    /// These aliases were been deprecated in 1.20, and removed in 1.24.
     ///
     /// ## Examples
-    ///
     /// ```python
-    /// numpy.bool
+    /// import numpy as np
+    ///
+    /// np.bool
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// bool
     /// ```
-    ///
     pub struct DeprecatedTypeAlias {
         pub type_name: String,
     }
@@ -38,12 +38,12 @@ impl AlwaysAutofixableViolation for DeprecatedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DeprecatedTypeAlias { type_name } = self;
-        format!("Numpy type alias `numpy.{type_name}` is deprecated, replace with builtin type")
+        format!("NumPy type alias `np.{type_name}` is deprecated, replace with builtin type")
     }
 
     fn autofix_title(&self) -> String {
         let DeprecatedTypeAlias { type_name } = self;
-        format!("Replace `numpy.{type_name}` with builtin type")
+        format!("Replace `np.{type_name}` with builtin type")
     }
 }
 

@@ -15,6 +15,7 @@ mod ast;
 mod autofix;
 pub mod cache;
 mod checkers;
+mod codes;
 mod cst;
 mod directives;
 mod doc_lines;

@@ -125,7 +125,7 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PercentFormatUnsupportedFormatCharacter { char } = self;
-        format!("`%`-format string has unsupported format character '{char}'")
+        format!("`%`-format string has unsupported format character `{char}`")
     }
 }
 

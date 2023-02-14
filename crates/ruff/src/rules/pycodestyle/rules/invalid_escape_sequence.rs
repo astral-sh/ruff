@@ -14,7 +14,7 @@ impl AlwaysAutofixableViolation for InvalidEscapeSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
         let InvalidEscapeSequence(char) = self;
-        format!("Invalid escape sequence: '\\{char}'")
+        format!("Invalid escape sequence: `\\{char}`")
     }
 
     fn autofix_title(&self) -> String {

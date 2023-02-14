@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 
-use crate::registry::RuleCodePrefix;
+use crate::registry::Linter;
 use crate::rule_selector::RuleSelector;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -131,43 +131,42 @@ impl fmt::Debug for Plugin {
     }
 }
 
-// TODO(martin): Convert into `impl From<Plugin> for Linter`
-impl Plugin {
-    pub fn selector(&self) -> RuleSelector {
-        match self {
-            Plugin::Flake82020 => RuleCodePrefix::YTT.into(),
-            Plugin::Flake8Annotations => RuleCodePrefix::ANN.into(),
-            Plugin::Flake8Bandit => RuleCodePrefix::S.into(),
-            Plugin::Flake8BlindExcept => RuleCodePrefix::BLE.into(),
-            Plugin::Flake8BooleanTrap => RuleCodePrefix::FBT.into(),
-            Plugin::Flake8Bugbear => RuleCodePrefix::B.into(),
-            Plugin::Flake8Builtins => RuleCodePrefix::A.into(),
-            Plugin::Flake8Commas => RuleCodePrefix::COM.into(),
-            Plugin::Flake8Comprehensions => RuleCodePrefix::C4.into(),
-            Plugin::Flake8Datetimez => RuleCodePrefix::DTZ.into(),
-            Plugin::Flake8Debugger => RuleCodePrefix::T1.into(),
-            Plugin::Flake8Docstrings => RuleCodePrefix::D.into(),
-            Plugin::Flake8Eradicate => RuleCodePrefix::ERA.into(),
-            Plugin::Flake8ErrMsg => RuleCodePrefix::EM.into(),
-            Plugin::Flake8Executable => RuleCodePrefix::EXE.into(),
-            Plugin::Flake8ImplicitStrConcat => RuleCodePrefix::ISC.into(),
-            Plugin::Flake8ImportConventions => RuleCodePrefix::ICN.into(),
-            Plugin::Flake8NoPep420 => RuleCodePrefix::INP.into(),
-            Plugin::Flake8Pie => RuleCodePrefix::PIE.into(),
-            Plugin::Flake8Print => RuleCodePrefix::T2.into(),
-            Plugin::Flake8PytestStyle => RuleCodePrefix::PT.into(),
-            Plugin::Flake8Quotes => RuleCodePrefix::Q.into(),
-            Plugin::Flake8Return => RuleCodePrefix::RET.into(),
-            Plugin::Flake8Simplify => RuleCodePrefix::SIM.into(),
-            Plugin::Flake8TidyImports => RuleCodePrefix::TID.into(),
-            Plugin::Flake8TypeChecking => RuleCodePrefix::TCH.into(),
-            Plugin::Flake8UnusedArguments => RuleCodePrefix::ARG.into(),
-            Plugin::Flake8UsePathlib => RuleCodePrefix::PTH.into(),
-            Plugin::McCabe => RuleCodePrefix::C9.into(),
-            Plugin::PEP8Naming => RuleCodePrefix::N.into(),
-            Plugin::PandasVet => RuleCodePrefix::PD.into(),
-            Plugin::Pyupgrade => RuleCodePrefix::UP.into(),
-            Plugin::Tryceratops => RuleCodePrefix::TRY.into(),
+impl From<&Plugin> for Linter {
+    fn from(plugin: &Plugin) -> Self {
+        match plugin {
+            Plugin::Flake82020 => Linter::Flake82020,
+            Plugin::Flake8Annotations => Linter::Flake8Annotations,
+            Plugin::Flake8Bandit => Linter::Flake8Bandit,
+            Plugin::Flake8BlindExcept => Linter::Flake8BlindExcept,
+            Plugin::Flake8BooleanTrap => Linter::Flake8BooleanTrap,
+            Plugin::Flake8Bugbear => Linter::Flake8Bugbear,
+            Plugin::Flake8Builtins => Linter::Flake8Builtins,
+            Plugin::Flake8Commas => Linter::Flake8Commas,
+            Plugin::Flake8Comprehensions => Linter::Flake8Comprehensions,
+            Plugin::Flake8Datetimez => Linter::Flake8Datetimez,
+            Plugin::Flake8Debugger => Linter::Flake8Debugger,
+            Plugin::Flake8Docstrings => Linter::Pydocstyle,
+            Plugin::Flake8Eradicate => Linter::Eradicate,
+            Plugin::Flake8ErrMsg => Linter::Flake8ErrMsg,
+            Plugin::Flake8Executable => Linter::Flake8Executable,
+            Plugin::Flake8ImplicitStrConcat => Linter::Flake8ImplicitStrConcat,
+            Plugin::Flake8ImportConventions => Linter::Flake8ImportConventions,
+            Plugin::Flake8NoPep420 => Linter::Flake8NoPep420,
+            Plugin::Flake8Pie => Linter::Flake8Pie,
+            Plugin::Flake8Print => Linter::Flake8Print,
+            Plugin::Flake8PytestStyle => Linter::Flake8PytestStyle,
+            Plugin::Flake8Quotes => Linter::Flake8Quotes,
+            Plugin::Flake8Return => Linter::Flake8Return,
+            Plugin::Flake8Simplify => Linter::Flake8Simplify,
+            Plugin::Flake8TidyImports => Linter::Flake8TidyImports,
+            Plugin::Flake8TypeChecking => Linter::Flake8TypeChecking,
+            Plugin::Flake8UnusedArguments => Linter::Flake8UnusedArguments,
+            Plugin::Flake8UsePathlib => Linter::Flake8UsePathlib,
+            Plugin::McCabe => Linter::McCabe,
+            Plugin::PEP8Naming => Linter::PEP8Naming,
+            Plugin::PandasVet => Linter::PandasVet,
+            Plugin::Pyupgrade => Linter::Pyupgrade,
+            Plugin::Tryceratops => Linter::Tryceratops,
         }
     }
 }
@@ -334,7 +333,7 @@ pub fn infer_plugins_from_codes(selectors: &HashSet<RuleSelector>) -> Vec<Plugin
         for selector in selectors {
             if selector
                 .into_iter()
-                .any(|rule| plugin.selector().into_iter().any(|r| r == rule))
+                .any(|rule| Linter::from(plugin).into_iter().any(|r| r == rule))
             {
                 return true;
             }

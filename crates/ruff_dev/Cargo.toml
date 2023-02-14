@@ -1,6 +1,7 @@
 [package]
 name = "ruff_dev"
-version = "0.0.246"
+version = "0.0.0"
+publish = false
 edition = "2021"
 
 [dependencies]
@@ -9,6 +10,7 @@ clap = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
 once_cell = { workspace = true }
+regex.workspace = true
 ruff = { path = "../ruff" }
 ruff_cli = { path = "../ruff_cli" }
 rustpython-common = { workspace = true }

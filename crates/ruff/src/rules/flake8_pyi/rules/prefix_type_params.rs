@@ -55,7 +55,7 @@ impl Violation for PrefixTypeParams {
     #[derive_message_formats]
     fn message(&self) -> String {
         let PrefixTypeParams { kind } = self;
-        format!("Name of private `{kind}` must start with _")
+        format!("Name of private `{kind}` must start with `_`")
     }
 }
 

@@ -149,20 +149,20 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [flake8-pyi (PYI)](#flake8-pyi-pyi)
    1. [flake8-pytest-style (PT)](#flake8-pytest-style-pt)
    1. [flake8-quotes (Q)](#flake8-quotes-q)
+   1. [flake8-raise (RSE)](#flake8-raise-rse)
    1. [flake8-return (RET)](#flake8-return-ret)
+   1. [flake8-self (SLF)](#flake8-self-slf)
    1. [flake8-simplify (SIM)](#flake8-simplify-sim)
    1. [flake8-tidy-imports (TID)](#flake8-tidy-imports-tid)
    1. [flake8-type-checking (TCH)](#flake8-type-checking-tch)
    1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
    1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
    1. [eradicate (ERA)](#eradicate-era)
+   1. [Numpy-specific rules (NPY)](#numpy-specific-rules-npy)
    1. [pandas-vet (PD)](#pandas-vet-pd)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PL)](#pylint-pl)
    1. [tryceratops (TRY)](#tryceratops-try)
-   1. [flake8-raise (RSE)](#flake8-raise-rse)
-   1. [flake8-self (SLF)](#flake8-self-slf)
-   1. [Numpy-specific rules (NPY)](#numpy-specific-rules-npy)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -255,8 +255,10 @@ Or, to enable autofix:
 
 <!-- Begin section: Configuration -->
 
-Ruff is configurable both via `pyproject.toml` and the command line. For a full list of configurable
+Ruff is configurable both via `pyproject.toml`, `ruff.toml`, and the command line. For a full list of configurable
 options, see the [API reference](#reference).
+
+### Configure via `pyproject.toml`
 
 If left unspecified, the default configuration is equivalent to:
 
@@ -362,6 +364,8 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
   extension.
 * By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
   consider turning off autofix for specific rules or categories (see: [FAQ](#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
+
+### Configure via `ruff.toml`
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
 an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the
@@ -672,7 +676,7 @@ Ruff supports two command-line flags that alter its exit code behavior:
 ### Autocompletion
 
 Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
-by `ruff completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
+by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
 `powershell`, or `zsh`.
 
 The exact steps required to enable autocompletion will vary by shell. For example instructions,
@@ -726,13 +730,13 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F506 | percent-format-mixed-positional-and-named | `%`-format string has mixed positional and named placeholders |  |
 | F507 | percent-format-positional-count-mismatch | `%`-format string has {wanted} placeholder(s) but {got} substitution(s) |  |
 | F508 | percent-format-star-requires-sequence | `%`-format string `*` specifier requires sequence |  |
-| F509 | percent-format-unsupported-format-character | `%`-format string has unsupported format character '{char}' |  |
+| F509 | percent-format-unsupported-format-character | `%`-format string has unsupported format character `{char}` |  |
 | F521 | string-dot-format-invalid-format | `.format` call has invalid format string: {message} |  |
 | F522 | string-dot-format-extra-named-arguments | `.format` call has unused named argument(s): {message} | 🛠 |
 | F523 | string-dot-format-extra-positional-arguments | `.format` call has unused arguments at position(s): {message} |  |
 | F524 | string-dot-format-missing-arguments | `.format` call is missing argument(s) for placeholder(s): {message} |  |
 | F525 | string-dot-format-mixing-automatic | `.format` string mixes automatic and manual numbering |  |
-| F541 | [f-string-missing-placeholders](https://github.com/charliermarsh/ruff/blob/main/docs/rules/f-string-missing-placeholders.md) | f-string without any placeholders | 🛠 |
+| F541 | [f-string-missing-placeholders](https://beta.ruff.rs/docs/rules/f-string-missing-placeholders/) | f-string without any placeholders | 🛠 |
 | F601 | multi-value-repeated-key-literal | Dictionary key literal `{name}` repeated | 🛠 |
 | F602 | multi-value-repeated-key-variable | Dictionary key `{name}` repeated | 🛠 |
 | F621 | expressions-in-star-assignment | Too many expressions in star-unpacking assignment |  |
@@ -751,7 +755,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F821 | undefined-name | Undefined name `{name}` |  |
 | F822 | undefined-export | Undefined name `{name}` in `__all__` |  |
 | F823 | undefined-local | Local variable `{name}` referenced before assignment |  |
-| F841 | [unused-variable](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unused-variable.md) | Local variable `{name}` is assigned to but never used | 🛠 |
+| F841 | [unused-variable](https://beta.ruff.rs/docs/rules/unused-variable/) | Local variable `{name}` is assigned to but never used | 🛠 |
 | F842 | unused-annotation | Local variable `{name}` is annotated but never used |  |
 | F901 | raise-not-implemented | `raise NotImplemented` should be `raise NotImplementedError` | 🛠 |
 
@@ -775,7 +779,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | E713 | not-in-test | Test for membership should be `not in` | 🛠 |
 | E714 | not-is-test | Test for object identity should be `is not` | 🛠 |
 | E721 | type-comparison | Do not compare types, use `isinstance()` |  |
-| E722 | [bare-except](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bare-except.md) | Do not use bare `except` |  |
+| E722 | [bare-except](https://beta.ruff.rs/docs/rules/bare-except/) | Do not use bare `except` |  |
 | E731 | lambda-assignment | Do not assign a `lambda` expression, use a `def` | 🛠 |
 | E741 | ambiguous-variable-name | Ambiguous variable name: `{name}` |  |
 | E742 | ambiguous-class-name | Ambiguous class name: `{name}` |  |
@@ -789,7 +793,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | ---- | ---- | ------- | --- |
 | W292 | no-new-line-at-end-of-file | No newline at end of file | 🛠 |
 | W505 | doc-line-too-long | Doc line too long ({length} > {limit} characters) |  |
-| W605 | invalid-escape-sequence | Invalid escape sequence: '\{char}' | 🛠 |
+| W605 | invalid-escape-sequence | Invalid escape sequence: `\{char}` | 🛠 |
 
 ### mccabe (C90)
 
@@ -797,7 +801,7 @@ For more, see [mccabe](https://pypi.org/project/mccabe/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C901 | [complex-structure](https://github.com/charliermarsh/ruff/blob/main/docs/rules/complex-structure.md) | `{name}` is too complex ({complexity}) |  |
+| C901 | [complex-structure](https://beta.ruff.rs/docs/rules/complex-structure/) | `{name}` is too complex ({complexity}) |  |
 
 ### isort (I)
 
@@ -805,8 +809,8 @@ For more, see [isort](https://pypi.org/project/isort/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| I001 | [unsorted-imports](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unsorted-imports.md) | Import block is un-sorted or un-formatted | 🛠 |
-| I002 | [missing-required-import](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-required-import.md) | Missing required import: `{name}` | 🛠 |
+| I001 | [unsorted-imports](https://beta.ruff.rs/docs/rules/unsorted-imports/) | Import block is un-sorted or un-formatted | 🛠 |
+| I002 | [missing-required-import](https://beta.ruff.rs/docs/rules/missing-required-import/) | Missing required import: `{name}` | 🛠 |
 
 ### pep8-naming (N)
 
@@ -860,8 +864,8 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line | 🛠 |
 | D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
 | D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
-| D300 | triple-single-quotes | Use """triple double quotes""" |  |
-| D301 | escape-sequence-in-docstring | Use r""" if any backslashes in a docstring |  |
+| D300 | triple-single-quotes | Use triple double quotes `"""` |  |
+| D301 | escape-sequence-in-docstring | Use `r"""` if any backslashes in a docstring |  |
 | D400 | ends-in-period | First line should end with a period | 🛠 |
 | D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
@@ -948,17 +952,17 @@ For more, see [flake8-annotations](https://pypi.org/project/flake8-annotations/)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ANN001 | [missing-type-function-argument](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-function-argument.md) | Missing type annotation for function argument `{name}` |  |
-| ANN002 | [missing-type-args](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-args.md) | Missing type annotation for `*{name}` |  |
-| ANN003 | [missing-type-kwargs](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-kwargs.md) | Missing type annotation for `**{name}` |  |
-| ANN101 | [missing-type-self](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-self.md) | Missing type annotation for `{name}` in method |  |
-| ANN102 | [missing-type-cls](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-type-cls.md) | Missing type annotation for `{name}` in classmethod |  |
-| ANN201 | [missing-return-type-public-function](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-public-function.md) | Missing return type annotation for public function `{name}` |  |
-| ANN202 | [missing-return-type-private-function](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-private-function.md) | Missing return type annotation for private function `{name}` |  |
-| ANN204 | [missing-return-type-special-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-special-method.md) | Missing return type annotation for special method `{name}` | 🛠 |
-| ANN205 | [missing-return-type-static-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-static-method.md) | Missing return type annotation for staticmethod `{name}` |  |
-| ANN206 | [missing-return-type-class-method](https://github.com/charliermarsh/ruff/blob/main/docs/rules/missing-return-type-class-method.md) | Missing return type annotation for classmethod `{name}` |  |
-| ANN401 | [any-type](https://github.com/charliermarsh/ruff/blob/main/docs/rules/any-type.md) | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
+| ANN001 | [missing-type-function-argument](https://beta.ruff.rs/docs/rules/missing-type-function-argument/) | Missing type annotation for function argument `{name}` |  |
+| ANN002 | [missing-type-args](https://beta.ruff.rs/docs/rules/missing-type-args/) | Missing type annotation for `*{name}` |  |
+| ANN003 | [missing-type-kwargs](https://beta.ruff.rs/docs/rules/missing-type-kwargs/) | Missing type annotation for `**{name}` |  |
+| ANN101 | [missing-type-self](https://beta.ruff.rs/docs/rules/missing-type-self/) | Missing type annotation for `{name}` in method |  |
+| ANN102 | [missing-type-cls](https://beta.ruff.rs/docs/rules/missing-type-cls/) | Missing type annotation for `{name}` in classmethod |  |
+| ANN201 | [missing-return-type-public-function](https://beta.ruff.rs/docs/rules/missing-return-type-public-function/) | Missing return type annotation for public function `{name}` |  |
+| ANN202 | [missing-return-type-private-function](https://beta.ruff.rs/docs/rules/missing-return-type-private-function/) | Missing return type annotation for private function `{name}` |  |
+| ANN204 | [missing-return-type-special-method](https://beta.ruff.rs/docs/rules/missing-return-type-special-method/) | Missing return type annotation for special method `{name}` | 🛠 |
+| ANN205 | [missing-return-type-static-method](https://beta.ruff.rs/docs/rules/missing-return-type-static-method/) | Missing return type annotation for staticmethod `{name}` |  |
+| ANN206 | [missing-return-type-class-method](https://beta.ruff.rs/docs/rules/missing-return-type-class-method/) | Missing return type annotation for classmethod `{name}` |  |
+| ANN401 | [any-type](https://beta.ruff.rs/docs/rules/any-type/) | Dynamically typed expressions (typing.Any) are disallowed in `{name}` |  |
 
 ### flake8-bandit (S)
 
@@ -977,12 +981,12 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S110 | try-except-pass | `try`-`except`-`pass` detected, consider logging the exception |  |
 | S112 | try-except-continue | `try`-`except`-`continue` detected, consider logging the exception |  |
 | S113 | request-without-timeout | Probable use of requests call with timeout set to `{value}` |  |
-| S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: "{}" |  |
+| S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: `{string}` |  |
 | S501 | request-with-no-cert-validation | Probable use of `{string}` call with `verify=False` disabling SSL certificate checks |  |
 | S506 | unsafe-yaml-load | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 | S508 | snmp-insecure-version | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
 | S509 | snmp-weak-cryptography | You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure. |  |
-| S608 | [hardcoded-sql-expression](https://github.com/charliermarsh/ruff/blob/main/docs/rules/hardcoded-sql-expression.md) | Possible SQL injection vector through string-based query construction |  |
+| S608 | [hardcoded-sql-expression](https://beta.ruff.rs/docs/rules/hardcoded-sql-expression/) | Possible SQL injection vector through string-based query construction |  |
 | S612 | logging-config-insecure-listen | Use of insecure `logging.config.listen` detected |  |
 | S701 | jinja2-autoescape-false | Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function. |  |
 
@@ -1025,7 +1029,7 @@ For more, see [flake8-bugbear](https://pypi.org/project/flake8-bugbear/) on PyPI
 | B014 | duplicate-handler-exception | Exception handler with duplicate exception: `{name}` | 🛠 |
 | B015 | useless-comparison | Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it. |  |
 | B016 | cannot-raise-literal | Cannot raise a literal. Did you intend to return it or raise an Exception? |  |
-| B017 | [assert-raises-exception](https://github.com/charliermarsh/ruff/blob/main/docs/rules/assert-raises-exception.md) | `assertRaises(Exception)` should be considered evil |  |
+| B017 | [assert-raises-exception](https://beta.ruff.rs/docs/rules/assert-raises-exception/) | `assertRaises(Exception)` should be considered evil |  |
 | B018 | useless-expression | Found useless expression. Either assign it to a variable or remove it. |  |
 | B019 | cached-instance-method | Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks |  |
 | B020 | loop-variable-overrides-iterator | Loop control variable `{name}` overrides iterable it iterates |  |
@@ -1045,9 +1049,9 @@ For more, see [flake8-builtins](https://pypi.org/project/flake8-builtins/) on Py
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| A001 | builtin-variable-shadowing | Variable `{name}` is shadowing a python builtin |  |
-| A002 | builtin-argument-shadowing | Argument `{name}` is shadowing a python builtin |  |
-| A003 | builtin-attribute-shadowing | Class attribute `{name}` is shadowing a python builtin |  |
+| A001 | [builtin-variable-shadowing](https://beta.ruff.rs/docs/rules/builtin-variable-shadowing/) | Variable `{name}` is shadowing a python builtin |  |
+| A002 | [builtin-argument-shadowing](https://beta.ruff.rs/docs/rules/builtin-argument-shadowing/) | Argument `{name}` is shadowing a python builtin |  |
+| A003 | [builtin-attribute-shadowing](https://beta.ruff.rs/docs/rules/builtin-attribute-shadowing/) | Class attribute `{name}` is shadowing a python builtin |  |
 
 ### flake8-commas (COM)
 
@@ -1065,9 +1069,9 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| C400 | [unnecessary-generator-list](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-generator-list.md) | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
-| C401 | [unnecessary-generator-set](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-generator-set.md) | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
-| C402 | [unnecessary-generator-dict](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-generator-dict.md) | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
+| C400 | [unnecessary-generator-list](https://beta.ruff.rs/docs/rules/unnecessary-generator-list/) | Unnecessary generator (rewrite as a `list` comprehension) | 🛠 |
+| C401 | [unnecessary-generator-set](https://beta.ruff.rs/docs/rules/unnecessary-generator-set/) | Unnecessary generator (rewrite as a `set` comprehension) | 🛠 |
+| C402 | [unnecessary-generator-dict](https://beta.ruff.rs/docs/rules/unnecessary-generator-dict/) | Unnecessary generator (rewrite as a `dict` comprehension) | 🛠 |
 | C403 | unnecessary-list-comprehension-set | Unnecessary `list` comprehension (rewrite as a `set` comprehension) | 🛠 |
 | C404 | unnecessary-list-comprehension-dict | Unnecessary `list` comprehension (rewrite as a `dict` comprehension) | 🛠 |
 | C405 | unnecessary-literal-set | Unnecessary `{obj_type}` literal (rewrite as a `set` literal) | 🛠 |
@@ -1076,11 +1080,11 @@ For more, see [flake8-comprehensions](https://pypi.org/project/flake8-comprehens
 | C409 | unnecessary-literal-within-tuple-call | Unnecessary `{literal}` literal passed to `tuple()` (rewrite as a `tuple` literal) | 🛠 |
 | C410 | unnecessary-literal-within-list-call | Unnecessary `{literal}` literal passed to `list()` (remove the outer call to `list()`) | 🛠 |
 | C411 | unnecessary-list-call | Unnecessary `list` call (remove the outer call to `list()`) | 🛠 |
-| C413 | [unnecessary-call-around-sorted](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-call-around-sorted.md) | Unnecessary `{func}` call around `sorted()` | 🛠 |
-| C414 | [unnecessary-double-cast-or-process](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-double-cast-or-process.md) | Unnecessary `{inner}` call within `{outer}()` | 🛠 |
+| C413 | [unnecessary-call-around-sorted](https://beta.ruff.rs/docs/rules/unnecessary-call-around-sorted/) | Unnecessary `{func}` call around `sorted()` | 🛠 |
+| C414 | [unnecessary-double-cast-or-process](https://beta.ruff.rs/docs/rules/unnecessary-double-cast-or-process/) | Unnecessary `{inner}` call within `{outer}()` | 🛠 |
 | C415 | unnecessary-subscript-reversal | Unnecessary subscript reversal of iterable within `{func}()` |  |
 | C416 | unnecessary-comprehension | Unnecessary `{obj_type}` comprehension (rewrite using `{obj_type}()`) | 🛠 |
-| C417 | [unnecessary-map](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unnecessary-map.md) | Unnecessary `map` usage (rewrite using a generator expression) | 🛠 |
+| C417 | [unnecessary-map](https://beta.ruff.rs/docs/rules/unnecessary-map/) | Unnecessary `map` usage (rewrite using a generator expression) | 🛠 |
 
 ### flake8-datetimez (DTZ)
 
@@ -1112,9 +1116,9 @@ For more, see [flake8-django](https://pypi.org/project/flake8-django/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| DJ001 | [model-string-field-nullable](https://github.com/charliermarsh/ruff/blob/main/docs/rules/model-string-field-nullable.md) | Avoid using `null=True` on string-based fields such as {field_name} |  |
-| DJ008 | [model-dunder-str](https://github.com/charliermarsh/ruff/blob/main/docs/rules/model-dunder-str.md) | Model does not define `__str__` method |  |
-| DJ013 | [receiver-decorator-checker](https://github.com/charliermarsh/ruff/blob/main/docs/rules/receiver-decorator-checker.md) | `@receiver` decorator must be on top of all the other decorators |  |
+| DJ001 | [nullable-model-string-field](https://beta.ruff.rs/docs/rules/nullable-model-string-field/) | Avoid using `null=True` on string-based fields such as {field_name} |  |
+| DJ008 | [model-without-dunder-str](https://beta.ruff.rs/docs/rules/model-without-dunder-str/) | Model does not define `__str__` method |  |
+| DJ013 | [non-leading-receiver-decorator](https://beta.ruff.rs/docs/rules/non-leading-receiver-decorator/) | `@receiver` decorator must be on top of all the other decorators |  |
 
 ### flake8-errmsg (EM)
 
@@ -1134,7 +1138,7 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) o
 | ---- | ---- | ------- | --- |
 | EXE001 | shebang-not-executable | Shebang is present but file is not executable |  |
 | EXE002 | shebang-missing-executable-file | The file is executable but no shebang is present |  |
-| EXE003 | shebang-python | Shebang should contain "python" |  |
+| EXE003 | shebang-python | Shebang should contain `python` |  |
 | EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
 | EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
 
@@ -1154,7 +1158,7 @@ For more, see [flake8-import-conventions](https://github.com/joaopalmeiro/flake8
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ICN001 | [unconventional-import-alias](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unconventional-import-alias.md) | `{name}` should be imported as `{asname}` |  |
+| ICN001 | [unconventional-import-alias](https://beta.ruff.rs/docs/rules/unconventional-import-alias/) | `{name}` should be imported as `{asname}` |  |
 
 ### flake8-logging-format (G)
 
@@ -1177,7 +1181,7 @@ For more, see [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420/) on 
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| INP001 | [implicit-namespace-package](https://github.com/charliermarsh/ruff/blob/main/docs/rules/implicit-namespace-package.md) | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
+| INP001 | [implicit-namespace-package](https://beta.ruff.rs/docs/rules/implicit-namespace-package/) | File `{filename}` is part of an implicit namespace package. Add an `__init__.py`. |  |
 
 ### flake8-pie (PIE)
 
@@ -1208,9 +1212,9 @@ For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PYI001 | [prefix-type-params](https://github.com/charliermarsh/ruff/blob/main/docs/rules/prefix-type-params.md) | Name of private `{kind}` must start with _ |  |
-| PYI007 | [unrecognized-platform-check](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unrecognized-platform-check.md) | Unrecognized sys.platform check |  |
-| PYI008 | [unrecognized-platform-name](https://github.com/charliermarsh/ruff/blob/main/docs/rules/unrecognized-platform-name.md) | Unrecognized platform `{platform}` |  |
+| PYI001 | [prefix-type-params](https://beta.ruff.rs/docs/rules/prefix-type-params/) | Name of private `{kind}` must start with `_` |  |
+| PYI007 | [unrecognized-platform-check](https://beta.ruff.rs/docs/rules/unrecognized-platform-check/) | Unrecognized `sys.platform` check |  |
+| PYI008 | [unrecognized-platform-name](https://beta.ruff.rs/docs/rules/unrecognized-platform-name/) | Unrecognized platform `{platform}` |  |
 
 ### flake8-pytest-style (PT)
 
@@ -1250,10 +1254,18 @@ For more, see [flake8-quotes](https://pypi.org/project/flake8-quotes/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| Q000 | [bad-quotes-inline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-inline-string.md) | Double quotes found but single quotes preferred | 🛠 |
-| Q001 | [bad-quotes-multiline-string](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-multiline-string.md) | Double quote multiline found but single quotes preferred | 🛠 |
-| Q002 | [bad-quotes-docstring](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-quotes-docstring.md) | Double quote docstring found but single quotes preferred | 🛠 |
-| Q003 | [avoidable-escaped-quote](https://github.com/charliermarsh/ruff/blob/main/docs/rules/avoidable-escaped-quote.md) | Change outer quotes to avoid escaping inner quotes | 🛠 |
+| Q000 | [bad-quotes-inline-string](https://beta.ruff.rs/docs/rules/bad-quotes-inline-string/) | Double quotes found but single quotes preferred | 🛠 |
+| Q001 | [bad-quotes-multiline-string](https://beta.ruff.rs/docs/rules/bad-quotes-multiline-string/) | Double quote multiline found but single quotes preferred | 🛠 |
+| Q002 | [bad-quotes-docstring](https://beta.ruff.rs/docs/rules/bad-quotes-docstring/) | Double quote docstring found but single quotes preferred | 🛠 |
+| Q003 | [avoidable-escaped-quote](https://beta.ruff.rs/docs/rules/avoidable-escaped-quote/) | Change outer quotes to avoid escaping inner quotes | 🛠 |
+
+### flake8-raise (RSE)
+
+For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception | 🛠 |
 
 ### flake8-return (RET)
 
@@ -1269,6 +1281,14 @@ For more, see [flake8-return](https://pypi.org/project/flake8-return/) on PyPI.
 | RET506 | superfluous-else-raise | Unnecessary `{branch}` after `raise` statement |  |
 | RET507 | superfluous-else-continue | Unnecessary `{branch}` after `continue` statement |  |
 | RET508 | superfluous-else-break | Unnecessary `{branch}` after `break` statement |  |
+
+### flake8-self (SLF)
+
+For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| SLF001 | private-member-access | Private member accessed: `{access}` |  |
 
 ### flake8-simplify (SIM)
 
@@ -1286,7 +1306,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | SIM110 | convert-loop-to-any | Use `{any}` instead of `for` loop | 🛠 |
 | SIM111 | convert-loop-to-all | Use `{all}` instead of `for` loop | 🛠 |
 | SIM112 | use-capital-environment-variables | Use capitalized environment variable `{expected}` instead of `{original}` | 🛠 |
-| SIM114 | [if-with-same-arms](https://github.com/charliermarsh/ruff/blob/main/docs/rules/if-with-same-arms.md) | Combine `if` branches using logical `or` operator |  |
+| SIM114 | [if-with-same-arms](https://beta.ruff.rs/docs/rules/if-with-same-arms/) | Combine `if` branches using logical `or` operator |  |
 | SIM115 | open-file-with-context-handler | Use context handler for opening files |  |
 | SIM117 | multiple-with-statements | Use a single `with` statement with multiple contexts instead of nested `with` statements | 🛠 |
 | SIM118 | key-in-dict | Use `{key} in {dict}` instead of `{key} in {dict}.keys()` | 🛠 |
@@ -1309,8 +1329,8 @@ For more, see [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TID251 | [banned-api](https://github.com/charliermarsh/ruff/blob/main/docs/rules/banned-api.md) | `{name}` is banned: {message} |  |
-| TID252 | [relative-imports](https://github.com/charliermarsh/ruff/blob/main/docs/rules/relative-imports.md) | Relative imports from parent modules are banned | 🛠 |
+| TID251 | [banned-api](https://beta.ruff.rs/docs/rules/banned-api/) | `{name}` is banned: {message} |  |
+| TID252 | [relative-imports](https://beta.ruff.rs/docs/rules/relative-imports/) | Relative imports from parent modules are banned | 🛠 |
 
 ### flake8-type-checking (TCH)
 
@@ -1374,7 +1394,13 @@ For more, see [eradicate](https://pypi.org/project/eradicate/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| ERA001 | [commented-out-code](https://github.com/charliermarsh/ruff/blob/main/docs/rules/commented-out-code.md) | Found commented-out code | 🛠 |
+| ERA001 | [commented-out-code](https://beta.ruff.rs/docs/rules/commented-out-code/) | Found commented-out code | 🛠 |
+
+### Numpy-specific rules (NPY)
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| NPY001 | [deprecated-type-alias](https://beta.ruff.rs/docs/rules/deprecated-type-alias/) | NumPy type alias `np.{type_name}` is deprecated, replace with builtin type | 🛠 |
 
 ### pandas-vet (PD)
 
@@ -1382,7 +1408,7 @@ For more, see [pandas-vet](https://pypi.org/project/pandas-vet/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PD002 | [use-of-inplace-argument](https://github.com/charliermarsh/ruff/blob/main/docs/rules/use-of-inplace-argument.md) | `inplace=True` should be avoided; it has inconsistent behavior | 🛠 |
+| PD002 | [use-of-inplace-argument](https://beta.ruff.rs/docs/rules/use-of-inplace-argument/) | `inplace=True` should be avoided; it has inconsistent behavior | 🛠 |
 | PD003 | use-of-dot-is-null | `.isna` is preferred to `.isnull`; functionality is equivalent |  |
 | PD004 | use-of-dot-not-null | `.notna` is preferred to `.notnull`; functionality is equivalent |  |
 | PD007 | use-of-dot-ix | `.ix` is deprecated; use more explicit `.loc` or `.iloc` |  |
@@ -1421,13 +1447,13 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLE0100 | [yield-in-init](https://github.com/charliermarsh/ruff/blob/main/docs/rules/yield-in-init.md) | `__init__` method is a generator |  |
+| PLE0100 | [yield-in-init](https://beta.ruff.rs/docs/rules/yield-in-init/) | `__init__` method is a generator |  |
 | PLE0117 | nonlocal-without-binding | Nonlocal name `{name}` found without binding |  |
 | PLE0118 | used-prior-global-declaration | Name `{name}` is used prior to global declaration on line {line} |  |
 | PLE0604 | invalid-all-object | Invalid object in `__all__`, must contain only strings |  |
 | PLE0605 | invalid-all-format | Invalid format for `__all__`, must be `tuple` or `list` |  |
 | PLE1142 | await-outside-async | `await` should be used within an async function |  |
-| PLE1307 | [bad-string-format-type](https://github.com/charliermarsh/ruff/blob/main/docs/rules/bad-string-format-type.md) | Format type does not match argument type |  |
+| PLE1307 | [bad-string-format-type](https://beta.ruff.rs/docs/rules/bad-string-format-type/) | Format type does not match argument type |  |
 | PLE1310 | bad-str-strip-call | String `{strip}` call contains duplicate characters (did you mean `{removal}`?) |  |
 | PLE2502 | bidirectional-unicode | Contains control characters that can permit obfuscated code |  |
 
@@ -1450,7 +1476,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLW0120 | useless-else-on-loop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
+| PLW0120 | useless-else-on-loop | `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it |  |
 | PLW0602 | global-variable-not-assigned | Using global for `{name}` but no assignment is done |  |
 
 ### tryceratops (TRY)
@@ -1459,44 +1485,22 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| TRY002 | [raise-vanilla-class](https://github.com/charliermarsh/ruff/blob/main/docs/rules/raise-vanilla-class.md) | Create your own exception |  |
+| TRY002 | [raise-vanilla-class](https://beta.ruff.rs/docs/rules/raise-vanilla-class/) | Create your own exception |  |
 | TRY003 | raise-vanilla-args | Avoid specifying long messages outside the exception class |  |
-| TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
+| TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type |  |
 | TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |
 | TRY201 | verbose-raise | Use `raise` without specifying exception name |  |
 | TRY300 | try-consider-else | Consider moving this statement to an `else` block |  |
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 | TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
 
-### flake8-raise (RSE)
-
-For more, see [flake8-raise](https://pypi.org/project/flake8-raise/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| RSE102 | unnecessary-paren-on-raise-exception | Unnecessary parentheses on raised exception | 🛠 |
-
-### flake8-self (SLF)
-
-For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| SLF001 | private-member-access | Private member accessed: `{access}` |  |
-
-### Numpy-specific rules (NPY)
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| NPY001 | [deprecated-type-alias](https://github.com/charliermarsh/ruff/blob/main/docs/rules/deprecated-type-alias.md) | Numpy type alias `numpy.{type_name}` is deprecated, replace with builtin type | 🛠 |
-
 ### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| RUF001 | ambiguous-unicode-character-string | String contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
-| RUF002 | ambiguous-unicode-character-docstring | Docstring contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
-| RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
+| RUF001 | ambiguous-unicode-character-string | String contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
+| RUF002 | ambiguous-unicode-character-docstring | Docstring contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
+| RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
 | RUF004 | keyword-argument-before-star-argument | Keyword argument `{name}` must come after starred arguments |  |
 | RUF005 | unpack-instead-of-concatenating-to-collection-literal | Consider `{expr}` instead of concatenation | 🛠 |
 | RUF100 | unused-noqa | Unused `noqa` directive | 🛠 |

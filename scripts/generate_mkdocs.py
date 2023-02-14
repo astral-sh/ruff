@@ -1,6 +1,7 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
 import argparse
 import shutil
+import subprocess
 from pathlib import Path
 
 import yaml
@@ -27,6 +28,9 @@ FATHOM_SCRIPT: str = (
 
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
+
+    subprocess.run(["cargo", "dev", "generate-docs"], check=True)
+
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
 
@@ -36,11 +40,8 @@ def main() -> None:
         raise ValueError(msg)
     content = content.replace(DOCUMENTATION_LINK, "")
 
-    # Replace all GitHub links with relative links.
-    content = content.replace(
-        "https://github.com/charliermarsh/ruff/blob/main/docs/rules/",
-        "rules/",
-    )
+    # Make the documentation links in the README more relative.
+    content = content.replace("https://beta.ruff.rs", "")
 
     Path("docs").mkdir(parents=True, exist_ok=True)
 

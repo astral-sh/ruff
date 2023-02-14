@@ -18,8 +18,6 @@ from \
     ..parent\
     import \
     world_hello
-
-# TID252 (without autofix; too many levels up)
 from ..... import ultragrantparent
 from ...... import ultragrantparent
 from ....... import ultragrantparent
