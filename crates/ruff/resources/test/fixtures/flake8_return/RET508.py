@@ -136,3 +136,24 @@ def nested2(x, y, z):
                 break
         else:
             a = z
+
+
+def elif1(x, y, w, z):
+    for i in x:
+        if i > y:
+            a = z
+        elif i > w:
+            break
+        else:
+            a = z
+
+
+def elif2(x, y, w, z):
+    for i in x:
+        if i > y:
+            a = z
+        else:
+            if i > w:
+                break
+            else:
+                a = z

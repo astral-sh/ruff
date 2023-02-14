@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: CharField
   location:
     row: 7
@@ -14,7 +14,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: TextField
   location:
     row: 8
@@ -25,7 +25,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: SlugField
   location:
     row: 9
@@ -36,7 +36,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: EmailField
   location:
     row: 10
@@ -47,7 +47,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: FilePathField
   location:
     row: 11
@@ -58,7 +58,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: URLField
   location:
     row: 12
@@ -69,7 +69,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: CharField
   location:
     row: 16
@@ -80,7 +80,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: CharField
   location:
     row: 17
@@ -91,7 +91,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: SlugField
   location:
     row: 18
@@ -102,7 +102,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: EmailField
   location:
     row: 19
@@ -113,7 +113,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: FilePathField
   location:
     row: 20
@@ -124,7 +124,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelStringFieldNullable:
+    NullableModelStringField:
       field_name: URLField
   location:
     row: 21

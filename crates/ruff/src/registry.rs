@@ -557,9 +557,9 @@ ruff_macros::define_rule_mapping!(
     RUF005 => rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     RUF100 => rules::ruff::rules::UnusedNOQA,
     // flake8-django
-    DJ001 => rules::flake8_django::rules::ModelStringFieldNullable,
-    DJ008 => rules::flake8_django::rules::ModelDunderStr,
-    DJ013 => rules::flake8_django::rules::ReceiverDecoratorChecker,
+    DJ001 => rules::flake8_django::rules::NullableModelStringField,
+    DJ008 => rules::flake8_django::rules::ModelWithoutDunderStr,
+    DJ013 => rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
 
 #[derive(EnumIter, Debug, PartialEq, Eq, RuleNamespace)]
@@ -655,9 +655,15 @@ pub enum Linter {
     /// [flake8-quotes](https://pypi.org/project/flake8-quotes/)
     #[prefix = "Q"]
     Flake8Quotes,
+    /// [flake8-raise](https://pypi.org/project/flake8-raise/)
+    #[prefix = "RSE"]
+    Flake8Raise,
     /// [flake8-return](https://pypi.org/project/flake8-return/)
     #[prefix = "RET"]
     Flake8Return,
+    /// [flake8-self](https://pypi.org/project/flake8-self/)
+    #[prefix = "SLF"]
+    Flake8Self,
     /// [flake8-simplify](https://pypi.org/project/flake8-simplify/)
     #[prefix = "SIM"]
     Flake8Simplify,
@@ -688,12 +694,6 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
-    /// [flake8-raise](https://pypi.org/project/flake8-raise/)
-    #[prefix = "RSE"]
-    Flake8Raise,
-    /// [flake8-self](https://pypi.org/project/flake8-self/)
-    #[prefix = "SLF"]
-    Flake8Self,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

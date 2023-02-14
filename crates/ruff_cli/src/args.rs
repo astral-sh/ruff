@@ -96,6 +96,9 @@ pub struct CheckArgs {
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
+    /// The minimum Python version that should be supported.
+    #[arg(long)]
+    pub target_version: Option<PythonVersion>,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for
     /// configuration.
     #[arg(long, conflicts_with = "isolated")]
@@ -193,9 +196,6 @@ pub struct CheckArgs {
     force_exclude: bool,
     #[clap(long, overrides_with("force_exclude"), hide = true)]
     no_force_exclude: bool,
-    /// The minimum Python version that should be supported.
-    #[arg(long, help_heading = "Rule configuration", hide = true)]
-    pub target_version: Option<PythonVersion>,
     /// Set the line-length for length-associated rules and automatic
     /// formatting.
     #[arg(long, help_heading = "Rule configuration", hide = true)]
