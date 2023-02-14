@@ -1,0 +1,41 @@
+---
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    AssertFalse: ~
+  location:
+    row: 8
+    column: 7
+  end_location:
+    row: 8
+    column: 12
+  fix:
+    content:
+      - raise AssertionError()
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 12
+  parent: ~
+- kind:
+    AssertFalse: ~
+  location:
+    row: 10
+    column: 7
+  end_location:
+    row: 10
+    column: 12
+  fix:
+    content:
+      - "raise AssertionError(\"message\")"
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 23
+  parent: ~
+

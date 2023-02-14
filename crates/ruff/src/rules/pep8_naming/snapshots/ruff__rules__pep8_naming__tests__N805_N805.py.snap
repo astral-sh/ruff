@@ -1,0 +1,55 @@
+---
+source: crates/ruff/src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    InvalidFirstArgumentNameForMethod: ~
+  location:
+    row: 7
+    column: 19
+  end_location:
+    row: 7
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFirstArgumentNameForMethod: ~
+  location:
+    row: 12
+    column: 29
+  end_location:
+    row: 12
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFirstArgumentNameForMethod: ~
+  location:
+    row: 27
+    column: 14
+  end_location:
+    row: 27
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFirstArgumentNameForMethod: ~
+  location:
+    row: 31
+    column: 14
+  end_location:
+    row: 31
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    InvalidFirstArgumentNameForMethod: ~
+  location:
+    row: 60
+    column: 28
+  end_location:
+    row: 60
+    column: 32
+  fix: ~
+  parent: ~
+

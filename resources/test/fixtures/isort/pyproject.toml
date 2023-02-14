@@ -1,5 +1,0 @@
-[tool.ruff]
-line-length = 88
-
-[tool.ruff.isort]
-lines-after-imports = 3

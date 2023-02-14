@@ -1,0 +1,115 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 2
+    column: 6
+  end_location:
+    row: 2
+    column: 58
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 14
+    column: 6
+  end_location:
+    row: 14
+    column: 34
+  fix: ~
+  parent: ~
+- kind:
+    BadStringFormatType: ~
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 19
+  fix: ~
+  parent: ~
+

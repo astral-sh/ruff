@@ -1,0 +1,65 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    WhitespaceBeforeCloseBracket: ~
+  location:
+    row: 19
+    column: 22
+  end_location:
+    row: 19
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    WhitespaceBeforeCloseBracket: ~
+  location:
+    row: 21
+    column: 21
+  end_location:
+    row: 21
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    WhitespaceBeforeCloseBracket: ~
+  location:
+    row: 23
+    column: 10
+  end_location:
+    row: 23
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    WhitespaceBeforeCloseBracket: ~
+  location:
+    row: 25
+    column: 22
+  end_location:
+    row: 25
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    WhitespaceBeforeCloseBracket: ~
+  location:
+    row: 27
+    column: 21
+  end_location:
+    row: 27
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    WhitespaceBeforeCloseBracket: ~
+  location:
+    row: 29
+    column: 10
+  end_location:
+    row: 29
+    column: 10
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,55 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    MultipleSpacesAfterOperator: ~
+  location:
+    row: 28
+    column: 7
+  end_location:
+    row: 28
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesAfterOperator: ~
+  location:
+    row: 31
+    column: 3
+  end_location:
+    row: 31
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesAfterOperator: ~
+  location:
+    row: 32
+    column: 3
+  end_location:
+    row: 32
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesAfterOperator: ~
+  location:
+    row: 35
+    column: 6
+  end_location:
+    row: 35
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesAfterOperator: ~
+  location:
+    row: 36
+    column: 6
+  end_location:
+    row: 36
+    column: 6
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,27 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    ImportStar:
+      name: F634
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    ImportStar:
+      name: F634
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 18
+  fix: ~
+  parent: ~
+

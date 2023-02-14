@@ -1,0 +1,35 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    OverIndented: ~
+  location:
+    row: 6
+    column: 5
+  end_location:
+    row: 6
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    OverIndented: ~
+  location:
+    row: 39
+    column: 8
+  end_location:
+    row: 39
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    OverIndented: ~
+  location:
+    row: 42
+    column: 2
+  end_location:
+    row: 42
+    column: 2
+  fix: ~
+  parent: ~
+

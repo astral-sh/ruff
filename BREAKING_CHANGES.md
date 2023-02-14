@@ -1,5 +1,20 @@
 # Breaking Changes
 
+## 0.0.246
+
+### `multiple-statements-on-one-line-def` (`E704`) was removed ([#2773](https://github.com/charliermarsh/ruff/pull/2773))
+
+This rule was introduced in v0.0.245. However, it turns out that pycodestyle and Flake8 ignore this
+rule by default, as it is not part of PEP 8. As such, we've removed it from Ruff.
+
+## 0.0.245
+
+### Ruff's public `check` method was removed ([#2709](https://github.com/charliermarsh/ruff/pull/2709))
+
+Previously, Ruff exposed a `check` method as a public Rust API. This method was used by few,
+if any clients, and was not well documented or supported. As such, it has been removed, with
+the intention of adding a stable public API in the future.
+
 ## 0.0.238
 
 ### `select`, `extend-select`, `ignore`, and `extend-ignore` have new semantics ([#2312](https://github.com/charliermarsh/ruff/pull/2312))

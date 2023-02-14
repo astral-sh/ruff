@@ -1,0 +1,197 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 2
+    column: 20
+  end_location:
+    row: 2
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 5
+    column: 20
+  end_location:
+    row: 5
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 8
+    column: 20
+  end_location:
+    row: 8
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 11
+    column: 20
+  end_location:
+    row: 11
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 14
+    column: 20
+  end_location:
+    row: 14
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 17
+    column: 20
+  end_location:
+    row: 17
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 20
+    column: 20
+  end_location:
+    row: 20
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 23
+    column: 20
+  end_location:
+    row: 23
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 26
+    column: 20
+  end_location:
+    row: 26
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 32
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 36
+    column: 20
+  end_location:
+    row: 38
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 42
+    column: 4
+  end_location:
+    row: 44
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 49
+    column: 4
+  end_location:
+    row: 51
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: Strip
+      removal: ~
+  location:
+    row: 61
+    column: 10
+  end_location:
+    row: 61
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: LStrip
+      removal: RemovePrefix
+  location:
+    row: 64
+    column: 11
+  end_location:
+    row: 64
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    BadStrStripCall:
+      strip: RStrip
+      removal: RemoveSuffix
+  location:
+    row: 67
+    column: 11
+  end_location:
+    row: 67
+    column: 20
+  fix: ~
+  parent: ~
+

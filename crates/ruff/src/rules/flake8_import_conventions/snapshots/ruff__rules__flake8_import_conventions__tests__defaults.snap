@@ -1,0 +1,125 @@
+---
+source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnconventionalImportAlias:
+      - altair
+      - alt
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    UnconventionalImportAlias:
+      - matplotlib.pyplot
+      - plt
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    UnconventionalImportAlias:
+      - numpy
+      - np
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnconventionalImportAlias:
+      - pandas
+      - pd
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    UnconventionalImportAlias:
+      - seaborn
+      - sns
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    UnconventionalImportAlias:
+      - altair
+      - alt
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    UnconventionalImportAlias:
+      - matplotlib.pyplot
+      - plt
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    UnconventionalImportAlias:
+      - numpy
+      - np
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    UnconventionalImportAlias:
+      - pandas
+      - pd
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    UnconventionalImportAlias:
+      - seaborn
+      - sns
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 22
+  fix: ~
+  parent: ~
+

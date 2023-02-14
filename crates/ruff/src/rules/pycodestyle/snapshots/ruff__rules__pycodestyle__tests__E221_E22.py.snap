@@ -1,0 +1,85 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    MultipleSpacesBeforeOperator: ~
+  location:
+    row: 3
+    column: 5
+  end_location:
+    row: 3
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesBeforeOperator: ~
+  location:
+    row: 5
+    column: 1
+  end_location:
+    row: 5
+    column: 1
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesBeforeOperator: ~
+  location:
+    row: 6
+    column: 1
+  end_location:
+    row: 6
+    column: 1
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesBeforeOperator: ~
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesBeforeOperator: ~
+  location:
+    row: 10
+    column: 4
+  end_location:
+    row: 10
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesBeforeOperator: ~
+  location:
+    row: 13
+    column: 8
+  end_location:
+    row: 13
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesBeforeOperator: ~
+  location:
+    row: 15
+    column: 8
+  end_location:
+    row: 15
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    MultipleSpacesBeforeOperator: ~
+  location:
+    row: 19
+    column: 13
+  end_location:
+    row: 19
+    column: 13
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,45 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnexpectedIndentationComment: ~
+  location:
+    row: 15
+    column: 5
+  end_location:
+    row: 15
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UnexpectedIndentationComment: ~
+  location:
+    row: 22
+    column: 12
+  end_location:
+    row: 22
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnexpectedIndentationComment: ~
+  location:
+    row: 24
+    column: 12
+  end_location:
+    row: 24
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    UnexpectedIndentationComment: ~
+  location:
+    row: 26
+    column: 12
+  end_location:
+    row: 26
+    column: 12
+  fix: ~
+  parent: ~
+

@@ -1,0 +1,20 @@
+[package]
+name = "ruff_dev"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+itertools = { workspace = true }
+libcst = { workspace = true }
+once_cell = { workspace = true }
+ruff = { path = "../ruff" }
+ruff_cli = { path = "../ruff_cli" }
+rustpython-common = { workspace = true }
+rustpython-parser = { workspace = true }
+schemars = { workspace = true }
+serde_json = { version = "1.0.91" }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+textwrap = { version = "0.16.0" }

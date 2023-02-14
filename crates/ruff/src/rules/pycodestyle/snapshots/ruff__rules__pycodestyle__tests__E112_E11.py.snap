@@ -1,0 +1,15 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoIndentedBlock: ~
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 0
+  fix: ~
+  parent: ~
+

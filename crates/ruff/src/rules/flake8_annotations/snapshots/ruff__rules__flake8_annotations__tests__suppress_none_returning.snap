@@ -1,0 +1,38 @@
+---
+source: crates/ruff/src/rules/flake8_annotations/mod.rs
+expression: diagnostics
+---
+- kind:
+    MissingReturnTypePublicFunction:
+      name: foo
+  location:
+    row: 45
+    column: 4
+  end_location:
+    row: 45
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MissingReturnTypePublicFunction:
+      name: foo
+  location:
+    row: 50
+    column: 4
+  end_location:
+    row: 50
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    MissingTypeFunctionArgument:
+      name: a
+  location:
+    row: 59
+    column: 8
+  end_location:
+    row: 59
+    column: 9
+  fix: ~
+  parent: ~
+

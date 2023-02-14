@@ -1,0 +1,231 @@
+---
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    CollapsibleIf:
+      fixable: true
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 3
+    column: 9
+  fix:
+    content:
+      - "if a and b:"
+      - "    c"
+      - ""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 5
+      column: 0
+  parent: ~
+- kind:
+    CollapsibleIf:
+      fixable: true
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 9
+    column: 13
+  fix:
+    content:
+      - "if a and b:"
+      - "    if c:"
+      - "        d"
+      - ""
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 11
+      column: 0
+  parent: ~
+- kind:
+    CollapsibleIf:
+      fixable: true
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 16
+    column: 9
+  fix:
+    content:
+      - "elif b and c:"
+      - "    d"
+      - ""
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 18
+      column: 0
+  parent: ~
+- kind:
+    CollapsibleIf:
+      fixable: false
+  location:
+    row: 20
+    column: 0
+  end_location:
+    row: 22
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    CollapsibleIf:
+      fixable: true
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 27
+    column: 9
+  fix:
+    content:
+      - "if a and b:"
+      - "    # Fixable due to placement of this comment."
+      - "    c"
+      - ""
+    location:
+      row: 26
+      column: 0
+    end_location:
+      row: 30
+      column: 0
+  parent: ~
+- kind:
+    CollapsibleIf:
+      fixable: true
+  location:
+    row: 51
+    column: 4
+  end_location:
+    row: 52
+    column: 16
+  fix:
+    content:
+      - "    if True and True:"
+      - "        \"\"\"this"
+      - "is valid\"\"\""
+      - ""
+      - "        \"\"\"the indentation on"
+      - "            this line is significant\"\"\""
+      - ""
+      - "        \"this is\" \\"
+      - "\"allowed too\""
+      - ""
+      - "        (\"so is\""
+      - "\"this for some reason\")"
+      - ""
+    location:
+      row: 51
+      column: 0
+    end_location:
+      row: 64
+      column: 0
+  parent: ~
+- kind:
+    CollapsibleIf:
+      fixable: true
+  location:
+    row: 67
+    column: 0
+  end_location:
+    row: 68
+    column: 12
+  fix:
+    content:
+      - "if True and True:"
+      - "    \"\"\"this"
+      - "is valid\"\"\""
+      - ""
+      - "    \"\"\"the indentation on"
+      - "        this line is significant\"\"\""
+      - ""
+      - "    \"this is\" \\"
+      - "\"allowed too\""
+      - ""
+      - "    (\"so is\""
+      - "\"this for some reason\")"
+      - ""
+    location:
+      row: 67
+      column: 0
+    end_location:
+      row: 80
+      column: 0
+  parent: ~
+- kind:
+    CollapsibleIf:
+      fixable: true
+  location:
+    row: 83
+    column: 4
+  end_location:
+    row: 86
+    column: 10
+  fix:
+    content:
+      - "    if node.module and (node.module == \"multiprocessing\" or node.module.startswith("
+      - "        \"multiprocessing.\""
+      - "    )):"
+      - "        print(\"Bad module!\")"
+      - ""
+    location:
+      row: 83
+      column: 0
+    end_location:
+      row: 88
+      column: 0
+  parent: ~
+- kind:
+    CollapsibleIf:
+      fixable: true
+  location:
+    row: 90
+    column: 0
+  end_location:
+    row: 93
+    column: 6
+  fix:
+    content:
+      - "if node.module and (node.module == \"multiprocessing\" or node.module.startswith("
+      - "    \"multiprocessing.\""
+      - ")):"
+      - "    print(\"Bad module!\")"
+      - ""
+    location:
+      row: 90
+      column: 0
+    end_location:
+      row: 95
+      column: 0
+  parent: ~
+- kind:
+    CollapsibleIf:
+      fixable: true
+  location:
+    row: 117
+    column: 4
+  end_location:
+    row: 118
+    column: 13
+  fix:
+    content:
+      - "    if b and c:"
+      - "        print(\"foo\")"
+      - ""
+    location:
+      row: 117
+      column: 0
+    end_location:
+      row: 120
+      column: 0
+  parent: ~
+

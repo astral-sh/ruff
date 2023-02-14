@@ -2,7 +2,18 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
-## The basics
+- [The Basics](#the-basics)
+  - [Prerequisites](#prerequisites)
+  - [Development](#development)
+  - [Project Structure](#project-structure)
+  - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
+    - [Rule naming convention](#rule-naming-convention)
+  - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
+- [MkDocs](#mkdocs)
+- [Release Process](#release-process)
+- [Benchmarks](#benchmarks)
+
+## The Basics
 
 Ruff welcomes contributions in the form of Pull Requests.
 
@@ -10,7 +21,7 @@ For small changes (e.g., bug fixes), feel free to submit a PR.
 
 For larger changes (e.g., new lint rules, new functionality, new configuration options), consider
 creating an [**issue**](https://github.com/charliermarsh/ruff/issues) outlining your proposed
-change. You can also join us on [**Discord**](https://discord.gg/Z8KbeK24) to discuss your idea with
+change. You can also join us on [**Discord**](https://discord.gg/c9MhzV8aU5) to discuss your idea with
 the community.
 
 If you're looking for a place to start, we recommend implementing a new lint rule (see:
@@ -20,8 +31,10 @@ existing Python plugins, which can be used as a reference implementation.
 
 As a concrete example: consider taking on one of the rules from the [`tryceratops`](https://github.com/charliermarsh/ruff/issues/2056)
 plugin, and looking to the originating [Python source](https://github.com/guilatrova/tryceratops)
-for guidance. [`flake8-simplify`](https://github.com/charliermarsh/ruff/issues/998) has a few rules
-left too.
+for guidance.
+
+Alternatively, we've started work on the [`flake8-pyi`](https://github.com/charliermarsh/ruff/issues/848)
+plugin (see the [Python source](https://github.com/PyCQA/flake8-pyi)) -- another good place to start.
 
 ### Prerequisites
 
@@ -39,16 +52,16 @@ cargo install cargo-insta
 After cloning the repository, run Ruff locally with:
 
 ```shell
-cargo run resources/test/fixtures --no-cache
+cargo run check /path/to/file.py --no-cache
 ```
 
 Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
 ```shell
-cargo fmt --all     # Auto-formatting...
+cargo fmt --all  # Auto-formatting...
 cargo clippy --fix --workspace --all-targets --all-features  # Linting...
-cargo test --all    # Testing...
+cargo test --all  # Testing...
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
@@ -71,58 +84,88 @@ pre-commit run --all-files
 Your Pull Request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
 
+### Project Structure
+
+Ruff is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
+such that all crates are contained in a flat `crates` directory.
+
+The vast majority of the code, including all lint rules, lives in the `ruff` crate (located at
+`crates/ruff`). As a contributor, that's the crate that'll be most relevant to you.
+
+At time of writing, the repository includes the following crates:
+
+- `crates/ruff`: library crate containing all lint rules and the core logic for running them.
+- `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
+- `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g., `cargo dev generate-all`).
+- `crates/ruff_macros`: library crate containing macros used by Ruff.
+- `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of standard library modules by versionb).
+- `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
+
 ### Example: Adding a new lint rule
 
 At a high level, the steps involved in adding a new lint rule are as follows:
 
-1. Create a file for your rule (e.g., `src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
-2. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
-3. Map the violation struct to a rule code in `src/registry.rs` (e.g., `E402`).
-4. Define the logic for triggering the violation in `src/checkers/ast.rs` (for AST-based checks),
-   `src/checkers/tokens.rs` (for token-based checks), `src/checkers/lines.rs` (for text-based
-   checks), or `src/checkers/filesystem.rs` (for filesystem-based checks).
-5. Add a test fixture.
-6. Update the generated files (documentation and generated code).
+1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention).
+2. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
+3. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
+4. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
+5. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast.rs` (for AST-based
+   checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks), `crates/ruff/src/checkers/lines.rs`
+   (for text-based checks), or `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based
+   checks).
+6. Add a test fixture.
+7. Update the generated files (documentation and generated code).
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate
-rule linter (e.g., `src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
+rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
 contain a struct defined via `define_violation!`, along with a function that creates the violation
-based on any required inputs. (Many of the existing examples live in `src/violations.rs`, but we're
-looking to place new rules in their own files.)
+based on any required inputs. (Many of the existing examples live in `crates/ruff/src/violations.rs`,
+but we're looking to place new rules in their own files.)
 
-To trigger the violation, you'll likely want to augment the logic in `src/checkers/ast.rs`, which
-defines the Python AST visitor, responsible for iterating over the abstract syntax tree and
+To trigger the violation, you'll likely want to augment the logic in `crates/ruff/src/checkers/ast.rs`,
+which defines the Python AST visitor, responsible for iterating over the abstract syntax tree and
 collecting diagnostics as it goes.
 
 If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
 for the `Check::new` invocations to understand how other, similar rules are implemented.
 
-To add a test fixture, create a file under `resources/test/fixtures/[linter]`, named to match
-the code you defined earlier (e.g., `resources/test/fixtures/pycodestyle/E402.py`). This file should
+To add a test fixture, create a file under `crates/ruff/resources/test/fixtures/[linter]`, named to match
+the code you defined earlier (e.g., `crates/ruff/resources/test/fixtures/pycodestyle/E402.py`). This file should
 contain a variety of violations and non-violations designed to evaluate and demonstrate the behavior
 of your lint rule.
 
 Run `cargo dev generate-all` to generate the code for your new fixture. Then run Ruff
-locally with (e.g.) `cargo run resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
+locally with (e.g.) `cargo run check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `src/[linter]/mod.rs` file. Then, run `cargo test --all`.
+`test_case` macro in the relevant `crates/ruff/src/[linter]/mod.rs` file. Then, run `cargo test --all`.
 Your test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the
 generated snapshot, then commit the snapshot file alongside the rest of your changes.
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
+#### Rule naming convention
+
+The rule name should make sense when read as "allow *rule-name*" or "allow *rule-name* items".
+
+This implies that rule names:
+
+* should state the bad thing being checked for
+
+* should not contain instructions on what you what you should use instead
+  (these belong in the rule documentation and the `autofix_title` for rules that have autofix)
+
 ### Example: Adding a new configuration option
 
 Ruff's user-facing settings live in a few different places.
 
-First, the command-line options are defined via the `Cli` struct in `src/cli.rs`.
+First, the command-line options are defined via the `Cli` struct in `crates/ruff/src/cli.rs`.
 
-Second, the `pyproject.toml` options are defined in `src/settings/options.rs` (via the `Options`
-struct), `src/settings/configuration.rs` (via the `Configuration` struct), and `src/settings/mod.rs`
-(via the `Settings` struct). These represent, respectively: the schema used to parse the
-`pyproject.toml` file; an internal, intermediate representation; and the final, internal
-representation used to power Ruff.
+Second, the `pyproject.toml` options are defined in `crates/ruff/src/settings/options.rs` (via the
+`Options` struct), `crates/ruff/src/settings/configuration.rs` (via the `Configuration` struct), and
+`crates/ruff/src/settings/mod.rs` (via the `Settings` struct). These represent, respectively: the
+schema used to parse the `pyproject.toml` file; an internal, intermediate representation; and the
+final, internal representation used to power Ruff.
 
 To add a new configuration option, you'll likely want to modify these latter few files (along with
 `cli.rs`, if appropriate). If you want to pattern-match against an existing example, grep for
@@ -130,15 +173,35 @@ To add a new configuration option, you'll likely want to modify these latter few
 variables (e.g., `_`).
 
 Note that plugin-specific configuration options are defined in their own modules (e.g.,
-`src/flake8_unused_arguments/settings.rs`).
+`crates/ruff/src/flake8_unused_arguments/settings.rs`).
 
 You may also want to add the new configuration option to the `flake8-to-ruff` tool, which is
 responsible for converting `flake8` configuration files to Ruff's TOML format. This logic
-lives in `flake8_to_ruff/src/converter.rs`.
+lives in `crates/ruff/src/flake8_to_ruff/converter.rs`.
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
-## Release process
+## MkDocs
+
+To preview any changes to the documentation locally:
+
+1. Install MkDocs and Material for MkDocs with:
+   ```shell
+   pip install -r docs/requirements.txt
+   ```
+2. Generate the MkDocs site with:
+   ```shell
+   python scripts/generate_mkdocs.py
+   ```
+3. Run the development server with:
+   ```shell
+   mkdocs serve
+   ```
+
+The documentation should then be available locally at
+[http://127.0.0.1:8000/docs/](http://127.0.0.1:8000/docs/).
+
+## Release Process
 
 As of now, Ruff has an ad hoc release process: releases are cut with high frequency via GitHub
 Actions, which automatically generates the appropriate wheels across architectures and publishes
@@ -153,50 +216,50 @@ First, clone [CPython](https://github.com/python/cpython). It's a large and dive
 which makes it a good target for benchmarking.
 
 ```shell
-git clone --branch 3.10 https://github.com/python/cpython.git resources/test/cpython
+git clone --branch 3.10 https://github.com/python/cpython.git crates/ruff/resources/test/cpython
 ```
 
 To benchmark the release build:
 
 ```shell
 cargo build --release && hyperfine --ignore-failure --warmup 10 \
-  "./target/release/ruff ./resources/test/cpython/ --no-cache" \
-  "./target/release/ruff ./resources/test/cpython/"
+  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache" \
+  "./target/release/ruff ./crates/ruff/resources/test/cpython/"
 
-Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
+Benchmark 1: ./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache
   Time (mean ± σ):     293.8 ms ±   3.2 ms    [User: 2384.6 ms, System: 90.3 ms]
   Range (min … max):   289.9 ms … 301.6 ms    10 runs
 
   Warning: Ignoring non-zero exit code.
 
-Benchmark 2: ./target/release/ruff ./resources/test/cpython/
+Benchmark 2: ./target/release/ruff ./crates/ruff/resources/test/cpython/
   Time (mean ± σ):      48.0 ms ±   3.1 ms    [User: 65.2 ms, System: 124.7 ms]
   Range (min … max):    45.0 ms …  66.7 ms    62 runs
 
   Warning: Ignoring non-zero exit code.
 
 Summary
-  './target/release/ruff ./resources/test/cpython/' ran
-    6.12 ± 0.41 times faster than './target/release/ruff ./resources/test/cpython/ --no-cache'
+  './target/release/ruff ./crates/ruff/resources/test/cpython/' ran
+    6.12 ± 0.41 times faster than './target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache'
 ```
 
 To benchmark against the ecosystem's existing tools:
 
 ```shell
 hyperfine --ignore-failure --warmup 5 \
-  "./target/release/ruff ./resources/test/cpython/ --no-cache" \
-  "pyflakes resources/test/cpython" \
+  "./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache" \
+  "pyflakes crates/ruff/resources/test/cpython" \
   "autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython" \
-  "pycodestyle resources/test/cpython" \
-  "flake8 resources/test/cpython"
+  "pycodestyle crates/ruff/resources/test/cpython" \
+  "flake8 crates/ruff/resources/test/cpython"
 
-Benchmark 1: ./target/release/ruff ./resources/test/cpython/ --no-cache
+Benchmark 1: ./target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache
   Time (mean ± σ):     294.3 ms ±   3.3 ms    [User: 2467.5 ms, System: 89.6 ms]
   Range (min … max):   291.1 ms … 302.8 ms    10 runs
 
   Warning: Ignoring non-zero exit code.
 
-Benchmark 2: pyflakes resources/test/cpython
+Benchmark 2: pyflakes crates/ruff/resources/test/cpython
   Time (mean ± σ):     15.786 s ±  0.143 s    [User: 15.560 s, System: 0.214 s]
   Range (min … max):   15.640 s … 16.157 s    10 runs
 
@@ -206,24 +269,24 @@ Benchmark 3: autoflake --recursive --expand-star-imports --remove-all-unused-imp
   Time (mean ± σ):      6.175 s ±  0.169 s    [User: 54.102 s, System: 1.057 s]
   Range (min … max):    5.950 s …  6.391 s    10 runs
 
-Benchmark 4: pycodestyle resources/test/cpython
+Benchmark 4: pycodestyle crates/ruff/resources/test/cpython
   Time (mean ± σ):     46.921 s ±  0.508 s    [User: 46.699 s, System: 0.202 s]
   Range (min … max):   46.171 s … 47.863 s    10 runs
 
   Warning: Ignoring non-zero exit code.
 
-Benchmark 5: flake8 resources/test/cpython
+Benchmark 5: flake8 crates/ruff/resources/test/cpython
   Time (mean ± σ):     12.260 s ±  0.321 s    [User: 102.934 s, System: 1.230 s]
   Range (min … max):   11.848 s … 12.933 s    10 runs
 
   Warning: Ignoring non-zero exit code.
 
 Summary
-  './target/release/ruff ./resources/test/cpython/ --no-cache' ran
+  './target/release/ruff ./crates/ruff/resources/test/cpython/ --no-cache' ran
    20.98 ± 0.62 times faster than 'autoflake --recursive --expand-star-imports --remove-all-unused-imports --remove-unused-variables --remove-duplicate-keys resources/test/cpython'
-   41.66 ± 1.18 times faster than 'flake8 resources/test/cpython'
-   53.64 ± 0.77 times faster than 'pyflakes resources/test/cpython'
-  159.43 ± 2.48 times faster than 'pycodestyle resources/test/cpython'
+   41.66 ± 1.18 times faster than 'flake8 crates/ruff/resources/test/cpython'
+   53.64 ± 0.77 times faster than 'pyflakes crates/ruff/resources/test/cpython'
+  159.43 ± 2.48 times faster than 'pycodestyle crates/ruff/resources/test/cpython'
 ```
 
 You can run `poetry install` from `./scripts` to create a working environment for the above. All
@@ -256,10 +319,10 @@ rm Lib/test/bad_coding.py \
   Lib/test/test_typing.py
 ```
 
-Then, from `resources/test/cpython`, run: `time pylint -j 0 -E $(git ls-files '*.py')`. This
+Then, from `crates/ruff/resources/test/cpython`, run: `time pylint -j 0 -E $(git ls-files '*.py')`. This
 will execute Pylint with maximum parallelism and only report errors.
 
-To benchmark Pyupgrade, run the following from `resources/test/cpython`:
+To benchmark Pyupgrade, run the following from `crates/ruff/resources/test/cpython`:
 
 ```shell
 hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \

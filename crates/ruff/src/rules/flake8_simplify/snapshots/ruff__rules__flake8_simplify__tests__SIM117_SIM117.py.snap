@@ -1,0 +1,185 @@
+---
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    MultipleWithStatements:
+      fixable: true
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 3
+    column: 18
+  fix:
+    content:
+      - "with A() as a, B() as b:"
+      - "    print(\"hello\")"
+      - ""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 5
+      column: 0
+  parent: ~
+- kind:
+    MultipleWithStatements:
+      fixable: true
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 9
+    column: 17
+  fix:
+    content:
+      - "with A(), B():"
+      - "    with C():"
+      - "        print(\"hello\")"
+      - ""
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 11
+      column: 0
+  parent: ~
+- kind:
+    MultipleWithStatements:
+      fixable: false
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 15
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    MultipleWithStatements:
+      fixable: true
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 20
+    column: 18
+  fix:
+    content:
+      - "with A() as a, B() as b:"
+      - "    # Fixable due to placement of this comment."
+      - "    print(\"hello\")"
+      - ""
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 23
+      column: 0
+  parent: ~
+- kind:
+    MultipleWithStatements:
+      fixable: true
+  location:
+    row: 53
+    column: 4
+  end_location:
+    row: 54
+    column: 22
+  fix:
+    content:
+      - "    with A() as a, B() as b:"
+      - "        \"\"\"this"
+      - "is valid\"\"\""
+      - ""
+      - "        \"\"\"the indentation on"
+      - "            this line is significant\"\"\""
+      - ""
+      - "        \"this is\" \\"
+      - "\"allowed too\""
+      - ""
+      - "        (\"so is\""
+      - "\"this for some reason\")"
+      - ""
+    location:
+      row: 53
+      column: 0
+    end_location:
+      row: 66
+      column: 0
+  parent: ~
+- kind:
+    MultipleWithStatements:
+      fixable: true
+  location:
+    row: 68
+    column: 0
+  end_location:
+    row: 72
+    column: 18
+  fix:
+    content:
+      - with (
+      - "    A() as a,"
+      - "    B() as b,C() as c"
+      - "):"
+      - "    print(\"hello\")"
+      - ""
+    location:
+      row: 68
+      column: 0
+    end_location:
+      row: 74
+      column: 0
+  parent: ~
+- kind:
+    MultipleWithStatements:
+      fixable: true
+  location:
+    row: 76
+    column: 0
+  end_location:
+    row: 80
+    column: 6
+  fix:
+    content:
+      - with (
+      - "    A() as a, B() as b,"
+      - "    C() as c,"
+      - "):"
+      - "    print(\"hello\")"
+      - ""
+    location:
+      row: 76
+      column: 0
+    end_location:
+      row: 82
+      column: 0
+  parent: ~
+- kind:
+    MultipleWithStatements:
+      fixable: true
+  location:
+    row: 84
+    column: 0
+  end_location:
+    row: 91
+    column: 6
+  fix:
+    content:
+      - with (
+      - "    A() as a,"
+      - "    B() as b,C() as c,"
+      - "    D() as d,"
+      - "):"
+      - "    print(\"hello\")"
+      - ""
+    location:
+      row: 84
+      column: 0
+    end_location:
+      row: 93
+      column: 0
+  parent: ~
+

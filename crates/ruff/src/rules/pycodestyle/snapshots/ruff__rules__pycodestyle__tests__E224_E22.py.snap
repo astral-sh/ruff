@@ -1,0 +1,15 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    TabAfterOperator: ~
+  location:
+    row: 48
+    column: 4
+  end_location:
+    row: 48
+    column: 4
+  fix: ~
+  parent: ~
+

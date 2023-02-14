@@ -1,0 +1,27 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    IndentationWithInvalidMultiple:
+      indent_size: 4
+  location:
+    row: 3
+    column: 2
+  end_location:
+    row: 3
+    column: 2
+  fix: ~
+  parent: ~
+- kind:
+    IndentationWithInvalidMultiple:
+      indent_size: 4
+  location:
+    row: 6
+    column: 5
+  end_location:
+    row: 6
+    column: 5
+  fix: ~
+  parent: ~
+

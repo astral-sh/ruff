@@ -1,0 +1,135 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    ComparisonOfConstant:
+      left_constant: "100"
+      op: Eq
+      right_constant: "100"
+  location:
+    row: 3
+    column: 3
+  end_location:
+    row: 3
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    ComparisonOfConstant:
+      left_constant: "1"
+      op: Eq
+      right_constant: "3"
+  location:
+    row: 6
+    column: 3
+  end_location:
+    row: 6
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ComparisonOfConstant:
+      left_constant: "1"
+      op: NotEq
+      right_constant: "3"
+  location:
+    row: 9
+    column: 3
+  end_location:
+    row: 9
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ComparisonOfConstant:
+      left_constant: "4"
+      op: Eq
+      right_constant: "3"
+  location:
+    row: 13
+    column: 3
+  end_location:
+    row: 13
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ComparisonOfConstant:
+      left_constant: "1"
+      op: Gt
+      right_constant: "0"
+  location:
+    row: 23
+    column: 3
+  end_location:
+    row: 23
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ComparisonOfConstant:
+      left_constant: "1"
+      op: GtE
+      right_constant: "0"
+  location:
+    row: 29
+    column: 3
+  end_location:
+    row: 29
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ComparisonOfConstant:
+      left_constant: "1"
+      op: Lt
+      right_constant: "0"
+  location:
+    row: 35
+    column: 3
+  end_location:
+    row: 35
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ComparisonOfConstant:
+      left_constant: "1"
+      op: LtE
+      right_constant: "0"
+  location:
+    row: 41
+    column: 3
+  end_location:
+    row: 41
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    ComparisonOfConstant:
+      left_constant: "\"hello\""
+      op: Eq
+      right_constant: "\"\""
+  location:
+    row: 51
+    column: 3
+  end_location:
+    row: 51
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    ComparisonOfConstant:
+      left_constant: "True"
+      op: Eq
+      right_constant: "False"
+  location:
+    row: 58
+    column: 3
+  end_location:
+    row: 58
+    column: 7
+  fix: ~
+  parent: ~
+

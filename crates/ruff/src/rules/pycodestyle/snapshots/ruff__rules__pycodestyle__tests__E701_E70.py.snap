@@ -1,0 +1,135 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 4
+    column: 39
+  end_location:
+    row: 4
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 25
+    column: 7
+  end_location:
+    row: 25
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 27
+    column: 7
+  end_location:
+    row: 27
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 29
+    column: 9
+  end_location:
+    row: 29
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 31
+    column: 3
+  end_location:
+    row: 31
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 32
+    column: 17
+  end_location:
+    row: 32
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 33
+    column: 7
+  end_location:
+    row: 33
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 35
+    column: 7
+  end_location:
+    row: 35
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 37
+    column: 8
+  end_location:
+    row: 37
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 39
+    column: 14
+  end_location:
+    row: 39
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 54
+    column: 7
+  end_location:
+    row: 54
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 56
+    column: 7
+  end_location:
+    row: 56
+    column: 8
+  fix: ~
+  parent: ~
+

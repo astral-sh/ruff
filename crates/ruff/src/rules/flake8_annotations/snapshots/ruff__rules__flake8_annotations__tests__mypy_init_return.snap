@@ -1,0 +1,70 @@
+---
+source: crates/ruff/src/rules/flake8_annotations/mod.rs
+expression: diagnostics
+---
+- kind:
+    MissingReturnTypeSpecialMethod:
+      name: __init__
+  location:
+    row: 5
+    column: 8
+  end_location:
+    row: 5
+    column: 16
+  fix:
+    content: " -> None"
+    location:
+      row: 5
+      column: 22
+    end_location:
+      row: 5
+      column: 22
+  parent: ~
+- kind:
+    MissingReturnTypeSpecialMethod:
+      name: __init__
+  location:
+    row: 11
+    column: 8
+  end_location:
+    row: 11
+    column: 16
+  fix:
+    content: " -> None"
+    location:
+      row: 11
+      column: 27
+    end_location:
+      row: 11
+      column: 27
+  parent: ~
+- kind:
+    MissingReturnTypePrivateFunction:
+      name: __init__
+  location:
+    row: 40
+    column: 4
+  end_location:
+    row: 40
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    MissingReturnTypeSpecialMethod:
+      name: __init__
+  location:
+    row: 47
+    column: 8
+  end_location:
+    row: 47
+    column: 16
+  fix:
+    content: " -> None"
+    location:
+      row: 47
+      column: 28
+    end_location:
+      row: 47
+      column: 28
+  parent: ~
+

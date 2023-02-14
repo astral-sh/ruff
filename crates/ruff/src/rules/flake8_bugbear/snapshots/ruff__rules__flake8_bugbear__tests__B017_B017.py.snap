@@ -1,0 +1,15 @@
+---
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    AssertRaisesException: ~
+  location:
+    row: 22
+    column: 8
+  end_location:
+    row: 23
+    column: 42
+  fix: ~
+  parent: ~
+

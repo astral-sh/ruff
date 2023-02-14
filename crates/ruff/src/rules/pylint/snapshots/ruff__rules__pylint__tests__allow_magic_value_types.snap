@@ -1,0 +1,38 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    MagicValueComparison:
+      value: "\"Hunter2\""
+  location:
+    row: 50
+    column: 21
+  end_location:
+    row: 50
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    MagicValueComparison:
+      value: "3.141592653589793"
+  location:
+    row: 56
+    column: 20
+  end_location:
+    row: 56
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    MagicValueComparison:
+      value: "b\"something\""
+  location:
+    row: 65
+    column: 17
+  end_location:
+    row: 65
+    column: 29
+  fix: ~
+  parent: ~
+

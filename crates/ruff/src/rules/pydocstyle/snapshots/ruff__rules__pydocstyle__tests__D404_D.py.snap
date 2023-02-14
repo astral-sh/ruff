@@ -1,0 +1,25 @@
+---
+source: crates/ruff/src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    DocstringStartsWithThis: ~
+  location:
+    row: 631
+    column: 4
+  end_location:
+    row: 631
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    DocstringStartsWithThis: ~
+  location:
+    row: 636
+    column: 4
+  end_location:
+    row: 636
+    column: 56
+  fix: ~
+  parent: ~
+

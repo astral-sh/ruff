@@ -1,0 +1,45 @@
+---
+source: crates/ruff/src/rules/flake8_print/mod.rs
+expression: diagnostics
+---
+- kind:
+    PrintFound: ~
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    PrintFound: ~
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    PrintFound: ~
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    PrintFound: ~
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 5
+  fix: ~
+  parent: ~
+

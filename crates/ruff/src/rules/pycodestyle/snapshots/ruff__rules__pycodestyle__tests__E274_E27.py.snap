@@ -1,0 +1,25 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    TabBeforeKeyword: ~
+  location:
+    row: 28
+    column: 1
+  end_location:
+    row: 28
+    column: 1
+  fix: ~
+  parent: ~
+- kind:
+    TabBeforeKeyword: ~
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 30
+    column: 4
+  fix: ~
+  parent: ~
+

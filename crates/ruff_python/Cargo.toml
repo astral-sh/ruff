@@ -1,0 +1,11 @@
+[package]
+name = "ruff_python"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+
+[dependencies]
+once_cell = {workspace = true}
+regex = { workspace = true }
+rustc-hash = { workspace = true }

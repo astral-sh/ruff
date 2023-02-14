@@ -1,0 +1,149 @@
+---
+source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 12
+    column: 8
+  end_location:
+    row: 12
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 13
+    column: 8
+  end_location:
+    row: 13
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 31
+    column: 34
+  end_location:
+    row: 31
+    column: 40
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 38
+    column: 4
+  end_location:
+    row: 41
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 39
+    column: 8
+  end_location:
+    row: 39
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 40
+    column: 8
+  end_location:
+    row: 40
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 49
+    column: 4
+  end_location:
+    row: 52
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 60
+    column: 4
+  end_location:
+    row: 63
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 71
+    column: 4
+  end_location:
+    row: 74
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 80
+    column: 30
+  end_location:
+    row: 80
+    column: 36
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 81
+    column: 38
+  end_location:
+    row: 81
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    ParametrizeValuesWrongType:
+      values: tuple
+      row: list
+  location:
+    row: 81
+    column: 46
+  end_location:
+    row: 81
+    column: 52
+  fix: ~
+  parent: ~
+

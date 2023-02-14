@@ -1,0 +1,65 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    NoIndentedBlockComment: ~
+  location:
+    row: 30
+    column: 0
+  end_location:
+    row: 30
+    column: 0
+  fix: ~
+  parent: ~
+- kind:
+    NoIndentedBlockComment: ~
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 31
+    column: 0
+  fix: ~
+  parent: ~
+- kind:
+    NoIndentedBlockComment: ~
+  location:
+    row: 32
+    column: 0
+  end_location:
+    row: 32
+    column: 0
+  fix: ~
+  parent: ~
+- kind:
+    NoIndentedBlockComment: ~
+  location:
+    row: 33
+    column: 0
+  end_location:
+    row: 33
+    column: 0
+  fix: ~
+  parent: ~
+- kind:
+    NoIndentedBlockComment: ~
+  location:
+    row: 34
+    column: 0
+  end_location:
+    row: 34
+    column: 0
+  fix: ~
+  parent: ~
+- kind:
+    NoIndentedBlockComment: ~
+  location:
+    row: 35
+    column: 0
+  end_location:
+    row: 35
+    column: 0
+  fix: ~
+  parent: ~
+

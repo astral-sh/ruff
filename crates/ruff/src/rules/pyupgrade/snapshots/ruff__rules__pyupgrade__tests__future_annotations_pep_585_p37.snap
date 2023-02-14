@@ -1,0 +1,24 @@
+---
+source: crates/ruff/src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    DeprecatedCollectionType:
+      name: List
+  location:
+    row: 34
+    column: 17
+  end_location:
+    row: 34
+    column: 21
+  fix:
+    content:
+      - list
+    location:
+      row: 34
+      column: 17
+    end_location:
+      row: 34
+      column: 21
+  parent: ~
+
