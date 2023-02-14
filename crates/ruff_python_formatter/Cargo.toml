@@ -1,6 +1,6 @@
 [package]
-name = "ruff_fmt"
-version = "0.1.0"
+name = "ruff_python_formatter"
+version = "0.0.0"
 edition = "2021"
 
 [dependencies]

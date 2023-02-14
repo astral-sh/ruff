@@ -2721,22 +2721,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff_fmt"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap 4.1.4",
- "insta",
- "once_cell",
- "rome_formatter",
- "rome_text_size",
- "rustc-hash",
- "rustpython-common",
- "rustpython-parser",
- "test-case",
-]
-
-[[package]]
 name = "ruff_formatter"
 version = "0.0.0"
 dependencies = [
@@ -2768,6 +2752,22 @@ dependencies = [
  "once_cell",
  "regex",
  "rustc-hash",
+]
+
+[[package]]
+name = "ruff_python_formatter"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "clap 4.1.4",
+ "insta",
+ "once_cell",
+ "rome_formatter",
+ "rome_text_size",
+ "rustc-hash",
+ "rustpython-common",
+ "rustpython-parser",
+ "test-case",
 ]
 
 [[package]]
