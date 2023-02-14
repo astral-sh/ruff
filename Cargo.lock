@@ -2538,7 +2538,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_dev"
-version = "0.0.246"
+version = "0.0.0"
 dependencies = [
  "anyhow",
  "clap 4.1.4",
@@ -2558,7 +2558,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_macros"
-version = "0.0.246"
+version = "0.0.0"
 dependencies = [
  "itertools",
  "proc-macro2",
@@ -2569,7 +2569,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_python"
-version = "0.0.246"
+version = "0.0.0"
 dependencies = [
  "once_cell",
  "regex",
