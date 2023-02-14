@@ -1302,8 +1302,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | SIM107 | return-in-try-except-finally | Don't use `return` in `try`/`except` and `finally` |  |
 | SIM108 | use-ternary-operator | Use ternary operator `{contents}` instead of if-else-block | 🛠 |
 | SIM109 | compare-with-tuple | Use `{replacement}` instead of multiple equality comparisons | 🛠 |
-| SIM110 | convert-loop-to-any | Use `{any}` instead of `for` loop | 🛠 |
-| SIM111 | convert-loop-to-all | Use `{all}` instead of `for` loop | 🛠 |
+| SIM110 | reimplemented-builtin | Use `{repl}` instead of `for` loop | 🛠 |
 | SIM112 | use-capital-environment-variables | Use capitalized environment variable `{expected}` instead of `{original}` | 🛠 |
 | SIM114 | [if-with-same-arms](https://beta.ruff.rs/docs/rules/if-with-same-arms/) | Combine `if` branches using logical `or` operator |  |
 | SIM115 | open-file-with-context-handler | Use context handler for opening files |  |

@@ -1648,9 +1648,7 @@ where
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
                 if matches!(stmt.node, StmtKind::For { .. }) {
-                    if self.settings.rules.enabled(&Rule::ConvertLoopToAny)
-                        || self.settings.rules.enabled(&Rule::ConvertLoopToAll)
-                    {
+                    if self.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
