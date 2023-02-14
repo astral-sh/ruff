@@ -13,7 +13,7 @@ impl Violation for UselessElseOnLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Else clause on loop without a break statement, remove the else and de-indent all the \
+            "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the \
              code inside it"
         )
     }

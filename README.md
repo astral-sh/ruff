@@ -725,7 +725,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F506 | percent-format-mixed-positional-and-named | `%`-format string has mixed positional and named placeholders |  |
 | F507 | percent-format-positional-count-mismatch | `%`-format string has {wanted} placeholder(s) but {got} substitution(s) |  |
 | F508 | percent-format-star-requires-sequence | `%`-format string `*` specifier requires sequence |  |
-| F509 | percent-format-unsupported-format-character | `%`-format string has unsupported format character '{char}' |  |
+| F509 | percent-format-unsupported-format-character | `%`-format string has unsupported format character `{char}` |  |
 | F521 | string-dot-format-invalid-format | `.format` call has invalid format string: {message} |  |
 | F522 | string-dot-format-extra-named-arguments | `.format` call has unused named argument(s): {message} | 🛠 |
 | F523 | string-dot-format-extra-positional-arguments | `.format` call has unused arguments at position(s): {message} |  |
@@ -788,7 +788,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | ---- | ---- | ------- | --- |
 | W292 | no-new-line-at-end-of-file | No newline at end of file | 🛠 |
 | W505 | doc-line-too-long | Doc line too long ({length} > {limit} characters) |  |
-| W605 | invalid-escape-sequence | Invalid escape sequence: '\{char}' | 🛠 |
+| W605 | invalid-escape-sequence | Invalid escape sequence: `\{char}` | 🛠 |
 
 ### mccabe (C90)
 
@@ -859,8 +859,8 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line | 🛠 |
 | D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
 | D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
-| D300 | triple-single-quotes | Use """triple double quotes""" |  |
-| D301 | escape-sequence-in-docstring | Use r""" if any backslashes in a docstring |  |
+| D300 | triple-single-quotes | Use triple double quotes `"""` |  |
+| D301 | escape-sequence-in-docstring | Use `r"""` if any backslashes in a docstring |  |
 | D400 | ends-in-period | First line should end with a period | 🛠 |
 | D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
@@ -976,7 +976,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S110 | try-except-pass | `try`-`except`-`pass` detected, consider logging the exception |  |
 | S112 | try-except-continue | `try`-`except`-`continue` detected, consider logging the exception |  |
 | S113 | request-without-timeout | Probable use of requests call with timeout set to `{value}` |  |
-| S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: "{}" |  |
+| S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: `{string}` |  |
 | S501 | request-with-no-cert-validation | Probable use of `{string}` call with `verify=False` disabling SSL certificate checks |  |
 | S506 | unsafe-yaml-load | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 | S508 | snmp-insecure-version | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
@@ -1133,7 +1133,7 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) o
 | ---- | ---- | ------- | --- |
 | EXE001 | shebang-not-executable | Shebang is present but file is not executable |  |
 | EXE002 | shebang-missing-executable-file | The file is executable but no shebang is present |  |
-| EXE003 | shebang-python | Shebang should contain "python" |  |
+| EXE003 | shebang-python | Shebang should contain `python` |  |
 | EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
 | EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
 
@@ -1207,8 +1207,8 @@ For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PYI001 | [prefix-type-params](https://beta.ruff.rs/docs/rules/prefix-type-params/) | Name of private `{kind}` must start with _ |  |
-| PYI007 | [unrecognized-platform-check](https://beta.ruff.rs/docs/rules/unrecognized-platform-check/) | Unrecognized sys.platform check |  |
+| PYI001 | [prefix-type-params](https://beta.ruff.rs/docs/rules/prefix-type-params/) | Name of private `{kind}` must start with `_` |  |
+| PYI007 | [unrecognized-platform-check](https://beta.ruff.rs/docs/rules/unrecognized-platform-check/) | Unrecognized `sys.platform` check |  |
 | PYI008 | [unrecognized-platform-name](https://beta.ruff.rs/docs/rules/unrecognized-platform-name/) | Unrecognized platform `{platform}` |  |
 
 ### flake8-pytest-style (PT)
@@ -1465,7 +1465,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLW0120 | useless-else-on-loop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
+| PLW0120 | useless-else-on-loop | `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it |  |
 | PLW0602 | global-variable-not-assigned | Using global for `{name}` but no assignment is done |  |
 
 ### tryceratops (TRY)
@@ -1487,9 +1487,9 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| RUF001 | ambiguous-unicode-character-string | String contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
-| RUF002 | ambiguous-unicode-character-docstring | Docstring contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
-| RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
+| RUF001 | ambiguous-unicode-character-string | String contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
+| RUF002 | ambiguous-unicode-character-docstring | Docstring contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
+| RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
 | RUF004 | keyword-argument-before-star-argument | Keyword argument `{name}` must come after starred arguments |  |
 | RUF005 | unpack-instead-of-concatenating-to-collection-literal | Consider `{expr}` instead of concatenation | 🛠 |
 | RUF100 | unused-noqa | Unused `noqa` directive | 🛠 |
