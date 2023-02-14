@@ -123,7 +123,7 @@ mod tests {
     use anyhow::Result;
     use rustc_hash::FxHashMap;
 
-    use crate::registry::RuleCodePrefix;
+    use crate::codes::{self, RuleCodePrefix};
     use crate::rules::flake8_quotes::settings::Quote;
     use crate::rules::flake8_tidy_imports::banned_api::ApiBan;
     use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
@@ -207,7 +207,7 @@ select = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    select: Some(vec![RuleCodePrefix::E501.into()]),
+                    select: Some(vec![codes::Pycodestyle::E501.into()]),
                     ..Options::default()
                 })
             })
@@ -225,8 +225,8 @@ ignore = ["E501"]
             pyproject.tool,
             Some(Tools {
                 ruff: Some(Options {
-                    extend_select: Some(vec![RuleCodePrefix::RUF100.into()]),
-                    ignore: Some(vec![RuleCodePrefix::E501.into()]),
+                    extend_select: Some(vec![codes::Ruff::_100.into()]),
+                    ignore: Some(vec![codes::Pycodestyle::E501.into()]),
                     ..Options::default()
                 })
             })
@@ -283,7 +283,7 @@ other-attribute = 1
                 external: Some(vec!["V101".to_string()]),
                 per_file_ignores: Some(FxHashMap::from_iter([(
                     "__init__.py".to_string(),
-                    vec![RuleCodePrefix::F401.into()]
+                    vec![RuleCodePrefix::Pyflakes(codes::Pyflakes::_401).into()]
                 )])),
                 flake8_bugbear: Some(flake8_bugbear::settings::Options {
                     extend_immutable_calls: Some(vec![

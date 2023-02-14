@@ -23,7 +23,7 @@ mod tests {
     #[test_case(Rule::SysVersionCmpStr10, Path::new("YTT302.py"); "YTT302")]
     #[test_case(Rule::SysVersionSlice1Referenced, Path::new("YTT303.py"); "YTT303")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_2020").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),

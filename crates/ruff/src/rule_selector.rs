@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use itertools::Itertools;
 use schemars::_serde_json::Value;
 use schemars::schema::{InstanceType, Schema, SchemaObject};
 use schemars::JsonSchema;
@@ -8,17 +9,25 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::registry::{Rule, RuleCodePrefix, RuleIter};
+use crate::codes::RuleCodePrefix;
+use crate::registry::{Linter, Rule, RuleIter, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
     /// All rules
     All,
+    Linter(Linter),
     Prefix {
         prefix: RuleCodePrefix,
         redirected_from: Option<&'static str>,
     },
+}
+
+impl From<Linter> for RuleSelector {
+    fn from(linter: Linter) -> Self {
+        Self::Linter(linter)
+    }
 }
 
 impl FromStr for RuleSelector {
@@ -32,9 +41,17 @@ impl FromStr for RuleSelector {
                 Some((from, target)) => (target, Some(from)),
                 None => (s, None),
             };
+
+            let (linter, code) =
+                Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+
+            if code.is_empty() {
+                return Ok(Self::Linter(linter));
+            }
+
             Ok(Self::Prefix {
-                prefix: RuleCodePrefix::from_str(s)
-                    .map_err(|_| ParseError::Unknown(s.to_string()))?,
+                prefix: RuleCodePrefix::parse(&linter, code)
+                    .map_err(|_| ParseError::Unknown(code.to_string()))?,
                 redirected_from,
             })
         }
@@ -50,10 +67,13 @@ pub enum ParseError {
 }
 
 impl RuleSelector {
-    pub fn short_code(&self) -> &'static str {
+    pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
-            RuleSelector::All => "ALL",
-            RuleSelector::Prefix { prefix, .. } => prefix.into(),
+            RuleSelector::All => ("", "ALL"),
+            RuleSelector::Prefix { prefix, .. } => {
+                (prefix.linter().common_prefix(), prefix.short_code())
+            }
+            RuleSelector::Linter(l) => (l.common_prefix(), ""),
         }
     }
 }
@@ -63,7 +83,8 @@ impl Serialize for RuleSelector {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.short_code())
+        let (prefix, code) = self.prefix_and_code();
+        serializer.serialize_str(&format!("{prefix}{code}"))
     }
 }
 
@@ -117,14 +138,15 @@ impl IntoIterator for &RuleSelector {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
-            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Prefix(prefix.into_iter()),
+            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.into_iter()),
+            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.into_iter()),
         }
     }
 }
 
 pub enum RuleSelectorIter {
     All(RuleIter),
-    Prefix(std::vec::IntoIter<Rule>),
+    Vec(std::vec::IntoIter<Rule>),
 }
 
 impl Iterator for RuleSelectorIter {
@@ -133,7 +155,7 @@ impl Iterator for RuleSelectorIter {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             RuleSelectorIter::All(iter) => iter.next(),
-            RuleSelectorIter::Prefix(iter) => iter.next(),
+            RuleSelectorIter::Vec(iter) => iter.next(),
         }
     }
 }
@@ -160,7 +182,19 @@ impl JsonSchema for RuleSelector {
             instance_type: Some(InstanceType::String.into()),
             enum_values: Some(
                 std::iter::once("ALL".to_string())
-                    .chain(RuleCodePrefix::iter().map(|s| s.as_ref().to_string()))
+                    .chain(
+                        RuleCodePrefix::iter()
+                            .map(|p| {
+                                let prefix = p.linter().common_prefix();
+                                let code = p.short_code();
+                                format!("{prefix}{code}")
+                            })
+                            .chain(Linter::iter().filter_map(|l| {
+                                let prefix = l.common_prefix();
+                                (!prefix.is_empty()).then(|| prefix.to_string())
+                            }))
+                            .sorted(),
+                    )
                     .map(Value::String)
                     .collect(),
             ),
@@ -173,7 +207,18 @@ impl RuleSelector {
     pub(crate) fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
-            RuleSelector::Prefix { prefix, .. } => prefix.specificity(),
+            RuleSelector::Linter(..) => Specificity::Linter,
+            RuleSelector::Prefix { prefix, .. } => {
+                let prefix: &'static str = prefix.short_code();
+                match prefix.len() {
+                    1 => Specificity::Code1Char,
+                    2 => Specificity::Code2Chars,
+                    3 => Specificity::Code3Chars,
+                    4 => Specificity::Code4Chars,
+                    5 => Specificity::Code5Chars,
+                    _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
+                }
+            }
         }
     }
 }

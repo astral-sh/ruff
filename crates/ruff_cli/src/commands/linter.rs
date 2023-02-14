@@ -37,7 +37,7 @@ pub fn linter(format: HelpFormat) -> Result<()> {
                         .upstream_categories()
                         .unwrap()
                         .iter()
-                        .map(|UpstreamCategory(prefix, ..)| prefix.as_ref())
+                        .map(|UpstreamCategory(prefix, ..)| prefix.short_code())
                         .join("/"),
                     prefix => prefix.to_string(),
                 };
@@ -52,8 +52,8 @@ pub fn linter(format: HelpFormat) -> Result<()> {
                     name: linter_info.name(),
                     categories: linter_info.upstream_categories().map(|cats| {
                         cats.iter()
-                            .map(|UpstreamCategory(prefix, name, ..)| LinterCategoryInfo {
-                                prefix: prefix.as_ref(),
+                            .map(|UpstreamCategory(prefix, name)| LinterCategoryInfo {
+                                prefix: prefix.short_code(),
                                 name,
                             })
                             .collect()
@@ -74,7 +74,7 @@ pub fn linter(format: HelpFormat) -> Result<()> {
                         .upstream_categories()
                         .unwrap()
                         .iter()
-                        .map(|UpstreamCategory(prefix, ..)| prefix.as_ref())
+                        .map(|UpstreamCategory(prefix, ..)| prefix.short_code())
                         .join("/"),
                     prefix => prefix.to_string(),
                 };

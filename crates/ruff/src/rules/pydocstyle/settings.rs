@@ -26,6 +26,7 @@ impl Convention {
                 Rule::MultiLineSummarySecondLine,
                 Rule::SectionUnderlineNotOverIndented,
                 Rule::EndsInPeriod,
+                Rule::NonImperativeMood,
                 Rule::DocstringStartsWithThis,
                 Rule::NewLineAfterSectionName,
                 Rule::DashedUnderlineAfterSection,

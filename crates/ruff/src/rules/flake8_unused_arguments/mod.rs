@@ -21,7 +21,7 @@ mod tests {
     #[test_case(Rule::UnusedStaticMethodArgument, Path::new("ARG.py"); "ARG004")]
     #[test_case(Rule::UnusedLambdaArgument, Path::new("ARG.py"); "ARG005")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_unused_arguments").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
