@@ -195,4 +195,42 @@ expression: diagnostics
       row: 157
       column: 15
   parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(x in y for x in iterable)
+  location:
+    row: 162
+    column: 4
+  end_location:
+    row: 164
+    column: 24
+  fix:
+    content:
+      - return all(x in y for x in iterable)
+    location:
+      row: 162
+      column: 4
+    end_location:
+      row: 165
+      column: 15
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(x <= y for x in iterable)
+  location:
+    row: 170
+    column: 4
+  end_location:
+    row: 172
+    column: 24
+  fix:
+    content:
+      - return all(x <= y for x in iterable)
+    location:
+      row: 170
+      column: 4
+    end_location:
+      row: 173
+      column: 15
+  parent: ~
 
