@@ -12,7 +12,7 @@ use strum::IntoEnumIterator;
 use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
 use crate::cache::cache_dir;
-use crate::registry::{Rule, INCOMPATIBLE_CODES};
+use crate::registry::{Rule, RuleNamespace, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
@@ -360,7 +360,11 @@ impl From<&Configuration> for RuleTable {
 
         for (from, target) in redirects {
             // TODO(martin): This belongs into the ruff_cli crate.
-            crate::warn_user!("`{from}` has been remapped to `{}`.", target.as_ref());
+            crate::warn_user!(
+                "`{from}` has been remapped to `{}{}`.",
+                target.linter().common_prefix(),
+                target.short_code()
+            );
         }
 
         let mut rules = Self::empty();
@@ -430,7 +434,8 @@ mod tests {
     use rustc_hash::FxHashSet;
 
     use super::configuration::RuleSelection;
-    use crate::registry::{Rule, RuleCodePrefix};
+    use crate::codes::{self, Pycodestyle};
+    use crate::registry::Rule;
     use crate::settings::configuration::Configuration;
     use crate::settings::rule_table::RuleTable;
 
@@ -448,7 +453,7 @@ mod tests {
     #[test]
     fn rule_codes() {
         let actual = resolve_rules([RuleSelection {
-            select: Some(vec![RuleCodePrefix::W.into()]),
+            select: Some(vec![codes::Pycodestyle::W.into()]),
             ..RuleSelection::default()
         }]);
 
@@ -460,31 +465,31 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([RuleSelection {
-            select: Some(vec![RuleCodePrefix::W6.into()]),
+            select: Some(vec![Pycodestyle::W6.into()]),
             ..RuleSelection::default()
         }]);
         let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([RuleSelection {
-            select: Some(vec![RuleCodePrefix::W.into()]),
-            ignore: vec![RuleCodePrefix::W292.into()],
+            select: Some(vec![Pycodestyle::W.into()]),
+            ignore: vec![codes::Pycodestyle::W292.into()],
             ..RuleSelection::default()
         }]);
         let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([RuleSelection {
-            select: Some(vec![RuleCodePrefix::W292.into()]),
-            ignore: vec![RuleCodePrefix::W.into()],
+            select: Some(vec![Pycodestyle::W292.into()]),
+            ignore: vec![Pycodestyle::W.into()],
             ..RuleSelection::default()
         }]);
         let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([RuleSelection {
-            select: Some(vec![RuleCodePrefix::W605.into()]),
-            ignore: vec![RuleCodePrefix::W605.into()],
+            select: Some(vec![Pycodestyle::W605.into()]),
+            ignore: vec![Pycodestyle::W605.into()],
             ..RuleSelection::default()
         }]);
         let expected = FxHashSet::from_iter([]);
@@ -492,12 +497,12 @@ mod tests {
 
         let actual = resolve_rules([
             RuleSelection {
-                select: Some(vec![RuleCodePrefix::W.into()]),
-                ignore: vec![RuleCodePrefix::W292.into()],
+                select: Some(vec![Pycodestyle::W.into()]),
+                ignore: vec![Pycodestyle::W292.into()],
                 ..RuleSelection::default()
             },
             RuleSelection {
-                extend_select: vec![RuleCodePrefix::W292.into()],
+                extend_select: vec![Pycodestyle::W292.into()],
                 ..RuleSelection::default()
             },
         ]);
@@ -510,13 +515,13 @@ mod tests {
 
         let actual = resolve_rules([
             RuleSelection {
-                select: Some(vec![RuleCodePrefix::W.into()]),
-                ignore: vec![RuleCodePrefix::W292.into()],
+                select: Some(vec![Pycodestyle::W.into()]),
+                ignore: vec![Pycodestyle::W292.into()],
                 ..RuleSelection::default()
             },
             RuleSelection {
-                extend_select: vec![RuleCodePrefix::W292.into()],
-                ignore: vec![RuleCodePrefix::W.into()],
+                extend_select: vec![Pycodestyle::W292.into()],
+                ignore: vec![Pycodestyle::W.into()],
                 ..RuleSelection::default()
             },
         ]);
@@ -529,11 +534,11 @@ mod tests {
         let actual = resolve_rules([
             RuleSelection {
                 select: Some(vec![]),
-                ignore: vec![RuleCodePrefix::W292.into()],
+                ignore: vec![Pycodestyle::W292.into()],
                 ..RuleSelection::default()
             },
             RuleSelection {
-                select: Some(vec![RuleCodePrefix::W.into()]),
+                select: Some(vec![Pycodestyle::W.into()]),
                 ..RuleSelection::default()
             },
         ]);
@@ -543,12 +548,12 @@ mod tests {
         let actual = resolve_rules([
             RuleSelection {
                 select: Some(vec![]),
-                ignore: vec![RuleCodePrefix::W292.into()],
+                ignore: vec![Pycodestyle::W292.into()],
                 ..RuleSelection::default()
             },
             RuleSelection {
-                select: Some(vec![RuleCodePrefix::W.into()]),
-                ignore: vec![RuleCodePrefix::W505.into()],
+                select: Some(vec![Pycodestyle::W.into()]),
+                ignore: vec![Pycodestyle::W505.into()],
                 ..RuleSelection::default()
             },
         ]);

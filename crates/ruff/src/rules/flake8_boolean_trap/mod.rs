@@ -16,7 +16,7 @@ mod tests {
     #[test_case(Rule::BooleanDefaultValueInFunctionDefinition, Path::new("FBT.py"); "FBT002")]
     #[test_case(Rule::BooleanPositionalValueInFunctionCall, Path::new("FBT.py"); "FBT003")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_boolean_trap").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),

@@ -254,8 +254,10 @@ Or, to enable autofix:
 
 <!-- Begin section: Configuration -->
 
-Ruff is configurable both via `pyproject.toml` and the command line. For a full list of configurable
+Ruff is configurable both via `pyproject.toml`, `ruff.toml`, and the command line. For a full list of configurable
 options, see the [API reference](#reference).
+
+### Configure via `pyproject.toml`
 
 If left unspecified, the default configuration is equivalent to:
 
@@ -361,6 +363,8 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
   extension.
 * By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
   consider turning off autofix for specific rules or categories (see: [FAQ](#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
+
+### Configure via `ruff.toml`
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
 an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the

@@ -39,7 +39,7 @@ mod tests {
     #[test_case(Rule::DictGetWithDefault, Path::new("SIM401.py"); "SIM401")]
     #[test_case(Rule::IfWithSameArms, Path::new("SIM114.py"); "SIM114")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_simplify").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
