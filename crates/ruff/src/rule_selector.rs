@@ -233,3 +233,76 @@ pub(crate) enum Specificity {
     Code4Chars,
     Code5Chars,
 }
+
+mod clap_completion {
+    use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use strum::IntoEnumIterator;
+
+    use crate::{
+        codes::RuleCodePrefix,
+        registry::{Linter, RuleNamespace},
+        RuleSelector,
+    };
+
+    #[derive(Clone)]
+    pub struct RuleSelectorParser;
+
+    impl ValueParserFactory for RuleSelector {
+        type Parser = RuleSelectorParser;
+
+        fn value_parser() -> Self::Parser {
+            RuleSelectorParser
+        }
+    }
+
+    impl TypedValueParser for RuleSelectorParser {
+        type Value = RuleSelector;
+
+        fn parse_ref(
+            &self,
+            _cmd: &clap::Command,
+            _arg: Option<&clap::Arg>,
+            value: &std::ffi::OsStr,
+        ) -> Result<Self::Value, clap::Error> {
+            let value = value
+                .to_str()
+                .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
+
+            value
+                .parse()
+                .map_err(|e| clap::Error::raw(clap::error::ErrorKind::InvalidValue, e))
+        }
+
+        fn possible_values(
+            &self,
+        ) -> Option<Box<dyn Iterator<Item = clap::builder::PossibleValue> + '_>> {
+            Some(Box::new(
+                std::iter::once(PossibleValue::new("ALL").help("all rules")).chain(
+                    Linter::iter()
+                        .filter_map(|l| {
+                            let prefix = l.common_prefix();
+                            (!prefix.is_empty()).then(|| PossibleValue::new(prefix).help(l.name()))
+                        })
+                        .chain(RuleCodePrefix::iter().map(|p| {
+                            let prefix = p.linter().common_prefix();
+                            let code = p.short_code();
+
+                            let mut rules_iter = p.into_iter();
+                            let rule1 = rules_iter.next();
+                            let rule2 = rules_iter.next();
+
+                            let value = PossibleValue::new(format!("{prefix}{code}"));
+
+                            if rule2.is_none() {
+                                let rule1 = rule1.unwrap();
+                                let name: &'static str = rule1.into();
+                                value.help(name)
+                            } else {
+                                value
+                            }
+                        })),
+                ),
+            ))
+        }
+    }
+}
