@@ -550,6 +550,8 @@ ruff_macros::register_rules!(
     rules::flake8_raise::rules::UnnecessaryParenOnRaiseException,
     // flake8-self
     rules::flake8_self::rules::PrivateMemberAccess,
+    // numpy
+    rules::numpy::rules::NumpyDeprecatedTypeAlias,
     // ruff
     rules::ruff::rules::AmbiguousUnicodeCharacterString,
     rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,
@@ -695,6 +697,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// NumPy-specific rules
+    #[prefix = "NPY"]
+    Numpy,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
