@@ -40,11 +40,8 @@ def main() -> None:
         raise ValueError(msg)
     content = content.replace(DOCUMENTATION_LINK, "")
 
-    # Replace all GitHub links with relative links.
-    content = content.replace(
-        "https://github.com/charliermarsh/ruff/blob/main/docs/rules/",
-        "rules/",
-    )
+    # Make the documentation links in the README more relative.
+    content = content.replace("https://beta.ruff.rs", "")
 
     Path("docs").mkdir(parents=True, exist_ok=True)
 
