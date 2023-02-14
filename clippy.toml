@@ -1,1 +1,1 @@
-doc-valid-idents = ["StackOverflow", "CodeQL", ".."]
+doc-valid-idents = ["StackOverflow", "CodeQL", "NumPy", ".."]

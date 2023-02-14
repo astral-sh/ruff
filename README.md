@@ -158,11 +158,11 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [flake8-unused-arguments (ARG)](#flake8-unused-arguments-arg)
    1. [flake8-use-pathlib (PTH)](#flake8-use-pathlib-pth)
    1. [eradicate (ERA)](#eradicate-era)
-   1. [Numpy-specific rules (NPY)](#numpy-specific-rules-npy)
    1. [pandas-vet (PD)](#pandas-vet-pd)
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PL)](#pylint-pl)
    1. [tryceratops (TRY)](#tryceratops-try)
+   1. [NumPy-specific rules (NPY)](#numpy-specific-rules-npy)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
@@ -1396,12 +1396,6 @@ For more, see [eradicate](https://pypi.org/project/eradicate/) on PyPI.
 | ---- | ---- | ------- | --- |
 | ERA001 | [commented-out-code](https://beta.ruff.rs/docs/rules/commented-out-code/) | Found commented-out code | 🛠 |
 
-### Numpy-specific rules (NPY)
-
-| Code | Name | Message | Fix |
-| ---- | ---- | ------- | --- |
-| NPY001 | [deprecated-type-alias](https://beta.ruff.rs/docs/rules/deprecated-type-alias/) | NumPy type alias `np.{type_name}` is deprecated, replace with builtin type | 🛠 |
-
 ### pandas-vet (PD)
 
 For more, see [pandas-vet](https://pypi.org/project/pandas-vet/) on PyPI.
@@ -1493,6 +1487,12 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | TRY300 | try-consider-else | Consider moving this statement to an `else` block |  |
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 | TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
+
+### NumPy-specific rules (NPY)
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| NPY001 | [numpy-deprecated-type-alias](https://beta.ruff.rs/docs/rules/numpy-deprecated-type-alias/) | NumPy type alias `np.{type_name}` is deprecated, replace with builtin type | 🛠 |
 
 ### Ruff-specific rules (RUF)
 

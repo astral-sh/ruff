@@ -30,19 +30,19 @@ define_violation!(
     /// ```python
     /// bool
     /// ```
-    pub struct DeprecatedTypeAlias {
+    pub struct NumpyDeprecatedTypeAlias {
         pub type_name: String,
     }
 );
-impl AlwaysAutofixableViolation for DeprecatedTypeAlias {
+impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DeprecatedTypeAlias { type_name } = self;
+        let NumpyDeprecatedTypeAlias { type_name } = self;
         format!("NumPy type alias `np.{type_name}` is deprecated, replace with builtin type")
     }
 
     fn autofix_title(&self) -> String {
-        let DeprecatedTypeAlias { type_name } = self;
+        let NumpyDeprecatedTypeAlias { type_name } = self;
         format!("Replace `np.{type_name}` with builtin type")
     }
 }
@@ -65,7 +65,7 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
         }
     }) {
         let mut diagnostic = Diagnostic::new(
-            DeprecatedTypeAlias {
+            NumpyDeprecatedTypeAlias {
                 type_name: type_name.to_string(),
             },
             Range::from_located(expr),

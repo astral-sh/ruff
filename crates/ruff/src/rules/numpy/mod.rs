@@ -1,4 +1,4 @@
-//! Numpy-specific rules.
+//! NumPy-specific rules.
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -13,7 +13,7 @@ mod tests {
     use crate::test::test_path;
     use crate::{assert_yaml_snapshot, settings};
 
-    #[test_case(Rule::DeprecatedTypeAlias, Path::new("NPY001.py"); "NPY001")]
+    #[test_case(Rule::NumpyDeprecatedTypeAlias, Path::new("NPY001.py"); "NPY001")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(

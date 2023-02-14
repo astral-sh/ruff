@@ -588,7 +588,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Self, "001") => Rule::PrivateMemberAccess,
 
         // numpy
-        (Numpy, "001") => Rule::DeprecatedTypeAlias,
+        (Numpy, "001") => Rule::NumpyDeprecatedTypeAlias,
 
         // ruff
         (Ruff, "001") => Rule::AmbiguousUnicodeCharacterString,

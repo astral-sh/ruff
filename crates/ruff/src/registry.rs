@@ -551,7 +551,7 @@ ruff_macros::register_rules!(
     // flake8-self
     rules::flake8_self::rules::PrivateMemberAccess,
     // numpy
-    rules::numpy::rules::DeprecatedTypeAlias,
+    rules::numpy::rules::NumpyDeprecatedTypeAlias,
     // ruff
     rules::ruff::rules::AmbiguousUnicodeCharacterString,
     rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,
@@ -685,9 +685,6 @@ pub enum Linter {
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
-    /// NumPy-specific rules
-    #[prefix = "NPY"]
-    Numpy,
     /// [pandas-vet](https://pypi.org/project/pandas-vet/)
     #[prefix = "PD"]
     PandasVet,
@@ -700,6 +697,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// NumPy-specific rules
+    #[prefix = "NPY"]
+    Numpy,
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,

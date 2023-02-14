@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DeprecatedTypeAlias:
+    NumpyDeprecatedTypeAlias:
       type_name: bool
   location:
     row: 6
@@ -22,7 +22,7 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    DeprecatedTypeAlias:
+    NumpyDeprecatedTypeAlias:
       type_name: int
   location:
     row: 7
@@ -41,7 +41,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    DeprecatedTypeAlias:
+    NumpyDeprecatedTypeAlias:
       type_name: object
   location:
     row: 9
@@ -60,7 +60,7 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    DeprecatedTypeAlias:
+    NumpyDeprecatedTypeAlias:
       type_name: int
   location:
     row: 12
@@ -79,7 +79,7 @@ expression: diagnostics
       column: 77
   parent: ~
 - kind:
-    DeprecatedTypeAlias:
+    NumpyDeprecatedTypeAlias:
       type_name: long
   location:
     row: 12
@@ -98,7 +98,7 @@ expression: diagnostics
       column: 86
   parent: ~
 - kind:
-    DeprecatedTypeAlias:
+    NumpyDeprecatedTypeAlias:
       type_name: object
   location:
     row: 17
@@ -117,7 +117,7 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    DeprecatedTypeAlias:
+    NumpyDeprecatedTypeAlias:
       type_name: int
   location:
     row: 20

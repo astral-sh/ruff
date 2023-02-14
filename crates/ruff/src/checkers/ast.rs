@@ -2145,7 +2145,7 @@ where
                         if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
                             pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
-                        if self.settings.rules.enabled(&Rule::DeprecatedTypeAlias) {
+                        if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
                             numpy::rules::deprecated_type_alias(self, expr);
                         }
 
@@ -2214,7 +2214,7 @@ where
                 if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
                     pyupgrade::rules::typing_text_str_alias(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::DeprecatedTypeAlias) {
+                if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
                     numpy::rules::deprecated_type_alias(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::RewriteMockImport) {
