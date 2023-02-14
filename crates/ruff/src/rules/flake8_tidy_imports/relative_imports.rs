@@ -89,11 +89,11 @@ fn fix_banned_relative_import(
     stmt: &Stmt,
     level: Option<&usize>,
     module: Option<&str>,
-    module_path: &Option<Vec<String>>,
+    module_path: Option<&Vec<String>>,
     stylist: &Stylist,
 ) -> Option<Fix> {
     // Only fix is the module path is known
-    if let Some(mut parts) = module_path.clone() {
+    if let Some(mut parts) = module_path.cloned() {
         // Remove relative level from module path
         for _ in 0..*level? {
             parts.pop();
@@ -136,7 +136,7 @@ pub fn banned_relative_import(
     stmt: &Stmt,
     level: Option<&usize>,
     module: Option<&str>,
-    module_path: &Option<Vec<String>>,
+    module_path: Option<&Vec<String>>,
     strictness: &Strictness,
 ) -> Option<Diagnostic> {
     let strictness_level = match strictness {
