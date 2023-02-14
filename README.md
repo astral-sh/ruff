@@ -1126,9 +1126,9 @@ For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| EM101 | raw-string-in-exception | Exception must not use a string literal, assign to variable first |  |
-| EM102 | f-string-in-exception | Exception must not use an f-string literal, assign to variable first |  |
-| EM103 | dot-format-in-exception | Exception must not use a `.format()` string directly, assign to variable first |  |
+| EM101 | [raw-string-in-exception](https://beta.ruff.rs/docs/rules/raw-string-in-exception/) | Exception must not use a string literal, assign to variable first |  |
+| EM102 | [f-string-in-exception](https://beta.ruff.rs/docs/rules/f-string-in-exception/) | Exception must not use an f-string literal, assign to variable first |  |
+| EM103 | [dot-format-in-exception](https://beta.ruff.rs/docs/rules/dot-format-in-exception/) | Exception must not use a `.format()` string directly, assign to variable first |  |
 
 ### flake8-executable (EXE)
 
