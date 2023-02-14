@@ -1476,7 +1476,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | ---- | ---- | ------- | --- |
 | TRY002 | [raise-vanilla-class](https://beta.ruff.rs/docs/rules/raise-vanilla-class/) | Create your own exception |  |
 | TRY003 | raise-vanilla-args | Avoid specifying long messages outside the exception class |  |
-| TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type | 🛠 |
+| TRY004 | prefer-type-error | Prefer `TypeError` exception for invalid type |  |
 | TRY200 | reraise-no-cause | Use `raise from` to specify exception cause |  |
 | TRY201 | verbose-raise | Use `raise` without specifying exception name |  |
 | TRY300 | try-consider-else | Consider moving this statement to an `else` block |  |
