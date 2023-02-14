@@ -3,6 +3,7 @@ use ruff_python::string::is_lower;
 use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
+use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
@@ -44,15 +45,16 @@ impl<'a> Visitor<'a> for RaiseVisitor {
             | StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }
             | StmtKind::Try { .. } => {}
-            StmtKind::If { body, .. }
-            | StmtKind::While { body, .. }
+            StmtKind::If { body, orelse, .. } => {
+                visitor::walk_body(self, body);
+                visitor::walk_body(self, orelse);
+            }
+            StmtKind::While { body, .. }
             | StmtKind::With { body, .. }
             | StmtKind::AsyncWith { body, .. }
             | StmtKind::For { body, .. }
             | StmtKind::AsyncFor { body, .. } => {
-                for stmt in body {
-                    self.visit_stmt(stmt);
-                }
+                visitor::walk_body(self, body);
             }
             _ => {}
         }
@@ -63,8 +65,6 @@ pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
     let mut visitor = RaiseVisitor {
         diagnostics: vec![],
     };
-    for stmt in body {
-        visitor.visit_stmt(stmt);
-    }
+    visitor::walk_body(&mut visitor, body);
     checker.diagnostics.extend(visitor.diagnostics);
 }

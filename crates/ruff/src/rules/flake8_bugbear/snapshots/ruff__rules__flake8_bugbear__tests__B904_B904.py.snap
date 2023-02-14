@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -30,6 +30,26 @@ expression: diagnostics
   end_location:
     row: 16
     column: 39
+  fix: ~
+  parent: ~
+- kind:
+    RaiseWithoutFromInsideExcept: ~
+  location:
+    row: 62
+    column: 8
+  end_location:
+    row: 62
+    column: 35
+  fix: ~
+  parent: ~
+- kind:
+    RaiseWithoutFromInsideExcept: ~
+  location:
+    row: 64
+    column: 8
+  end_location:
+    row: 64
+    column: 35
   fix: ~
   parent: ~
 
