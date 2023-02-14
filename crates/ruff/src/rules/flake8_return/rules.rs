@@ -423,13 +423,7 @@ fn superfluous_elif(checker: &mut Checker, stack: &Stack) -> bool {
 
 /// RET505, RET506, RET507, RET508
 fn superfluous_else(checker: &mut Checker, stack: &Stack) -> bool {
-    for stmt in &stack.ifs {
-        let StmtKind::If { orelse, .. } = &stmt.node else {
-            continue;
-        };
-        if orelse.is_empty() {
-            continue;
-        }
+    for stmt in &stack.elses {
         if superfluous_else_node(checker, stmt, Branch::Else) {
             return true;
         }
