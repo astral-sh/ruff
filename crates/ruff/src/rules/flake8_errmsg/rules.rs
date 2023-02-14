@@ -8,22 +8,22 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for raw usage of a string literal in Exception raising.
+    /// Checks for the use of string literals in exception constructors.
     ///
     /// ## Why is this bad?
-    /// Python includes the line with the raise in the default traceback (and most
-    /// other formatters, like Rich and `IPython` to too).
+    /// Python includes the `raise` in the default traceback (and formatters
+    /// like Rich and IPython do too).
+    ///
+    /// By using a string literal, the error message will be duplicated in the
+    /// traceback, which can make the traceback less readable.
     ///
     /// ## Example
-    ///
-    /// This exception
-    ///
+    /// Given:
     /// ```python
     /// raise RuntimeError("'Some value' is incorrect")
     /// ```
     ///
-    /// will produce a traceback like this:
-    ///
+    /// Python will produce a traceback like:
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 2, in <module>
@@ -31,27 +31,19 @@ define_violation!(
     /// RuntimeError: 'Some value' is incorrect
     /// ```
     ///
-    /// If this is longer or more complex, the duplication can be quite confusing for a
-    /// user unaccustomed to reading tracebacks.
-    ///
-    /// While if you always assign to something like `msg`
-    ///
+    /// Instead, assign the string to a variable:
     /// ```python
     /// msg = "'Some value' is incorrect"
     /// raise RuntimeError(msg)
     /// ```
     ///
-    /// then you get:
-    ///
+    /// Which will produce a traceback like:
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 3, in <module>
     ///     raise RuntimeError(msg)
     /// RuntimeError: 'Some value' is incorrect
     /// ```
-    ///
-    /// Now there's a simpler traceback, less code, and no double message. If you have
-    /// a long message, this also often formats better when using Black, too.
     pub struct RawStringInException;
 );
 impl Violation for RawStringInException {
@@ -63,23 +55,23 @@ impl Violation for RawStringInException {
 
 define_violation!(
     /// ## What it does
-    /// Checks for raw usage of an f-string literal in Exception raising.
+    /// Checks for the use of f-strings in exception constructors.
     ///
     /// ## Why is this bad?
-    /// Python includes the line with the raise in the default traceback (and most
-    /// other formatters, like Rich and `IPython` to too).
+    /// Python includes the `raise` in the default traceback (and formatters
+    /// like Rich and IPython do too).
+    ///
+    /// By using an f-string, the error message will be duplicated in the
+    /// traceback, which can make the traceback less readable.
     ///
     /// ## Example
-    ///
-    /// This exception
-    ///
+    /// Given:
     /// ```python
     /// sub = "Some value"
     /// raise RuntimeError(f"{sub!r} is incorrect")
     /// ```
     ///
-    /// will produce a traceback like this:
-    ///
+    /// Python will produce a traceback like:
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 2, in <module>
@@ -87,28 +79,20 @@ define_violation!(
     /// RuntimeError: 'Some value' is incorrect
     /// ```
     ///
-    /// If this is longer or more complex, the duplication can be quite confusing for a
-    /// user unaccustomed to reading tracebacks.
-    ///
-    /// While if you always assign to something like `msg`
-    ///
+    /// Instead, assign the string to a variable:
     /// ```python
     /// sub = "Some value"
     /// msg = f"{sub!r} is incorrect"
     /// raise RuntimeError(msg)
     /// ```
     ///
-    /// then you get:
-    ///
+    /// Which will produce a traceback like:
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 3, in <module>
     ///     raise RuntimeError(msg)
     /// RuntimeError: 'Some value' is incorrect
     /// ```
-    ///
-    /// Now there's a simpler traceback, less code, and no double message. If you have
-    /// a long message, this also often formats better when using Black, too.
     pub struct FStringInException;
 );
 impl Violation for FStringInException {
@@ -120,23 +104,24 @@ impl Violation for FStringInException {
 
 define_violation!(
     /// ## What it does
-    /// Checks for raw usage of `.format` on a string literal in Exception raising.
+    /// Checks for the use of `.format` calls on string literals in exception
+    /// constructors.
     ///
     /// ## Why is this bad?
-    /// Python includes the line with the raise in the default traceback (and most
-    /// other formatters, like Rich and `IPython` to too).
+    /// Python includes the `raise` in the default traceback (and formatters
+    /// like Rich and IPython do too).
+    ///
+    /// By using a `.format` call, the error message will be duplicated in the
+    /// traceback, which can make the traceback less readable.
     ///
     /// ## Example
-    ///
-    /// This exception
-    ///
+    /// Given:
     /// ```python
     /// sub = "Some value"
     /// raise RuntimeError("'{}' is incorrect".format(sub))
     /// ```
     ///
-    /// will produce a traceback like this:
-    ///
+    /// Python will produce a traceback like:
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 2, in <module>
@@ -144,28 +129,20 @@ define_violation!(
     /// RuntimeError: 'Some value' is incorrect
     /// ```
     ///
-    /// If this is longer or more complex, the duplication can be quite confusing for a
-    /// user unaccustomed to reading tracebacks.
-    ///
-    /// While if you always assign to something like `msg`
-    ///
+    /// Instead, assign the string to a variable:
     /// ```python
     /// sub = "Some value"
     /// msg = "'{}' is incorrect".format(sub)
     /// raise RuntimeError(msg)
     /// ```
     ///
-    /// then you get:
-    ///
+    /// Which will produce a traceback like:
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 3, in <module>
     ///     raise RuntimeError(msg)
     /// RuntimeError: 'Some value' is incorrect
     /// ```
-    ///
-    /// Now there's a simpler traceback, less code, and no double message. If you have
-    /// a long message, this also often formats better when using Black, too.
     pub struct DotFormatInException;
 );
 impl Violation for DotFormatInException {
