@@ -675,7 +675,7 @@ Ruff supports two command-line flags that alter its exit code behavior:
 ### Autocompletion
 
 Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
-by `ruff completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
+by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
 `powershell`, or `zsh`.
 
 The exact steps required to enable autocompletion will vary by shell. For example instructions,
