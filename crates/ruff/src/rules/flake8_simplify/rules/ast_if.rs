@@ -118,15 +118,15 @@ define_violation!(
     ///
     /// ### Example
     /// ```python
-    /// if x = 1:
+    /// if x == 1:
     ///     print("Hello")
-    /// elif x = 2:
+    /// elif x == 2:
     ///     print("Hello")
     /// ```
     ///
     /// Use instead:
     /// ```python
-    /// if x = 1 or x = 2:
+    /// if x == 1 or x == 2:
     ///     print("Hello")
     /// ```
     pub struct IfWithSameArms;
