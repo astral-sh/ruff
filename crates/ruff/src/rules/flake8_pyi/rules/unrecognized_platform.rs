@@ -42,7 +42,7 @@ define_violation!(
 impl Violation for UnrecognizedPlatformCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Unrecognized sys.platform check")
+        format!("Unrecognized `sys.platform` check")
     }
 }
 

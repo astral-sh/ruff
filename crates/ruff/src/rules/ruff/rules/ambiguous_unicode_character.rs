@@ -25,8 +25,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
             representant,
         } = self;
         format!(
-            "String contains ambiguous unicode character '{confusable}' (did you mean \
-             '{representant}'?)"
+            "String contains ambiguous unicode character `{confusable}` (did you mean \
+             `{representant}`?)"
         )
     }
 
@@ -35,7 +35,7 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
             confusable,
             representant,
         } = self;
-        format!("Replace '{confusable}' with '{representant}'")
+        format!("Replace `{confusable}` with `{representant}`")
     }
 }
 
@@ -53,8 +53,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
             representant,
         } = self;
         format!(
-            "Docstring contains ambiguous unicode character '{confusable}' (did you mean \
-             '{representant}'?)"
+            "Docstring contains ambiguous unicode character `{confusable}` (did you mean \
+             `{representant}`?)"
         )
     }
 
@@ -63,7 +63,7 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
             confusable,
             representant,
         } = self;
-        format!("Replace '{confusable}' with '{representant}'")
+        format!("Replace `{confusable}` with `{representant}`")
     }
 }
 
@@ -81,8 +81,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
             representant,
         } = self;
         format!(
-            "Comment contains ambiguous unicode character '{confusable}' (did you mean \
-             '{representant}'?)"
+            "Comment contains ambiguous unicode character `{confusable}` (did you mean \
+             `{representant}`?)"
         )
     }
 
@@ -91,7 +91,7 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
             confusable,
             representant,
         } = self;
-        format!("Replace '{confusable}' with '{representant}'")
+        format!("Replace `{confusable}` with `{representant}`")
     }
 }
 

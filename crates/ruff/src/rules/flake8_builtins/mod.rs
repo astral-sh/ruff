@@ -19,7 +19,7 @@ mod tests {
     #[test_case(Rule::BuiltinArgumentShadowing, Path::new("A002.py"); "A002")]
     #[test_case(Rule::BuiltinAttributeShadowing, Path::new("A003.py"); "A003")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_builtins").join(path).as_path(),
             &Settings::for_rule(rule_code),
@@ -34,7 +34,7 @@ mod tests {
     fn builtins_ignorelist(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "{}_{}_builtins_ignorelist",
-            rule_code.code(),
+            rule_code.noqa_code(),
             path.to_string_lossy()
         );
 

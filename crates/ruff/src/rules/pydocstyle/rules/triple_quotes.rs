@@ -12,7 +12,7 @@ define_violation!(
 impl Violation for TripleSingleQuotes {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"Use """triple double quotes""""#)
+        format!(r#"Use triple double quotes `"""`"#)
     }
 }
 

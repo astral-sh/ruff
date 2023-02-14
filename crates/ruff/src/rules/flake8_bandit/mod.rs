@@ -35,7 +35,7 @@ mod tests {
     #[test_case(Rule::TryExceptPass, Path::new("S110.py"); "S110")]
     #[test_case(Rule::TryExceptContinue, Path::new("S112.py"); "S112")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bandit").join(path).as_path(),
             &Settings::for_rule(rule_code),

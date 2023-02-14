@@ -22,17 +22,17 @@ struct Explanation<'a> {
 
 /// Explain a `Rule` to the user.
 pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
-    let (linter, _) = Linter::parse_code(rule.code()).unwrap();
+    let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
     let mut stdout = BufWriter::new(io::stdout().lock());
     let mut output = String::new();
 
     match format {
         HelpFormat::Text | HelpFormat::Pretty => {
-            output.push_str(&format!("# {} ({})", rule.as_ref(), rule.code()));
+            output.push_str(&format!("# {} ({})", rule.as_ref(), rule.noqa_code()));
             output.push('\n');
             output.push('\n');
 
-            let (linter, _) = Linter::parse_code(rule.code()).unwrap();
+            let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
             output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
             output.push('\n');
             output.push('\n');
@@ -58,7 +58,7 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
         }
         HelpFormat::Json => {
             output.push_str(&serde_json::to_string_pretty(&Explanation {
-                code: rule.code(),
+                code: &rule.noqa_code().to_string(),
                 linter: linter.name(),
                 summary: rule.message_formats()[0],
             })?);

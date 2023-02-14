@@ -43,7 +43,7 @@ mod tests {
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"); "B904")]
     #[test_case(Rule::ZipWithoutExplicitStrict, Path::new("B905.py"); "B905")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_bugbear").join(path).as_path(),
             &Settings::for_rule(rule_code),
