@@ -109,7 +109,8 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        help_heading = "Rule selection"
+        help_heading = "Rule selection",
+        hide_possible_values = true
     )]
     pub select: Option<Vec<RuleSelector>>,
     /// Comma-separated list of rule codes to disable.
@@ -117,7 +118,8 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        help_heading = "Rule selection"
+        help_heading = "Rule selection",
+        hide_possible_values = true
     )]
     pub ignore: Option<Vec<RuleSelector>>,
     /// Like --select, but adds additional rule codes on top of the selected
@@ -126,7 +128,8 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        help_heading = "Rule selection"
+        help_heading = "Rule selection",
+        hide_possible_values = true
     )]
     pub extend_select: Option<Vec<RuleSelector>>,
     /// Like --ignore. (Deprecated: You can just use --ignore instead.)
@@ -164,7 +167,8 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        help_heading = "Rule selection"
+        help_heading = "Rule selection",
+        hide_possible_values = true
     )]
     pub fixable: Option<Vec<RuleSelector>>,
     /// List of rule codes to treat as ineligible for autofix. Only applicable
@@ -173,7 +177,8 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
-        help_heading = "Rule selection"
+        help_heading = "Rule selection",
+        hide_possible_values = true
     )]
     pub unfixable: Option<Vec<RuleSelector>>,
     /// Respect file exclusions via `.gitignore` and other standard ignore
