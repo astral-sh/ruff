@@ -1,14 +1,8 @@
 [package]
 name = "ruff_text_size"
 version = "0.0.0"
-edition = "2018"
-authors = [
-    "Aleksey Kladov <aleksey.kladov@gmail.com>",
-    "Christopher Durham (CAD97) <cad97@cad97.com>"
-]
-description = "Newtypes for text offsets"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/charliermarsh/ruff"
+publish = false
+edition = "2021"
 
 [dependencies]
 serde = { version = "1.0", optional = true, default_features = false }
