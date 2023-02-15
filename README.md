@@ -1503,6 +1503,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
 | RUF004 | keyword-argument-before-star-argument | Keyword argument `{name}` must come after starred arguments |  |
 | RUF005 | unpack-instead-of-concatenating-to-collection-literal | Consider `{expr}` instead of concatenation | 🛠 |
+| RUF006 | [asyncio-dangling-task](https://beta.ruff.rs/docs/rules/asyncio-dangling-task/) | Store a reference to the return value of `asyncio.create_task` |  |
 | RUF100 | unused-noqa | Unused `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
