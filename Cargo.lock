@@ -378,9 +378,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.1.4"
+version = "4.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f13b9c79b5d1dd500d20ef541215a6423c75829ef43117e1b4d17fd8af0b5d76"
+checksum = "ec0b0588d44d4d63a87dbd75c136c166bbfd9a86a31cb89e09906521c7d3f5e3"
 dependencies = [
  "bitflags",
  "clap_derive",
@@ -397,7 +397,7 @@ version = "4.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3d6540eedc41f8a5a76cf3d8d458057dcdf817be4158a55b5f861f7a5483de75"
 dependencies = [
- "clap 4.1.4",
+ "clap 4.1.6",
 ]
 
 [[package]]
@@ -406,7 +406,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4160b4a4f72ef58bd766bad27c09e6ef1cc9d82a22f6a0f55d152985a4a48e31"
 dependencies = [
- "clap 4.1.4",
+ "clap 4.1.6",
  "clap_complete",
  "clap_complete_fig",
 ]
@@ -417,7 +417,7 @@ version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf0c76d8fcf782a1102ccfcd10ca8246e7fdd609c1cd6deddbb96cb638e9bb5c"
 dependencies = [
- "clap 4.1.4",
+ "clap 4.1.6",
  "clap_complete",
 ]
 
@@ -902,7 +902,7 @@ name = "flake8-to-ruff"
 version = "0.0.247"
 dependencies = [
  "anyhow",
- "clap 4.1.4",
+ "clap 4.1.6",
  "colored",
  "configparser",
  "once_cell",
@@ -1628,7 +1628,7 @@ dependencies = [
  "ansi_term",
  "anyhow",
  "base64 0.20.0",
- "clap 4.1.4",
+ "clap 4.1.6",
  "clap_complete",
  "env_proxy",
  "gethostname",
@@ -2453,7 +2453,7 @@ dependencies = [
  "bitflags",
  "cfg-if",
  "chrono",
- "clap 4.1.4",
+ "clap 4.1.6",
  "colored",
  "console_error_panic_hook",
  "console_log",
@@ -2512,7 +2512,7 @@ dependencies = [
  "bitflags",
  "cachedir",
  "chrono",
- "clap 4.1.4",
+ "clap 4.1.6",
  "clap_complete_command",
  "clearscreen",
  "colored",
@@ -2547,7 +2547,7 @@ name = "ruff_dev"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "clap 4.1.4",
+ "clap 4.1.6",
  "itertools",
  "libcst",
  "once_cell",
@@ -2602,7 +2602,7 @@ name = "ruff_python_formatter"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "clap 4.1.4",
+ "clap 4.1.6",
  "insta",
  "once_cell",
  "ruff_formatter",
