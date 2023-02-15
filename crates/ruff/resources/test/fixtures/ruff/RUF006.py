@@ -6,12 +6,33 @@ def f():
     asyncio.create_task(coordinator.ws_connect())  # Error
 
 
+# Error
+def f():
+    asyncio.ensure_future(coordinator.ws_connect())  # Error
+
+
 # OK
 def f():
     background_tasks = set()
 
     for i in range(10):
         task = asyncio.create_task(some_coro(param=i))
+
+        # Add task to the set. This creates a strong reference.
+        background_tasks.add(task)
+
+        # To prevent keeping references to finished tasks forever,
+        # make each task remove its own reference from the set after
+        # completion:
+        task.add_done_callback(background_tasks.discard)
+
+
+# OK
+def f():
+    background_tasks = set()
+
+    for i in range(10):
+        task = asyncio.ensure_future(some_coro(param=i))
 
         # Add task to the set. This creates a strong reference.
         background_tasks.add(task)
