@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 
-use crate::{generate_cli_help, generate_docs, generate_json_schema, generate_options};
+use crate::{generate_cli_help, generate_docs, generate_json_schema};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -16,9 +16,6 @@ pub fn main(args: &Args) -> Result<()> {
         dry_run: args.dry_run,
     })?;
     generate_json_schema::main(&generate_json_schema::Args {
-        dry_run: args.dry_run,
-    })?;
-    generate_options::main(&generate_options::Args {
         dry_run: args.dry_run,
     })?;
     generate_cli_help::main(&generate_cli_help::Args {

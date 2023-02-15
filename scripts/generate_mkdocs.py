@@ -49,6 +49,10 @@ def main() -> None:
     # Split the README.md into sections.
     for title, filename in SECTIONS:
         with Path(f"docs/{filename}").open("w+") as f:
+            if filename == "settings.md":
+                f.write(subprocess.check_output(["cargo", "dev", "generate-options"], encoding="utf-8"))
+                continue
+
             block = content.split(f"<!-- Begin section: {title} -->")
             if len(block) != 2:
                 msg = f"Section {title} not found in README.md"

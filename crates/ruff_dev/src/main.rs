@@ -36,7 +36,7 @@ enum Command {
     /// Generate a Markdown-compatible table of supported lint rules.
     GenerateRulesTable,
     /// Generate a Markdown-compatible listing of configuration options.
-    GenerateOptions(generate_options::Args),
+    GenerateOptions,
     /// Generate CLI help.
     GenerateCliHelp(generate_cli_help::Args),
     /// Generate Markdown docs.
@@ -58,7 +58,7 @@ fn main() -> Result<()> {
         Command::GenerateAll(args) => generate_all::main(args)?,
         Command::GenerateJSONSchema(args) => generate_json_schema::main(args)?,
         Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
-        Command::GenerateOptions(args) => generate_options::main(args)?,
+        Command::GenerateOptions => println!("{}", generate_options::generate()),
         Command::GenerateCliHelp(args) => generate_cli_help::main(args)?,
         Command::GenerateDocs(args) => generate_docs::main(args)?,
         Command::PrintAST(args) => print_ast::main(args)?,
