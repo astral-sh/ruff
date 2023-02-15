@@ -1287,7 +1287,7 @@ For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| SLF001 | private-member-access | Private member accessed: `{access}` |  |
+| SLF001 | [private-member-access](https://beta.ruff.rs/docs/rules/private-member-access/) | Private member accessed: `{access}` |  |
 
 ### flake8-simplify (SIM)
 
