@@ -11,9 +11,6 @@ use crate::utils::replace_readme_section;
 const TABLE_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated sections. -->\n";
 const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 
-const TOC_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated table of contents. -->";
-const TOC_END_PRAGMA: &str = "<!-- End auto-generated table of contents. -->";
-
 const FIX_SYMBOL: &str = "🛠";
 const URL_PREFIX: &str = "https://beta.ruff.rs/docs/rules";
 
@@ -57,7 +54,6 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
 pub fn main(args: &Args) -> Result<()> {
     // Generate the table string.
     let mut table_out = format!("The {FIX_SYMBOL} emoji indicates that a rule is automatically fixable by the `--fix` command-line option.\n\n");
-    let mut toc_out = String::new();
     for linter in Linter::iter() {
         let codes_csv: String = match linter.common_prefix() {
             "" => linter
@@ -71,14 +67,6 @@ pub fn main(args: &Args) -> Result<()> {
         table_out.push_str(&format!("### {} ({codes_csv})", linter.name()));
         table_out.push('\n');
         table_out.push('\n');
-
-        toc_out.push_str(&format!(
-            "   1. [{} ({})](#{}-{})\n",
-            linter.name(),
-            codes_csv,
-            linter.name().to_lowercase().replace(' ', "-"),
-            codes_csv.to_lowercase().replace(',', "-").replace(' ', "")
-        ));
 
         if let Some(url) = linter.url() {
             let host = url
@@ -121,10 +109,8 @@ pub fn main(args: &Args) -> Result<()> {
     }
 
     if args.dry_run {
-        print!("Table of Contents: {toc_out}\n Rules Tables: {table_out}");
+        print!("Rules Tables: {table_out}");
     } else {
-        // Extra newline in the markdown numbered list looks weird
-        replace_readme_section(toc_out.trim_end(), TOC_BEGIN_PRAGMA, TOC_END_PRAGMA)?;
         replace_readme_section(&table_out, TABLE_BEGIN_PRAGMA, TABLE_END_PRAGMA)?;
     }
 
