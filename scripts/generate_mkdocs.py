@@ -61,6 +61,9 @@ def main() -> None:
 
             f.write(block[0])
 
+            if filename == "rules.md":
+                f.write(subprocess.check_output(["cargo", "dev", "generate-rules-table"], encoding="utf-8"))
+
     # Copy the CONTRIBUTING.md.
     shutil.copy("CONTRIBUTING.md", "docs/contributing.md")
 
