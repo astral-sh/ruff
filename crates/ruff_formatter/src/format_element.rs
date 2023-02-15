@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use crate::{TagKind, TextSize};
 #[cfg(target_pointer_width = "64")]
 use ruff_rowan::static_assert;
-use ruff_rowan::SyntaxTokenText;
+use ruff_rowan::{SyntaxTokenText, TextRange};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::rc::Rc;
@@ -38,6 +38,9 @@ pub enum FormatElement {
         source_position: TextSize,
     },
 
+    /// Token constructed by slicing a defined range from a static string.
+    StaticTextSlice { text: Rc<str>, range: TextRange },
+
     /// A token for a text that is taken as is from the source code (input text and formatted representation are identical).
     /// Implementing by taking a slice from a `SyntaxToken` to avoid allocating a new string.
     SyntaxTokenTextSlice {
@@ -45,13 +48,6 @@ pub enum FormatElement {
         source_position: TextSize,
         /// The token text
         slice: SyntaxTokenText,
-    },
-
-    /// Token constructed by slicing a defined range from a static string
-    StaticTextSlice {
-        text: Rc<str>,
-        start: usize,
-        end: usize,
     },
 
     /// Prevents that line suffixes move past this boundary. Forces the printer to print any pending
@@ -73,9 +69,6 @@ pub enum FormatElement {
 impl std::fmt::Debug for FormatElement {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            FormatElement::StaticTextSlice { text, .. } => {
-                fmt.debug_tuple("Text").field(text).finish()
-            }
             FormatElement::Space => write!(fmt, "Space"),
             FormatElement::Line(mode) => fmt.debug_tuple("Line").field(mode).finish(),
             FormatElement::ExpandParent => write!(fmt, "ExpandParent"),
@@ -84,6 +77,9 @@ impl std::fmt::Debug for FormatElement {
             }
             FormatElement::DynamicText { text, .. } => {
                 fmt.debug_tuple("DynamicText").field(text).finish()
+            }
+            FormatElement::StaticTextSlice { text, .. } => {
+                fmt.debug_tuple("Text").field(text).finish()
             }
             FormatElement::SyntaxTokenTextSlice { slice, .. } => fmt
                 .debug_tuple("SyntaxTokenTextSlice")
@@ -249,14 +245,12 @@ impl FormatElement {
 impl FormatElements for FormatElement {
     fn will_break(&self) -> bool {
         match self {
-            FormatElement::StaticTextSlice { text, start, end } => {
-                text[*start..*end].contains('\n')
-            }
             FormatElement::ExpandParent => true,
             FormatElement::Tag(Tag::StartGroup(group)) => !group.mode().is_flat(),
             FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
             FormatElement::StaticText { text } => text.contains('\n'),
             FormatElement::DynamicText { text, .. } => text.contains('\n'),
+            FormatElement::StaticTextSlice { text, range } => text[*range].contains('\n'),
             FormatElement::SyntaxTokenTextSlice { slice, .. } => slice.contains('\n'),
             FormatElement::Interned(interned) => interned.will_break(),
             // Traverse into the most flat version because the content is guaranteed to expand when even
