@@ -27,7 +27,6 @@ An extremely fast Python linter, written in Rust.
 
 * ⚡️  10-100x faster than existing linters
 * 🐍  Installable via `pip`
-* 🤝  Python 3.11 compatibility
 * 🛠️  `pyproject.toml` support
 * 📦  Built-in caching, to avoid re-analyzing unchanged files
 * 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
@@ -1905,6 +1904,22 @@ Ruff can also replace [isort](https://pypi.org/project/isort/),
 implemented in [pyupgrade](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827)).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an Issue.
+
+### What versions of Python does Ruff support?
+
+Ruff can lint code for any Python version from 3.7 onwards. However, Ruff lacks support for a few
+language features that were introduced in Python 3.10 and later. Specifically, Ruff does not
+support:
+
+- "Structural Pattern Matching" ([PEP 622](https://peps.python.org/pep-0622/)), introduced in Python 3.10.
+- "Exception Groups and except* ([PEP 654](https://www.python.org/dev/peps/pep-0654/)), introduced in Python 3.11.
+
+Support for these features is planned.
+
+Ruff does not support Python 2. Ruff _may_ run on pre-Python 3.7 code, although such versions
+are not officially supported (e.g., Ruff does _not_ respect type comments).
+
+Ruff is installable under any Python version from 3.7 onwards.
 
 ### Do I need to install Rust to use Ruff?
 
