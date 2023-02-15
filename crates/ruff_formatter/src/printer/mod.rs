@@ -121,9 +121,8 @@ impl<'a> Printer<'a> {
                     }
 
                     // Print a second line break if this is an empty line
-                    if line_mode == &LineMode::Empty && !self.state.has_empty_line {
+                    if line_mode == &LineMode::Empty {
                         self.print_str("\n");
-                        self.state.has_empty_line = true;
                     }
 
                     self.state.pending_space = false;
@@ -644,8 +643,6 @@ impl<'a> Printer<'a> {
     fn print_str(&mut self, content: &str) {
         for char in content.chars() {
             self.print_char(char);
-
-            self.state.has_empty_line = false;
         }
     }
 
@@ -708,7 +705,6 @@ struct PrinterState<'a> {
     generated_line: usize,
     generated_column: usize,
     line_width: usize,
-    has_empty_line: bool,
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
@@ -1443,7 +1439,7 @@ two lines`,
     }
 
     #[test]
-    fn it_prints_consecutive_empty_lines_as_one() {
+    fn it_prints_consecutive_empty_lines_as_many() {
         let result = format(&format_args![
             text("a"),
             empty_line(),
@@ -1452,11 +1448,11 @@ two lines`,
             text("b"),
         ]);
 
-        assert_eq!("a\n\nb", result.as_code())
+        assert_eq!("a\n\n\n\nb", result.as_code())
     }
 
     #[test]
-    fn it_prints_consecutive_mixed_lines_as_one() {
+    fn it_prints_consecutive_mixed_lines_as_many() {
         let result = format(&format_args![
             text("a"),
             empty_line(),
@@ -1466,7 +1462,7 @@ two lines`,
             text("b"),
         ]);
 
-        assert_eq!("a\n\nb", result.as_code())
+        assert_eq!("a\n\n\nb", result.as_code())
     }
 
     #[test]
