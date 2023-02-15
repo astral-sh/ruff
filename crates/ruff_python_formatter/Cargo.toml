@@ -1,15 +1,16 @@
 [package]
 name = "ruff_python_formatter"
 version = "0.0.0"
+publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.68"
-clap = { version = "4.0.1", features = ["derive"] }
-once_cell = "1.17.0"
+anyhow = { workspace = true }
+clap = { workspace = true }
+once_cell = { workspace = true }
 ruff_formatter = { path = "../ruff_formatter" }
 ruff_text_size = { path = "../ruff_text_size" }
-rustc-hash = "1.1.0"
+rustc-hash = { workspace = true }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
 
