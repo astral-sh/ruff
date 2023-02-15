@@ -169,6 +169,7 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
 1. [Contributing](#contributing)
 1. [Support](#support)
 1. [Reference](#reference)
+1. [Acknowledgements](#acknowledgements)
 1. [License](#license)
 
 ## Installation and Usage
@@ -4035,6 +4036,30 @@ keep-runtime-typing = true
 <!-- End auto-generated options sections. -->
 
 <!-- End section: Settings -->
+
+<!-- Begin section: Acknowledgements -->
+
+## Acknowledgements
+
+Ruff's linter draws on both the APIs and implementation details of many other
+tools in the Python ecosystem, especially [Flake8](https://github.com/PyCQA/flake8), [Pyflakes](https://github.com/PyCQA/pyflakes),
+[pycodestyle](https://github.com/PyCQA/pycodestyle), [pydocstyle](https://github.com/PyCQA/pydocstyle),
+[pyupgrade](https://github.com/asottile/pyupgrade), and [isort](https://github.com/PyCQA/isort).
+
+In some cases, Ruff includes a "direct" Rust port of the corresponding tool.
+We're grateful to the maintainers of these tools for their work, and for all
+the value they've provided to the Python community.
+
+Ruff's autoformatter is built on a fork of Rome's [`rome_formatter`](https://github.com/rome/tools/tree/main/crates/rome_formatter),
+and again draws on both the APIs and implementation details of [Rome](https://github.com/rome/tools),
+[Prettier](https://github.com/prettier/prettier), and [Black](https://github.com/psf/black).
+
+Ruff is also influenced by a number of tools outside the Python ecosystem, like
+[Clippy](https://github.com/rust-lang/rust-clippy) and [ESLint](https://github.com/eslint/eslint).
+
+Ruff is released under the MIT license.
+
+<!-- End section: Acknowledgements -->
 
 ## License
 
