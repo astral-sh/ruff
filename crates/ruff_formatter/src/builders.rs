@@ -8,6 +8,7 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::num::NonZeroU8;
+use std::rc::Rc;
 use Tag::*;
 
 /// A line break that only gets printed if the enclosing `Group` doesn't fit on a single line.
@@ -300,6 +301,34 @@ impl<Context> Format<Context> for DynamicText<'_> {
 impl std::fmt::Debug for DynamicText<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::write!(f, "DynamicToken({})", self.text)
+    }
+}
+
+/// Creates a text from a dynamic string and a range of the input source
+pub fn static_text_slice(text: Rc<str>, range: TextRange) -> StaticTextSlice {
+    debug_assert_no_newlines(&text[range]);
+
+    StaticTextSlice { text, range }
+}
+
+#[derive(Eq, PartialEq)]
+pub struct StaticTextSlice {
+    text: Rc<str>,
+    range: TextRange,
+}
+
+impl<Context> Format<Context> for StaticTextSlice {
+    fn fmt(&self, f: &mut Formatter<Context>) -> FormatResult<()> {
+        f.write_element(FormatElement::StaticTextSlice {
+            text: self.text.clone(),
+            range: self.range,
+        })
+    }
+}
+
+impl std::fmt::Debug for StaticTextSlice {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::write!(f, "StaticTextSlice({})", &self.text[self.range])
     }
 }
 
