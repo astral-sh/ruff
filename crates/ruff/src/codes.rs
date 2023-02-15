@@ -265,7 +265,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         // flake8-simplify
         (Flake8Simplify, "101") => Rule::DuplicateIsinstanceCall,
         (Flake8Simplify, "102") => Rule::CollapsibleIf,
-        (Flake8Simplify, "103") => Rule::NeedlessBool,
+        (Flake8Simplify, "103") => Rule::UnnecessaryBoolCall,
         (Flake8Simplify, "105") => Rule::UseContextlibSuppress,
         (Flake8Simplify, "107") => Rule::ReturnInTryExceptFinally,
         (Flake8Simplify, "108") => Rule::UseTernaryOperator,

@@ -254,7 +254,7 @@ ruff_macros::register_rules!(
     // flake8-simplify
     rules::flake8_simplify::rules::DuplicateIsinstanceCall,
     rules::flake8_simplify::rules::CollapsibleIf,
-    rules::flake8_simplify::rules::NeedlessBool,
+    rules::flake8_simplify::rules::UnnecessaryBoolCall,
     rules::flake8_simplify::rules::UseContextlibSuppress,
     rules::flake8_simplify::rules::ReturnInTryExceptFinally,
     rules::flake8_simplify::rules::UseTernaryOperator,
