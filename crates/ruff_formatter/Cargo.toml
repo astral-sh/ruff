@@ -5,10 +5,7 @@ publish = false
 edition = "2021"
 
 [dependencies]
-cfg-if = { version = "1.0.0" }
-countme = { version = "3.0.1" }
 drop_bomb = { version = "0.1.5" }
-indexmap = { version = "1.9.1" }
 ruff_text_size = { path = "../ruff_text_size" }
 rustc-hash = { workspace = true }
 schemars = { version = "0.8.10", optional = true }

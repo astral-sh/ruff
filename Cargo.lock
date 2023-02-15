@@ -537,12 +537,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5827cebf4670468b8772dd191856768aedcb1b0278a04f989f7766351917b9dc"
 
 [[package]]
-name = "countme"
-version = "3.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7704b5fdd17b18ae31c4c1da5a2e0305a2bf17b5249300a9ee9ed7b72114c636"
-
-[[package]]
 name = "cpufeatures"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2573,10 +2567,7 @@ dependencies = [
 name = "ruff_formatter"
 version = "0.0.0"
 dependencies = [
- "cfg-if",
- "countme",
  "drop_bomb",
- "indexmap",
  "insta",
  "ruff_text_size",
  "rustc-hash",

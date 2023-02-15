@@ -27,6 +27,7 @@ mod buffer;
 mod builders;
 pub mod diagnostics;
 pub mod format_element;
+mod format_extensions;
 pub mod formatter;
 pub mod group_id;
 pub mod macros;
