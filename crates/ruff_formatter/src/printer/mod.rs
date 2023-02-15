@@ -99,6 +99,7 @@ impl<'a> Printer<'a> {
                 text,
                 source_position,
             } => self.print_text(text, Some(*source_position)),
+            FormatElement::StaticTextSlice { text, range } => self.print_text(&text[*range], None),
             FormatElement::SyntaxTokenTextSlice {
                 slice,
                 source_position,
@@ -1001,6 +1002,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::StaticText { text } => return Ok(self.fits_text(text)),
             FormatElement::DynamicText { text, .. } => return Ok(self.fits_text(text)),
+            FormatElement::StaticTextSlice { text, range } => {
+                return Ok(self.fits_text(&text[*range]))
+            }
             FormatElement::SyntaxTokenTextSlice { slice, .. } => return Ok(self.fits_text(slice)),
 
             FormatElement::LineSuffixBoundary => {
