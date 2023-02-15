@@ -49,14 +49,14 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
 }
 
 define_violation!(
-    pub struct AAndNotA {
+    pub struct ExprAndNotExpr {
         pub name: String,
     }
 );
-impl AlwaysAutofixableViolation for AAndNotA {
+impl AlwaysAutofixableViolation for ExprAndNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AAndNotA { name } = self;
+        let ExprAndNotExpr { name } = self;
         format!("Use `False` instead of `{name} and not {name}`")
     }
 
@@ -342,7 +342,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM220
-pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
+pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
         return;
     };
@@ -377,7 +377,7 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut diagnostic = Diagnostic::new(
-                    AAndNotA {
+                    ExprAndNotExpr {
                         name: id.to_string(),
                     },
                     Range::from_located(expr),

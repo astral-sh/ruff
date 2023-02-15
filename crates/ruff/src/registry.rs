@@ -272,7 +272,7 @@ ruff_macros::register_rules!(
     rules::flake8_simplify::rules::IfExprWithTrueFalse,
     rules::flake8_simplify::rules::IfExprWithFalseTrue,
     rules::flake8_simplify::rules::IfExprWithTwistedArms,
-    rules::flake8_simplify::rules::AAndNotA,
+    rules::flake8_simplify::rules::ExprAndNotExpr,
     rules::flake8_simplify::rules::ExprOrNotExpr,
     rules::flake8_simplify::rules::ExprOrTrue,
     rules::flake8_simplify::rules::ExprAndFalse,

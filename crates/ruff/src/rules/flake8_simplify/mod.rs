@@ -31,7 +31,7 @@ mod tests {
     #[test_case(Rule::IfExprWithTrueFalse, Path::new("SIM210.py"); "SIM210")]
     #[test_case(Rule::IfExprWithFalseTrue, Path::new("SIM211.py"); "SIM211")]
     #[test_case(Rule::IfExprWithTwistedArms, Path::new("SIM212.py"); "SIM212")]
-    #[test_case(Rule::AAndNotA, Path::new("SIM220.py"); "SIM220")]
+    #[test_case(Rule::ExprAndNotExpr, Path::new("SIM220.py"); "SIM220")]
     #[test_case(Rule::ExprOrNotExpr, Path::new("SIM221.py"); "SIM221")]
     #[test_case(Rule::ExprOrTrue, Path::new("SIM222.py"); "SIM222")]
     #[test_case(Rule::ExprAndFalse, Path::new("SIM223.py"); "SIM223")]

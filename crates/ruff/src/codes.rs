@@ -283,7 +283,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "210") => Rule::IfExprWithTrueFalse,
         (Flake8Simplify, "211") => Rule::IfExprWithFalseTrue,
         (Flake8Simplify, "212") => Rule::IfExprWithTwistedArms,
-        (Flake8Simplify, "220") => Rule::AAndNotA,
+        (Flake8Simplify, "220") => Rule::ExprAndNotExpr,
         (Flake8Simplify, "221") => Rule::ExprOrNotExpr,
         (Flake8Simplify, "222") => Rule::ExprOrTrue,
         (Flake8Simplify, "223") => Rule::ExprAndFalse,

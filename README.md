@@ -1315,7 +1315,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | SIM210 | if-expr-with-true-false | Use `bool({expr})` instead of `True if {expr} else False` | 🛠 |
 | SIM211 | if-expr-with-false-true | Use `not {expr}` instead of `False if {expr} else True` | 🛠 |
 | SIM212 | if-expr-with-twisted-arms | Use `{expr_else} if {expr_else} else {expr_body}` instead of `{expr_body} if not {expr_else} else {expr_else}` | 🛠 |
-| SIM220 | a-and-not-a | Use `False` instead of `{name} and not {name}` | 🛠 |
+| SIM220 | expr-and-not-expr | Use `False` instead of `{name} and not {name}` | 🛠 |
 | SIM221 | expr-or-not-expr | Use `True` instead of `{name} or not {name}` | 🛠 |
 | SIM222 | expr-or-true | Use `True` instead of `... or True` | 🛠 |
 | SIM223 | expr-and-false | Use `False` instead of `... and False` | 🛠 |

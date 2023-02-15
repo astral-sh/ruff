@@ -3,7 +3,7 @@ source: src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AAndNotA:
+    ExprAndNotExpr:
       name: a
   location:
     row: 1
@@ -22,7 +22,7 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    AAndNotA:
+    ExprAndNotExpr:
       name: a
   location:
     row: 4
@@ -41,7 +41,7 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    AAndNotA:
+    ExprAndNotExpr:
       name: a
   location:
     row: 7

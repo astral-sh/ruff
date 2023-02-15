@@ -3309,8 +3309,8 @@ where
                 if self.settings.rules.enabled(&Rule::CompareWithTuple) {
                     flake8_simplify::rules::compare_with_tuple(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AAndNotA) {
-                    flake8_simplify::rules::a_and_not_a(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprAndNotExpr) {
+                    flake8_simplify::rules::expr_and_not_expr(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::ExprOrNotExpr) {
                     flake8_simplify::rules::expr_or_not_expr(self, expr);
