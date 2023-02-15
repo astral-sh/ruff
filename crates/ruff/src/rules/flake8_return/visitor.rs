@@ -8,7 +8,7 @@ use crate::ast::visitor::Visitor;
 pub struct Stack<'a> {
     pub returns: Vec<(&'a Stmt, Option<&'a Expr>)>,
     pub yields: Vec<&'a Expr>,
-    pub ifs: Vec<&'a Stmt>,
+    pub elses: Vec<&'a Stmt>,
     pub elifs: Vec<&'a Stmt>,
     pub refs: FxHashMap<&'a str, Vec<Location>>,
     pub non_locals: FxHashSet<&'a str>,
@@ -20,6 +20,7 @@ pub struct Stack<'a> {
 #[derive(Default)]
 pub struct ReturnVisitor<'a> {
     pub stack: Stack<'a>,
+    parents: Vec<&'a Stmt>,
 }
 
 impl<'a> ReturnVisitor<'a> {
@@ -72,16 +73,37 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 self.stack
                     .returns
                     .push((stmt, value.as_ref().map(|expr| &**expr)));
+
+                self.parents.push(stmt);
                 visitor::walk_stmt(self, stmt);
+                self.parents.pop();
             }
             StmtKind::If { orelse, .. } => {
-                if orelse.len() == 1 && matches!(orelse.first().unwrap().node, StmtKind::If { .. })
-                {
-                    self.stack.elifs.push(stmt);
-                } else {
-                    self.stack.ifs.push(stmt);
+                let is_elif_arm = self.parents.iter().any(|parent| {
+                    if let StmtKind::If { orelse, .. } = &parent.node {
+                        orelse.len() == 1 && &orelse[0] == stmt
+                    } else {
+                        false
+                    }
+                });
+
+                if !is_elif_arm {
+                    let has_elif = orelse.len() == 1
+                        && matches!(orelse.first().unwrap().node, StmtKind::If { .. });
+                    let has_else = !orelse.is_empty();
+
+                    if has_elif {
+                        // `stmt` is an `if` block followed by an `elif` clause.
+                        self.stack.elifs.push(stmt);
+                    } else if has_else {
+                        // `stmt` is an `if` block followed by an `else` clause.
+                        self.stack.elses.push(stmt);
+                    }
                 }
+
+                self.parents.push(stmt);
                 visitor::walk_stmt(self, stmt);
+                self.parents.pop();
             }
             StmtKind::Assign { targets, value, .. } => {
                 if let ExprKind::Name { id, .. } = &value.node {
@@ -109,16 +131,24 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 self.stack
                     .loops
                     .push((stmt.location, stmt.end_location.unwrap()));
+
+                self.parents.push(stmt);
                 visitor::walk_stmt(self, stmt);
+                self.parents.pop();
             }
             StmtKind::Try { .. } => {
                 self.stack
                     .tries
                     .push((stmt.location, stmt.end_location.unwrap()));
+
+                self.parents.push(stmt);
                 visitor::walk_stmt(self, stmt);
+                self.parents.pop();
             }
             _ => {
+                self.parents.push(stmt);
                 visitor::walk_stmt(self, stmt);
+                self.parents.pop();
             }
         }
     }

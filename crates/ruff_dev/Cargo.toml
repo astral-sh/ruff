@@ -1,20 +1,22 @@
 [package]
 name = "ruff_dev"
-version = "0.0.244"
+version = "0.0.0"
+publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = { version = "1.0.66" }
-clap = { version = "4.0.1", features = ["derive"] }
-itertools = { version = "0.10.5" }
+anyhow = { workspace = true }
+clap = { workspace = true }
+itertools = { workspace = true }
 libcst = { workspace = true }
-once_cell = { version = "1.16.0" }
+once_cell = { workspace = true }
+regex.workspace = true
 ruff = { path = "../ruff" }
 ruff_cli = { path = "../ruff_cli" }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
-schemars = { version = "0.8.11" }
+schemars = { workspace = true }
 serde_json = { version = "1.0.91" }
-strum = { version = "0.24.1", features = ["strum_macros"] }
-strum_macros = { version = "0.24.3" }
+strum = { workspace = true }
+strum_macros = { workspace = true }
 textwrap = { version = "0.16.0" }

@@ -14,7 +14,7 @@ const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 const TOC_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated table of contents. -->";
 const TOC_END_PRAGMA: &str = "<!-- End auto-generated table of contents. -->";
 
-const URL_PREFIX: &str = "https://github.com/charliermarsh/ruff/blob/main/docs/rules";
+const URL_PREFIX: &str = "https://beta.ruff.rs/docs/rules";
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -23,7 +23,7 @@ pub struct Args {
     pub(crate) dry_run: bool,
 }
 
-fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>) {
+fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
     table_out.push_str("| Code | Name | Message | Fix |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | --- |");
@@ -38,11 +38,12 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>)
 
         #[allow(clippy::or_fun_call)]
         table_out.push_str(&format!(
-            "| {} | {} | {} | {} |",
-            rule.code(),
+            "| {}{} | {} | {} | {} |",
+            linter.common_prefix(),
+            linter.code_for_rule(&rule).unwrap(),
             rule.explanation()
                 .is_some()
-                .then_some(format_args!("[{rule_name}]({URL_PREFIX}/{rule_name}.md)",))
+                .then_some(format_args!("[{rule_name}]({URL_PREFIX}/{rule_name}/)",))
                 .unwrap_or(format_args!("{rule_name}")),
             rule.message_formats()[0].replace('|', r"\|"),
             fix_token
@@ -62,7 +63,7 @@ pub fn main(args: &Args) -> Result<()> {
                 .upstream_categories()
                 .unwrap()
                 .iter()
-                .map(|UpstreamCategory(prefix, ..)| prefix.as_ref())
+                .map(|UpstreamCategory(prefix, ..)| prefix.short_code())
                 .join(", "),
             prefix => prefix.to_string(),
         };
@@ -104,13 +105,17 @@ pub fn main(args: &Args) -> Result<()> {
 
         if let Some(categories) = linter.upstream_categories() {
             for UpstreamCategory(prefix, name) in categories {
-                table_out.push_str(&format!("#### {name} ({})", prefix.as_ref()));
+                table_out.push_str(&format!(
+                    "#### {name} ({}{})",
+                    linter.common_prefix(),
+                    prefix.short_code()
+                ));
                 table_out.push('\n');
                 table_out.push('\n');
-                generate_table(&mut table_out, prefix);
+                generate_table(&mut table_out, prefix, &linter);
             }
         } else {
-            generate_table(&mut table_out, &linter);
+            generate_table(&mut table_out, &linter, &linter);
         }
     }
 

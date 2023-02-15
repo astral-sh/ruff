@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: true
   location:
     row: 2
@@ -24,7 +24,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: true
   location:
     row: 7
@@ -46,7 +46,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: true
   location:
     row: 15
@@ -67,7 +67,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: false
   location:
     row: 20
@@ -78,7 +78,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: true
   location:
     row: 26
@@ -100,7 +100,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: true
   location:
     row: 51
@@ -131,7 +131,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: true
   location:
     row: 67
@@ -162,7 +162,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: true
   location:
     row: 83
@@ -185,7 +185,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: true
   location:
     row: 90
@@ -208,7 +208,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NestedIfStatements:
+    CollapsibleIf:
       fixable: true
   location:
     row: 117

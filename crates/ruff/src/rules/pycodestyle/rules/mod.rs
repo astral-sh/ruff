@@ -3,8 +3,8 @@ pub use ambiguous_function_name::{ambiguous_function_name, AmbiguousFunctionName
 pub use ambiguous_variable_name::{ambiguous_variable_name, AmbiguousVariableName};
 pub use bare_except::{bare_except, BareExcept};
 pub use compound_statements::{
-    compound_statements, MultipleStatementsOnOneLineColon, MultipleStatementsOnOneLineDef,
-    MultipleStatementsOnOneLineSemicolon, UselessSemicolon,
+    compound_statements, MultipleStatementsOnOneLineColon, MultipleStatementsOnOneLineSemicolon,
+    UselessSemicolon,
 };
 pub use doc_line_too_long::{doc_line_too_long, DocLineTooLong};
 pub use errors::{syntax_error, IOError, SyntaxError};

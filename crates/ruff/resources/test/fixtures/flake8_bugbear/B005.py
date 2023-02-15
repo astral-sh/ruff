@@ -17,6 +17,9 @@ s.rstrip(".facebook.com")  # warning
 s.rstrip("e")  # no warning
 s.rstrip("\n\t ")  # no warning
 s.rstrip(r"\n\t ")  # warning
+s.strip("a")  # no warning
+s.strip("あ")  # no warning
+s.strip("ああ")  # warning
 
 from somewhere import other_type, strip
 

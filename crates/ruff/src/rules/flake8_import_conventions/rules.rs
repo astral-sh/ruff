@@ -7,11 +7,11 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for imports that are typically imported using a common convention,
     /// like `import pandas as pd`, and enforces that convention.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Consistency is good. Use a common convention for imports to make your code
     /// more readable and idiomatic.
     ///
@@ -19,7 +19,7 @@ define_violation!(
     /// convention for importing the `pandas` library, and users typically expect
     /// Pandas to be aliased as `pd`.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// import pandas
     /// ```

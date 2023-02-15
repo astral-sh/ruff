@@ -1,11 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Stmt, StmtKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::string::is_lower_with_underscore;
+
+use crate::ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
 use crate::ast::types::Range;
+use crate::checkers::ast::Checker;
+use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use crate::source_code::Stylist;
+use crate::violation::{AutofixKind, Availability, Violation};
 
 pub type Settings = Strictness;
 
@@ -20,23 +26,117 @@ pub enum Strictness {
 }
 
 define_violation!(
-    pub struct RelativeImports(pub Strictness);
+    /// ## What it does
+    /// Checks for relative imports.
+    ///
+    /// ## Why is this bad?
+    /// Absolute imports, or relative imports from siblings, are recommended by [PEP 8]:
+    ///
+    /// > Absolute imports are recommended, as they are usually more readable and tend to be better behaved...
+    /// > ```python
+    /// > import mypkg.sibling
+    /// > from mypkg import sibling
+    /// > from mypkg.sibling import example
+    /// > ```
+    /// > However, explicit relative imports are an acceptable alternative to absolute imports,
+    /// > especially when dealing with complex package layouts where using absolute imports would be
+    /// > unnecessarily verbose:
+    /// > ```python
+    /// > from . import sibling
+    /// > from .sibling import example
+    /// > ```
+    ///
+    /// ## Options
+    /// * `flake8-tidy-imports.ban-relative-imports`
+    ///
+    /// ## Example
+    /// ```python
+    /// from .. import foo
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// from mypkg import foo
+    /// ```
+    ///
+    /// [PEP 8]: https://peps.python.org/pep-0008/#imports
+    pub struct RelativeImports {
+        pub strictness: Strictness,
+    }
 );
 impl Violation for RelativeImports {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RelativeImports(strictness) = self;
-        match strictness {
+        match self.strictness {
             Strictness::Parents => format!("Relative imports from parent modules are banned"),
             Strictness::All => format!("Relative imports are banned"),
         }
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|RelativeImports { strictness }| match strictness {
+            Strictness::Parents => {
+                format!("Replace relative imports from parent modules with absolute imports")
+            }
+            Strictness::All => format!("Replace relative imports with absolute imports"),
+        })
+    }
+}
+
+fn fix_banned_relative_import(
+    stmt: &Stmt,
+    level: Option<&usize>,
+    module: Option<&str>,
+    module_path: Option<&Vec<String>>,
+    stylist: &Stylist,
+) -> Option<Fix> {
+    // Only fix is the module path is known
+    if let Some(mut parts) = module_path.cloned() {
+        // Remove relative level from module path
+        for _ in 0..*level? {
+            parts.pop();
+        }
+
+        let call_path = from_relative_import(&parts, module.unwrap());
+        let module_name = call_path.as_slice();
+
+        // Require import to be a valid PEP 8 module:
+        // https://python.org/dev/peps/pep-0008/#package-and-module-names
+        if module_name.iter().any(|f| !is_lower_with_underscore(f)) {
+            return None;
+        }
+
+        let content = match &stmt.node {
+            StmtKind::ImportFrom { names, .. } => unparse_stmt(
+                &create_stmt(StmtKind::ImportFrom {
+                    module: Some(module_name.join(".")),
+                    names: names.clone(),
+                    level: Some(0),
+                }),
+                stylist,
+            ),
+            _ => return None,
+        };
+
+        Some(Fix::replacement(
+            content,
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ))
+    } else {
+        None
     }
 }
 
 /// TID252
 pub fn banned_relative_import(
+    checker: &Checker,
     stmt: &Stmt,
     level: Option<&usize>,
+    module: Option<&str>,
+    module_path: Option<&Vec<String>>,
     strictness: &Strictness,
 ) -> Option<Diagnostic> {
     let strictness_level = match strictness {
@@ -44,10 +144,20 @@ pub fn banned_relative_import(
         Strictness::Parents => 1,
     };
     if level? > &strictness_level {
-        Some(Diagnostic::new(
-            RelativeImports(strictness.clone()),
+        let mut diagnostic = Diagnostic::new(
+            RelativeImports {
+                strictness: strictness.clone(),
+            },
             Range::from_located(stmt),
-        ))
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            if let Some(fix) =
+                fix_banned_relative_import(stmt, level, module, module_path, checker.stylist)
+            {
+                diagnostic.amend(fix);
+            };
+        }
+        Some(diagnostic)
     } else {
         None
     }
@@ -59,11 +169,12 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::Strictness;
     use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
+
+    use super::Strictness;
 
     #[test]
     fn ban_parent_imports() -> Result<()> {
@@ -90,6 +201,23 @@ mod tests {
                     ban_relative_imports: Strictness::All,
                     ..Default::default()
                 },
+                ..Settings::for_rules(vec![Rule::RelativeImports])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ban_parent_imports_package() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_tidy_imports/TID252/my_package/sublib/api/application.py"),
+            &Settings {
+                flake8_tidy_imports: super::super::Settings {
+                    ban_relative_imports: Strictness::Parents,
+                    ..Default::default()
+                },
+                namespace_packages: vec![Path::new("my_package").to_path_buf()],
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;

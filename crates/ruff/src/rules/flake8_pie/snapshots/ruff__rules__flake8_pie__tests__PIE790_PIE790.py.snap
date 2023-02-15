@@ -1,9 +1,9 @@
 ---
-source: src/rules/flake8_pie/mod.rs
+source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 4
     column: 4
@@ -21,7 +21,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 9
     column: 4
@@ -39,7 +39,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 14
     column: 4
@@ -57,7 +57,7 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 21
     column: 4
@@ -75,7 +75,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 28
     column: 4
@@ -93,7 +93,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 35
     column: 4
@@ -111,7 +111,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 42
     column: 4
@@ -129,7 +129,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 50
     column: 4
@@ -147,7 +147,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 58
     column: 4
@@ -165,7 +165,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 65
     column: 4
@@ -183,7 +183,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 74
     column: 4
@@ -201,7 +201,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 79
     column: 4
@@ -219,7 +219,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 83
     column: 4
@@ -237,7 +237,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 87
     column: 4
@@ -255,7 +255,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 92
     column: 4
@@ -273,7 +273,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 96
     column: 4
@@ -291,7 +291,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnnecessaryPass: ~
+    UnnecessaryPass: ~
   location:
     row: 101
     column: 4

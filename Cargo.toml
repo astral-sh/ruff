@@ -3,9 +3,21 @@ members = ["crates/*"]
 default-members = ["crates/ruff", "crates/ruff_cli"]
 
 [workspace.dependencies]
+anyhow = { version = "1.0.66" }
+clap = { version = "4.0.1", features = ["derive"] }
+itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a8725d161fe8b3ed73a6758b21e177" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "d94d0ac72072eb60bd9363e69b96ff1d5eb401b3" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "d94d0ac72072eb60bd9363e69b96ff1d5eb401b3" }
+once_cell = { version = "1.16.0" }
+regex = { version = "1.6.0" }
+rustc-hash = { version = "1.1.0" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "61b48f108982d865524f86624a9d5bc2ae3bccef" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "61b48f108982d865524f86624a9d5bc2ae3bccef" }
+schemars = { version = "0.8.11" }
+serde = { version = "1.0.147", features = ["derive"] }
+serde_json = { version = "1.0.87" }
+strum = { version = "0.24.1", features = ["strum_macros"] }
+strum_macros = { version = "0.24.3" }
+toml = { version = "0.6.0" }
 
 [profile.release]
 panic = "abort"

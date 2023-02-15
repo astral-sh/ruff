@@ -11,7 +11,7 @@ Example usage:
 
 import argparse
 
-from _utils import ROOT_DIR, dir_name, get_indent
+from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
 
 
 def snake_case(name: str) -> str:
@@ -119,7 +119,7 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
             if has_written:
                 continue
 
-            if line.startswith("ruff_macros::define_rule_mapping!"):
+            if line.startswith("ruff_macros::register_rules!"):
                 seen_macro = True
                 continue
 
@@ -128,11 +128,23 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
 
             if line.strip() == f"// {linter}":
                 indent = get_indent(line)
-                fp.write(f"{indent}{code} => rules::{dir_name(linter)}::rules::{name},")
+                fp.write(f"{indent}rules::{dir_name(linter)}::rules::{name},")
                 fp.write("\n")
                 has_written = True
 
     assert has_written
+
+    text = ""
+    with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
+        while (line := next(fp)).strip() != f"// {linter}":
+            text += line
+        text += line
+        linter_variant = pascal_case(linter)
+        text += " "*8 + f'({linter_variant}, "{code}") => Rule::{name},\n'
+        text += fp.read()
+
+    with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
+        fp.write(text)
 
 
 if __name__ == "__main__":

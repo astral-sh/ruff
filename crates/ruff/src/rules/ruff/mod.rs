@@ -19,7 +19,7 @@ mod tests {
     #[test_case(Rule::KeywordArgumentBeforeStarArgument, Path::new("RUF004.py"); "RUF004")]
     #[test_case(Rule::UnpackInsteadOfConcatenatingToCollectionLiteral, Path::new("RUF005.py"); "RUF005")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
@@ -111,7 +111,7 @@ mod tests {
     fn redirects() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/redirects.py"),
-            &settings::Settings::for_rules(vec![Rule::UsePEP604Annotation]),
+            &settings::Settings::for_rules(vec![Rule::TypingUnion]),
         )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())

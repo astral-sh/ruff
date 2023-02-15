@@ -155,3 +155,19 @@ def f():
         if check(x):
             return False
     return True
+
+
+def f():
+    # SIM111
+    for x in iterable:
+        if x not in y:
+            return False
+    return True
+
+
+def f():
+    # SIM111
+    for x in iterable:
+        if x > y:
+            return False
+    return True

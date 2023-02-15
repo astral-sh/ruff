@@ -11,7 +11,8 @@ Checks for three or more consective if-statements with direct returns
 These can be simplified by using a dictionary
 
 ### Example
-```if x = 1:
+```python
+if x = 1:
     return "Hello"
 elif x = 2:
     return "Goodbye"
@@ -20,4 +21,6 @@ else:
 ```
 
 Use instead:
-`return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")`
+```python
+return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
+```

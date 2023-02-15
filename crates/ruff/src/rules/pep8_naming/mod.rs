@@ -31,7 +31,7 @@ mod tests {
     #[test_case(Rule::CamelcaseImportedAsAcronym, Path::new("N817.py"); "N817")]
     #[test_case(Rule::ErrorSuffixOnExceptionName, Path::new("N818.py"); "N818")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pep8_naming").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),

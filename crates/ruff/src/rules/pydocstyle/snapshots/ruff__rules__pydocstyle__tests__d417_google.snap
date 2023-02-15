@@ -1,9 +1,9 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DocumentAllArguments:
+    UndocumentedParam:
       names:
         - y
         - z
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocumentAllArguments:
+    UndocumentedParam:
       names:
         - y
         - z
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocumentAllArguments:
+    UndocumentedParam:
       names:
         - y
         - z
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocumentAllArguments:
+    UndocumentedParam:
       names:
         - y
         - z
@@ -55,7 +55,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocumentAllArguments:
+    UndocumentedParam:
       names:
         - y
   location:
@@ -67,7 +67,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocumentAllArguments:
+    UndocumentedParam:
       names:
         - y
   location:
@@ -79,7 +79,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocumentAllArguments:
+    UndocumentedParam:
       names:
         - y
   location:
@@ -91,7 +91,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocumentAllArguments:
+    UndocumentedParam:
       names:
         - x
   location:
@@ -103,7 +103,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocumentAllArguments:
+    UndocumentedParam:
       names:
         - "*args"
   location:

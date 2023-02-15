@@ -14,7 +14,7 @@ define_violation!(
 impl Violation for EscapeSequenceInDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"Use r""" if any backslashes in a docstring"#)
+        format!(r#"Use `r"""` if any backslashes in a docstring"#)
     }
 }
 

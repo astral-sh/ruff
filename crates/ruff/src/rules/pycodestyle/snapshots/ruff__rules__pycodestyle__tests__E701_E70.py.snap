@@ -112,4 +112,24 @@ expression: diagnostics
     column: 15
   fix: ~
   parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 54
+    column: 7
+  end_location:
+    row: 54
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 56
+    column: 7
+  end_location:
+    row: 56
+    column: 8
+  fix: ~
+  parent: ~
 

@@ -1,0 +1,25 @@
+---
+source: crates/ruff/src/rules/flake8_django/mod.rs
+expression: diagnostics
+---
+- kind:
+    NonLeadingReceiverDecorator: ~
+  location:
+    row: 15
+    column: 1
+  end_location:
+    row: 15
+    column: 35
+  fix: ~
+  parent: ~
+- kind:
+    NonLeadingReceiverDecorator: ~
+  location:
+    row: 35
+    column: 1
+  end_location:
+    row: 35
+    column: 35
+  fix: ~
+  parent: ~
+

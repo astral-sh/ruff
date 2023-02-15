@@ -1,9 +1,9 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SkipDocstring: ~
+    OverloadWithDocstring: ~
   location:
     row: 34
     column: 8
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SkipDocstring: ~
+    OverloadWithDocstring: ~
   location:
     row: 90
     column: 8
@@ -23,7 +23,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SkipDocstring: ~
+    OverloadWithDocstring: ~
   location:
     row: 110
     column: 4

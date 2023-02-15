@@ -13,7 +13,7 @@ mod tests {
     use textwrap::dedent;
 
     use crate::linter::{check_path, LinterResult};
-    use crate::registry::{Rule, RuleCodePrefix};
+    use crate::registry::{Linter, Rule};
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
     use crate::test::test_path;
@@ -21,7 +21,7 @@ mod tests {
 
     fn rule_code(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
-        let settings = settings::Settings::for_rules(&RuleCodePrefix::PD);
+        let settings = settings::Settings::for_rules(&Linter::PandasVet);
         let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_contents(&contents, &locator);
@@ -251,7 +251,7 @@ mod tests {
 
     #[test_case(Rule::UseOfInplaceArgument, Path::new("PD002.py"); "PD002")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pandas_vet").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),

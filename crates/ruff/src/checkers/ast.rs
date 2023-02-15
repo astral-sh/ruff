@@ -35,11 +35,11 @@ use crate::registry::{Diagnostic, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
-    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format,
-    flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return,
-    flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
-    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_django, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
+    flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise,
+    flake8_return, flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
+    flake8_unused_arguments, flake8_use_pathlib, mccabe, numpy, pandas_vet, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -50,6 +50,7 @@ use crate::{autofix, docstrings, noqa, visibility};
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
 type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
+type AnnotationContext = (bool, bool);
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
@@ -84,8 +85,8 @@ pub struct Checker<'a> {
     pub(crate) scopes: Vec<Scope<'a>>,
     pub(crate) scope_stack: Vec<usize>,
     pub(crate) dead_scopes: Vec<(usize, Vec<usize>)>,
-    deferred_string_type_definitions: Vec<(Range, &'a str, bool, DeferralContext<'a>)>,
-    deferred_type_definitions: Vec<(&'a Expr, bool, DeferralContext<'a>)>,
+    deferred_string_type_definitions: Vec<(Range, &'a str, AnnotationContext, DeferralContext<'a>)>,
+    deferred_type_definitions: Vec<(&'a Expr, AnnotationContext, DeferralContext<'a>)>,
     deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
     deferred_lambdas: Vec<(&'a Expr, DeferralContext<'a>)>,
     deferred_for_loops: Vec<(&'a Stmt, DeferralContext<'a>)>,
@@ -464,6 +465,17 @@ where
                 body,
                 ..
             } => {
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::NonLeadingReceiverDecorator)
+                {
+                    self.diagnostics
+                        .extend(flake8_django::rules::non_leading_receiver_decorator(
+                            decorator_list,
+                            |expr| self.resolve_call_path(expr),
+                        ));
+                }
                 if self.settings.rules.enabled(&Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {
@@ -566,7 +578,7 @@ where
                     flake8_return::rules::function(self, body);
                 }
 
-                if self.settings.rules.enabled(&Rule::FunctionIsTooComplex) {
+                if self.settings.rules.enabled(&Rule::ComplexStructure) {
                     if let Some(diagnostic) = mccabe::rules::function_is_too_complex(
                         stmt,
                         name,
@@ -771,6 +783,19 @@ where
                 decorator_list,
                 body,
             } => {
+                if self.settings.rules.enabled(&Rule::NullableModelStringField) {
+                    self.diagnostics
+                        .extend(flake8_django::rules::nullable_model_string_field(
+                            self, bases, body,
+                        ));
+                }
+                if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.rules.enabled(&Rule::UselessObjectInheritance) {
                     pyupgrade::rules::useless_object_inheritance(self, stmt, name, bases, keywords);
                 }
@@ -1291,8 +1316,11 @@ where
                     if self.settings.rules.enabled(&Rule::RelativeImports) {
                         if let Some(diagnostic) =
                             flake8_tidy_imports::relative_imports::banned_relative_import(
+                                self,
                                 stmt,
                                 level.as_ref(),
+                                module.as_deref(),
+                                self.module_path.as_ref(),
                                 &self.settings.flake8_tidy_imports.ban_relative_imports,
                             )
                         {
@@ -1477,7 +1505,7 @@ where
                 if self.settings.rules.enabled(&Rule::IfTuple) {
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
-                if self.settings.rules.enabled(&Rule::NestedIfStatements) {
+                if self.settings.rules.enabled(&Rule::CollapsibleIf) {
                     flake8_simplify::rules::nested_if_statements(
                         self,
                         stmt,
@@ -1487,11 +1515,14 @@ where
                         self.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::ReturnBoolConditionDirectly)
-                {
+                if self.settings.rules.enabled(&Rule::IfWithSameArms) {
+                    flake8_simplify::rules::if_with_same_arms(
+                        self,
+                        stmt,
+                        self.current_stmt_parent().map(std::convert::Into::into),
+                    );
+                }
+                if self.settings.rules.enabled(&Rule::NeedlessBool) {
                     flake8_simplify::rules::return_bool_condition_directly(self, stmt);
                 }
                 if self.settings.rules.enabled(&Rule::IfToDict) {
@@ -2042,13 +2073,13 @@ where
                 self.deferred_string_type_definitions.push((
                     Range::from_located(expr),
                     value,
-                    self.in_annotation,
+                    (self.in_annotation, self.in_type_checking_block),
                     (self.scope_stack.clone(), self.parents.clone()),
                 ));
             } else {
                 self.deferred_type_definitions.push((
                     expr,
-                    self.in_annotation,
+                    (self.in_annotation, self.in_type_checking_block),
                     (self.scope_stack.clone(), self.parents.clone()),
                 ));
             }
@@ -2066,7 +2097,7 @@ where
                 // Ex) Optional[...]
                 if !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(&Rule::UsePEP604Annotation)
+                    && self.settings.rules.enabled(&Rule::TypingUnion)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.annotations_future_enabled
@@ -2117,11 +2148,14 @@ where
                         if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
                             pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
+                        if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
+                            numpy::rules::deprecated_type_alias(self, expr);
+                        }
 
                         // Ex) List[...]
                         if !self.in_deferred_string_type_definition
                             && !self.settings.pyupgrade.keep_runtime_typing
-                            && self.settings.rules.enabled(&Rule::UsePEP585Annotation)
+                            && self.settings.rules.enabled(&Rule::DeprecatedCollectionType)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.annotations_future_enabled
@@ -2166,7 +2200,7 @@ where
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(&Rule::UsePEP585Annotation)
+                    && self.settings.rules.enabled(&Rule::DeprecatedCollectionType)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.annotations_future_enabled
@@ -2182,6 +2216,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
                     pyupgrade::rules::typing_text_str_alias(self, expr);
+                }
+                if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
+                    numpy::rules::deprecated_type_alias(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::RewriteMockImport) {
                     pyupgrade::rules::rewrite_mock_attribute(self, expr);
@@ -2367,7 +2404,7 @@ where
                 }
 
                 // flake8-pie
-                if self.settings.rules.enabled(&Rule::NoUnnecessaryDictKwargs) {
+                if self.settings.rules.enabled(&Rule::UnnecessaryDictKwargs) {
                     flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
                 }
 
@@ -2438,12 +2475,22 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::UnnecessaryGeneratorSet) {
                     flake8_comprehensions::rules::unnecessary_generator_set(
-                        self, expr, func, args, keywords,
+                        self,
+                        expr,
+                        self.current_expr_parent().map(Into::into),
+                        func,
+                        args,
+                        keywords,
                     );
                 }
                 if self.settings.rules.enabled(&Rule::UnnecessaryGeneratorDict) {
                     flake8_comprehensions::rules::unnecessary_generator_dict(
-                        self, expr, func, args, keywords,
+                        self,
+                        expr,
+                        self.current_expr_parent().map(Into::into),
+                        func,
+                        args,
+                        keywords,
                     );
                 }
                 if self
@@ -2532,7 +2579,13 @@ where
                     );
                 }
                 if self.settings.rules.enabled(&Rule::UnnecessaryMap) {
-                    flake8_comprehensions::rules::unnecessary_map(self, expr, func, args);
+                    flake8_comprehensions::rules::unnecessary_map(
+                        self,
+                        expr,
+                        self.current_expr_parent().map(Into::into),
+                        func,
+                        args,
+                    );
                 }
 
                 // flake8-boolean-trap
@@ -2785,7 +2838,7 @@ where
                     pyflakes::rules::repeated_keys(self, keys, values);
                 }
 
-                if self.settings.rules.enabled(&Rule::NoUnnecessarySpread) {
+                if self.settings.rules.enabled(&Rule::UnnecessarySpread) {
                     flake8_pie::rules::no_unnecessary_spread(self, keys, values);
                 }
             }
@@ -3121,6 +3174,23 @@ where
                 if self.settings.rules.enabled(&Rule::YodaConditions) {
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
                 }
+
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnrecognizedPlatformCheck)
+                    || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
+                {
+                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                        flake8_pyi::rules::unrecognized_platform(
+                            self,
+                            expr,
+                            left,
+                            ops,
+                            comparators,
+                        );
+                    }
+                }
             }
             ExprKind::Constant {
                 value: Constant::Str(value),
@@ -3130,7 +3200,7 @@ where
                     self.deferred_string_type_definitions.push((
                         Range::from_located(expr),
                         value,
-                        self.in_annotation,
+                        (self.in_annotation, self.in_type_checking_block),
                         (self.scope_stack.clone(), self.parents.clone()),
                     ));
                 }
@@ -3771,7 +3841,7 @@ where
     }
 
     fn visit_body(&mut self, body: &'b [Stmt]) {
-        if self.settings.rules.enabled(&Rule::NoUnnecessaryPass) {
+        if self.settings.rules.enabled(&Rule::UnnecessaryPass) {
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
@@ -3907,7 +3977,6 @@ impl<'a> Checker<'a> {
         if self.in_type_checking_block
             || self.in_annotation
             || self.in_deferred_string_type_definition
-            || self.in_deferred_type_definition
         {
             ExecutionContext::Typing
         } else {
@@ -4436,12 +4505,13 @@ impl<'a> Checker<'a> {
 
     fn check_deferred_type_definitions(&mut self) {
         self.deferred_type_definitions.reverse();
-        while let Some((expr, in_annotation, (scopes, parents))) =
+        while let Some((expr, (in_annotation, in_type_checking_block), (scopes, parents))) =
             self.deferred_type_definitions.pop()
         {
             self.scope_stack = scopes;
             self.parents = parents;
             self.in_annotation = in_annotation;
+            self.in_type_checking_block = in_type_checking_block;
             self.in_type_definition = true;
             self.in_deferred_type_definition = true;
             self.visit_expr(expr);
@@ -4456,7 +4526,7 @@ impl<'a> Checker<'a> {
     {
         let mut stacks = vec![];
         self.deferred_string_type_definitions.reverse();
-        while let Some((range, expression, in_annotation, context)) =
+        while let Some((range, expression, (in_annotation, in_type_checking_block), deferral)) =
             self.deferred_string_type_definitions.pop()
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
@@ -4467,7 +4537,7 @@ impl<'a> Checker<'a> {
                 }
                 relocate_expr(&mut expr, range);
                 allocator.push(expr);
-                stacks.push((in_annotation, context));
+                stacks.push(((in_annotation, in_type_checking_block), deferral));
             } else {
                 if self
                     .settings
@@ -4483,10 +4553,13 @@ impl<'a> Checker<'a> {
                 }
             }
         }
-        for (expr, (in_annotation, (scopes, parents))) in allocator.iter().zip(stacks) {
+        for (expr, ((in_annotation, in_type_checking_block), (scopes, parents))) in
+            allocator.iter().zip(stacks)
+        {
             self.scope_stack = scopes;
             self.parents = parents;
             self.in_annotation = in_annotation;
+            self.in_type_checking_block = in_type_checking_block;
             self.in_type_definition = true;
             self.in_deferred_string_type_definition = true;
             self.visit_expr(expr);
@@ -5036,10 +5109,7 @@ impl<'a> Checker<'a> {
                 .settings
                 .rules
                 .enabled(&Rule::MissingReturnTypeClassMethod)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::DynamicallyTypedExpression);
+            || self.settings.rules.enabled(&Rule::AnyType);
         let enforce_docstrings = self.settings.rules.enabled(&Rule::PublicModule)
             || self.settings.rules.enabled(&Rule::PublicClass)
             || self.settings.rules.enabled(&Rule::PublicMethod)
@@ -5088,7 +5158,7 @@ impl<'a> Checker<'a> {
             || self.settings.rules.enabled(&Rule::NonImperativeMood)
             || self.settings.rules.enabled(&Rule::NoSignature)
             || self.settings.rules.enabled(&Rule::FirstLineCapitalized)
-            || self.settings.rules.enabled(&Rule::NoThisPrefix)
+            || self.settings.rules.enabled(&Rule::DocstringStartsWithThis)
             || self.settings.rules.enabled(&Rule::CapitalizeSectionName)
             || self.settings.rules.enabled(&Rule::NewLineAfterSectionName)
             || self
@@ -5113,12 +5183,12 @@ impl<'a> Checker<'a> {
                 .settings
                 .rules
                 .enabled(&Rule::BlankLineAfterLastSection)
-            || self.settings.rules.enabled(&Rule::NonEmptySection)
+            || self.settings.rules.enabled(&Rule::EmptyDocstringSection)
             || self.settings.rules.enabled(&Rule::EndsInPunctuation)
             || self.settings.rules.enabled(&Rule::SectionNameEndsInColon)
-            || self.settings.rules.enabled(&Rule::DocumentAllArguments)
-            || self.settings.rules.enabled(&Rule::SkipDocstring)
-            || self.settings.rules.enabled(&Rule::NonEmpty);
+            || self.settings.rules.enabled(&Rule::UndocumentedParam)
+            || self.settings.rules.enabled(&Rule::OverloadWithDocstring)
+            || self.settings.rules.enabled(&Rule::EmptyDocstring);
 
         let mut overloaded_name: Option<String> = None;
         self.definitions.reverse();
@@ -5249,13 +5319,13 @@ impl<'a> Checker<'a> {
                 if self.settings.rules.enabled(&Rule::FirstLineCapitalized) {
                     pydocstyle::rules::capitalized(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::NoThisPrefix) {
+                if self.settings.rules.enabled(&Rule::DocstringStartsWithThis) {
                     pydocstyle::rules::starts_with_this(self, &docstring);
                 }
                 if self.settings.rules.enabled(&Rule::EndsInPunctuation) {
                     pydocstyle::rules::ends_with_punctuation(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::SkipDocstring) {
+                if self.settings.rules.enabled(&Rule::OverloadWithDocstring) {
                     pydocstyle::rules::if_needed(self, &docstring);
                 }
                 if self
@@ -5291,9 +5361,9 @@ impl<'a> Checker<'a> {
                         .settings
                         .rules
                         .enabled(&Rule::BlankLineAfterLastSection)
-                    || self.settings.rules.enabled(&Rule::NonEmptySection)
+                    || self.settings.rules.enabled(&Rule::EmptyDocstringSection)
                     || self.settings.rules.enabled(&Rule::SectionNameEndsInColon)
-                    || self.settings.rules.enabled(&Rule::DocumentAllArguments)
+                    || self.settings.rules.enabled(&Rule::UndocumentedParam)
                 {
                     pydocstyle::rules::sections(
                         self,

@@ -13,8 +13,8 @@ mod tests {
     use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::DuplicateIsinstanceCall, Path::new("SIM101.py"); "SIM101")]
-    #[test_case(Rule::NestedIfStatements, Path::new("SIM102.py"); "SIM102")]
-    #[test_case(Rule::ReturnBoolConditionDirectly, Path::new("SIM103.py"); "SIM103")]
+    #[test_case(Rule::CollapsibleIf, Path::new("SIM102.py"); "SIM102")]
+    #[test_case(Rule::NeedlessBool, Path::new("SIM103.py"); "SIM103")]
     #[test_case(Rule::UseContextlibSuppress, Path::new("SIM105.py"); "SIM105")]
     #[test_case(Rule::ReturnInTryExceptFinally, Path::new("SIM107.py"); "SIM107")]
     #[test_case(Rule::UseTernaryOperator, Path::new("SIM108.py"); "SIM108")]
@@ -38,8 +38,9 @@ mod tests {
     #[test_case(Rule::YodaConditions, Path::new("SIM300.py"); "SIM300")]
     #[test_case(Rule::DictGetWithDefault, Path::new("SIM401.py"); "SIM401")]
     #[test_case(Rule::IfToDict, Path::new("SIM116.py"); "SIM116")]
+    #[test_case(Rule::IfWithSameArms, Path::new("SIM114.py"); "SIM114")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_simplify").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
