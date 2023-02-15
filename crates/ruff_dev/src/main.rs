@@ -34,7 +34,7 @@ enum Command {
     /// Generate JSON schema for the TOML configuration file.
     GenerateJSONSchema(generate_json_schema::Args),
     /// Generate a Markdown-compatible table of supported lint rules.
-    GenerateRulesTable(generate_rules_table::Args),
+    GenerateRulesTable,
     /// Generate a Markdown-compatible listing of configuration options.
     GenerateOptions(generate_options::Args),
     /// Generate CLI help.
@@ -53,10 +53,11 @@ enum Command {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    #[allow(clippy::print_stdout)]
     match &args.command {
         Command::GenerateAll(args) => generate_all::main(args)?,
         Command::GenerateJSONSchema(args) => generate_json_schema::main(args)?,
-        Command::GenerateRulesTable(args) => generate_rules_table::main(args)?,
+        Command::GenerateRulesTable => println!("{}", generate_rules_table::generate()),
         Command::GenerateOptions(args) => generate_options::main(args)?,
         Command::GenerateCliHelp(args) => generate_cli_help::main(args)?,
         Command::GenerateDocs(args) => generate_docs::main(args)?,

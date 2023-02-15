@@ -1,25 +1,11 @@
 //! Generate a Markdown-compatible table of supported lint rules.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
 
-use anyhow::Result;
 use itertools::Itertools;
 use ruff::registry::{Linter, Rule, RuleNamespace, UpstreamCategory};
 use strum::IntoEnumIterator;
 
-use crate::utils::replace_readme_section;
-
-const TABLE_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated sections. -->\n";
-const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
-
 const FIX_SYMBOL: &str = "🛠";
 const URL_PREFIX: &str = "https://beta.ruff.rs/docs/rules";
-
-#[derive(clap::Args)]
-pub struct Args {
-    /// Write the generated table to stdout (rather than to `README.md`).
-    #[arg(long)]
-    pub(crate) dry_run: bool,
-}
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
     table_out.push_str("| Code | Name | Message | Fix |");
@@ -51,7 +37,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push('\n');
 }
 
-pub fn main(args: &Args) -> Result<()> {
+pub fn generate() -> String {
     // Generate the table string.
     let mut table_out = format!("The {FIX_SYMBOL} emoji indicates that a rule is automatically fixable by the `--fix` command-line option.\n\n");
     for linter in Linter::iter() {
@@ -108,11 +94,5 @@ pub fn main(args: &Args) -> Result<()> {
         }
     }
 
-    if args.dry_run {
-        print!("Rules Tables: {table_out}");
-    } else {
-        replace_readme_section(&table_out, TABLE_BEGIN_PRAGMA, TABLE_END_PRAGMA)?;
-    }
-
-    Ok(())
+    table_out
 }
