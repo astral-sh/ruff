@@ -1,6 +1,6 @@
 pub use ast_bool_op::{
-    a_and_not_a, a_or_not_a, and_false, compare_with_tuple, duplicate_isinstance_call,
-    expr_or_true, AAndNotA, AOrNotA, AndFalse, CompareWithTuple, DuplicateIsinstanceCall,
+    a_and_not_a, a_or_not_a, compare_with_tuple, duplicate_isinstance_call, expr_and_false,
+    expr_or_true, AAndNotA, AOrNotA, CompareWithTuple, DuplicateIsinstanceCall, ExprAndFalse,
     ExprOrTrue,
 };
 pub use ast_expr::{use_capital_environment_variables, UseCapitalEnvironmentVariables};

@@ -97,9 +97,9 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
 }
 
 define_violation!(
-    pub struct AndFalse;
+    pub struct ExprAndFalse;
 );
-impl AlwaysAutofixableViolation for AndFalse {
+impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `False` instead of `... and False`")
@@ -477,7 +477,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM223
-pub fn and_false(checker: &mut Checker, expr: &Expr) {
+pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
         return;
     };
@@ -490,7 +490,7 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut diagnostic = Diagnostic::new(AndFalse, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(ExprAndFalse, Range::from_located(value));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "False".to_string(),

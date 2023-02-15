@@ -1318,7 +1318,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | SIM220 | a-and-not-a | Use `False` instead of `{name} and not {name}` | 🛠 |
 | SIM221 | a-or-not-a | Use `True` instead of `{name} or not {name}` | 🛠 |
 | SIM222 | expr-or-true | Use `True` instead of `... or True` | 🛠 |
-| SIM223 | and-false | Use `False` instead of `... and False` | 🛠 |
+| SIM223 | expr-and-false | Use `False` instead of `... and False` | 🛠 |
 | SIM300 | yoda-conditions | Yoda conditions are discouraged, use `{suggestion}` instead | 🛠 |
 | SIM401 | dict-get-with-default | Use `{contents}` instead of an `if` block | 🛠 |
 

@@ -3318,8 +3318,8 @@ where
                 if self.settings.rules.enabled(&Rule::ExprOrTrue) {
                     flake8_simplify::rules::expr_or_true(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AndFalse) {
-                    flake8_simplify::rules::and_false(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprAndFalse) {
+                    flake8_simplify::rules::expr_and_false(self, expr);
                 }
             }
             _ => {}
