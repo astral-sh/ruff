@@ -42,7 +42,6 @@ glob = { version = "0.3.0" }
 ignore = { version = "0.4.18" }
 itertools = { workspace = true }
 log = { version = "0.4.17" }
-mdcat = { version = "1.0.0", default-features = false }
 notify = { version = "5.0.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache"] }
 pulldown-cmark = { version = "0.9.2", default-features = false, features = ['simd'] }
@@ -55,6 +54,7 @@ serde_json = { workspace = true }
 similar = { version = "2.2.1" }
 strum = { version = "0.24.1" }
 syntect = { version = "5.0.0", default-features = false, features = ["parsing", "regex-fancy", "default-themes", "default-syntaxes"] }
+termimad = { version = "0.21.0" }
 textwrap = { version = "0.16.0" }
 walkdir = { version = "2.3.2" }
 

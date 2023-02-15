@@ -1,12 +1,9 @@
 use std::io::{self, BufWriter, Write};
 
 use anyhow::Result;
-use colored::control::SHOULD_COLORIZE;
-use mdcat::terminal::{TerminalProgram, TerminalSize};
-use mdcat::{Environment, ResourceAccess, Settings};
-use pulldown_cmark::{Options, Parser};
 use serde::Serialize;
-use syntect::parsing::SyntaxSet;
+use termimad::crossterm::style::Color::Yellow;
+use termimad::{Alignment, MadSkin};
 
 use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::AutofixAvailability;
@@ -70,28 +67,10 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
             writeln!(stdout, "{output}")?;
         }
         HelpFormat::Pretty => {
-            let parser = Parser::new_ext(
-                &output,
-                Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH,
-            );
-
-            let cwd = std::env::current_dir()?;
-            let env = &Environment::for_local_directory(&cwd)?;
-
-            let terminal = if SHOULD_COLORIZE.should_colorize() {
-                TerminalProgram::detect()
-            } else {
-                TerminalProgram::Dumb
-            };
-
-            let settings = &Settings {
-                resource_access: ResourceAccess::LocalOnly,
-                syntax_set: SyntaxSet::load_defaults_newlines(),
-                terminal_capabilities: terminal.capabilities(),
-                terminal_size: TerminalSize::detect().unwrap_or_default(),
-            };
-
-            mdcat::push_tty(settings, env, &mut stdout, parser)?;
+            let mut skin = MadSkin::default();
+            skin.headers[0].align = Alignment::Left;
+            skin.bold.set_fg(Yellow);
+            writeln!(stdout, "{}", skin.term_text(&output))?;
         }
     };
 
