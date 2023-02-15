@@ -14,6 +14,7 @@ SECTIONS: list[tuple[str, str]] = [
     ("Settings", "settings.md"),
     ("Editor Integrations", "editor-integrations.md"),
     ("FAQ", "faq.md"),
+    ("Acknowledgements", "acknowledgements.md"),
 ]
 
 DOCUMENTATION_LINK: str = (
