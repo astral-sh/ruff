@@ -10,7 +10,7 @@ use crate::source_code::Locator;
 /// ANN204
 pub fn add_return_none_annotation(locator: &Locator, stmt: &Stmt) -> Result<Fix> {
     let range = Range::from_located(stmt);
-    let contents = locator.slice_source_code_range(&range);
+    let contents = locator.slice(&range);
 
     // Find the colon (following the `def` keyword).
     let mut seen_lpar = false;

@@ -83,7 +83,7 @@ pub fn organize_imports(
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
-    let indentation = locator.slice_source_code_range(&extract_indentation_range(&block.imports));
+    let indentation = locator.slice(&extract_indentation_range(&block.imports));
     let indentation = leading_space(indentation);
 
     let range = extract_range(&block.imports);
@@ -147,7 +147,7 @@ pub fn organize_imports(
         Location::new(range.location.row(), 0),
         Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
     );
-    let actual = locator.slice_source_code_range(&range);
+    let actual = locator.slice(&range);
     if matches_ignoring_indentation(actual, &expected) {
         None
     } else {

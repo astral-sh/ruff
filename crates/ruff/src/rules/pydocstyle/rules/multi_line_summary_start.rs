@@ -105,11 +105,10 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                     | DefinitionKind::NestedFunction(parent)
                     | DefinitionKind::Method(parent) = &docstring.kind
                     {
-                        let parent_indentation =
-                            checker.locator.slice_source_code_range(&Range::new(
-                                Location::new(parent.location.row(), 0),
-                                Location::new(parent.location.row(), parent.location.column()),
-                            ));
+                        let parent_indentation = checker.locator.slice(&Range::new(
+                            Location::new(parent.location.row(), 0),
+                            Location::new(parent.location.row(), parent.location.column()),
+                        ));
                         if parent_indentation.chars().all(char::is_whitespace) {
                             indentation.clear();
                             indentation.push_str(parent_indentation);
