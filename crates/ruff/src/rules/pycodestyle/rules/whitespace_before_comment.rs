@@ -60,7 +60,7 @@ pub fn whitespace_before_comment(
     let mut prev_end = Location::new(0, 0);
     for (start, tok, end) in tokens {
         if let Tok::Comment(text) = tok {
-            let line = locator.slice_source_code_range(&Range::new(
+            let line = locator.slice(&Range::new(
                 Location::new(start.row(), 0),
                 Location::new(start.row(), start.column()),
             ));

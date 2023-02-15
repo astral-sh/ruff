@@ -244,4 +244,15 @@ expression: diagnostics
     column: 15
   fix: ~
   parent: ~
+- kind:
+    MissingTypeSelf:
+      name: self
+  location:
+    row: 108
+    column: 12
+  end_location:
+    row: 108
+    column: 16
+  fix: ~
+  parent: ~
 

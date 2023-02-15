@@ -57,7 +57,7 @@ fn is_constant_like(expr: &Expr) -> bool {
 /// Generate a fix to reverse a comparison.
 fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Result<String> {
     let range = Range::from_located(expr);
-    let contents = locator.slice_source_code_range(&range);
+    let contents = locator.slice(&range);
 
     let mut expression = match_expression(contents)?;
     let mut comparison = match_comparison(&mut expression)?;

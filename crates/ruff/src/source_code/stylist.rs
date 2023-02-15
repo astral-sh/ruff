@@ -168,7 +168,7 @@ fn detect_indentation(contents: &str, locator: &Locator) -> Option<Indentation> 
     for (_start, tok, end) in lexer::make_tokenizer(contents).flatten() {
         if let Tok::Indent { .. } = tok {
             let start = Location::new(end.row(), 0);
-            let whitespace = locator.slice_source_code_range(&Range::new(start, end));
+            let whitespace = locator.slice(&Range::new(start, end));
             return Some(Indentation(whitespace.to_string()));
         }
     }
@@ -179,7 +179,7 @@ fn detect_indentation(contents: &str, locator: &Locator) -> Option<Indentation> 
 fn detect_quote(contents: &str, locator: &Locator) -> Option<Quote> {
     for (start, tok, end) in lexer::make_tokenizer(contents).flatten() {
         if let Tok::String { .. } = tok {
-            let content = locator.slice_source_code_range(&Range::new(start, end));
+            let content = locator.slice(&Range::new(start, end));
             if let Some(pattern) = leading_quote(content) {
                 if pattern.contains('\'') {
                     return Some(Quote::Single);

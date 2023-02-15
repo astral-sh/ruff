@@ -1693,7 +1693,7 @@ pub fn ambiguous_unicode_character(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let text = locator.slice_source_code_range(&Range::new(start, end));
+    let text = locator.slice(&Range::new(start, end));
 
     let mut col_offset = 0;
     let mut row_offset = 0;

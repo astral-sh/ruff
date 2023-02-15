@@ -71,9 +71,9 @@ impl Source {
         } else {
             Location::new(diagnostic.end_location.row() + 1, 0)
         };
-        let source = locator.slice_source_code_range(&Range::new(location, end_location));
+        let source = locator.slice(&Range::new(location, end_location));
         let num_chars_in_range = locator
-            .slice_source_code_range(&Range::new(diagnostic.location, diagnostic.end_location))
+            .slice(&Range::new(diagnostic.location, diagnostic.end_location))
             .chars()
             .count();
         Source {

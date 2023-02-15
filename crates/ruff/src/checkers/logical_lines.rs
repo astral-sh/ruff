@@ -52,8 +52,7 @@ pub fn check_logical_lines(
 
         // Extract the indentation level.
         let start_loc = line.mapping[0].1;
-        let start_line = locator
-            .slice_source_code_range(&Range::new(Location::new(start_loc.row(), 0), start_loc));
+        let start_line = locator.slice(&Range::new(Location::new(start_loc.row(), 0), start_loc));
         let indent_level = expand_indent(start_line);
         let indent_size = 4;
 

@@ -97,9 +97,7 @@ pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value:
             let mut diagnostic =
                 Diagnostic::new(RewriteListComprehension, Range::from_located(value));
             if checker.patch(diagnostic.kind.rule()) {
-                let existing = checker
-                    .locator
-                    .slice_source_code_range(&Range::from_located(value));
+                let existing = checker.locator.slice(&Range::from_located(value));
 
                 let mut content = String::with_capacity(existing.len());
                 content.push('(');
