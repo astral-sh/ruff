@@ -1,22 +1,7 @@
 //! Generate a Markdown-compatible listing of configuration options.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
-
-use anyhow::Result;
 use itertools::Itertools;
 use ruff::settings::options::Options;
 use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionField};
-
-use crate::utils::replace_readme_section;
-
-const BEGIN_PRAGMA: &str = "<!-- Begin auto-generated options sections. -->\n";
-const END_PRAGMA: &str = "<!-- End auto-generated options sections. -->";
-
-#[derive(clap::Args)]
-pub struct Args {
-    /// Write the generated table to stdout (rather than to `README.md`).
-    #[arg(long)]
-    pub(crate) dry_run: bool,
-}
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
     output.push_str(&format!("#### [`{0}`](#{0})\n", name));
@@ -39,7 +24,7 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: 
     output.push('\n');
 }
 
-pub fn main(args: &Args) -> Result<()> {
+pub fn generate() -> String {
     let mut output: String = "### Top-level\n\n".into();
 
     let mut sorted_options = Options::get_available_options();
@@ -64,11 +49,5 @@ pub fn main(args: &Args) -> Result<()> {
         }
     }
 
-    if args.dry_run {
-        print!("{output}");
-    } else {
-        replace_readme_section(&output, BEGIN_PRAGMA, END_PRAGMA)?;
-    }
-
-    Ok(())
+    output
 }
