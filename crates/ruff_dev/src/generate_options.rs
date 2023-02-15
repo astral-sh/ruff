@@ -40,7 +40,7 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: 
 }
 
 pub fn main(args: &Args) -> Result<()> {
-    let mut output = String::new();
+    let mut output: String = "### Top-level\n\n".into();
 
     let mut sorted_options = Options::get_available_options();
     sorted_options.sort_by_key(|(name, _)| *name);
