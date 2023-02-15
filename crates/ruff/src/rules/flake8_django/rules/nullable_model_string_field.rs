@@ -1,11 +1,14 @@
-use super::helpers;
+use rustpython_parser::ast::Constant::Bool;
+use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::Constant::Bool;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+
+use super::helpers;
 
 define_violation!(
     /// ## What it does
@@ -58,21 +61,13 @@ const NOT_NULL_TRUE_FIELDS: [&str; 6] = [
 ];
 
 /// DJ001
-pub fn nullable_model_string_field(
-    checker: &Checker,
-    bases: &[Expr],
-    body: &[Stmt],
-) -> Vec<Diagnostic> {
-    if !bases.iter().any(|base| helpers::is_model(checker, base)) {
-        return vec![];
-    }
-
+pub fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diagnostic> {
     let mut errors = Vec::new();
     for statement in body.iter() {
         let StmtKind::Assign {value, ..} = &statement.node else {
             continue
         };
-        if let Some(field_name) = check_nullable_field(checker, value) {
+        if let Some(field_name) = is_nullable_field(checker, value) {
             errors.push(Diagnostic::new(
                 NullableModelStringField {
                     field_name: field_name.to_string(),
@@ -84,7 +79,7 @@ pub fn nullable_model_string_field(
     errors
 }
 
-fn check_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
+fn is_nullable_field<'a>(checker: &'a Checker, value: &'a Expr) -> Option<&'a str> {
     let ExprKind::Call {func, keywords, ..} = &value.node else {
         return None;
     };

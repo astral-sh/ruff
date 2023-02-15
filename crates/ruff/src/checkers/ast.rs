@@ -786,7 +786,7 @@ where
                 if self.settings.rules.enabled(&Rule::NullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
-                            self, bases, body,
+                            self, body,
                         ));
                 }
                 if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
