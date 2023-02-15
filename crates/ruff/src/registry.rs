@@ -274,7 +274,7 @@ ruff_macros::register_rules!(
     rules::flake8_simplify::rules::IfExprWithTwistedArms,
     rules::flake8_simplify::rules::AAndNotA,
     rules::flake8_simplify::rules::AOrNotA,
-    rules::flake8_simplify::rules::OrTrue,
+    rules::flake8_simplify::rules::ExprOrTrue,
     rules::flake8_simplify::rules::AndFalse,
     rules::flake8_simplify::rules::YodaConditions,
     rules::flake8_simplify::rules::DictGetWithDefault,

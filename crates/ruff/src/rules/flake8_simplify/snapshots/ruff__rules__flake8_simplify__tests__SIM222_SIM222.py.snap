@@ -3,7 +3,7 @@ source: src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    OrTrue: ~
+    ExprOrTrue: ~
   location:
     row: 1
     column: 8
@@ -21,7 +21,7 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    OrTrue: ~
+    ExprOrTrue: ~
   location:
     row: 4
     column: 15
@@ -39,7 +39,7 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    OrTrue: ~
+    ExprOrTrue: ~
   location:
     row: 7
     column: 14

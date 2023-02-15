@@ -83,9 +83,9 @@ impl AlwaysAutofixableViolation for AOrNotA {
 }
 
 define_violation!(
-    pub struct OrTrue;
+    pub struct ExprOrTrue;
 );
-impl AlwaysAutofixableViolation for OrTrue {
+impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `True` instead of `... or True`")
@@ -450,7 +450,7 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM222
-pub fn or_true(checker: &mut Checker, expr: &Expr) {
+pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
         return;
     };
@@ -463,7 +463,7 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut diagnostic = Diagnostic::new(OrTrue, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(ExprOrTrue, Range::from_located(value));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "True".to_string(),

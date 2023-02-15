@@ -1,6 +1,7 @@
 pub use ast_bool_op::{
-    a_and_not_a, a_or_not_a, and_false, compare_with_tuple, duplicate_isinstance_call, or_true,
-    AAndNotA, AOrNotA, AndFalse, CompareWithTuple, DuplicateIsinstanceCall, OrTrue,
+    a_and_not_a, a_or_not_a, and_false, compare_with_tuple, duplicate_isinstance_call,
+    expr_or_true, AAndNotA, AOrNotA, AndFalse, CompareWithTuple, DuplicateIsinstanceCall,
+    ExprOrTrue,
 };
 pub use ast_expr::{use_capital_environment_variables, UseCapitalEnvironmentVariables};
 pub use ast_for::{convert_for_loop_to_any_all, ConvertLoopToAll, ConvertLoopToAny};
