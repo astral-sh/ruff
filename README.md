@@ -122,7 +122,6 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
 1. [FAQ](#faq)
 1. [Contributing](#contributing)
 1. [Support](#support)
-1. [Reference](#reference)
 1. [Acknowledgements](#acknowledgements)
 1. [License](#license)
 
@@ -210,8 +209,8 @@ Or, to enable autofix:
 
 <!-- Begin section: Configuration -->
 
-Ruff is configurable both via `pyproject.toml`, `ruff.toml`, and the command line. For a full list of configurable
-options, see the [API reference](#reference).
+Ruff is configurable both via `pyproject.toml`, `ruff.toml`, and the command line.
+For a full list of configurable options, see the [list of all options](https://beta.ruff.rs/docs/settings/).
 
 ### Configure via `pyproject.toml`
 
@@ -343,7 +342,7 @@ unfixable = ["B"]
 "path/to/file.py" = ["E402"]
 ```
 
-For a full list of configurable options, see the [API reference](#reference).
+For a full list of configurable options, see the [list of all options](https://beta.ruff.rs/docs/settings/).
 
 ### Command-line interface
 
@@ -1264,10 +1263,6 @@ Having trouble? Check out the existing issues on [**GitHub**](https://github.com
 or feel free to [**open a new one**](https://github.com/charliermarsh/ruff/issues/new).
 
 You can also ask for help on [**Discord**](https://discord.gg/c9MhzV8aU5).
-
-## Reference
-
-See the [list of all options](https://beta.ruff.rs/docs/settings/).
 
 <!-- Begin section: Acknowledgements -->
 
