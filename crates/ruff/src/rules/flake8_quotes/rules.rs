@@ -263,7 +263,7 @@ fn docstring(
 ) -> Option<Diagnostic> {
     let quotes_settings = &settings.flake8_quotes;
 
-    let text = locator.slice_source_code_range(&Range::new(start, end));
+    let text = locator.slice(&Range::new(start, end));
     let trivia: Trivia = text.into();
 
     if trivia
@@ -310,7 +310,7 @@ fn strings(
     let trivia = sequence
         .iter()
         .map(|(start, end)| {
-            let text = locator.slice_source_code_range(&Range::new(*start, *end));
+            let text = locator.slice(&Range::new(*start, *end));
             let trivia: Trivia = text.into();
             trivia
         })

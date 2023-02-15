@@ -20,7 +20,7 @@ pub fn adjust_indentation(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let contents = locator.slice_source_code_range(&range);
+    let contents = locator.slice(&range);
 
     let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
 
@@ -69,7 +69,7 @@ pub fn remove_class_def_base(
 /// Generate a fix to remove arguments from a `super` call.
 pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr) -> Option<Fix> {
     let range = Range::from_located(expr);
-    let contents = locator.slice_source_code_range(&range);
+    let contents = locator.slice(&range);
 
     let mut tree = libcst_native::parse_module(contents, None).ok()?;
 
@@ -151,7 +151,7 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
         // It's possible that `last_pos` is after `fix.location`, if we're removing the
         // first _two_ members.
         if start_location > last_pos {
-            let slice = locator.slice_source_code_range(&Range::new(last_pos, start_location));
+            let slice = locator.slice(&Range::new(last_pos, start_location));
             output.push_str(slice);
         }
 
@@ -159,7 +159,7 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
     }
 
     // Add the remaining content.
-    let slice = locator.slice_source_code_at(last_pos);
+    let slice = locator.skip(last_pos);
     output.push_str(slice);
     output
 }

@@ -104,40 +104,26 @@ impl<'a> Locator<'a> {
         self.index.get_or_init(|| index(self.contents))
     }
 
-    pub fn slice_source_code_until(&self, location: Location) -> &'a str {
+    /// Take the source code up to the given [`Location`].
+    pub fn take(&self, location: Location) -> &'a str {
         let index = self.get_or_init_index();
         let offset = truncate(location, index, self.contents);
         &self.contents[..offset]
     }
 
-    pub fn slice_source_code_at(&self, location: Location) -> &'a str {
+    /// Take the source code after the given [`Location`].
+    pub fn skip(&self, location: Location) -> &'a str {
         let index = self.get_or_init_index();
         let offset = truncate(location, index, self.contents);
         &self.contents[offset..]
     }
 
-    pub fn slice_source_code_range(&self, range: &Range) -> &'a str {
+    /// Take the source code between the given [`Range`].
+    pub fn slice(&self, range: &Range) -> &'a str {
         let index = self.get_or_init_index();
         let start = truncate(range.location, index, self.contents);
         let end = truncate(range.end_location, index, self.contents);
         &self.contents[start..end]
-    }
-
-    pub fn partition_source_code_at(
-        &self,
-        outer: &Range,
-        inner: &Range,
-    ) -> (&'a str, &'a str, &'a str) {
-        let index = self.get_or_init_index();
-        let outer_start = truncate(outer.location, index, self.contents);
-        let outer_end = truncate(outer.end_location, index, self.contents);
-        let inner_start = truncate(inner.location, index, self.contents);
-        let inner_end = truncate(inner.end_location, index, self.contents);
-        (
-            &self.contents[outer_start..inner_start],
-            &self.contents[inner_start..inner_end],
-            &self.contents[inner_end..outer_end],
-        )
     }
 
     pub const fn len(&self) -> usize {

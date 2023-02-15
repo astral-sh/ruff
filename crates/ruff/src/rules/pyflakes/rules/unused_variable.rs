@@ -67,7 +67,7 @@ fn match_token_after<F, T>(located: &Located<T>, locator: &Locator, f: F) -> Ran
 where
     F: Fn(Tok) -> bool,
 {
-    let contents = locator.slice_source_code_at(located.location);
+    let contents = locator.skip(located.location);
 
     // Track the bracket depth.
     let mut par_count = 0;
@@ -129,7 +129,7 @@ fn match_token<F, T>(located: &Located<T>, locator: &Locator, f: F) -> Range
 where
     F: Fn(Tok) -> bool,
 {
-    let contents = locator.slice_source_code_at(located.location);
+    let contents = locator.skip(located.location);
 
     // Track the bracket depth.
     let mut par_count = 0;

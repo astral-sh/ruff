@@ -81,7 +81,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
 /// Return the location of a trailing semicolon following a `Stmt`, if it's part
 /// of a multi-statement line.
 fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
-    let contents = locator.slice_source_code_at(stmt.end_location.unwrap());
+    let contents = locator.skip(stmt.end_location.unwrap());
     for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         if trimmed.starts_with(';') {
@@ -104,7 +104,7 @@ fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
 /// Find the next valid break for a `Stmt` after a semicolon.
 fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
     let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
-    let contents = locator.slice_source_code_at(start_location);
+    let contents = locator.skip(start_location);
     for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         // Skip past any continuations.
@@ -136,7 +136,7 @@ fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
 
 /// Return `true` if a `Stmt` occurs at the end of a file.
 fn is_end_of_file(stmt: &Stmt, locator: &Locator) -> bool {
-    let contents = locator.slice_source_code_at(stmt.end_location.unwrap());
+    let contents = locator.skip(stmt.end_location.unwrap());
     contents.is_empty()
 }
 
@@ -209,7 +209,7 @@ pub fn remove_unused_imports<'a>(
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+    let module_text = locator.slice(&Range::from_located(stmt));
     let mut tree = match_module(module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {
@@ -339,7 +339,7 @@ pub fn remove_argument(
     remove_parentheses: bool,
 ) -> Result<Fix> {
     // TODO(sbrugman): Preserve trailing comments.
-    let contents = locator.slice_source_code_at(stmt_at);
+    let contents = locator.skip(stmt_at);
 
     let mut fix_start = None;
     let mut fix_end = None;

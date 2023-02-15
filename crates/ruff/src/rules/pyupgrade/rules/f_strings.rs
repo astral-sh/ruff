@@ -46,9 +46,7 @@ impl<'a> FormatSummaryValues<'a> {
         let mut extracted_kwargs: FxHashMap<&str, String> = FxHashMap::default();
         if let ExprKind::Call { args, keywords, .. } = &expr.node {
             for arg in args {
-                let arg = checker
-                    .locator
-                    .slice_source_code_range(&Range::from_located(arg));
+                let arg = checker.locator.slice(&Range::from_located(arg));
                 if contains_invalids(arg) {
                     return None;
                 }
@@ -57,9 +55,7 @@ impl<'a> FormatSummaryValues<'a> {
             for keyword in keywords {
                 let KeywordData { arg, value } = &keyword.node;
                 if let Some(key) = arg {
-                    let kwarg = checker
-                        .locator
-                        .slice_source_code_range(&Range::from_located(value));
+                    let kwarg = checker.locator.slice(&Range::from_located(value));
                     if contains_invalids(kwarg) {
                         return None;
                     }
@@ -130,9 +126,7 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         return None;
     };
 
-    let contents = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(value));
+    let contents = checker.locator.slice(&Range::from_located(value));
 
     // Tokenize: we need to avoid trying to fix implicit string concatenations.
     if lexer::make_tokenizer(contents)
@@ -265,9 +259,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     };
 
     // Avoid refactors that increase the resulting string length.
-    let existing = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(expr));
+    let existing = checker.locator.slice(&Range::from_located(expr));
     if contents.len() > existing.len() {
         return;
     }
