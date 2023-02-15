@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::prelude::*;
 use std::cell::RefCell;
 use std::marker::PhantomData;
@@ -5,7 +7,7 @@ use std::ops::Deref;
 
 use crate::Buffer;
 
-/// Utility trait that allows memorizing the output of a [Format].
+/// Utility trait that allows memorizing the output of a [`Format`].
 /// Useful to avoid re-formatting the same object twice.
 pub trait MemoizeFormat<Context> {
     /// Returns a formattable object that memoizes the result of `Format` by cloning.
@@ -16,7 +18,7 @@ pub trait MemoizeFormat<Context> {
     /// use std::cell::Cell;
     /// use ruff_formatter::{format, write};
     /// use ruff_formatter::prelude::*;
-    /// use ruff_rowan::TextSize;
+    /// use ruff_text_size::TextSize;
     ///
     /// struct MyFormat {
     ///   value: Cell<u64>
@@ -66,7 +68,7 @@ pub trait MemoizeFormat<Context> {
 
 impl<T, Context> MemoizeFormat<Context> for T where T: Format<Context> {}
 
-/// Memoizes the output of its inner [Format] to avoid re-formatting a potential expensive object.
+/// Memoizes the output of its inner [`Format`] to avoid re-formatting a potential expensive object.
 #[derive(Debug)]
 pub struct Memoized<F, Context> {
     inner: F,
@@ -98,7 +100,7 @@ where
     /// use std::cell::Cell;
     /// use ruff_formatter::{format, write};
     /// use ruff_formatter::prelude::*;
-    /// use ruff_rowan::TextSize;
+    /// use ruff_text_size::TextSize;
     ///
     /// #[derive(Default)]
     /// struct Counter {

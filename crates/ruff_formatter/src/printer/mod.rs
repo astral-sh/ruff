@@ -24,7 +24,7 @@ use crate::printer::queue::{
     AllPredicate, FitsEndPredicate, FitsQueue, PrintQueue, Queue, SingleEntryPredicate,
 };
 use drop_bomb::DebugDropBomb;
-use ruff_rowan::{TextLen, TextSize};
+use ruff_text_size::{TextLen, TextSize};
 use std::num::NonZeroU8;
 use unicode_width::UnicodeWidthChar;
 
@@ -100,11 +100,6 @@ impl<'a> Printer<'a> {
                 source_position,
             } => self.print_text(text, Some(*source_position)),
             FormatElement::StaticTextSlice { text, range } => self.print_text(&text[*range], None),
-            FormatElement::SyntaxTokenTextSlice {
-                slice,
-                source_position,
-            } => self.print_text(slice, Some(*source_position)),
-
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
                     && matches!(line_mode, LineMode::Soft | LineMode::SoftOrSpace)
@@ -1001,8 +996,6 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
             FormatElement::StaticTextSlice { text, range } => {
                 return Ok(self.fits_text(&text[*range]))
             }
-            FormatElement::SyntaxTokenTextSlice { slice, .. } => return Ok(self.fits_text(slice)),
-
             FormatElement::LineSuffixBoundary => {
                 if self.state.has_line_suffix {
                     return Ok(Fits::No);
