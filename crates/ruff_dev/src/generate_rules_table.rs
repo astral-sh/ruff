@@ -14,6 +14,7 @@ const TABLE_END_PRAGMA: &str = "<!-- End auto-generated sections. -->";
 const TOC_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated table of contents. -->";
 const TOC_END_PRAGMA: &str = "<!-- End auto-generated table of contents. -->";
 
+const FIX_SYMBOL: &str = "🛠";
 const URL_PREFIX: &str = "https://beta.ruff.rs/docs/rules";
 
 #[derive(clap::Args)]
@@ -31,7 +32,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     for rule in rules {
         let fix_token = match rule.autofixable() {
             None => "",
-            Some(_) => "🛠",
+            Some(_) => FIX_SYMBOL,
         };
 
         let rule_name = rule.as_ref();
@@ -55,7 +56,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
 
 pub fn main(args: &Args) -> Result<()> {
     // Generate the table string.
-    let mut table_out = String::new();
+    let mut table_out = format!("The {FIX_SYMBOL} emoji indicates that a rule is automatically fixable by the `--fix` command-line option.\n\n");
     let mut toc_out = String::new();
     for linter in Linter::iter() {
         let codes_csv: String = match linter.common_prefix() {
