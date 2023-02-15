@@ -468,7 +468,7 @@ Options:
       --show-settings
           See the settings Ruff will use to lint a given Python file
   -h, --help
-          Print help (see more with '--help')
+          Print help
 
 Rule selection:
       --select <RULE_CODE>
