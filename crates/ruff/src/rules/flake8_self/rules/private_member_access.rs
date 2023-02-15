@@ -10,40 +10,40 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for the access of a private member of a class.
+    /// Checks for accesses on "private" class members.
     ///
     /// ## Why is this bad?
-    /// If a member of a class is declared private, the standard is that
-    /// the member in question generally shouldn't be accessed by anything
-    /// except for internally in the class. Using private variables can
-    /// also possibly cause problems if used incorrectly, and those errors
-    /// can be difficult to debug.
+    /// In Python, the convention is such that class members that are prefixed
+    /// with a single underscore, or prefixed but not suffixed with a double
+    /// underscore, are considered private and intended for internal use.
     ///
-    /// Instead, the name of the member should be renamed to public
-    /// (no leading underscores) if possible. If this is not possible,
-    /// consider removing the usage or adding a `noqa` statement.
+    /// Using such "private" members is considered a misuse of the class, as
+    /// there are no guarantees that the member will be present in future
+    /// versions, that it will have the same type, or that it will have the same
+    /// behavior. Instead, use the class's public interface.
     ///
     /// ## Example
     /// ```python
-    /// class MyClass:
+    /// class Class:
     ///     def __init__(self):
-    ///         self._private_member = "this is only supposed to be used internally"
+    ///         self._private_member = "..."
     ///
-    /// var_myclass = MyClass()
-    /// print(var_myclass._private_member)
+    /// var = Class()
+    /// print(var._private_member)
     /// ```
     ///
-    /// Instead, use
+    /// Use instead:
     /// ```python
-    /// class MyClass:
+    /// class Class:
     ///     def __init__(self):
-    ///         self.public_member = "public (underscore prefix is removed)"
+    ///         self.public_member = "..."
     ///
-    /// var_myclass = MyClass()
-    /// print(var_myclass.public_member)
+    /// var = Class()
+    /// print(var.public_member)
     /// ```
     ///
-    /// * [What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
+    /// ## References
+    /// * [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
     /// ```
     pub struct PrivateMemberAccess {
         pub access: String,
