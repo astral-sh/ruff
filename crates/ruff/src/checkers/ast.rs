@@ -1795,6 +1795,13 @@ where
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, value);
                 }
+                if self.settings.rules.enabled(&Rule::AsyncioDanglingTask) {
+                    if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
+                        self.resolve_call_path(expr)
+                    }) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
             }
             _ => {}
         }

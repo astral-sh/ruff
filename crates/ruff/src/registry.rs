@@ -558,6 +558,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::AmbiguousUnicodeCharacterComment,
     rules::ruff::rules::KeywordArgumentBeforeStarArgument,
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
+    rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
