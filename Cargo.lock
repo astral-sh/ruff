@@ -899,7 +899,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.246"
+version = "0.0.247"
 dependencies = [
  "anyhow",
  "clap 4.1.4",
@@ -2446,7 +2446,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.246"
+version = "0.0.247"
 dependencies = [
  "anyhow",
  "bisection",
@@ -2502,7 +2502,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.246"
+version = "0.0.247"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
