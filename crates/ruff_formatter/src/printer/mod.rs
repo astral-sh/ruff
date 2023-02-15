@@ -123,7 +123,6 @@ impl<'a> Printer<'a> {
                     // Print a second line break if this is an empty line
                     if line_mode == &LineMode::Empty {
                         self.print_str("\n");
-                        self.state.has_empty_line = true;
                     }
 
                     self.state.pending_space = false;
@@ -644,8 +643,6 @@ impl<'a> Printer<'a> {
     fn print_str(&mut self, content: &str) {
         for char in content.chars() {
             self.print_char(char);
-
-            self.state.has_empty_line = false;
         }
     }
 
@@ -708,7 +705,6 @@ struct PrinterState<'a> {
     generated_line: usize,
     generated_column: usize,
     line_width: usize,
-    has_empty_line: bool,
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
