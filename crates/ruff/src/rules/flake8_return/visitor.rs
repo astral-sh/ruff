@@ -16,7 +16,7 @@ pub struct Stack<'a> {
     pub assigns: FxHashMap<&'a str, Vec<Range>>,
     pub loops: Vec<(Location, Location)>,
     pub tries: Vec<(Location, Location)>,
-    pub assign_values: FxHashMap<&'a str, Expr>,
+    pub assign_values: FxHashMap<&'a str, &'a Expr>,
 }
 
 #[derive(Default)]
@@ -118,10 +118,9 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                         return;
                     }
 
-                    // TODO: Make this only run if the autofix is enabled, as this incurs a
-                    // slight performance overhead by using `.clone`
+                    // TODO: Make this only run if the autofix is enabled (or we could merge into the below statement)
                     if let ExprKind::Name { id, .. } = &target.node {
-                        self.stack.assign_values.insert(id, *value.clone());
+                        self.stack.assign_values.insert(id, value);
                     }
 
                     // This is hacky, but I don't kmow how to pass the "context" of the

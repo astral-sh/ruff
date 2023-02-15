@@ -372,67 +372,66 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         let mut diagnostic = Diagnostic::new(UnnecessaryAssign, Range::from_located(expr));
 
         if checker.patch(diagnostic.kind.rule()) {
+            // assign_expr is the Expr referring to the value of the last assignment (e.g. `5+5` for `var = 5+5`)
+            // TODO: This might cause a problem if there is an assignment after, needs further testing
             if let Some(assign_expr) = stack.assign_values.get(id.as_str()) {
-                if let Some(assign_locations) = stack.assigns.get(id.as_str()) {
-                    let expr_loc = expr.end_location.unwrap();
-                    if let Some(last_assign_loc) = assign_locations
-                        .iter()
-                        .rev()
-                        .find(|x| x.location < expr_loc)
+                // assign_locations is a &Vec<Range> that has each range for each whole assignment (`var = 5+5`)
+                let assign_locations = stack.assigns.get(id.as_str()).unwrap();
+                let expr_loc = expr.end_location.unwrap();
+                if let Some(last_assign_loc) = assign_locations
+                    .iter()
+                    .rev()
+                    .find(|x| x.location < expr_loc)
+                {
+                    let in_between_source = checker
+                        .locator
+                        .slice(&Range::new(last_assign_loc.end_location, expr.location))
+                        .to_owned();
+                    // Ensure that all indentation is identical (no if or while statement).
+                    let all_indentation_same = (checker
+                        .locator
+                        .slice(&Range::new(
+                            Location::new(last_assign_loc.location.row(), 0),
+                            Location::new(last_assign_loc.location.row() + 1, 0),
+                        ))
+                        .chars()
+                        .take_while(|c| checker.stylist.indentation().contains(*c))
+                        .join("")
+                        + &in_between_source)
+                        .lines()
+                        .tuple_windows()
+                        .all(|(ln1, ln2): (&str, &str)| {
+                            extract_indentation(ln1, checker.stylist)
+                                == extract_indentation(ln2, checker.stylist)
+                        });
+                    // Check if the code without the final return statement is only comments
+                    if all_indentation_same
+                        && code_is_only_comments(
+                            in_between_source.trim_end().trim_end_matches("return"),
+                        )
                     {
-                        let in_between_source = checker
-                            .locator
-                            .slice_source_code_range(&Range::new(
-                                last_assign_loc.end_location,
-                                expr.location,
-                            ))
-                            .to_owned();
-                        // Ensure that all indentation is identical (no if or while statement).
-                        let all_indentation_same = (checker
-                            .locator
-                            .slice_source_code_range(&Range::new(
-                                Location::new(last_assign_loc.location.row(), 0),
-                                Location::new(last_assign_loc.location.row() + 1, 0),
-                            ))
-                            .chars()
-                            .take_while(|c| checker.stylist.indentation().contains(*c))
-                            .join("")
-                            + &in_between_source)
-                            .lines()
-                            .tuple_windows()
-                            .all(|(ln1, ln2): (&str, &str)| {
-                                extract_indentation(ln1, checker.stylist)
-                                    == extract_indentation(ln2, checker.stylist)
-                            });
-                        // Check if the code without the final return statement is only comments
-                        if all_indentation_same
-                            && code_is_only_comments(
-                                in_between_source.trim_end().trim_end_matches("return"),
-                            )
+                        // Avoid a trailing empty line and avoid causing invalid syntax with semicolon usage
+                        let fixed_source = match in_between_source
+                            .strip_prefix(checker.stylist.line_ending().as_str())
                         {
-                            // Avoid a trailing empty line and avoid causing invalid syntax with semicolon usage
-                            let fixed_source = match in_between_source
-                                .strip_prefix(checker.stylist.line_ending().as_str())
-                            {
-                                Some(newline_stripped) => {
-                                    match newline_stripped
-                                        .strip_prefix(checker.stylist.indentation().as_str())
-                                    {
-                                        Some(unindented) => unindented.to_owned(),
-                                        None => in_between_source,
-                                    }
-                                }
-                                None => match in_between_source.strip_prefix(';') {
-                                    Some(no_semicolon) => no_semicolon.to_owned(),
+                            Some(newline_stripped) => {
+                                match newline_stripped
+                                    .strip_prefix(checker.stylist.indentation().as_str())
+                                {
+                                    Some(unindented) => unindented.to_owned(),
                                     None => in_between_source,
-                                },
-                            };
-                            diagnostic.amend(Fix::replacement(
-                                fixed_source + &unparse_expr(&assign_expr.clone(), checker.stylist),
-                                last_assign_loc.location,
-                                expr.end_location.unwrap(),
-                            ));
-                        }
+                                }
+                            }
+                            None => match in_between_source.strip_prefix(';') {
+                                Some(no_semicolon) => no_semicolon.to_owned(),
+                                None => in_between_source,
+                            },
+                        };
+                        diagnostic.amend(Fix::replacement(
+                            fixed_source + &unparse_expr(assign_expr, checker.stylist),
+                            last_assign_loc.location,
+                            expr.end_location.unwrap(),
+                        ));
                     }
                 }
             }
