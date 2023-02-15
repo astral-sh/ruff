@@ -116,14 +116,14 @@ developer of [Zulip](https://github.com/zulip/zulip):
 This README is also available as [documentation](https://beta.ruff.rs/docs/).
 
 1. [Installation and Usage](#installation-and-usage)
-1. [Configuration](#configuration)
-1. [Supported Rules](#supported-rules)
-1. [Editor Integrations](#editor-integrations)
-1. [FAQ](#faq)
-1. [Contributing](#contributing)
-1. [Support](#support)
-1. [Acknowledgements](#acknowledgements)
-1. [License](#license)
+2. [Configuration](#configuration)
+3. [Supported Rules](#supported-rules)
+4. [Editor Integrations](#editor-integrations)
+5. [FAQ](#faq)
+6. [Contributing](#contributing)
+7. [Support](#support)
+8. [Acknowledgements](#acknowledgements)
+9. [License](#license)
 
 ## Installation and Usage
 
