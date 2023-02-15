@@ -12,4 +12,14 @@ expression: diagnostics
     column: 49
   fix: ~
   parent: ~
+- kind:
+    AsyncioDanglingTask: ~
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 51
+  fix: ~
+  parent: ~
 

@@ -8,15 +8,16 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for `asyncio.create_task` calls that do not store a reference
-    /// to the returned result.
+    /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls
+    /// that do not store a reference to the returned result.
     ///
     /// ## Why is this bad?
     /// Per the `asyncio` documentation, the event loop only retains a weak
-    /// reference to tasks. If the task returned by `asyncio.create_task` is
-    /// not stored in a variable, or a collection, or otherwise referenced, it
-    /// may be garbage collected at any time. This can lead to unexpected and
-    /// inconsistent behavior, as your tasks may or may not run to completion.
+    /// reference to tasks. If the task returned by `asyncio.create_task` and
+    /// `asyncio.ensure_future` is not stored in a variable, or a collection,
+    /// or otherwise referenced, it may be garbage collected at any time. This
+    /// can lead to unexpected and inconsistent behavior, as your tasks may or
+    /// may not run to completion.
     ///
     /// ## Example
     /// ```python
@@ -55,7 +56,7 @@ define_violation!(
 impl Violation for AsyncioDanglingTask {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Store a reference to the return value of `asyncio.create_task`")
+        format!("Store a reference to the return value of `asyncio.create_task` and `asyncio.ensure_future`")
     }
 }
 
@@ -66,7 +67,9 @@ where
 {
     if let ExprKind::Call { func, .. } = &expr.node {
         if resolve_call_path(func).map_or(false, |call_path| {
-            call_path.as_slice() == ["asyncio", "create_task"]
+            [["asyncio", "create_task"], ["asyncio", "ensure_future"]]
+                .iter()
+                .any(|v| v == call_path.as_slice())
         }) {
             return Some(Diagnostic::new(
                 AsyncioDanglingTask,
