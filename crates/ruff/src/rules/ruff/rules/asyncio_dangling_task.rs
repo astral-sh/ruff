@@ -52,29 +52,29 @@ define_violation!(
     /// * [_The Heisenbug lurking in your async code_](https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/)
     /// * [`asyncio.create_task`](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
     pub struct AsyncioDanglingTask {
-        pub keyword: DeferralKeyword,
+        pub method: Method,
     }
 );
 
 impl Violation for AsyncioDanglingTask {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AsyncioDanglingTask { keyword } = self;
-        format!("Store a reference to the return value of `asyncio.{keyword}`")
+        let AsyncioDanglingTask { method } = self;
+        format!("Store a reference to the return value of `asyncio.{method}`")
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum DeferralKeyword {
+pub enum Method {
     CreateTask,
     EnsureFuture,
 }
 
-impl fmt::Display for DeferralKeyword {
+impl fmt::Display for Method {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DeferralKeyword::CreateTask => fmt.write_str("create_task"),
-            DeferralKeyword::EnsureFuture => fmt.write_str("ensure_future"),
+            Method::CreateTask => fmt.write_str("create_task"),
+            Method::EnsureFuture => fmt.write_str("ensure_future"),
         }
     }
 }
@@ -88,13 +88,13 @@ where
         match resolve_call_path(func).as_deref() {
             Some(["asyncio", "create_task"]) => Some(Diagnostic::new(
                 AsyncioDanglingTask {
-                    keyword: DeferralKeyword::CreateTask,
+                    method: Method::CreateTask,
                 },
                 Range::from_located(expr),
             )),
             Some(["asyncio", "ensure_future"]) => Some(Diagnostic::new(
                 AsyncioDanglingTask {
-                    keyword: DeferralKeyword::EnsureFuture,
+                    method: Method::EnsureFuture,
                 },
                 Range::from_located(expr),
             )),

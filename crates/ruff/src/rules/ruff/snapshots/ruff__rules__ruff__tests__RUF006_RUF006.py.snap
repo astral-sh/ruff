@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     AsyncioDanglingTask:
-      keyword: CreateTask
+      method: CreateTask
   location:
     row: 6
     column: 4
@@ -15,7 +15,7 @@ expression: diagnostics
   parent: ~
 - kind:
     AsyncioDanglingTask:
-      keyword: EnsureFuture
+      method: EnsureFuture
   location:
     row: 11
     column: 4
