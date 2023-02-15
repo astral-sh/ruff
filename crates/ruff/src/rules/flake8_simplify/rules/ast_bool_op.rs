@@ -66,14 +66,14 @@ impl AlwaysAutofixableViolation for AAndNotA {
 }
 
 define_violation!(
-    pub struct AOrNotA {
+    pub struct ExprOrNotExpr {
         pub name: String,
     }
 );
-impl AlwaysAutofixableViolation for AOrNotA {
+impl AlwaysAutofixableViolation for ExprOrNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AOrNotA { name } = self;
+        let ExprOrNotExpr { name } = self;
         format!("Use `True` instead of `{name} or not {name}`")
     }
 
@@ -396,7 +396,7 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM221
-pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
+pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
         return;
     };
@@ -431,7 +431,7 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut diagnostic = Diagnostic::new(
-                    AOrNotA {
+                    ExprOrNotExpr {
                         name: id.to_string(),
                     },
                     Range::from_located(expr),

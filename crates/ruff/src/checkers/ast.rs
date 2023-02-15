@@ -3312,8 +3312,8 @@ where
                 if self.settings.rules.enabled(&Rule::AAndNotA) {
                     flake8_simplify::rules::a_and_not_a(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AOrNotA) {
-                    flake8_simplify::rules::a_or_not_a(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprOrNotExpr) {
+                    flake8_simplify::rules::expr_or_not_expr(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::ExprOrTrue) {
                     flake8_simplify::rules::expr_or_true(self, expr);
