@@ -47,10 +47,11 @@ Ruff is extremely actively developed and used in major open-source projects like
 
 * [pandas](https://github.com/pandas-dev/pandas)
 * [FastAPI](https://github.com/tiangolo/fastapi)
+* [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
 * [Apache Airflow](https://github.com/apache/airflow)
 * [SciPy](https://github.com/scipy/scipy)
-* [Bokeh](https://github.com/bokeh/bokeh)
 * [Zulip](https://github.com/zulip/zulip)
+* [Bokeh](https://github.com/bokeh/bokeh)
 * [Pydantic](https://github.com/pydantic/pydantic)
 * [Dagster](https://github.com/dagster-io/dagster)
 * [Dagger](https://github.com/dagger/dagger)
