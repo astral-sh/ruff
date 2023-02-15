@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::helpers::collect_call_path;
-use crate::ast::types::Range;
+use crate::ast::types::{BindingKind, Range, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
@@ -60,17 +60,47 @@ impl Violation for PrivateMemberAccess {
 /// SLF001
 pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, attr, .. } = &expr.node {
-        if !attr.ends_with("__") && (attr.starts_with('_') || attr.starts_with("__")) {
+        if (attr.starts_with("__") && !attr.ends_with("__"))
+            || (attr.starts_with('_') && !attr.starts_with("__"))
+        {
             if let ExprKind::Call { func, .. } = &value.node {
+                // Ignore `super()` calls.
                 let call_path = collect_call_path(func);
                 if call_path.as_slice() == ["super"] {
                     return;
                 }
             } else {
+                // Ignore `self` and `cls` accesses.
                 let call_path = collect_call_path(value);
                 if call_path.as_slice() == ["self"]
                     || call_path.as_slice() == ["cls"]
                     || call_path.as_slice() == ["mcs"]
+                {
+                    return;
+                }
+
+                // Ignore accesses on class members from _within_ the class.
+                if checker
+                    .scopes
+                    .iter()
+                    .rev()
+                    .find_map(|scope| match &scope.kind {
+                        ScopeKind::Class(class_def) => Some(class_def),
+                        _ => None,
+                    })
+                    .map_or(false, |class_def| {
+                        if call_path.as_slice() == [class_def.name] {
+                            checker
+                                .find_binding(class_def.name)
+                                .map_or(false, |binding| {
+                                    // TODO(charlie): Could the name ever be bound to a _different_
+                                    // class here?
+                                    matches!(binding.kind, BindingKind::ClassDefinition)
+                                })
+                        } else {
+                            false
+                        }
+                    })
                 {
                     return;
                 }
