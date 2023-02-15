@@ -3,7 +3,8 @@ source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AsyncioDanglingTask: ~
+    AsyncioDanglingTask:
+      keyword: CreateTask
   location:
     row: 6
     column: 4
@@ -13,7 +14,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AsyncioDanglingTask: ~
+    AsyncioDanglingTask:
+      keyword: EnsureFuture
   location:
     row: 11
     column: 4

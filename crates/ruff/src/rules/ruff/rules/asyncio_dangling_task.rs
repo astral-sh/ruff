@@ -1,10 +1,11 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
-
 use crate::ast::types::{CallPath, Range};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
+use ruff_macros::{define_violation, derive_message_formats};
+use serde::{Deserialize, Serialize};
+use std::fmt;
 
 define_violation!(
     /// ## What it does
@@ -50,13 +51,31 @@ define_violation!(
     /// ## References
     /// * [_The Heisenbug lurking in your async code_](https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/)
     /// * [`asyncio.create_task`](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
-    pub struct AsyncioDanglingTask;
+    pub struct AsyncioDanglingTask {
+        pub keyword: DeferralKeyword,
+    }
 );
 
 impl Violation for AsyncioDanglingTask {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Store a reference to the return value of `asyncio.create_task` and `asyncio.ensure_future`")
+        let AsyncioDanglingTask { keyword } = self;
+        format!("Store a reference to the return value of `asyncio.{keyword}`")
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DeferralKeyword {
+    CreateTask,
+    EnsureFuture,
+}
+
+impl fmt::Display for DeferralKeyword {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DeferralKeyword::CreateTask => fmt.write_str("create_task"),
+            DeferralKeyword::EnsureFuture => fmt.write_str("ensure_future"),
+        }
     }
 }
 
@@ -66,16 +85,22 @@ where
     F: FnOnce(&'a Expr) -> Option<CallPath<'a>>,
 {
     if let ExprKind::Call { func, .. } = &expr.node {
-        if resolve_call_path(func).map_or(false, |call_path| {
-            [["asyncio", "create_task"], ["asyncio", "ensure_future"]]
-                .iter()
-                .any(|v| v == call_path.as_slice())
-        }) {
-            return Some(Diagnostic::new(
-                AsyncioDanglingTask,
+        match resolve_call_path(func).as_deref() {
+            Some(["asyncio", "create_task"]) => Some(Diagnostic::new(
+                AsyncioDanglingTask {
+                    keyword: DeferralKeyword::CreateTask,
+                },
                 Range::from_located(expr),
-            ));
+            )),
+            Some(["asyncio", "ensure_future"]) => Some(Diagnostic::new(
+                AsyncioDanglingTask {
+                    keyword: DeferralKeyword::EnsureFuture,
+                },
+                Range::from_located(expr),
+            )),
+            _ => None,
         }
+    } else {
+        None
     }
-    None
 }
