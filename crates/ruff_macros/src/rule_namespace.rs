@@ -1,7 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::HashSet;
 
-use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::spanned::Spanned;
 use syn::{Attribute, Data, DataEnum, DeriveInput, Error, Lit, Meta, MetaNameValue};
@@ -16,9 +15,9 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
     let mut parsed = Vec::new();
 
     let mut common_prefix_match_arms = quote!();
-    let mut name_match_arms = quote!(Self::Ruff => "Ruff-specific rules",);
-    let mut url_match_arms = quote!(Self::Ruff => None,);
-    let mut into_iter_match_arms = quote!();
+    let mut name_match_arms =
+        quote!(Self::Ruff => "Ruff-specific rules", Self::Numpy => "NumPy-specific rules", );
+    let mut url_match_arms = quote!(Self::Ruff => None, Self::Numpy => None, );
 
     let mut all_prefixes = HashSet::new();
 
@@ -60,7 +59,7 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
         let variant_ident = variant.ident;
 
-        if variant_ident != "Ruff" {
+        if variant_ident != "Ruff" && variant_ident != "Numpy" {
             let (name, url) = parse_doc_attr(doc_attr)?;
             name_match_arms.extend(quote! {Self::#variant_ident => #name,});
             url_match_arms.extend(quote! {Self::#variant_ident => Some(#url),});
@@ -79,11 +78,6 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
         if let [prefix] = &prefixes[..] {
             common_prefix_match_arms.extend(quote! { Self::#variant_ident => #prefix, });
-
-            let prefix_ident = Ident::new(prefix, Span::call_site());
-            into_iter_match_arms.extend(quote! {
-                #ident::#variant_ident => RuleCodePrefix::#prefix_ident.into_iter(),
-            });
         } else {
             // There is more than one prefix. We already previously asserted
             // that prefixes of the same variant don't start with the same character
@@ -106,13 +100,6 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
         }});
     }
 
-    into_iter_match_arms.extend(quote! {
-        #ident::Pycodestyle => {
-            let rules: Vec<_> = (&RuleCodePrefix::E).into_iter().chain(&RuleCodePrefix::W).collect();
-            rules.into_iter()
-        }
-    });
-
     Ok(quote! {
         impl crate::registry::RuleNamespace for #ident {
             fn parse_code(code: &str) -> Option<(Self, &str)> {
@@ -130,19 +117,6 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
 
             fn url(&self) -> Option<&'static str> {
                 match self { #url_match_arms }
-            }
-        }
-
-        impl IntoIterator for &#ident {
-            type Item = Rule;
-            type IntoIter = ::std::vec::IntoIter<Self::Item>;
-
-            fn into_iter(self) -> Self::IntoIter {
-                use colored::Colorize;
-
-                match self {
-                    #into_iter_match_arms
-                }
             }
         }
     })

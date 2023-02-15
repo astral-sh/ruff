@@ -763,6 +763,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
+name = "drop_bomb"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bda8e21c04aca2ae33ffc2fd8c23134f3cac46db123ba97bd9d3f3b8a4a85e1"
+
+[[package]]
 name = "dyn-clone"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -857,9 +863,9 @@ dependencies = [
 
 [[package]]
 name = "fastrand"
-version = "1.8.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7a407cfaa3385c4ae6b23e84623d48c2798d06e3e6a1878f7f59f17b3f86499"
+checksum = "e51093e27b0797c359783294ca4f0a911c270184cb10f85783b118614a1501be"
 dependencies = [
  "instant",
 ]
@@ -2545,6 +2551,7 @@ dependencies = [
  "itertools",
  "libcst",
  "once_cell",
+ "regex",
  "ruff",
  "ruff_cli",
  "rustpython-common",
@@ -2554,6 +2561,20 @@ dependencies = [
  "strum",
  "strum_macros",
  "textwrap",
+]
+
+[[package]]
+name = "ruff_formatter"
+version = "0.0.0"
+dependencies = [
+ "drop_bomb",
+ "insta",
+ "ruff_text_size",
+ "rustc-hash",
+ "schemars",
+ "serde",
+ "tracing",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2574,6 +2595,32 @@ dependencies = [
  "once_cell",
  "regex",
  "rustc-hash",
+]
+
+[[package]]
+name = "ruff_python_formatter"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "clap 4.1.4",
+ "insta",
+ "once_cell",
+ "ruff_formatter",
+ "ruff_text_size",
+ "rustc-hash",
+ "rustpython-common",
+ "rustpython-parser",
+ "test-case",
+]
+
+[[package]]
+name = "ruff_text_size"
+version = "0.0.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_test",
+ "static_assertions",
 ]
 
 [[package]]
@@ -2837,6 +2884,15 @@ name = "serde_spanned"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0efd8caf556a6cebd3b285caf480045fcc1ac04f6bd786b09a6f11af30c4fcf4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "serde_test"
+version = "1.0.152"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3611210d2d67e3513204742004d6ac6f589e521861dabb0f649b070eea8bed9e"
 dependencies = [
  "serde",
 ]
@@ -3149,10 +3205,11 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.4"
+version = "1.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
+checksum = "3fdd6f064ccff2d6567adcb3873ca630700f00b5ad3f060c25b5dcfd9a4ce152"
 dependencies = [
+ "cfg-if",
  "once_cell",
 ]
 
@@ -3271,9 +3328,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.6"
+version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc6a3b08b64e6dfad376fa2432c7b1f01522e37a623c3050bc95db2d3ff21583"
+checksum = "5427d89453009325de0d8f342c9490009f76e999cb7672d77e46267448f7e6b2"
 dependencies = [
  "bytes",
  "futures-core",
@@ -3932,9 +3989,9 @@ dependencies = [
 
 [[package]]
 name = "zune-inflate"
-version = "0.2.42"
+version = "0.2.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c473377c11c4a3ac6a2758f944cd336678e9c977aa0abf54f6450cf77e902d6d"
+checksum = "589245df6230839c305984dcc0a8385cc72af1fd223f360ffd5d65efa4216d40"
 dependencies = [
  "simd-adler32",
 ]

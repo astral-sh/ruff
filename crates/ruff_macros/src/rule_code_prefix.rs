@@ -4,63 +4,55 @@ use proc_macro2::Span;
 use quote::quote;
 use syn::{Attribute, Ident};
 
+pub fn get_prefix_ident(prefix: &str) -> Ident {
+    let prefix = if prefix.as_bytes()[0].is_ascii_digit() {
+        // Identifiers in Rust may not start with a number.
+        format!("_{prefix}")
+    } else {
+        prefix.to_string()
+    };
+    Ident::new(&prefix, Span::call_site())
+}
+
 pub fn expand<'a>(
-    rule_type: &Ident,
     prefix_ident: &Ident,
-    variants: impl Iterator<Item = (&'a Ident, &'a Vec<Attribute>)>,
-    variant_name: impl Fn(&str) -> &'a Ident,
+    variants: impl Iterator<Item = (&'a str, &'a Vec<Attribute>)>,
 ) -> proc_macro2::TokenStream {
     // Build up a map from prefix to matching RuleCodes.
     let mut prefix_to_codes: BTreeMap<String, BTreeSet<String>> = BTreeMap::default();
-    let mut attributes: BTreeMap<String, &[Attribute]> = BTreeMap::default();
-
-    let mut pl_codes = BTreeSet::new();
+    let mut code_to_attributes: BTreeMap<String, &[Attribute]> = BTreeMap::default();
 
     for (variant, attr) in variants {
         let code_str = variant.to_string();
-        let code_prefix_len = code_str
-            .chars()
-            .take_while(|char| char.is_alphabetic())
-            .count();
-        let code_suffix_len = code_str.len() - code_prefix_len;
-        for i in 0..=code_suffix_len {
-            let prefix = code_str[..code_prefix_len + i].to_string();
+        for i in 1..=code_str.len() {
+            let prefix = code_str[..i].to_string();
             prefix_to_codes
                 .entry(prefix)
                 .or_default()
                 .insert(code_str.clone());
         }
-        if code_str.starts_with("PL") {
-            pl_codes.insert(code_str.clone());
-        }
-        attributes.insert(code_str, attr);
+        code_to_attributes.insert(code_str, attr);
     }
 
-    prefix_to_codes.insert("PL".to_string(), pl_codes);
+    let variant_strs: Vec<_> = prefix_to_codes.keys().collect();
+    let variant_idents: Vec<_> = prefix_to_codes
+        .keys()
+        .map(|prefix| {
+            let ident = get_prefix_ident(prefix);
+            quote! {
+                #ident
+            }
+        })
+        .collect();
 
-    let prefix_variants = prefix_to_codes.iter().map(|(prefix, codes)| {
-        let prefix = Ident::new(prefix, Span::call_site());
-        let attrs = attributes_for_prefix(codes, &attributes);
-        quote! {
-            #attrs
-            #prefix
-        }
-    });
-
-    let prefix_impl = generate_impls(
-        rule_type,
-        prefix_ident,
-        &prefix_to_codes,
-        variant_name,
-        &attributes,
-    );
+    let attributes: Vec<_> = prefix_to_codes
+        .values()
+        .map(|codes| attributes_for_prefix(codes, &code_to_attributes))
+        .collect();
 
     quote! {
         #[derive(
             ::strum_macros::EnumIter,
-            ::strum_macros::EnumString,
-            ::strum_macros::AsRefStr,
-            ::strum_macros::IntoStaticStr,
             Debug,
             PartialEq,
             Eq,
@@ -68,83 +60,34 @@ pub fn expand<'a>(
             Ord,
             Clone,
             Hash,
-            ::serde::Serialize,
-            ::serde::Deserialize,
         )]
         pub enum #prefix_ident {
-            #(#prefix_variants,)*
+            #(#attributes #variant_idents,)*
         }
 
-        #prefix_impl
-    }
-}
+        impl std::str::FromStr for #prefix_ident {
+            type Err = FromCodeError;
 
-fn generate_impls<'a>(
-    rule_type: &Ident,
-    prefix_ident: &Ident,
-    prefix_to_codes: &BTreeMap<String, BTreeSet<String>>,
-    variant_name: impl Fn(&str) -> &'a Ident,
-    attributes: &BTreeMap<String, &[Attribute]>,
-) -> proc_macro2::TokenStream {
-    let into_iter_match_arms = prefix_to_codes.iter().map(|(prefix_str, codes)| {
-        let prefix = Ident::new(prefix_str, Span::call_site());
-        let attrs = attributes_for_prefix(codes, attributes);
-        let codes = codes.iter().map(|code| {
-            let rule_variant = variant_name(code);
-            let attrs = attributes[code];
-            quote! {
-                #(#attrs)*
-                #rule_type::#rule_variant
-            }
-        });
-        quote! {
-            #attrs
-            #prefix_ident::#prefix => vec![#(#codes),*].into_iter(),
-        }
-    });
-
-    let specificity_match_arms = prefix_to_codes.iter().map(|(prefix_str, codes)| {
-        let prefix = Ident::new(prefix_str, Span::call_site());
-        let mut num_numeric = prefix_str.chars().filter(|char| char.is_numeric()).count();
-        if prefix_str != "PL" && prefix_str.starts_with("PL") {
-            num_numeric += 1;
-        }
-        let suffix_len = match num_numeric {
-            0 => quote! { Specificity::Linter },
-            1 => quote! { Specificity::Code1Char },
-            2 => quote! { Specificity::Code2Chars },
-            3 => quote! { Specificity::Code3Chars },
-            4 => quote! { Specificity::Code4Chars },
-            5 => quote! { Specificity::Code5Chars },
-            _ => panic!("Invalid prefix: {prefix}"),
-        };
-        let attrs = attributes_for_prefix(codes, attributes);
-        quote! {
-            #attrs
-            #prefix_ident::#prefix => #suffix_len,
-        }
-    });
-
-    quote! {
-        impl #prefix_ident {
-            pub(crate) fn specificity(&self) -> crate::rule_selector::Specificity {
-                use crate::rule_selector::Specificity;
-
-                #[allow(clippy::match_same_arms)]
-                match self {
-                    #(#specificity_match_arms)*
+            fn from_str(code: &str) -> Result<Self, Self::Err> {
+                match code {
+                    #(#attributes #variant_strs => Ok(Self::#variant_idents),)*
+                    _ => Err(FromCodeError::Unknown)
                 }
             }
         }
 
-        impl IntoIterator for &#prefix_ident {
-            type Item = #rule_type;
-            type IntoIter = ::std::vec::IntoIter<Self::Item>;
+        impl From<&#prefix_ident> for &'static str {
+            fn from(code: &#prefix_ident) -> Self {
+                match code {
+                    #(#attributes #prefix_ident::#variant_idents => #variant_strs,)*
+                }
+            }
+        }
 
-            fn into_iter(self) -> Self::IntoIter {
-                #[allow(clippy::match_same_arms)]
+        impl AsRef<str> for #prefix_ident {
+            fn as_ref(&self) -> &str {
                 match self {
-                    #(#into_iter_match_arms)*
+                    #(#attributes Self::#variant_idents => #variant_strs,)*
                 }
             }
         }
@@ -163,7 +106,7 @@ fn attributes_for_prefix(
 
 /// If all values in an iterator are the same, return that value. Otherwise,
 /// return `None`.
-fn if_all_same<T: PartialEq>(iter: impl Iterator<Item = T>) -> Option<T> {
+pub fn if_all_same<T: PartialEq>(iter: impl Iterator<Item = T>) -> Option<T> {
     let mut iter = iter.peekable();
     let first = iter.next()?;
     if iter.all(|x| x == first) {

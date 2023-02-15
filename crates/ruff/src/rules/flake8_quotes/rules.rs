@@ -21,7 +21,6 @@ define_violation!(
     /// strings, but be consistent.
     ///
     /// ## Options
-    ///
     /// * `flake8-quotes.inline-quotes`
     ///
     /// ## Example
@@ -67,7 +66,6 @@ define_violation!(
     /// strings, but be consistent.
     ///
     /// ## Options
-    ///
     /// * `flake8-quotes.multiline-quotes`
     ///
     /// ## Example
@@ -116,7 +114,6 @@ define_violation!(
     /// strings, but be consistent.
     ///
     /// ## Options
-    ///
     /// * `flake8-quotes.docstring-quotes`
     ///
     /// ## Example

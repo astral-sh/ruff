@@ -38,8 +38,8 @@ use crate::rules::{
     flake8_django, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise,
     flake8_return, flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
-    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_unused_arguments, flake8_use_pathlib, mccabe, numpy, pandas_vet, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -1320,8 +1320,8 @@ where
                                 stmt,
                                 level.as_ref(),
                                 module.as_deref(),
+                                self.module_path.as_ref(),
                                 &self.settings.flake8_tidy_imports.ban_relative_imports,
-                                self.path,
                             )
                         {
                             self.diagnostics.push(diagnostic);
@@ -1560,12 +1560,7 @@ where
                     pyflakes::rules::assert_tuple(self, stmt, test);
                 }
                 if self.settings.rules.enabled(&Rule::AssertFalse) {
-                    flake8_bugbear::rules::assert_false(
-                        self,
-                        stmt,
-                        test,
-                        msg.as_ref().map(|expr| &**expr),
-                    );
+                    flake8_bugbear::rules::assert_false(self, stmt, test, msg.as_deref());
                 }
                 if self.settings.rules.enabled(&Rule::Assert) {
                     self.diagnostics
@@ -2145,6 +2140,9 @@ where
                         if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
                             pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
+                        if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
+                            numpy::rules::deprecated_type_alias(self, expr);
+                        }
 
                         // Ex) List[...]
                         if !self.in_deferred_string_type_definition
@@ -2210,6 +2208,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
                     pyupgrade::rules::typing_text_str_alias(self, expr);
+                }
+                if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
+                    numpy::rules::deprecated_type_alias(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::RewriteMockImport) {
                     pyupgrade::rules::rewrite_mock_attribute(self, expr);

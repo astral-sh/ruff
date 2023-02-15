@@ -33,6 +33,7 @@ pub mod flake8_unused_arguments;
 pub mod flake8_use_pathlib;
 pub mod isort;
 pub mod mccabe;
+pub mod numpy;
 pub mod pandas_vet;
 pub mod pep8_naming;
 pub mod pycodestyle;

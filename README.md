@@ -7,7 +7,6 @@
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
-[![image](https://img.shields.io/date/1676394000?label=Jetbrains%20Ruff%20Webinar&logo=jetbrains)](https://info.jetbrains.com/PyCharm-Webinar-February14-2023.html)
 
 [**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
 
@@ -27,7 +26,6 @@ An extremely fast Python linter, written in Rust.
 
 * ⚡️  10-100x faster than existing linters
 * 🐍  Installable via `pip`
-* 🤝  Python 3.11 compatibility
 * 🛠️  `pyproject.toml` support
 * 📦  Built-in caching, to avoid re-analyzing unchanged files
 * 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
@@ -162,12 +160,14 @@ This README is also available as [documentation](https://beta.ruff.rs/docs/).
    1. [pygrep-hooks (PGH)](#pygrep-hooks-pgh)
    1. [Pylint (PL)](#pylint-pl)
    1. [tryceratops (TRY)](#tryceratops-try)
+   1. [NumPy-specific rules (NPY)](#numpy-specific-rules-npy)
    1. [Ruff-specific rules (RUF)](#ruff-specific-rules-ruf)<!-- End auto-generated table of contents. -->
 1. [Editor Integrations](#editor-integrations)
 1. [FAQ](#faq)
 1. [Contributing](#contributing)
 1. [Support](#support)
 1. [Reference](#reference)
+1. [Acknowledgements](#acknowledgements)
 1. [License](#license)
 
 ## Installation and Usage
@@ -254,8 +254,10 @@ Or, to enable autofix:
 
 <!-- Begin section: Configuration -->
 
-Ruff is configurable both via `pyproject.toml` and the command line. For a full list of configurable
+Ruff is configurable both via `pyproject.toml`, `ruff.toml`, and the command line. For a full list of configurable
 options, see the [API reference](#reference).
+
+### Configure via `pyproject.toml`
 
 If left unspecified, the default configuration is equivalent to:
 
@@ -361,6 +363,8 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
   extension.
 * By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
   consider turning off autofix for specific rules or categories (see: [FAQ](#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
+
+### Configure via `ruff.toml`
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
 an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the
@@ -671,7 +675,7 @@ Ruff supports two command-line flags that alter its exit code behavior:
 ### Autocompletion
 
 Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
-by `ruff completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
+by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
 `powershell`, or `zsh`.
 
 The exact steps required to enable autocompletion will vary by shell. For example instructions,
@@ -725,7 +729,7 @@ For more, see [Pyflakes](https://pypi.org/project/pyflakes/) on PyPI.
 | F506 | percent-format-mixed-positional-and-named | `%`-format string has mixed positional and named placeholders |  |
 | F507 | percent-format-positional-count-mismatch | `%`-format string has {wanted} placeholder(s) but {got} substitution(s) |  |
 | F508 | percent-format-star-requires-sequence | `%`-format string `*` specifier requires sequence |  |
-| F509 | percent-format-unsupported-format-character | `%`-format string has unsupported format character '{char}' |  |
+| F509 | percent-format-unsupported-format-character | `%`-format string has unsupported format character `{char}` |  |
 | F521 | string-dot-format-invalid-format | `.format` call has invalid format string: {message} |  |
 | F522 | string-dot-format-extra-named-arguments | `.format` call has unused named argument(s): {message} | 🛠 |
 | F523 | string-dot-format-extra-positional-arguments | `.format` call has unused arguments at position(s): {message} |  |
@@ -788,7 +792,7 @@ For more, see [pycodestyle](https://pypi.org/project/pycodestyle/) on PyPI.
 | ---- | ---- | ------- | --- |
 | W292 | no-new-line-at-end-of-file | No newline at end of file | 🛠 |
 | W505 | doc-line-too-long | Doc line too long ({length} > {limit} characters) |  |
-| W605 | invalid-escape-sequence | Invalid escape sequence: '\{char}' | 🛠 |
+| W605 | invalid-escape-sequence | Invalid escape sequence: `\{char}` | 🛠 |
 
 ### mccabe (C90)
 
@@ -859,8 +863,8 @@ For more, see [pydocstyle](https://pypi.org/project/pydocstyle/) on PyPI.
 | D213 | multi-line-summary-second-line | Multi-line docstring summary should start at the second line | 🛠 |
 | D214 | section-not-over-indented | Section is over-indented ("{name}") | 🛠 |
 | D215 | section-underline-not-over-indented | Section underline is over-indented ("{name}") | 🛠 |
-| D300 | triple-single-quotes | Use """triple double quotes""" |  |
-| D301 | escape-sequence-in-docstring | Use r""" if any backslashes in a docstring |  |
+| D300 | triple-single-quotes | Use triple double quotes `"""` |  |
+| D301 | escape-sequence-in-docstring | Use `r"""` if any backslashes in a docstring |  |
 | D400 | ends-in-period | First line should end with a period | 🛠 |
 | D401 | non-imperative-mood | First line of docstring should be in imperative mood: "{first_line}" |  |
 | D402 | no-signature | First line should not be the function's signature |  |
@@ -976,7 +980,7 @@ For more, see [flake8-bandit](https://pypi.org/project/flake8-bandit/) on PyPI.
 | S110 | try-except-pass | `try`-`except`-`pass` detected, consider logging the exception |  |
 | S112 | try-except-continue | `try`-`except`-`continue` detected, consider logging the exception |  |
 | S113 | request-without-timeout | Probable use of requests call with timeout set to `{value}` |  |
-| S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: "{}" |  |
+| S324 | hashlib-insecure-hash-function | Probable use of insecure hash functions in `hashlib`: `{string}` |  |
 | S501 | request-with-no-cert-validation | Probable use of `{string}` call with `verify=False` disabling SSL certificate checks |  |
 | S506 | unsafe-yaml-load | Probable use of unsafe loader `{name}` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`. |  |
 | S508 | snmp-insecure-version | The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able. |  |
@@ -1121,9 +1125,9 @@ For more, see [flake8-errmsg](https://pypi.org/project/flake8-errmsg/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| EM101 | raw-string-in-exception | Exception must not use a string literal, assign to variable first |  |
-| EM102 | f-string-in-exception | Exception must not use an f-string literal, assign to variable first |  |
-| EM103 | dot-format-in-exception | Exception must not use a `.format()` string directly, assign to variable first |  |
+| EM101 | [raw-string-in-exception](https://beta.ruff.rs/docs/rules/raw-string-in-exception/) | Exception must not use a string literal, assign to variable first |  |
+| EM102 | [f-string-in-exception](https://beta.ruff.rs/docs/rules/f-string-in-exception/) | Exception must not use an f-string literal, assign to variable first |  |
+| EM103 | [dot-format-in-exception](https://beta.ruff.rs/docs/rules/dot-format-in-exception/) | Exception must not use a `.format()` string directly, assign to variable first |  |
 
 ### flake8-executable (EXE)
 
@@ -1133,7 +1137,7 @@ For more, see [flake8-executable](https://pypi.org/project/flake8-executable/) o
 | ---- | ---- | ------- | --- |
 | EXE001 | shebang-not-executable | Shebang is present but file is not executable |  |
 | EXE002 | shebang-missing-executable-file | The file is executable but no shebang is present |  |
-| EXE003 | shebang-python | Shebang should contain "python" |  |
+| EXE003 | shebang-python | Shebang should contain `python` |  |
 | EXE004 | shebang-whitespace | Avoid whitespace before shebang | 🛠 |
 | EXE005 | shebang-newline | Shebang should be at the beginning of the file |  |
 
@@ -1207,8 +1211,8 @@ For more, see [flake8-pyi](https://pypi.org/project/flake8-pyi/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PYI001 | [prefix-type-params](https://beta.ruff.rs/docs/rules/prefix-type-params/) | Name of private `{kind}` must start with _ |  |
-| PYI007 | [unrecognized-platform-check](https://beta.ruff.rs/docs/rules/unrecognized-platform-check/) | Unrecognized sys.platform check |  |
+| PYI001 | [prefix-type-params](https://beta.ruff.rs/docs/rules/prefix-type-params/) | Name of private `{kind}` must start with `_` |  |
+| PYI007 | [unrecognized-platform-check](https://beta.ruff.rs/docs/rules/unrecognized-platform-check/) | Unrecognized `sys.platform` check |  |
 | PYI008 | [unrecognized-platform-name](https://beta.ruff.rs/docs/rules/unrecognized-platform-name/) | Unrecognized platform `{platform}` |  |
 
 ### flake8-pytest-style (PT)
@@ -1465,7 +1469,7 @@ For more, see [Pylint](https://pypi.org/project/pylint/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| PLW0120 | useless-else-on-loop | Else clause on loop without a break statement, remove the else and de-indent all the code inside it |  |
+| PLW0120 | useless-else-on-loop | `else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it |  |
 | PLW0602 | global-variable-not-assigned | Using global for `{name}` but no assignment is done |  |
 
 ### tryceratops (TRY)
@@ -1483,13 +1487,19 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | TRY301 | raise-within-try | Abstract `raise` to an inner function |  |
 | TRY400 | error-instead-of-exception | Use `logging.exception` instead of `logging.error` |  |
 
+### NumPy-specific rules (NPY)
+
+| Code | Name | Message | Fix |
+| ---- | ---- | ------- | --- |
+| NPY001 | [numpy-deprecated-type-alias](https://beta.ruff.rs/docs/rules/numpy-deprecated-type-alias/) | Type alias `np.{type_name}` is deprecated, replace with builtin type | 🛠 |
+
 ### Ruff-specific rules (RUF)
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| RUF001 | ambiguous-unicode-character-string | String contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
-| RUF002 | ambiguous-unicode-character-docstring | Docstring contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
-| RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character '{confusable}' (did you mean '{representant}'?) | 🛠 |
+| RUF001 | ambiguous-unicode-character-string | String contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
+| RUF002 | ambiguous-unicode-character-docstring | Docstring contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
+| RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
 | RUF004 | keyword-argument-before-star-argument | Keyword argument `{name}` must come after starred arguments |  |
 | RUF005 | unpack-instead-of-concatenating-to-collection-literal | Consider `{expr}` instead of concatenation | 🛠 |
 | RUF100 | unused-noqa | Unused `noqa` directive | 🛠 |
@@ -1894,6 +1904,22 @@ Ruff can also replace [isort](https://pypi.org/project/isort/),
 implemented in [pyupgrade](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827)).
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an Issue.
+
+### What versions of Python does Ruff support?
+
+Ruff can lint code for any Python version from 3.7 onwards. However, Ruff lacks support for a few
+language features that were introduced in Python 3.10 and later. Specifically, Ruff does not
+support:
+
+- "Structural Pattern Matching" ([PEP 622](https://peps.python.org/pep-0622/)), introduced in Python 3.10.
+- "Exception Groups and except* ([PEP 654](https://www.python.org/dev/peps/pep-0654/)), introduced in Python 3.11.
+
+Support for these features is planned.
+
+Ruff does not support Python 2. Ruff _may_ run on pre-Python 3.7 code, although such versions
+are not officially supported (e.g., Ruff does _not_ respect type comments).
+
+Ruff is installable under any Python version from 3.7 onwards.
 
 ### Do I need to install Rust to use Ruff?
 
@@ -4024,6 +4050,32 @@ keep-runtime-typing = true
 <!-- End auto-generated options sections. -->
 
 <!-- End section: Settings -->
+
+<!-- Begin section: Acknowledgements -->
+
+## Acknowledgements
+
+Ruff's linter draws on both the APIs and implementation details of many other
+tools in the Python ecosystem, especially [Flake8](https://github.com/PyCQA/flake8), [Pyflakes](https://github.com/PyCQA/pyflakes),
+[pycodestyle](https://github.com/PyCQA/pycodestyle), [pydocstyle](https://github.com/PyCQA/pydocstyle),
+[pyupgrade](https://github.com/asottile/pyupgrade), and [isort](https://github.com/PyCQA/isort).
+
+In some cases, Ruff includes a "direct" Rust port of the corresponding tool.
+We're grateful to the maintainers of these tools for their work, and for all
+the value they've provided to the Python community.
+
+Ruff's autoformatter is built on a fork of Rome's [`rome_formatter`](https://github.com/rome/tools/tree/main/crates/rome_formatter),
+and again draws on both the APIs and implementation details of [Rome](https://github.com/rome/tools),
+[Prettier](https://github.com/prettier/prettier), and [Black](https://github.com/psf/black).
+
+Ruff is also influenced by a number of tools outside the Python ecosystem, like
+[Clippy](https://github.com/rust-lang/rust-clippy) and [ESLint](https://github.com/eslint/eslint).
+
+Ruff is the beneficiary of a large number of [contributors](https://github.com/charliermarsh/ruff/graphs/contributors).
+
+Ruff is released under the MIT license.
+
+<!-- End section: Acknowledgements -->
 
 ## License
 

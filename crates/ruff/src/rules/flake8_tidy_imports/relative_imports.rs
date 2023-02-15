@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use rustpython_parser::ast::{Stmt, StmtKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -7,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use ruff_macros::{define_violation, derive_message_formats};
 use ruff_python::string::is_lower_with_underscore;
 
-use crate::ast::helpers::{create_stmt, unparse_stmt};
+use crate::ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -32,7 +30,7 @@ define_violation!(
     /// Checks for relative imports.
     ///
     /// ## Why is this bad?
-    /// Absolute imports, or relative imports from siblings, are recommended by [PEP 8](https://peps.python.org/pep-0008/#imports):
+    /// Absolute imports, or relative imports from siblings, are recommended by [PEP 8]:
     ///
     /// > Absolute imports are recommended, as they are usually more readable and tend to be better behaved...
     /// > ```python
@@ -49,7 +47,6 @@ define_violation!(
     /// > ```
     ///
     /// ## Options
-    ///
     /// * `flake8-tidy-imports.ban-relative-imports`
     ///
     /// ## Example
@@ -61,6 +58,8 @@ define_violation!(
     /// ```python
     /// from mypkg import foo
     /// ```
+    ///
+    /// [PEP 8]: https://peps.python.org/pep-0008/#imports
     pub struct RelativeImports {
         pub strictness: Strictness,
     }
@@ -90,51 +89,45 @@ fn fix_banned_relative_import(
     stmt: &Stmt,
     level: Option<&usize>,
     module: Option<&str>,
-    path: &Path,
+    module_path: Option<&Vec<String>>,
     stylist: &Stylist,
 ) -> Option<Fix> {
-    let base = if let Some(module) = module {
-        module.to_string()
+    // Only fix is the module path is known
+    if let Some(mut parts) = module_path.cloned() {
+        // Remove relative level from module path
+        for _ in 0..*level? {
+            parts.pop();
+        }
+
+        let call_path = from_relative_import(&parts, module.unwrap());
+        let module_name = call_path.as_slice();
+
+        // Require import to be a valid PEP 8 module:
+        // https://python.org/dev/peps/pep-0008/#package-and-module-names
+        if module_name.iter().any(|f| !is_lower_with_underscore(f)) {
+            return None;
+        }
+
+        let content = match &stmt.node {
+            StmtKind::ImportFrom { names, .. } => unparse_stmt(
+                &create_stmt(StmtKind::ImportFrom {
+                    module: Some(module_name.join(".")),
+                    names: names.clone(),
+                    level: Some(0),
+                }),
+                stylist,
+            ),
+            _ => return None,
+        };
+
+        Some(Fix::replacement(
+            content,
+            stmt.location,
+            stmt.end_location.unwrap(),
+        ))
     } else {
-        String::new()
-    };
-
-    let mut parent = path.parent()?;
-    for _ in 0..*level? {
-        parent = parent.parent()?;
+        None
     }
-
-    let module_name = parent.file_name()?.to_string_lossy().to_string();
-
-    // Require import to be a valid PEP 8 module:
-    // https://python.org/dev/peps/pep-0008/#package-and-module-names
-    if !is_lower_with_underscore(module_name.as_str()) {
-        return None;
-    }
-
-    let new_import = if base.is_empty() {
-        module_name
-    } else {
-        format!("{}.{}", module_name, base)
-    };
-
-    let content = match &stmt.node {
-        StmtKind::ImportFrom { names, .. } => unparse_stmt(
-            &create_stmt(StmtKind::ImportFrom {
-                module: Some(new_import),
-                names: names.clone(),
-                level: Some(0),
-            }),
-            stylist,
-        ),
-        _ => return None,
-    };
-
-    Some(Fix::replacement(
-        content,
-        stmt.location,
-        stmt.end_location.unwrap(),
-    ))
 }
 
 /// TID252
@@ -143,8 +136,8 @@ pub fn banned_relative_import(
     stmt: &Stmt,
     level: Option<&usize>,
     module: Option<&str>,
+    module_path: Option<&Vec<String>>,
     strictness: &Strictness,
-    path: &Path,
 ) -> Option<Diagnostic> {
     let strictness_level = match strictness {
         Strictness::All => 0,
@@ -159,7 +152,7 @@ pub fn banned_relative_import(
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) =
-                fix_banned_relative_import(stmt, level, module, path, checker.stylist)
+                fix_banned_relative_import(stmt, level, module, module_path, checker.stylist)
             {
                 diagnostic.amend(fix);
             };
@@ -208,6 +201,23 @@ mod tests {
                     ban_relative_imports: Strictness::All,
                     ..Default::default()
                 },
+                ..Settings::for_rules(vec![Rule::RelativeImports])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ban_parent_imports_package() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_tidy_imports/TID252/my_package/sublib/api/application.py"),
+            &Settings {
+                flake8_tidy_imports: super::super::Settings {
+                    ban_relative_imports: Strictness::Parents,
+                    ..Default::default()
+                },
+                namespace_packages: vec![Path::new("my_package").to_path_buf()],
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;

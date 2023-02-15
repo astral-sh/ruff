@@ -19,7 +19,6 @@ define_violation!(
     /// Functions with a high complexity are hard to understand and maintain.
     ///
     /// ## Options
-    ///
     /// * `mccabe.max-complexity`
     ///
     /// ## Example
