@@ -4072,6 +4072,8 @@ and again draws on both the APIs and implementation details of [Rome](https://gi
 Ruff is also influenced by a number of tools outside the Python ecosystem, like
 [Clippy](https://github.com/rust-lang/rust-clippy) and [ESLint](https://github.com/eslint/eslint).
 
+Ruff is the beneficiary of a large number of [contributors](https://github.com/charliermarsh/ruff/graphs/contributors).
+
 Ruff is released under the MIT license.
 
 <!-- End section: Acknowledgements -->
