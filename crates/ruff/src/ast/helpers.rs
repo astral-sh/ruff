@@ -723,7 +723,7 @@ where
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
                 // Don't recurse.
             }
-            StmtKind::Return { value } => self.returns.push(value.as_ref().map(|expr| &**expr)),
+            StmtKind::Return { value } => self.returns.push(value.as_deref()),
             _ => visitor::walk_stmt(self, stmt),
         }
     }
