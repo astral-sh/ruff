@@ -81,7 +81,7 @@ pub fn is_simple_power(expr: &Expr) -> bool {
         }
         ExprKind::Constant { .. } => true,
         ExprKind::Name { .. } => true,
-        ExprKind::Attribute { .. } => true,
+        ExprKind::Attribute { value, .. } => is_simple_power(value),
         _ => false,
     }
 }
