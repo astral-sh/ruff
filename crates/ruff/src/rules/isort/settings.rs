@@ -125,7 +125,7 @@ pub struct Options {
             force-to-top = ["src"]
         "#
     )]
-    /// A list of modules to be the top of their appropriate section.
+    /// Force specific imports to the top of their appropriate section.
     pub force_to_top: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,

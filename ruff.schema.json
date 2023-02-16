@@ -945,7 +945,7 @@
           ]
         },
         "force-to-top": {
-          "description": "A list of modules to be the top of their appropriate section.",
+          "description": "Force specific imports to the top of their appropriate section.",
           "type": [
             "array",
             "null"

@@ -3519,7 +3519,7 @@ force-sort-within-sections = true
 
 #### [`force-to-top`](#force-to-top)
 
-A list of modules to be the top of their appropriate section.
+Force specific imports to the top of their appropriate section.
 
 **Default value**: `[]`
 
