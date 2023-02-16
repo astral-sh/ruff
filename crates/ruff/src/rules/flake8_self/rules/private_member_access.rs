@@ -44,7 +44,6 @@ define_violation!(
     ///
     /// ## References
     /// * [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
-    /// ```
     pub struct PrivateMemberAccess {
         pub access: String,
     }
