@@ -1,0 +1,9 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
+a, b = 1, 2
+c =    6  # fmt: skip
+d = 5
+

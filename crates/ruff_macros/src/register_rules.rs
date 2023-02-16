@@ -57,6 +57,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             PartialOrd,
             Ord,
             AsRefStr,
+            ::strum_macros::IntoStaticStr,
         )]
         #[strum(serialize_all = "kebab-case")]
         pub enum Rule { #rule_variants }

@@ -1,0 +1,12 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
+# The percent-percent comments are Spyder IDE cells.
+# Both `#%%`` and `# %%` are accepted, so `black` standardises
+# to the latter.
+
+# %%
+# %%
+

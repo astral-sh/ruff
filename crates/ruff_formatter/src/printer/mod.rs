@@ -24,7 +24,7 @@ use crate::printer::queue::{
     AllPredicate, FitsEndPredicate, FitsQueue, PrintQueue, Queue, SingleEntryPredicate,
 };
 use drop_bomb::DebugDropBomb;
-use ruff_rowan::{TextLen, TextSize};
+use ruff_text_size::{TextLen, TextSize};
 use std::num::NonZeroU8;
 use unicode_width::UnicodeWidthChar;
 
@@ -99,11 +99,7 @@ impl<'a> Printer<'a> {
                 text,
                 source_position,
             } => self.print_text(text, Some(*source_position)),
-            FormatElement::SyntaxTokenTextSlice {
-                slice,
-                source_position,
-            } => self.print_text(slice, Some(*source_position)),
-
+            FormatElement::StaticTextSlice { text, range } => self.print_text(&text[*range], None),
             FormatElement::Line(line_mode) => {
                 if args.mode().is_flat()
                     && matches!(line_mode, LineMode::Soft | LineMode::SoftOrSpace)
@@ -120,9 +116,8 @@ impl<'a> Printer<'a> {
                     }
 
                     // Print a second line break if this is an empty line
-                    if line_mode == &LineMode::Empty && !self.state.has_empty_line {
+                    if line_mode == &LineMode::Empty {
                         self.print_str("\n");
-                        self.state.has_empty_line = true;
                     }
 
                     self.state.pending_space = false;
@@ -643,8 +638,6 @@ impl<'a> Printer<'a> {
     fn print_str(&mut self, content: &str) {
         for char in content.chars() {
             self.print_char(char);
-
-            self.state.has_empty_line = false;
         }
     }
 
@@ -707,7 +700,6 @@ struct PrinterState<'a> {
     generated_line: usize,
     generated_column: usize,
     line_width: usize,
-    has_empty_line: bool,
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
@@ -1001,8 +993,9 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
             FormatElement::StaticText { text } => return Ok(self.fits_text(text)),
             FormatElement::DynamicText { text, .. } => return Ok(self.fits_text(text)),
-            FormatElement::SyntaxTokenTextSlice { slice, .. } => return Ok(self.fits_text(slice)),
-
+            FormatElement::StaticTextSlice { text, range } => {
+                return Ok(self.fits_text(&text[*range]))
+            }
             FormatElement::LineSuffixBoundary => {
                 if self.state.has_line_suffix {
                     return Ok(Fits::No);
@@ -1439,7 +1432,7 @@ two lines`,
     }
 
     #[test]
-    fn it_prints_consecutive_empty_lines_as_one() {
+    fn it_prints_consecutive_empty_lines_as_many() {
         let result = format(&format_args![
             text("a"),
             empty_line(),
@@ -1448,11 +1441,11 @@ two lines`,
             text("b"),
         ]);
 
-        assert_eq!("a\n\nb", result.as_code())
+        assert_eq!("a\n\n\n\nb", result.as_code())
     }
 
     #[test]
-    fn it_prints_consecutive_mixed_lines_as_one() {
+    fn it_prints_consecutive_mixed_lines_as_many() {
         let result = format(&format_args![
             text("a"),
             empty_line(),
@@ -1462,7 +1455,7 @@ two lines`,
             text("b"),
         ]);
 
-        assert_eq!("a\n\nb", result.as_code())
+        assert_eq!("a\n\n\nb", result.as_code())
     }
 
     #[test]

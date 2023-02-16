@@ -1,0 +1,19 @@
+[package]
+name = "ruff_python_formatter"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+once_cell = { workspace = true }
+ruff_formatter = { path = "../ruff_formatter" }
+ruff_text_size = { path = "../ruff_text_size" }
+rustc-hash = { workspace = true }
+rustpython-common = { workspace = true }
+rustpython-parser = { workspace = true }
+
+[dev-dependencies]
+insta = { version = "1.19.0", features = [] }
+test-case = { version = "2.2.2" }

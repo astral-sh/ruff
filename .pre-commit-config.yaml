@@ -32,7 +32,11 @@ repos:
         language: rust
         types_or: [python, pyi]
         require_serial: true
-        exclude: ^crates/ruff/resources
+        exclude: |
+          (?x)^(
+            crates/ruff/resources/.*|
+            crates/ruff_python_formatter/resources/.*
+          )$
       - id: dev-generate-all
         name: dev-generate-all
         entry: cargo dev generate-all

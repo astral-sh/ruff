@@ -1,10 +1,8 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
-use super::branch::Branch;
-use super::helpers::result_exists;
-use super::visitor::{ReturnVisitor, Stack};
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::helpers::elif_else_range;
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
@@ -13,6 +11,10 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
+
+use super::branch::Branch;
+use super::helpers::result_exists;
+use super::visitor::{ReturnVisitor, Stack};
 
 define_violation!(
     pub struct UnnecessaryReturnNone;
@@ -196,29 +198,45 @@ fn is_noreturn_func(checker: &Checker, func: &Expr) -> bool {
 }
 
 /// RET503
-fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
-    match &last_stmt.node {
+fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
+    match &stmt.node {
         StmtKind::If { body, orelse, .. } => {
-            if body.is_empty() || orelse.is_empty() {
-                checker.diagnostics.push(Diagnostic::new(
-                    ImplicitReturn,
-                    Range::from_located(last_stmt),
-                ));
-                return;
-            }
-
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);
             }
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
+            } else {
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
+                if checker.patch(diagnostic.kind.rule()) {
+                    if let Some(indent) = indentation(checker.locator, stmt) {
+                        let mut content = String::new();
+                        content.push_str(checker.stylist.line_ending().as_str());
+                        content.push_str(indent);
+                        content.push_str("return None");
+                        diagnostic.amend(Fix::insertion(content, stmt.end_location.unwrap()));
+                    }
+                }
+                checker.diagnostics.push(diagnostic);
             }
         }
-        StmtKind::For { body, orelse, .. } | StmtKind::AsyncFor { body, orelse, .. } => {
+        StmtKind::For { orelse, .. }
+        | StmtKind::AsyncFor { orelse, .. }
+        | StmtKind::While { orelse, .. } => {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
-            } else if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt);
+            } else {
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
+                if checker.patch(diagnostic.kind.rule()) {
+                    if let Some(indent) = indentation(checker.locator, stmt) {
+                        let mut content = String::new();
+                        content.push_str(checker.stylist.line_ending().as_str());
+                        content.push_str(indent);
+                        content.push_str("return None");
+                        diagnostic.amend(Fix::insertion(content, stmt.end_location.unwrap()));
+                    }
+                }
+                checker.diagnostics.push(diagnostic);
             }
         }
         StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => {
@@ -234,10 +252,7 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
                     ..
                 }
             ) => {}
-        StmtKind::Return { .. }
-        | StmtKind::While { .. }
-        | StmtKind::Raise { .. }
-        | StmtKind::Try { .. } => {}
+        StmtKind::Return { .. } | StmtKind::Raise { .. } | StmtKind::Try { .. } => {}
         StmtKind::Expr { value, .. }
             if matches!(
                 &value.node,
@@ -245,17 +260,14 @@ fn implicit_return(checker: &mut Checker, last_stmt: &Stmt) {
                     if is_noreturn_func(checker, func)
             ) => {}
         _ => {
-            let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(last_stmt));
+            let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(indent) = indentation(checker.locator, last_stmt) {
+                if let Some(indent) = indentation(checker.locator, stmt) {
                     let mut content = String::new();
+                    content.push_str(checker.stylist.line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
-                    content.push_str(checker.stylist.line_ending().as_str());
-                    diagnostic.amend(Fix::insertion(
-                        content,
-                        Location::new(last_stmt.end_location.unwrap().row() + 1, 0),
-                    ));
+                    diagnostic.amend(Fix::insertion(content, stmt.end_location.unwrap()));
                 }
             }
             checker.diagnostics.push(diagnostic);

@@ -103,3 +103,7 @@ class Foo:
     @classmethod
     def foo(cls, a: int, b: int) -> int:
         pass
+
+    # ANN101
+    def foo(self, /, a: int, b: int) -> int:
+        pass

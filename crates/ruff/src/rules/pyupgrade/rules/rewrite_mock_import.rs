@@ -143,7 +143,7 @@ fn format_import(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+    let module_text = locator.slice(&Range::from_located(stmt));
     let mut tree = match_module(module_text)?;
     let mut import = match_import(&mut tree)?;
 
@@ -177,7 +177,7 @@ fn format_import_from(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+    let module_text = locator.slice(&Range::from_located(stmt));
     let mut tree = match_module(module_text).unwrap();
     let mut import = match_import_from(&mut tree)?;
 

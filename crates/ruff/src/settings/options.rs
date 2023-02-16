@@ -70,7 +70,7 @@ pub struct Options {
     /// default expression matches `_`, `__`, and `_var`, but not `_var_`.
     pub dummy_variable_rgx: Option<String>,
     #[option(
-        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
+        default = r#"[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]"#,
         value_type = "list[str]",
         example = r#"
             exclude = [".venv"]

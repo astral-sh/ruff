@@ -71,10 +71,9 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             .rules
             .enabled(&Rule::NoBlankLineBeforeClass)
     {
-        let (before, ..) = checker.locator.partition_source_code_at(
-            &Range::from_located(parent),
-            &Range::from_located(docstring.expr),
-        );
+        let before = checker
+            .locator
+            .slice(&Range::new(parent.location, docstring.expr.location));
 
         let blank_lines_before = before
             .lines()
@@ -134,10 +133,10 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         .rules
         .enabled(&Rule::OneBlankLineAfterClass)
     {
-        let (_, _, after) = checker.locator.partition_source_code_at(
-            &Range::from_located(parent),
-            &Range::from_located(docstring.expr),
-        );
+        let after = checker.locator.slice(&Range::new(
+            docstring.expr.end_location.unwrap(),
+            parent.end_location.unwrap(),
+        ));
 
         let all_blank_after = after
             .lines()

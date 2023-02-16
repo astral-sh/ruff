@@ -6,9 +6,9 @@ use crate::printer::LineEnding;
 use crate::{format, write};
 use crate::{
     BufferExtensions, Format, FormatContext, FormatElement, FormatOptions, FormatResult, Formatter,
-    IndentStyle, LineWidth, PrinterOptions, TransformSourceMap,
+    IndentStyle, LineWidth, PrinterOptions,
 };
-use ruff_rowan::TextSize;
+use ruff_text_size::TextSize;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -81,7 +81,7 @@ impl Document {
                     }
                     FormatElement::StaticText { text } => text.contains('\n'),
                     FormatElement::DynamicText { text, .. } => text.contains('\n'),
-                    FormatElement::SyntaxTokenTextSlice { slice, .. } => slice.contains('\n'),
+                    FormatElement::StaticTextSlice { text, range } => text[*range].contains('\n'),
                     FormatElement::ExpandParent
                     | FormatElement::Line(LineMode::Hard | LineMode::Empty) => true,
                     _ => false,
@@ -142,10 +142,6 @@ impl FormatContext for IrFormatContext {
     fn options(&self) -> &Self::Options {
         &IrFormatOptions
     }
-
-    fn source_map(&self) -> Option<&TransformSourceMap> {
-        None
-    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -194,7 +190,7 @@ impl Format<IrFormatContext> for &[FormatElement] {
                 element @ FormatElement::Space
                 | element @ FormatElement::StaticText { .. }
                 | element @ FormatElement::DynamicText { .. }
-                | element @ FormatElement::SyntaxTokenTextSlice { .. } => {
+                | element @ FormatElement::StaticTextSlice { .. } => {
                     if !in_text {
                         write!(f, [text("\"")])?;
                     }

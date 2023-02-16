@@ -4,10 +4,10 @@ pub mod tag;
 use crate::format_element::tag::{LabelId, Tag};
 use std::borrow::Cow;
 
-use crate::{TagKind, TextSize};
 #[cfg(target_pointer_width = "64")]
-use ruff_rowan::static_assert;
-use ruff_rowan::SyntaxTokenText;
+use crate::static_assert;
+use crate::{TagKind, TextSize};
+use ruff_text_size::TextRange;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::rc::Rc;
@@ -38,14 +38,8 @@ pub enum FormatElement {
         source_position: TextSize,
     },
 
-    /// A token for a text that is taken as is from the source code (input text and formatted representation are identical).
-    /// Implementing by taking a slice from a `SyntaxToken` to avoid allocating a new string.
-    SyntaxTokenTextSlice {
-        /// The start position of the token in the unformatted source code
-        source_position: TextSize,
-        /// The token text
-        slice: SyntaxTokenText,
-    },
+    /// Token constructed by slicing a defined range from a static string.
+    StaticTextSlice { text: Rc<str>, range: TextRange },
 
     /// Prevents that line suffixes move past this boundary. Forces the printer to print any pending
     /// line suffixes, potentially by inserting a hard line break.
@@ -75,10 +69,9 @@ impl std::fmt::Debug for FormatElement {
             FormatElement::DynamicText { text, .. } => {
                 fmt.debug_tuple("DynamicText").field(text).finish()
             }
-            FormatElement::SyntaxTokenTextSlice { slice, .. } => fmt
-                .debug_tuple("SyntaxTokenTextSlice")
-                .field(slice)
-                .finish(),
+            FormatElement::StaticTextSlice { text, .. } => {
+                fmt.debug_tuple("Text").field(text).finish()
+            }
             FormatElement::LineSuffixBoundary => write!(fmt, "LineSuffixBoundary"),
             FormatElement::BestFitting(best_fitting) => {
                 fmt.debug_tuple("BestFitting").field(&best_fitting).finish()
@@ -224,7 +217,7 @@ impl FormatElement {
     pub const fn is_text(&self) -> bool {
         matches!(
             self,
-            FormatElement::SyntaxTokenTextSlice { .. }
+            FormatElement::StaticTextSlice { .. }
                 | FormatElement::DynamicText { .. }
                 | FormatElement::StaticText { .. }
         )
@@ -243,7 +236,7 @@ impl FormatElements for FormatElement {
             FormatElement::Line(line_mode) => matches!(line_mode, LineMode::Hard | LineMode::Empty),
             FormatElement::StaticText { text } => text.contains('\n'),
             FormatElement::DynamicText { text, .. } => text.contains('\n'),
-            FormatElement::SyntaxTokenTextSlice { slice, .. } => slice.contains('\n'),
+            FormatElement::StaticTextSlice { text, range } => text[*range].contains('\n'),
             FormatElement::Interned(interned) => interned.will_break(),
             // Traverse into the most flat version because the content is guaranteed to expand when even
             // the most flat version contains some content that forces a break.
@@ -376,7 +369,7 @@ mod tests {
 }
 
 #[cfg(target_pointer_width = "64")]
-static_assert!(std::mem::size_of::<ruff_rowan::TextRange>() == 8usize);
+static_assert!(std::mem::size_of::<ruff_text_size::TextRange>() == 8usize);
 
 #[cfg(target_pointer_width = "64")]
 static_assert!(std::mem::size_of::<crate::format_element::tag::VerbatimKind>() == 8usize);

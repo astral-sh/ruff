@@ -134,4 +134,70 @@ expression: diagnostics
     column: 57
   fix: ~
   parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: CharField
+  location:
+    row: 25
+    column: 16
+  end_location:
+    row: 25
+    column: 64
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: CharField
+  location:
+    row: 26
+    column: 16
+  end_location:
+    row: 26
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: SlugField
+  location:
+    row: 27
+    column: 16
+  end_location:
+    row: 27
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: EmailField
+  location:
+    row: 28
+    column: 17
+  end_location:
+    row: 28
+    column: 61
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: FilePathField
+  location:
+    row: 29
+    column: 20
+  end_location:
+    row: 29
+    column: 67
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: URLField
+  location:
+    row: 30
+    column: 15
+  end_location:
+    row: 30
+    column: 57
+  fix: ~
+  parent: ~
 

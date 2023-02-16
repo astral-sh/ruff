@@ -786,7 +786,7 @@ where
                 if self.settings.rules.enabled(&Rule::NullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
-                            self, bases, body,
+                            self, body,
                         ));
                 }
                 if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
@@ -900,7 +900,38 @@ where
                 }
 
                 for alias in names {
-                    if alias.node.name.contains('.') && alias.node.asname.is_none() {
+                    if alias.node.name == "__future__" {
+                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
+                        self.add_binding(
+                            name,
+                            Binding {
+                                kind: BindingKind::FutureImportation,
+                                runtime_usage: None,
+                                // Always mark `__future__` imports as used.
+                                synthetic_usage: Some((
+                                    self.scopes[*(self
+                                        .scope_stack
+                                        .last()
+                                        .expect("No current scope found"))]
+                                    .id,
+                                    Range::from_located(alias),
+                                )),
+                                typing_usage: None,
+                                range: Range::from_located(alias),
+                                source: Some(self.current_stmt().clone()),
+                                context: self.execution_context(),
+                            },
+                        );
+
+                        if self.settings.rules.enabled(&Rule::LateFutureImport)
+                            && !self.futures_allowed
+                        {
+                            self.diagnostics.push(Diagnostic::new(
+                                pyflakes::rules::LateFutureImport,
+                                Range::from_located(stmt),
+                            ));
+                        }
+                    } else if alias.node.name.contains('.') && alias.node.asname.is_none() {
                         // Given `import foo.bar`, `name` would be "foo", and `full_name` would be
                         // "foo.bar".
                         let name = alias.node.name.split('.').next().unwrap();
@@ -918,10 +949,6 @@ where
                             },
                         );
                     } else {
-                        if let Some(asname) = &alias.node.asname {
-                            self.check_builtin_shadowing(asname, stmt, false);
-                        }
-
                         // Given `import foo`, `name` and `full_name` would both be `foo`.
                         // Given `import foo as bar`, `name` would be `bar` and `full_name` would
                         // be `foo`.
@@ -957,6 +984,10 @@ where
                                 context: self.execution_context(),
                             },
                         );
+
+                        if let Some(asname) = &alias.node.asname {
+                            self.check_builtin_shadowing(asname, stmt, false);
+                        }
                     }
 
                     // flake8-debugger
@@ -1563,12 +1594,7 @@ where
                     pyflakes::rules::assert_tuple(self, stmt, test);
                 }
                 if self.settings.rules.enabled(&Rule::AssertFalse) {
-                    flake8_bugbear::rules::assert_false(
-                        self,
-                        stmt,
-                        test,
-                        msg.as_ref().map(|expr| &**expr),
-                    );
+                    flake8_bugbear::rules::assert_false(self, stmt, test, msg.as_deref());
                 }
                 if self.settings.rules.enabled(&Rule::Assert) {
                     self.diagnostics
@@ -1580,11 +1606,12 @@ where
                     }
                 }
                 if self.settings.rules.enabled(&Rule::CompositeAssertion) {
-                    if let Some(diagnostic) =
-                        flake8_pytest_style::rules::composite_condition(stmt, test)
-                    {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_pytest_style::rules::composite_condition(
+                        self,
+                        stmt,
+                        test,
+                        msg.as_deref(),
+                    );
                 }
             }
             StmtKind::With { items, body, .. } => {
@@ -1651,9 +1678,7 @@ where
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
                 if matches!(stmt.node, StmtKind::For { .. }) {
-                    if self.settings.rules.enabled(&Rule::ConvertLoopToAny)
-                        || self.settings.rules.enabled(&Rule::ConvertLoopToAll)
-                    {
+                    if self.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
@@ -1802,6 +1827,13 @@ where
                     .enabled(&Rule::UseCapitalEnvironmentVariables)
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, value);
+                }
+                if self.settings.rules.enabled(&Rule::AsyncioDanglingTask) {
+                    if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
+                        self.resolve_call_path(expr)
+                    }) {
+                        self.diagnostics.push(diagnostic);
+                    }
                 }
             }
             _ => {}
@@ -5229,10 +5261,8 @@ impl<'a> Checker<'a> {
 
                 // Extract a `Docstring` from a `Definition`.
                 let expr = definition.docstring.unwrap();
-                let contents = self
-                    .locator
-                    .slice_source_code_range(&Range::from_located(expr));
-                let indentation = self.locator.slice_source_code_range(&Range::new(
+                let contents = self.locator.slice(&Range::from_located(expr));
+                let indentation = self.locator.slice(&Range::new(
                     Location::new(expr.location.row(), 0),
                     Location::new(expr.location.row(), expr.location.column()),
                 ));

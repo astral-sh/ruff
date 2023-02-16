@@ -86,7 +86,7 @@ fn generate_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut expression = match_expression(module_text)?;
     let mut call = match_call(&mut expression)?;
 

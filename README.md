@@ -7,7 +7,6 @@
 [![image](https://img.shields.io/pypi/l/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![image](https://img.shields.io/pypi/pyversions/ruff.svg)](https://pypi.python.org/pypi/ruff)
 [![Actions status](https://github.com/charliermarsh/ruff/workflows/CI/badge.svg)](https://github.com/charliermarsh/ruff/actions)
-[![image](https://img.shields.io/date/1676394000?label=Jetbrains%20Ruff%20Webinar&logo=jetbrains)](https://info.jetbrains.com/PyCharm-Webinar-February14-2023.html)
 
 [**Discord**](https://discord.gg/c9MhzV8aU5) | [**Docs**](https://beta.ruff.rs/docs/) | [**Playground**](https://play.ruff.rs/)
 
@@ -27,7 +26,6 @@ An extremely fast Python linter, written in Rust.
 
 * ⚡️  10-100x faster than existing linters
 * 🐍  Installable via `pip`
-* 🤝  Python 3.11 compatibility
 * 🛠️  `pyproject.toml` support
 * 📦  Built-in caching, to avoid re-analyzing unchanged files
 * 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
@@ -49,10 +47,11 @@ Ruff is extremely actively developed and used in major open-source projects like
 
 * [pandas](https://github.com/pandas-dev/pandas)
 * [FastAPI](https://github.com/tiangolo/fastapi)
+* [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
 * [Apache Airflow](https://github.com/apache/airflow)
 * [SciPy](https://github.com/scipy/scipy)
-* [Bokeh](https://github.com/bokeh/bokeh)
 * [Zulip](https://github.com/zulip/zulip)
+* [Bokeh](https://github.com/bokeh/bokeh)
 * [Pydantic](https://github.com/pydantic/pydantic)
 * [Dagster](https://github.com/dagster-io/dagster)
 * [Dagger](https://github.com/dagger/dagger)
@@ -234,7 +233,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.246'
+  rev: 'v0.0.247'
   hooks:
     - id: ruff
 ```
@@ -244,7 +243,7 @@ Or, to enable autofix:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.246'
+  rev: 'v0.0.247'
   hooks:
     - id: ruff
       args: [--fix, --exit-non-zero-on-fix]
@@ -283,6 +282,7 @@ exclude = [
     ".mypy_cache",
     ".nox",
     ".pants.d",
+    ".pytype",
     ".ruff_cache",
     ".svn",
     ".tox",
@@ -819,21 +819,22 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| N801 | invalid-class-name | Class name `{name}` should use CapWords convention  |  |
-| N802 | invalid-function-name | Function name `{name}` should be lowercase |  |
+| N801 | [invalid-class-name](https://beta.ruff.rs/docs/rules/invalid-class-name/) | Class name `{name}` should use CapWords convention  |  |
+| N802 | [invalid-function-name](https://beta.ruff.rs/docs/rules/invalid-function-name/) | Function name `{name}` should be lowercase |  |
 | N803 | invalid-argument-name | Argument name `{name}` should be lowercase |  |
-| N804 | invalid-first-argument-name-for-class-method | First argument of a class method should be named `cls` |  |
-| N805 | invalid-first-argument-name-for-method | First argument of a method should be named `self` |  |
-| N806 | non-lowercase-variable-in-function | Variable `{name}` in function should be lowercase |  |
-| N807 | dunder-function-name | Function name should not start and end with `__` |  |
-| N811 | constant-imported-as-non-constant | Constant `{name}` imported as non-constant `{asname}` |  |
-| N812 | lowercase-imported-as-non-lowercase | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
-| N813 | camelcase-imported-as-lowercase | Camelcase `{name}` imported as lowercase `{asname}` |  |
-| N814 | camelcase-imported-as-constant | Camelcase `{name}` imported as constant `{asname}` |  |
+| N804 | [invalid-first-argument-name-for-class-method](https://beta.ruff.rs/docs/rules/invalid-first-argument-name-for-class-method/) | First argument of a class method should be named `cls` |  |
+| N805 | [invalid-first-argument-name-for-method](https://beta.ruff.rs/docs/rules/invalid-first-argument-name-for-method/) | First argument of a method should be named `self` |  |
+| N806 | [non-lowercase-variable-in-function](https://beta.ruff.rs/docs/rules/non-lowercase-variable-in-function/) | Variable `{name}` in function should be lowercase |  |
+| N807 | [dunder-function-name](https://beta.ruff.rs/docs/rules/dunder-function-name/) | Function name should not start and end with `__` |  |
+| N811 | [constant-imported-as-non-constant](https://beta.ruff.rs/docs/rules/constant-imported-as-non-constant/) | Constant `{name}` imported as non-constant `{asname}` |  |
+| N812 | [lowercase-imported-as-non-lowercase](https://beta.ruff.rs/docs/rules/lowercase-imported-as-non-lowercase/) | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
+| N813 | [camelcase-imported-as-lowercase](https://beta.ruff.rs/docs/rules/camelcase-imported-as-lowercase/) | Camelcase `{name}` imported as lowercase `{asname}` |  |
+| N814 | [camelcase-imported-as-constant](https://beta.ruff.rs/docs/rules/camelcase-imported-as-constant/) | Camelcase `{name}` imported as constant `{asname}` |  |
 | N815 | mixed-case-variable-in-class-scope | Variable `{name}` in class scope should not be mixedCase |  |
 | N816 | mixed-case-variable-in-global-scope | Variable `{name}` in global scope should not be mixedCase |  |
-| N817 | camelcase-imported-as-acronym | Camelcase `{name}` imported as acronym `{asname}` |  |
-| N818 | error-suffix-on-exception-name | Exception name `{name}` should be named with an Error suffix |  |
+| N817 | [camelcase-imported-as-acronym](https://beta.ruff.rs/docs/rules/camelcase-imported-as-acronym/) | CamelCase `{name}` imported as acronym `{asname}` |  |
+| N818 | [error-suffix-on-exception-name](https://beta.ruff.rs/docs/rules/error-suffix-on-exception-name/) | Exception name `{name}` should be named with an Error suffix |  |
+| N999 | [invalid-module-name](https://beta.ruff.rs/docs/rules/invalid-module-name/) | Invalid module name: '{name}' |  |
 
 ### pydocstyle (D)
 
@@ -1238,8 +1239,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT013 | incorrect-pytest-import | Found incorrect import of pytest, use simple `import pytest` instead |  |
 | PT015 | assert-always-false | Assertion always fails, replace with `pytest.fail()` |  |
 | PT016 | fail-without-message | No message passed to `pytest.fail()` |  |
-| PT017 | assert-in-except | Found assertion on exception `{name}` in except block, use `pytest.raises()` instead |  |
-| PT018 | composite-assertion | Assertion should be broken down into multiple parts |  |
+| PT017 | assert-in-except | Found assertion on exception `{name}` in `except` block, use `pytest.raises()` instead |  |
+| PT018 | [composite-assertion](https://beta.ruff.rs/docs/rules/composite-assertion/) | Assertion should be broken down into multiple parts | 🛠 |
 | PT019 | fixture-param-without-value | Fixture `{name}` without value is injected as parameter, use `@pytest.mark.usefixtures` instead |  |
 | PT020 | deprecated-yield-fixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
 | PT021 | fixture-finalizer-callback | Use `yield` instead of `request.addfinalizer` |  |
@@ -1289,7 +1290,7 @@ For more, see [flake8-self](https://pypi.org/project/flake8-self/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| SLF001 | private-member-access | Private member accessed: `{access}` |  |
+| SLF001 | [private-member-access](https://beta.ruff.rs/docs/rules/private-member-access/) | Private member accessed: `{access}` |  |
 
 ### flake8-simplify (SIM)
 
@@ -1304,8 +1305,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | SIM107 | return-in-try-except-finally | Don't use `return` in `try`/`except` and `finally` |  |
 | SIM108 | use-ternary-operator | Use ternary operator `{contents}` instead of if-else-block | 🛠 |
 | SIM109 | compare-with-tuple | Use `{replacement}` instead of multiple equality comparisons | 🛠 |
-| SIM110 | convert-loop-to-any | Use `{any}` instead of `for` loop | 🛠 |
-| SIM111 | convert-loop-to-all | Use `{all}` instead of `for` loop | 🛠 |
+| SIM110 | reimplemented-builtin | Use `{repl}` instead of `for` loop | 🛠 |
 | SIM112 | use-capital-environment-variables | Use capitalized environment variable `{expected}` instead of `{original}` | 🛠 |
 | SIM114 | [if-with-same-arms](https://beta.ruff.rs/docs/rules/if-with-same-arms/) | Combine `if` branches using logical `or` operator |  |
 | SIM115 | open-file-with-context-handler | Use context handler for opening files |  |
@@ -1505,6 +1505,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
 | RUF004 | keyword-argument-before-star-argument | Keyword argument `{name}` must come after starred arguments |  |
 | RUF005 | unpack-instead-of-concatenating-to-collection-literal | Consider `{expr}` instead of concatenation | 🛠 |
+| RUF006 | [asyncio-dangling-task](https://beta.ruff.rs/docs/rules/asyncio-dangling-task/) | Store a reference to the return value of `asyncio.{method}` |  |
 | RUF100 | unused-noqa | Unused `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
@@ -1908,6 +1909,22 @@ implemented in [pyupgrade](https://pypi.org/project/pyupgrade/) ([#827](https://
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an Issue.
 
+### What versions of Python does Ruff support?
+
+Ruff can lint code for any Python version from 3.7 onwards. However, Ruff lacks support for a few
+language features that were introduced in Python 3.10 and later. Specifically, Ruff does not
+support:
+
+- "Structural Pattern Matching" ([PEP 622](https://peps.python.org/pep-0622/)), introduced in Python 3.10.
+- "Exception Groups and except* ([PEP 654](https://www.python.org/dev/peps/pep-0654/)), introduced in Python 3.11.
+
+Support for these features is planned.
+
+Ruff does not support Python 2. Ruff _may_ run on pre-Python 3.7 code, although such versions
+are not officially supported (e.g., Ruff does _not_ respect type comments).
+
+Ruff is installable under any Python version from 3.7 onwards.
+
 ### Do I need to install Rust to use Ruff?
 
 Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
@@ -2196,7 +2213,7 @@ For more information on the glob syntax, refer to the [`globset` documentation](
 Note that you'll typically want to use
 [`extend-exclude`](#extend-exclude) to modify the excluded paths.
 
-**Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
+**Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
 
 **Type**: `list[str]`
 
@@ -3222,7 +3239,7 @@ raises-require-match-for = ["requests.RequestException"]
 #### [`avoid-escape`](#avoid-escape)
 
 Whether to avoid using single quotes if a string contains single quotes,
-or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+or vice-versa with double quotes, as per [PEP 8](https://peps.python.org/pep-0008/#string-quotes).
 This minimizes the need to escape quotation marks within strings.
 
 **Default value**: `true`
@@ -3498,6 +3515,23 @@ imports by module, independent of import style.
 ```toml
 [tool.ruff.isort]
 force-sort-within-sections = true
+```
+
+---
+
+#### [`force-to-top`](#force-to-top)
+
+Force specific imports to the top of their appropriate section.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+force-to-top = ["src"]
 ```
 
 ---
@@ -4057,6 +4091,8 @@ and again draws on both the APIs and implementation details of [Rome](https://gi
 
 Ruff is also influenced by a number of tools outside the Python ecosystem, like
 [Clippy](https://github.com/rust-lang/rust-clippy) and [ESLint](https://github.com/eslint/eslint).
+
+Ruff is the beneficiary of a large number of [contributors](https://github.com/charliermarsh/ruff/graphs/contributors).
 
 Ruff is released under the MIT license.
 

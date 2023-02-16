@@ -1,0 +1,15 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
+a, b, c = 3, 4, 5
+if (
+    a == 3
+    and b    != 9  # fmt: skip
+    and c is not None
+):
+    print("I'm good!")
+else:
+    print("I'm bad")
+

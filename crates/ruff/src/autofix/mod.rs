@@ -54,7 +54,7 @@ fn apply_fixes<'a>(
         }
 
         // Add all contents from `last_pos` to `fix.location`.
-        let slice = locator.slice_source_code_range(&Range::new(last_pos, fix.location));
+        let slice = locator.slice(&Range::new(last_pos, fix.location));
         output.push_str(slice);
 
         // Add the patch itself.
@@ -67,7 +67,7 @@ fn apply_fixes<'a>(
     }
 
     // Add the remaining content.
-    let slice = locator.slice_source_code_at(last_pos);
+    let slice = locator.skip(last_pos);
     output.push_str(slice);
 
     (output, fixed)
@@ -78,14 +78,14 @@ pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
     let mut output = String::with_capacity(locator.len());
 
     // Add all contents from `last_pos` to `fix.location`.
-    let slice = locator.slice_source_code_range(&Range::new(Location::new(1, 0), fix.location));
+    let slice = locator.slice(&Range::new(Location::new(1, 0), fix.location));
     output.push_str(slice);
 
     // Add the patch itself.
     output.push_str(&fix.content);
 
     // Add the remaining content.
-    let slice = locator.slice_source_code_at(fix.end_location);
+    let slice = locator.skip(fix.end_location);
     output.push_str(slice);
 
     output

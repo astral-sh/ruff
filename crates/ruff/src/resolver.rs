@@ -7,6 +7,7 @@ use std::sync::RwLock;
 
 use anyhow::{anyhow, bail, Result};
 use ignore::{DirEntry, WalkBuilder, WalkState};
+use itertools::Itertools;
 use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::FxHashSet;
@@ -217,7 +218,7 @@ pub fn python_files_in_path(
     processor: impl ConfigProcessor,
 ) -> Result<(Vec<Result<DirEntry, ignore::Error>>, Resolver)> {
     // Normalize every path (e.g., convert from relative to absolute).
-    let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).collect();
+    let mut paths: Vec<PathBuf> = paths.iter().map(fs::normalize_path).unique().collect();
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();

@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.246"
+version = "0.0.247"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -21,7 +21,7 @@ bisection = { version = "0.1.0" }
 bitflags = { version = "1.3.2" }
 cfg-if = { version = "1.0.0" }
 chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
-clap = { version = "4.0.1", features = ["derive", "env"] }
+clap = { workspace = true, features = ["derive", "env", "string"] }
 colored = { version = "2.0.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
