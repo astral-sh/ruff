@@ -30,11 +30,22 @@ mod tests {
     #[test_case(Rule::MixedCaseVariableInGlobalScope, Path::new("N816.py"); "N816")]
     #[test_case(Rule::CamelcaseImportedAsAcronym, Path::new("N817.py"); "N817")]
     #[test_case(Rule::ErrorSuffixOnExceptionName, Path::new("N818.py"); "N818")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/mod with spaces/__init__.py"); "N999_1")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/mod with spaces/file.py"); "N999_2")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/flake9/__init__.py"); "N999_3")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/MODULE/__init__.py"); "N999_4")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/MODULE/file.py"); "N999_5")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/mod-with-dashes/__init__.py"); "N999_6")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__init__.py"); "N999_7")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/no_module/test.txt"); "N999_8")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes.py"); "N999_9")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pep8_naming").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::Settings {
+                ..settings::Settings::for_rule(rule_code)
+            },
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())

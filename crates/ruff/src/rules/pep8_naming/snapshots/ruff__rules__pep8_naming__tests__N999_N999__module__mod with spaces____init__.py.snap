@@ -1,0 +1,16 @@
+---
+source: crates/ruff/src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    InvalidModuleName:
+      name: mod with spaces
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 0
+  fix: ~
+  parent: ~
+
