@@ -1,6 +1,7 @@
 # The percent-percent comments are Spyder IDE cells.
 
-#%%
+
+# %%
 def func():
     x = """
     a really long string
@@ -44,4 +45,4 @@ def func():
     )
 
 
-#%%
+# %%

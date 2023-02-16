@@ -62,6 +62,8 @@ def decorated1():
 # Preview.empty_lines_before_class_or_def_with_leading_comments.
 # In the current style, the user will have to split those lines by hand.
 some_instruction
+
+
 # This comment should be split from `some_instruction` by two lines but isn't.
 def g():
     ...
