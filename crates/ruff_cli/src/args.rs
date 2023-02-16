@@ -41,7 +41,7 @@ pub enum Command {
         rule: Rule,
 
         /// Output format
-        #[arg(long, value_enum, default_value = "pretty")]
+        #[arg(long, value_enum, default_value = "text")]
         format: HelpFormat,
     },
     /// List or describe the available configuration options
@@ -296,7 +296,6 @@ pub struct CheckArgs {
 pub enum HelpFormat {
     Text,
     Json,
-    Pretty,
 }
 
 #[allow(clippy::module_name_repetitions)]
