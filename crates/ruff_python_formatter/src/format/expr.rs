@@ -718,8 +718,7 @@ fn format_bin_op(
     right: &Expr,
 ) -> FormatResult<()> {
     // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators
-    let is_simple =
-        matches!(op, Operator::Pow) && (is_simple_power(left) && is_simple_power(right));
+    let is_simple = matches!(op, Operator::Pow) && is_simple_power(left) && is_simple_power(right);
 
     write!(f, [left.format()])?;
     if !is_simple {
@@ -788,7 +787,7 @@ fn format_lambda(
     body: &Expr,
 ) -> FormatResult<()> {
     write!(f, [text("lambda")])?;
-    if !args.args.is_empty() {
+    if !args.args.is_empty() || args.kwarg.is_some() || args.vararg.is_some() {
         write!(f, [space()])?;
         write!(f, [args.format()])?;
     }
