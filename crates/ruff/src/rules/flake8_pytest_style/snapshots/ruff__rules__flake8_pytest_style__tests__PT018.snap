@@ -3,7 +3,8 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: true
   location:
     row: 13
     column: 4
@@ -22,7 +23,8 @@ expression: diagnostics
       column: 39
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: true
   location:
     row: 14
     column: 4
@@ -42,7 +44,8 @@ expression: diagnostics
       column: 59
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: true
   location:
     row: 15
     column: 4
@@ -61,7 +64,8 @@ expression: diagnostics
       column: 43
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: true
   location:
     row: 16
     column: 4
@@ -80,7 +84,8 @@ expression: diagnostics
       column: 60
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: true
   location:
     row: 17
     column: 4
@@ -99,7 +104,8 @@ expression: diagnostics
       column: 43
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: true
   location:
     row: 18
     column: 4
@@ -118,7 +124,8 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: true
   location:
     row: 19
     column: 4
@@ -138,7 +145,8 @@ expression: diagnostics
       column: 63
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: true
   location:
     row: 22
     column: 4
@@ -157,7 +165,8 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: true
   location:
     row: 23
     column: 4
@@ -176,7 +185,8 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: false
   location:
     row: 26
     column: 4
@@ -186,7 +196,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: false
   location:
     row: 27
     column: 4
@@ -196,7 +207,8 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CompositeAssertion: ~
+    CompositeAssertion:
+      fixable: false
   location:
     row: 29
     column: 4

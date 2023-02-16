@@ -1237,7 +1237,7 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT013 | incorrect-pytest-import | Found incorrect import of pytest, use simple `import pytest` instead |  |
 | PT015 | assert-always-false | Assertion always fails, replace with `pytest.fail()` |  |
 | PT016 | fail-without-message | No message passed to `pytest.fail()` |  |
-| PT017 | assert-in-except | Found assertion on exception `{name}` in except block, use `pytest.raises()` instead |  |
+| PT017 | assert-in-except | Found assertion on exception `{name}` in `except` block, use `pytest.raises()` instead |  |
 | PT018 | [composite-assertion](https://beta.ruff.rs/docs/rules/composite-assertion/) | Assertion should be broken down into multiple parts | 🛠 |
 | PT019 | fixture-param-without-value | Fixture `{name}` without value is injected as parameter, use `@pytest.mark.usefixtures` instead |  |
 | PT020 | deprecated-yield-fixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
