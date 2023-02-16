@@ -29,7 +29,8 @@ mod resolve;
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 #[cfg(all(
-    any(target_os = "linux", target_os = "macos"),
+    not(target_os = "windows"),
+    not(target_os = "openbsd"),
     any(
         target_arch = "x86_64",
         target_arch = "aarch64",
