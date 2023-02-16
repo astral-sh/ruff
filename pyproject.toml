@@ -45,7 +45,3 @@ bindings = "bin"
 manifest-path = "crates/ruff_cli/Cargo.toml"
 python-source = "python"
 strip = true
-
-[tool.ruff.isort]
-force-single-line = true
-required-imports = ["from __future__ import annotations"]
