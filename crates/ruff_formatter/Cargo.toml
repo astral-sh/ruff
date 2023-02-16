@@ -1,0 +1,20 @@
+[package]
+name = "ruff_formatter"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[dependencies]
+drop_bomb = { version = "0.1.5" }
+ruff_text_size = { path = "../ruff_text_size" }
+rustc-hash = { workspace = true }
+schemars = { version = "0.8.10", optional = true }
+serde = { version = "1.0.136", features = ["derive"], optional = true }
+tracing = { version = "0.1.31", default-features = false, features = ["std"] }
+unicode-width = { version = "0.1.9" }
+
+[dev-dependencies]
+insta = { version = "1.19.0" }
+
+[features]
+serde = ["dep:serde", "schemars"]

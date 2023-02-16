@@ -26,7 +26,8 @@ impl Convention {
                 Rule::MultiLineSummarySecondLine,
                 Rule::SectionUnderlineNotOverIndented,
                 Rule::EndsInPeriod,
-                Rule::NoThisPrefix,
+                Rule::NonImperativeMood,
+                Rule::DocstringStartsWithThis,
                 Rule::NewLineAfterSectionName,
                 Rule::DashedUnderlineAfterSection,
                 Rule::SectionUnderlineAfterName,
@@ -42,7 +43,7 @@ impl Convention {
                 Rule::BlankLineAfterLastSection,
                 Rule::EndsInPunctuation,
                 Rule::SectionNameEndsInColon,
-                Rule::DocumentAllArguments,
+                Rule::UndocumentedParam,
             ],
             Convention::Pep257 => &[
                 Rule::OneBlankLineBeforeClass,
@@ -50,7 +51,7 @@ impl Convention {
                 Rule::MultiLineSummarySecondLine,
                 Rule::SectionNotOverIndented,
                 Rule::SectionUnderlineNotOverIndented,
-                Rule::NoThisPrefix,
+                Rule::DocstringStartsWithThis,
                 Rule::CapitalizeSectionName,
                 Rule::NewLineAfterSectionName,
                 Rule::DashedUnderlineAfterSection,
@@ -61,7 +62,7 @@ impl Convention {
                 Rule::BlankLineAfterLastSection,
                 Rule::EndsInPunctuation,
                 Rule::SectionNameEndsInColon,
-                Rule::DocumentAllArguments,
+                Rule::UndocumentedParam,
             ],
         }
     }

@@ -14,7 +14,7 @@ impl AlwaysAutofixableViolation for InvalidEscapeSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
         let InvalidEscapeSequence(char) = self;
-        format!("Invalid escape sequence: '\\{char}'")
+        format!("Invalid escape sequence: `\\{char}`")
     }
 
     fn autofix_title(&self) -> String {
@@ -49,7 +49,7 @@ pub fn invalid_escape_sequence(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let text = locator.slice_source_code_range(&Range::new(start, end));
+    let text = locator.slice(&Range::new(start, end));
 
     // Determine whether the string is single- or triple-quoted.
     let quote = extract_quote(text);

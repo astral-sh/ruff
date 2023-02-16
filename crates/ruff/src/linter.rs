@@ -4,6 +4,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::error;
+use rustc_hash::FxHashMap;
 use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
 
@@ -45,6 +46,8 @@ impl<T> LinterResult<T> {
         LinterResult::new(f(self.data), self.error)
     }
 }
+
+pub type FixTable = FxHashMap<&'static Rule, usize>;
 
 /// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
@@ -208,7 +211,7 @@ pub fn check_path(
             indexer.commented_lines(),
             &directives.noqa_line_for,
             settings,
-            autofix,
+            error.as_ref().map_or(autofix, |_| flags::Autofix::Disabled),
         );
     }
 
@@ -217,8 +220,8 @@ pub fn check_path(
 
 const MAX_ITERATIONS: usize = 100;
 
-/// Add any missing `#noqa` pragmas to the source code at the given `Path`.
-pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
+/// Add any missing `# noqa` pragmas to the source code at the given `Path`.
+pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings) -> Result<usize> {
     // Read the file from disk.
     let contents = fs::read_file(path)?;
 
@@ -244,7 +247,7 @@ pub fn add_noqa_to_path(path: &Path, settings: &Settings) -> Result<usize> {
         error,
     } = check_path(
         path,
-        None,
+        package,
         &contents,
         tokens,
         &locator,
@@ -341,11 +344,11 @@ pub fn lint_fix<'a>(
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
-) -> Result<(LinterResult<Vec<Message>>, Cow<'a, str>, usize)> {
+) -> Result<(LinterResult<Vec<Message>>, Cow<'a, str>, FixTable)> {
     let mut transformed = Cow::Borrowed(contents);
 
     // Track the number of fixed errors across iterations.
-    let mut fixed = 0;
+    let mut fixed = FxHashMap::default();
 
     // As an escape hatch, bail after 100 iterations.
     let mut iterations = 0;
@@ -419,7 +422,9 @@ This indicates a bug in `{}`. If you could open an issue at:
         if let Some((fixed_contents, applied)) = fix_file(&result.data, &locator) {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
-                fixed += applied;
+                for (rule, count) in applied {
+                    *fixed.entry(rule).or_default() += count;
+                }
 
                 // Store the fixed contents.
                 transformed = Cow::Owned(fixed_contents);

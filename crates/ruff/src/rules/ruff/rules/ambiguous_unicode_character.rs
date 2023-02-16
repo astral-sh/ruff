@@ -25,8 +25,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
             representant,
         } = self;
         format!(
-            "String contains ambiguous unicode character '{confusable}' (did you mean \
-             '{representant}'?)"
+            "String contains ambiguous unicode character `{confusable}` (did you mean \
+             `{representant}`?)"
         )
     }
 
@@ -35,7 +35,7 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
             confusable,
             representant,
         } = self;
-        format!("Replace '{confusable}' with '{representant}'")
+        format!("Replace `{confusable}` with `{representant}`")
     }
 }
 
@@ -53,8 +53,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
             representant,
         } = self;
         format!(
-            "Docstring contains ambiguous unicode character '{confusable}' (did you mean \
-             '{representant}'?)"
+            "Docstring contains ambiguous unicode character `{confusable}` (did you mean \
+             `{representant}`?)"
         )
     }
 
@@ -63,7 +63,7 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
             confusable,
             representant,
         } = self;
-        format!("Replace '{confusable}' with '{representant}'")
+        format!("Replace `{confusable}` with `{representant}`")
     }
 }
 
@@ -81,8 +81,8 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
             representant,
         } = self;
         format!(
-            "Comment contains ambiguous unicode character '{confusable}' (did you mean \
-             '{representant}'?)"
+            "Comment contains ambiguous unicode character `{confusable}` (did you mean \
+             `{representant}`?)"
         )
     }
 
@@ -91,7 +91,7 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
             confusable,
             representant,
         } = self;
-        format!("Replace '{confusable}' with '{representant}'")
+        format!("Replace `{confusable}` with `{representant}`")
     }
 }
 
@@ -1693,7 +1693,7 @@ pub fn ambiguous_unicode_character(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let text = locator.slice_source_code_range(&Range::new(start, end));
+    let text = locator.slice(&Range::new(start, end));
 
     let mut col_offset = 0;
     let mut row_offset = 0;

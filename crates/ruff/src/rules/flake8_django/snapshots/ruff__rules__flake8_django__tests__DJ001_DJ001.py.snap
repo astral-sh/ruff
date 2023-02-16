@@ -1,0 +1,203 @@
+---
+source: crates/ruff/src/rules/flake8_django/mod.rs
+expression: diagnostics
+---
+- kind:
+    NullableModelStringField:
+      field_name: CharField
+  location:
+    row: 7
+    column: 16
+  end_location:
+    row: 7
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: TextField
+  location:
+    row: 8
+    column: 16
+  end_location:
+    row: 8
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: SlugField
+  location:
+    row: 9
+    column: 16
+  end_location:
+    row: 9
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: EmailField
+  location:
+    row: 10
+    column: 17
+  end_location:
+    row: 10
+    column: 61
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: FilePathField
+  location:
+    row: 11
+    column: 20
+  end_location:
+    row: 11
+    column: 67
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: URLField
+  location:
+    row: 12
+    column: 15
+  end_location:
+    row: 12
+    column: 57
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: CharField
+  location:
+    row: 16
+    column: 16
+  end_location:
+    row: 16
+    column: 64
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: CharField
+  location:
+    row: 17
+    column: 16
+  end_location:
+    row: 17
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: SlugField
+  location:
+    row: 18
+    column: 16
+  end_location:
+    row: 18
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: EmailField
+  location:
+    row: 19
+    column: 17
+  end_location:
+    row: 19
+    column: 61
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: FilePathField
+  location:
+    row: 20
+    column: 20
+  end_location:
+    row: 20
+    column: 67
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: URLField
+  location:
+    row: 21
+    column: 15
+  end_location:
+    row: 21
+    column: 57
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: CharField
+  location:
+    row: 25
+    column: 16
+  end_location:
+    row: 25
+    column: 64
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: CharField
+  location:
+    row: 26
+    column: 16
+  end_location:
+    row: 26
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: SlugField
+  location:
+    row: 27
+    column: 16
+  end_location:
+    row: 27
+    column: 59
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: EmailField
+  location:
+    row: 28
+    column: 17
+  end_location:
+    row: 28
+    column: 61
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: FilePathField
+  location:
+    row: 29
+    column: 20
+  end_location:
+    row: 29
+    column: 67
+  fix: ~
+  parent: ~
+- kind:
+    NullableModelStringField:
+      field_name: URLField
+  location:
+    row: 30
+    column: 15
+  end_location:
+    row: 30
+    column: 57
+  fix: ~
+  parent: ~
+

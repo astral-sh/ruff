@@ -23,7 +23,7 @@ mod tests {
             Path::new("mccabe/C901.py"),
             &Settings {
                 mccabe: super::settings::Settings { max_complexity },
-                ..Settings::for_rules(vec![Rule::FunctionIsTooComplex])
+                ..Settings::for_rules(vec![Rule::ComplexStructure])
             },
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);

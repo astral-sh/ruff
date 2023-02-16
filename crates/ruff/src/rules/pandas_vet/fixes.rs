@@ -50,8 +50,7 @@ pub fn fix_inplace_argument(
 
         // Apply the deletion step.
         // TODO(charlie): Find a way to
-        let contents =
-            locator.slice_source_code_range(&Range::new(expr.location, expr.end_location.unwrap()));
+        let contents = locator.slice(&Range::new(expr.location, expr.end_location.unwrap()));
         let output = apply_fix(&fix_me, &Locator::new(contents));
 
         // Obtain the name prefix.

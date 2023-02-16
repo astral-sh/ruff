@@ -1,0 +1,35 @@
+---
+source: crates/ruff/src/rules/flake8_django/mod.rs
+expression: diagnostics
+---
+- kind:
+    ModelWithoutDunderStr: ~
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 18
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    ModelWithoutDunderStr: ~
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 33
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    ModelWithoutDunderStr: ~
+  location:
+    row: 36
+    column: 0
+  end_location:
+    row: 47
+    column: 16
+  fix: ~
+  parent: ~
+

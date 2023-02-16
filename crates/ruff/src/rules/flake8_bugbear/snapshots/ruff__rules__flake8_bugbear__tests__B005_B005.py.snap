@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -60,6 +60,16 @@ expression: diagnostics
   end_location:
     row: 19
     column: 18
+  fix: ~
+  parent: ~
+- kind:
+    StripWithMultiCharacters: ~
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 22
+    column: 13
   fix: ~
   parent: ~
 

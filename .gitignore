@@ -1,8 +1,6 @@
 # Local cache
 .ruff_cache
 crates/ruff/resources/test/cpython
-docs/*
-!docs/rules
 mkdocs.yml
 .overrides
 
@@ -189,3 +187,7 @@ cython_debug/
 
 # Visual Studio Code
 .vscode/
+
+# VIM
+.*.sw?
+.sw?

@@ -1,0 +1,35 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnrecognizedPlatformCheck: ~
+  location:
+    row: 7
+    column: 3
+  end_location:
+    row: 7
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    UnrecognizedPlatformCheck: ~
+  location:
+    row: 9
+    column: 3
+  end_location:
+    row: 9
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    UnrecognizedPlatformCheck: ~
+  location:
+    row: 11
+    column: 3
+  end_location:
+    row: 11
+    column: 24
+  fix: ~
+  parent: ~
+

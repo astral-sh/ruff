@@ -44,3 +44,13 @@ a: List[str] = []
 #:
 if a := 1:
     pass
+#:
+func = lambda x: x** 2 if cond else lambda x:x
+#:
+class C: ...
+#:
+def f(): ...
+#: E701:1:8 E702:1:13
+class C: ...; x = 1
+#: E701:1:8 E702:1:13
+class C: ...; ...

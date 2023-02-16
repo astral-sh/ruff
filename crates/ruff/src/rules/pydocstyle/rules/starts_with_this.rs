@@ -8,9 +8,9 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct NoThisPrefix;
+    pub struct DocstringStartsWithThis;
 );
-impl Violation for NoThisPrefix {
+impl Violation for DocstringStartsWithThis {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(r#"First word of the docstring should not be "This""#)
@@ -33,7 +33,7 @@ pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
         return;
     }
     checker.diagnostics.push(Diagnostic::new(
-        NoThisPrefix,
+        DocstringStartsWithThis,
         Range::from_located(docstring.expr),
     ));
 }

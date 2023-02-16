@@ -27,7 +27,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Build wheels - x86_64"
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         with:
           target: x86_64
           args: --release --out dist --sdist -m ./${{ env.CRATE_NAME }}/Cargo.toml
@@ -50,7 +50,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Build wheels - universal2"
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         with:
           args: --release --universal2 --out dist -m ./${{ env.CRATE_NAME }}/Cargo.toml
       - name: "Install built wheel - universal2"
@@ -76,7 +76,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Build wheels"
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           args: --release --out dist -m ./${{ env.CRATE_NAME }}/Cargo.toml
@@ -102,7 +102,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels"
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: auto
@@ -128,7 +128,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build wheels"
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: auto
@@ -166,7 +166,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Build wheels"
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
@@ -201,7 +201,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Build wheels"
-        uses: messense/maturin-action@v1
+        uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2
@@ -222,40 +222,6 @@ jobs:
           name: wheels
           path: dist
 
-  pypy:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest]
-        target: [x86_64, aarch64]
-        python-version:
-          - "3.7"
-          - "3.8"
-          - "3.9"
-        exclude:
-          - os: macos-latest
-            target: aarch64
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: pypy${{ matrix.python-version }}
-      - name: "Build wheels"
-        uses: messense/maturin-action@v1
-        with:
-          target: ${{ matrix.target }}
-          manylinux: auto
-          args: --release --out dist -i pypy${{ matrix.python-version }} -m ./${{ env.CRATE_NAME }}/Cargo.toml
-      - name: "Install built wheel"
-        if: matrix.target == 'x86_64'
-        run: |
-          pip install dist/${{ env.CRATE_NAME }}-*.whl --force-reinstall
-      - name: "Upload wheels"
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels
-          path: dist
-
   release:
     name: Release
     runs-on: ubuntu-latest
@@ -267,7 +233,6 @@ jobs:
       - linux-cross
       - musllinux
       - musllinux-cross
-      - pypy
     steps:
       - uses: actions/download-artifact@v3
         with:

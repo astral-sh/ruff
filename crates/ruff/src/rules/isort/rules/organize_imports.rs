@@ -19,14 +19,14 @@ use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// Consistency is good. Use a common convention for imports to make your code
     /// more readable and idiomatic.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// import pandas
     /// import numpy as np
@@ -83,7 +83,7 @@ pub fn organize_imports(
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
-    let indentation = locator.slice_source_code_range(&extract_indentation_range(&block.imports));
+    let indentation = locator.slice(&extract_indentation_range(&block.imports));
     let indentation = leading_space(indentation);
 
     let range = extract_range(&block.imports);
@@ -137,6 +137,7 @@ pub fn organize_imports(
         &settings.isort.variables,
         &settings.isort.no_lines_before,
         settings.isort.lines_after_imports,
+        settings.isort.lines_between_types,
         &settings.isort.forced_separate,
         settings.target_version,
     );
@@ -146,7 +147,7 @@ pub fn organize_imports(
         Location::new(range.location.row(), 0),
         Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
     );
-    let actual = locator.slice_source_code_range(&range);
+    let actual = locator.slice(&range);
     if matches_ignoring_indentation(actual, &expected) {
         None
     } else {

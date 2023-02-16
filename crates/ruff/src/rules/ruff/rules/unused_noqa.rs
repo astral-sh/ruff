@@ -21,7 +21,6 @@ impl AlwaysAutofixableViolation for UnusedNOQA {
     fn message(&self) -> String {
         let UnusedNOQA { codes } = self;
         match codes {
-            None => format!("Unused blanket `noqa` directive"),
             Some(codes) => {
                 let mut codes_by_reason = vec![];
                 if !codes.unmatched.is_empty() {
@@ -60,6 +59,7 @@ impl AlwaysAutofixableViolation for UnusedNOQA {
                     format!("Unused `noqa` directive ({})", codes_by_reason.join("; "))
                 }
             }
+            None => format!("Unused blanket `noqa` directive"),
         }
     }
 

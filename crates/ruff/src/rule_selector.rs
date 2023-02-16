@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use itertools::Itertools;
 use schemars::_serde_json::Value;
 use schemars::schema::{InstanceType, Schema, SchemaObject};
 use schemars::JsonSchema;
@@ -8,17 +9,25 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::registry::{Rule, RuleCodePrefix, RuleIter};
+use crate::codes::RuleCodePrefix;
+use crate::registry::{Linter, Rule, RuleIter, RuleNamespace};
 use crate::rule_redirects::get_redirect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
     /// All rules
     All,
+    Linter(Linter),
     Prefix {
         prefix: RuleCodePrefix,
         redirected_from: Option<&'static str>,
     },
+}
+
+impl From<Linter> for RuleSelector {
+    fn from(linter: Linter) -> Self {
+        Self::Linter(linter)
+    }
 }
 
 impl FromStr for RuleSelector {
@@ -32,9 +41,17 @@ impl FromStr for RuleSelector {
                 Some((from, target)) => (target, Some(from)),
                 None => (s, None),
             };
+
+            let (linter, code) =
+                Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+
+            if code.is_empty() {
+                return Ok(Self::Linter(linter));
+            }
+
             Ok(Self::Prefix {
-                prefix: RuleCodePrefix::from_str(s)
-                    .map_err(|_| ParseError::Unknown(s.to_string()))?,
+                prefix: RuleCodePrefix::parse(&linter, code)
+                    .map_err(|_| ParseError::Unknown(code.to_string()))?,
                 redirected_from,
             })
         }
@@ -50,10 +67,13 @@ pub enum ParseError {
 }
 
 impl RuleSelector {
-    pub fn short_code(&self) -> &'static str {
+    pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
-            RuleSelector::All => "ALL",
-            RuleSelector::Prefix { prefix, .. } => prefix.into(),
+            RuleSelector::All => ("", "ALL"),
+            RuleSelector::Prefix { prefix, .. } => {
+                (prefix.linter().common_prefix(), prefix.short_code())
+            }
+            RuleSelector::Linter(l) => (l.common_prefix(), ""),
         }
     }
 }
@@ -63,7 +83,8 @@ impl Serialize for RuleSelector {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(self.short_code())
+        let (prefix, code) = self.prefix_and_code();
+        serializer.serialize_str(&format!("{prefix}{code}"))
     }
 }
 
@@ -117,14 +138,15 @@ impl IntoIterator for &RuleSelector {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
-            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Prefix(prefix.into_iter()),
+            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.into_iter()),
+            RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.into_iter()),
         }
     }
 }
 
 pub enum RuleSelectorIter {
     All(RuleIter),
-    Prefix(std::vec::IntoIter<Rule>),
+    Vec(std::vec::IntoIter<Rule>),
 }
 
 impl Iterator for RuleSelectorIter {
@@ -133,7 +155,7 @@ impl Iterator for RuleSelectorIter {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             RuleSelectorIter::All(iter) => iter.next(),
-            RuleSelectorIter::Prefix(iter) => iter.next(),
+            RuleSelectorIter::Vec(iter) => iter.next(),
         }
     }
 }
@@ -160,7 +182,19 @@ impl JsonSchema for RuleSelector {
             instance_type: Some(InstanceType::String.into()),
             enum_values: Some(
                 std::iter::once("ALL".to_string())
-                    .chain(RuleCodePrefix::iter().map(|s| s.as_ref().to_string()))
+                    .chain(
+                        RuleCodePrefix::iter()
+                            .map(|p| {
+                                let prefix = p.linter().common_prefix();
+                                let code = p.short_code();
+                                format!("{prefix}{code}")
+                            })
+                            .chain(Linter::iter().filter_map(|l| {
+                                let prefix = l.common_prefix();
+                                (!prefix.is_empty()).then(|| prefix.to_string())
+                            }))
+                            .sorted(),
+                    )
                     .map(Value::String)
                     .collect(),
             ),
@@ -173,7 +207,18 @@ impl RuleSelector {
     pub(crate) fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
-            RuleSelector::Prefix { prefix, .. } => prefix.specificity(),
+            RuleSelector::Linter(..) => Specificity::Linter,
+            RuleSelector::Prefix { prefix, .. } => {
+                let prefix: &'static str = prefix.short_code();
+                match prefix.len() {
+                    1 => Specificity::Code1Char,
+                    2 => Specificity::Code2Chars,
+                    3 => Specificity::Code3Chars,
+                    4 => Specificity::Code4Chars,
+                    5 => Specificity::Code5Chars,
+                    _ => panic!("RuleSelector::specificity doesn't yet support codes with so many characters"),
+                }
+            }
         }
     }
 }
@@ -187,4 +232,77 @@ pub(crate) enum Specificity {
     Code3Chars,
     Code4Chars,
     Code5Chars,
+}
+
+mod clap_completion {
+    use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use strum::IntoEnumIterator;
+
+    use crate::{
+        codes::RuleCodePrefix,
+        registry::{Linter, RuleNamespace},
+        RuleSelector,
+    };
+
+    #[derive(Clone)]
+    pub struct RuleSelectorParser;
+
+    impl ValueParserFactory for RuleSelector {
+        type Parser = RuleSelectorParser;
+
+        fn value_parser() -> Self::Parser {
+            RuleSelectorParser
+        }
+    }
+
+    impl TypedValueParser for RuleSelectorParser {
+        type Value = RuleSelector;
+
+        fn parse_ref(
+            &self,
+            _cmd: &clap::Command,
+            _arg: Option<&clap::Arg>,
+            value: &std::ffi::OsStr,
+        ) -> Result<Self::Value, clap::Error> {
+            let value = value
+                .to_str()
+                .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
+
+            value
+                .parse()
+                .map_err(|e| clap::Error::raw(clap::error::ErrorKind::InvalidValue, e))
+        }
+
+        fn possible_values(
+            &self,
+        ) -> Option<Box<dyn Iterator<Item = clap::builder::PossibleValue> + '_>> {
+            Some(Box::new(
+                std::iter::once(PossibleValue::new("ALL").help("all rules")).chain(
+                    Linter::iter()
+                        .filter_map(|l| {
+                            let prefix = l.common_prefix();
+                            (!prefix.is_empty()).then(|| PossibleValue::new(prefix).help(l.name()))
+                        })
+                        .chain(RuleCodePrefix::iter().map(|p| {
+                            let prefix = p.linter().common_prefix();
+                            let code = p.short_code();
+
+                            let mut rules_iter = p.into_iter();
+                            let rule1 = rules_iter.next();
+                            let rule2 = rules_iter.next();
+
+                            let value = PossibleValue::new(format!("{prefix}{code}"));
+
+                            if rule2.is_none() {
+                                let rule1 = rule1.unwrap();
+                                let name: &'static str = rule1.into();
+                                value.help(name)
+                            } else {
+                                value
+                            }
+                        })),
+                ),
+            ))
+        }
+    }
 }

@@ -15,14 +15,14 @@ use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::violation::Violation;
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for mismatched argument types in "old-style" format strings.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// The format string is not checked at compile time, so it is easy to
     /// introduce bugs by mistyping the format string.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// print("%d" % "1")
     /// ```
@@ -245,9 +245,7 @@ fn is_valid_dict(
 /// PLE1307
 pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let content = checker
-        .locator
-        .slice_source_code_range(&Range::from_located(expr));
+    let content = checker.locator.slice(&Range::from_located(expr));
     let mut strings: Vec<(Location, Location)> = vec![];
     for (start, tok, end) in lexer::make_tokenizer_located(content, expr.location).flatten() {
         if matches!(tok, Tok::String { .. }) {
@@ -266,9 +264,7 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) 
     // Parse each string segment.
     let mut format_strings = vec![];
     for (start, end) in &strings {
-        let string = checker
-            .locator
-            .slice_source_code_range(&Range::new(*start, *end));
+        let string = checker.locator.slice(&Range::new(*start, *end));
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };

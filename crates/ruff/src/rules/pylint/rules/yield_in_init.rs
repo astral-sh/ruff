@@ -12,19 +12,27 @@ use crate::{
 };
 
 define_violation!(
-    /// ### What it does
-    /// Checks for `__init__` methods that turned into generators
-    /// via the presence of `yield` or `yield from` statements.
+    /// ## What it does
+    /// Checks for `__init__` methods that are turned into generators by the
+    /// inclusion of `yield` or `yield from` expressions.
     ///
-    /// ### Why is this bad?
-    /// Generators are not allowed in `__init__` methods.
+    /// ## Why is this bad?
+    /// The `__init__` method is the constructor for a given Python class,
+    /// responsible for initializing, rather than creating, new objects.
     ///
-    /// ### Example
+    /// The `__init__` method has to return `None`. By including a `yield` or
+    /// `yield from` expression in an `__init__`, the method will return a
+    /// generator object when called at runtime, resulting in a runtime error.
+    ///
+    /// ## Example
     /// ```python
-    /// class Foo:
-    ///     def __init__(self):
-    ///         yield 1
+    /// class InitIsGenerator:
+    ///     def __init__(self, i):
+    ///         yield i
     /// ```
+    ///
+    /// ## References
+    /// * [CodeQL: `py-init-method-is-generator`](https://codeql.github.com/codeql-query-help/python/py-init-method-is-generator/)
     pub struct YieldInInit;
 );
 

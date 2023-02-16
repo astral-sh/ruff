@@ -19,7 +19,7 @@ mod tests {
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_0.py"); "PGH003_0")]
     #[test_case(Rule::BlanketNOQA, Path::new("PGH004_0.py"); "PGH004_0")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pygrep-hooks").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),

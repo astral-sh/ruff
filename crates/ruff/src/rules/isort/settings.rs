@@ -47,7 +47,7 @@ pub struct Options {
     /// exactly one member. For example, this formatting would be retained,
     /// rather than condensing to a single line:
     ///
-    /// ```py
+    /// ```python
     /// from .utils import (
     ///     test_directory as test_directory,
     ///     test_id as test_id
@@ -146,8 +146,7 @@ pub struct Options {
         "#
     )]
     /// A list of modules to consider being a local folder.
-    /// Generally, this is reserved for relative
-    /// imports (from . import module).
+    /// Generally, this is reserved for relative imports (`from . import module`).
     pub known_local_folder: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -233,8 +232,18 @@ pub struct Options {
         "#
     )]
     /// The number of blank lines to place after imports.
-    /// -1 for automatic determination.
+    /// Use `-1` for automatic determination.
     pub lines_after_imports: Option<isize>,
+    #[option(
+        default = r#"0"#,
+        value_type = "int",
+        example = r#"
+            # Use a single line between direct and from import
+            lines-between-types = 1
+        "#
+    )]
+    /// The number of lines to place between "direct" and `import from` imports.
+    pub lines_between_types: Option<usize>,
     #[option(
         default = r#"[]"#,
         value_type = "Vec<String>",
@@ -268,6 +277,7 @@ pub struct Settings {
     pub variables: BTreeSet<String>,
     pub no_lines_before: BTreeSet<ImportType>,
     pub lines_after_imports: isize,
+    pub lines_between_types: usize,
     pub forced_separate: Vec<String>,
 }
 
@@ -292,6 +302,7 @@ impl Default for Settings {
             variables: BTreeSet::new(),
             no_lines_before: BTreeSet::new(),
             lines_after_imports: -1,
+            lines_between_types: 0,
             forced_separate: Vec::new(),
         }
     }
@@ -322,6 +333,7 @@ impl From<Options> for Settings {
             variables: BTreeSet::from_iter(options.variables.unwrap_or_default()),
             no_lines_before: BTreeSet::from_iter(options.no_lines_before.unwrap_or_default()),
             lines_after_imports: options.lines_after_imports.unwrap_or(-1),
+            lines_between_types: options.lines_between_types.unwrap_or_default(),
             forced_separate: Vec::from_iter(options.forced_separate.unwrap_or_default()),
         }
     }
@@ -348,6 +360,7 @@ impl From<Settings> for Options {
             variables: Some(settings.variables.into_iter().collect()),
             no_lines_before: Some(settings.no_lines_before.into_iter().collect()),
             lines_after_imports: Some(settings.lines_after_imports),
+            lines_between_types: Some(settings.lines_between_types),
             forced_separate: Some(settings.forced_separate.into_iter().collect()),
         }
     }

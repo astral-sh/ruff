@@ -1,9 +1,10 @@
 use anyhow::{bail, Result};
+use itertools::Itertools;
 use libcst_native::{
-    Arg, AssignEqual, Call, Codegen, CodegenState, Dict, DictComp, DictElement, Element, Expr,
-    Expression, LeftCurlyBrace, LeftParen, LeftSquareBracket, List, ListComp, Name,
-    ParenthesizableWhitespace, RightCurlyBrace, RightParen, RightSquareBracket, Set, SetComp,
-    SimpleString, SimpleWhitespace, Tuple,
+    Arg, AssignEqual, AssignTargetExpression, Call, Codegen, CodegenState, CompFor, Dict, DictComp,
+    DictElement, Element, Expr, Expression, GeneratorExp, LeftCurlyBrace, LeftParen,
+    LeftSquareBracket, List, ListComp, Name, ParenthesizableWhitespace, RightCurlyBrace,
+    RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace, Tuple,
 };
 
 use crate::ast::types::Range;
@@ -34,7 +35,7 @@ pub fn fix_unnecessary_generator_list(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -78,9 +79,10 @@ pub fn fix_unnecessary_generator_set(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
+    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -112,8 +114,18 @@ pub fn fix_unnecessary_generator_set(
     };
     tree.codegen(&mut state);
 
+    let mut content = state.to_string();
+
+    // If the expression is embedded in an f-string, surround it with spaces to avoid
+    // syntax errors.
+    if let Some(parent_element) = parent {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+            content = format!(" {content} ");
+        }
+    }
+
     Ok(Fix::replacement(
-        state.to_string(),
+        content,
         expr.location,
         expr.end_location.unwrap(),
     ))
@@ -125,8 +137,9 @@ pub fn fix_unnecessary_generator_dict(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
+    parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -175,8 +188,18 @@ pub fn fix_unnecessary_generator_dict(
     };
     tree.codegen(&mut state);
 
+    let mut content = state.to_string();
+
+    // If the expression is embedded in an f-string, surround it with spaces to avoid
+    // syntax errors.
+    if let Some(parent_element) = parent {
+        if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } = &parent_element.node {
+            content = format!(" {content} ");
+        }
+    }
+
     Ok(Fix::replacement(
-        state.to_string(),
+        content,
         expr.location,
         expr.end_location.unwrap(),
     ))
@@ -190,7 +213,7 @@ pub fn fix_unnecessary_list_comprehension_set(
 ) -> Result<Fix> {
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -234,7 +257,7 @@ pub fn fix_unnecessary_list_comprehension_dict(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -333,7 +356,7 @@ pub fn fix_unnecessary_literal_set(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let mut call = match_call(body)?;
@@ -384,7 +407,7 @@ pub fn fix_unnecessary_literal_dict(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -457,7 +480,7 @@ pub fn fix_unnecessary_collection_call(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -570,7 +593,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -629,7 +652,7 @@ pub fn fix_unnecessary_literal_within_list_call(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -691,7 +714,7 @@ pub fn fix_unnecessary_list_call(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -721,7 +744,7 @@ pub fn fix_unnecessary_call_around_sorted(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let outer_call = match_call(body)?;
@@ -742,6 +765,7 @@ pub fn fix_unnecessary_call_around_sorted(
         if outer_name.value == "list" {
             body.value = Expression::Call(inner_call.clone());
         } else {
+            // If the `reverse` argument is used
             let args = if inner_call.args.iter().any(|arg| {
                 matches!(
                     arg.keyword,
@@ -751,7 +775,46 @@ pub fn fix_unnecessary_call_around_sorted(
                     })
                 )
             }) {
-                inner_call.args.clone()
+                // Negate the `reverse` argument
+                inner_call
+                    .args
+                    .clone()
+                    .into_iter()
+                    .map(|mut arg| {
+                        if matches!(
+                            arg.keyword,
+                            Some(Name {
+                                value: "reverse",
+                                ..
+                            })
+                        ) {
+                            if let Expression::Name(ref val) = arg.value {
+                                if val.value == "True" {
+                                    // TODO: even better would be to drop the argument, as False is the default
+                                    arg.value = Expression::Name(Box::new(Name {
+                                        value: "False",
+                                        lpar: vec![],
+                                        rpar: vec![],
+                                    }));
+                                    arg
+                                } else if val.value == "False" {
+                                    arg.value = Expression::Name(Box::new(Name {
+                                        value: "True",
+                                        lpar: vec![],
+                                        rpar: vec![],
+                                    }));
+                                    arg
+                                } else {
+                                    arg
+                                }
+                            } else {
+                                arg
+                            }
+                        } else {
+                            arg
+                        }
+                    })
+                    .collect_vec()
             } else {
                 let mut args = inner_call.args.clone();
                 args.push(Arg {
@@ -802,13 +865,52 @@ pub fn fix_unnecessary_call_around_sorted(
     ))
 }
 
+/// (C414) Convert `sorted(list(foo))` to `sorted(foo)`
+pub fn fix_unnecessary_double_cast_or_process(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &rustpython_parser::ast::Expr,
+) -> Result<Fix> {
+    let module_text = locator.slice(&Range::from_located(expr));
+    let mut tree = match_module(module_text)?;
+    let body = match_expr(&mut tree)?;
+    let mut outer_call = match_call(body)?;
+    let inner_call = match &outer_call.args[..] {
+        [arg] => {
+            if let Expression::Call(call) = &arg.value {
+                &call.args
+            } else {
+                bail!("Expected Expression::Call ");
+            }
+        }
+        _ => {
+            bail!("Expected one argument in outer function call");
+        }
+    };
+
+    outer_call.args = inner_call.clone();
+
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
+    tree.codegen(&mut state);
+
+    Ok(Fix::replacement(
+        state.to_string(),
+        expr.location,
+        expr.end_location.unwrap(),
+    ))
+}
+
 /// (C416) Convert `[i for i in x]` to `list(x)`.
 pub fn fix_unnecessary_comprehension(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(expr));
+    let module_text = locator.slice(&Range::from_located(expr));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
 
@@ -874,4 +976,174 @@ pub fn fix_unnecessary_comprehension(
         expr.location,
         expr.end_location.unwrap(),
     ))
+}
+
+/// (C417) Convert `map(lambda x: x * 2, bar)` to `(x * 2 for x in bar)`.
+pub fn fix_unnecessary_map(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &rustpython_parser::ast::Expr,
+    parent: Option<&rustpython_parser::ast::Expr>,
+    kind: &str,
+) -> Result<Fix> {
+    let module_text = locator.slice(&Range::from_located(expr));
+    let mut tree = match_module(module_text)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
+
+    let (args, lambda_func) = match &arg.value {
+        Expression::Call(outer_call) => {
+            let inner_lambda = outer_call.args.first().unwrap().value.clone();
+            match &inner_lambda {
+                Expression::Lambda(..) => (outer_call.args.clone(), inner_lambda),
+                _ => {
+                    bail!("Expected a lambda function")
+                }
+            }
+        }
+        Expression::Lambda(..) => (call.args.clone(), arg.value.clone()),
+        _ => {
+            bail!("Expected a lambda or call")
+        }
+    };
+
+    let Expression::Lambda(func_body) = &lambda_func else {
+        bail!("Expected a lambda")
+    };
+
+    if args.len() == 2 {
+        if func_body.params.params.iter().any(|f| f.default.is_some()) {
+            bail!("Currently not supporting default values");
+        }
+
+        let mut args_str = func_body
+            .params
+            .params
+            .iter()
+            .map(|f| f.name.value)
+            .join(", ");
+        if args_str.is_empty() {
+            args_str = "_".to_string();
+        }
+
+        let compfor = Box::new(CompFor {
+            target: AssignTargetExpression::Name(Box::new(Name {
+                value: args_str.as_str(),
+                lpar: vec![],
+                rpar: vec![],
+            })),
+            iter: args.last().unwrap().value.clone(),
+            ifs: vec![],
+            inner_for_in: None,
+            asynchronous: None,
+            whitespace_before: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
+            whitespace_after_for: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(
+                " ",
+            )),
+            whitespace_before_in: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(
+                " ",
+            )),
+            whitespace_after_in: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
+        });
+
+        match kind {
+            "generator" => {
+                body.value = Expression::GeneratorExp(Box::new(GeneratorExp {
+                    elt: func_body.body.clone(),
+                    for_in: compfor,
+                    lpar: vec![LeftParen::default()],
+                    rpar: vec![RightParen::default()],
+                }));
+            }
+            "list" => {
+                body.value = Expression::ListComp(Box::new(ListComp {
+                    elt: func_body.body.clone(),
+                    for_in: compfor,
+                    lbracket: LeftSquareBracket::default(),
+                    rbracket: RightSquareBracket::default(),
+                    lpar: vec![],
+                    rpar: vec![],
+                }));
+            }
+            "set" => {
+                body.value = Expression::SetComp(Box::new(SetComp {
+                    elt: func_body.body.clone(),
+                    for_in: compfor,
+                    lpar: vec![],
+                    rpar: vec![],
+                    lbrace: LeftCurlyBrace::default(),
+                    rbrace: RightCurlyBrace::default(),
+                }));
+            }
+            "dict" => {
+                let (key, value) = if let Expression::Tuple(tuple) = func_body.body.as_ref() {
+                    if tuple.elements.len() != 2 {
+                        bail!("Expected two elements")
+                    }
+
+                    let Some(Element::Simple { value: key, .. }) = &tuple.elements.get(0) else {
+                        bail!(
+                            "Expected tuple to contain a key as the first element"
+                        );
+                    };
+                    let Some(Element::Simple { value, .. }) = &tuple.elements.get(1) else {
+                        bail!(
+                            "Expected tuple to contain a key as the second element"
+                        );
+                    };
+
+                    (key, value)
+                } else {
+                    bail!("Expected tuple for dict comprehension")
+                };
+
+                body.value = Expression::DictComp(Box::new(DictComp {
+                    for_in: compfor,
+                    lpar: vec![],
+                    rpar: vec![],
+                    key: Box::new(key.clone()),
+                    value: Box::new(value.clone()),
+                    lbrace: LeftCurlyBrace::default(),
+                    rbrace: RightCurlyBrace::default(),
+                    whitespace_before_colon: ParenthesizableWhitespace::default(),
+                    whitespace_after_colon: ParenthesizableWhitespace::SimpleWhitespace(
+                        SimpleWhitespace(" "),
+                    ),
+                }));
+            }
+            _ => {
+                bail!("Expected generator, list, set or dict");
+            }
+        }
+
+        let mut state = CodegenState {
+            default_newline: stylist.line_ending(),
+            default_indent: stylist.indentation(),
+            ..CodegenState::default()
+        };
+        tree.codegen(&mut state);
+
+        let mut content = state.to_string();
+
+        // If the expression is embedded in an f-string, surround it with spaces to avoid
+        // syntax errors.
+        if kind == "set" || kind == "dict" {
+            if let Some(parent_element) = parent {
+                if let &rustpython_parser::ast::ExprKind::FormattedValue { .. } =
+                    &parent_element.node
+                {
+                    content = format!(" {content} ");
+                }
+            }
+        }
+
+        Ok(Fix::replacement(
+            content,
+            expr.location,
+            expr.end_location.unwrap(),
+        ))
+    } else {
+        bail!("Should have two arguments");
+    }
 }

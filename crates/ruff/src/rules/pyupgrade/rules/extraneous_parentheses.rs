@@ -139,7 +139,7 @@ pub fn extraneous_parentheses(
                 if matches!(autofix, flags::Autofix::Enabled)
                     && settings.rules.should_fix(&Rule::ExtraneousParentheses)
                 {
-                    let contents = locator.slice_source_code_range(&Range::new(*start, *end));
+                    let contents = locator.slice(&Range::new(*start, *end));
                     diagnostic.amend(Fix::replacement(
                         contents[1..contents.len() - 1].to_string(),
                         *start,

@@ -1,0 +1,10 @@
+---
+source: src/source_code/mod.rs
+assertion_line: 0
+expression: formatted
+---
+a = "this is some code"
+b =     5  # fmt:skip
+c = 9  # fmt: skip
+d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
+

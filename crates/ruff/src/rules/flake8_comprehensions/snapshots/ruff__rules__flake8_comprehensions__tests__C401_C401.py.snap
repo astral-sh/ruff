@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_comprehensions/mod.rs
+source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -39,5 +39,59 @@ expression: diagnostics
     end_location:
       row: 4
       column: 1
+  parent: ~
+- kind:
+    UnnecessaryGeneratorSet: ~
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 48
+  fix:
+    content:
+      - " {a if a < 6 else 0  for a in range(3)} "
+    location:
+      row: 5
+      column: 7
+    end_location:
+      row: 5
+      column: 48
+  parent: ~
+- kind:
+    UnnecessaryGeneratorSet: ~
+  location:
+    row: 6
+    column: 16
+  end_location:
+    row: 6
+    column: 57
+  fix:
+    content:
+      - "{a if a < 6 else 0  for a in range(3)}"
+    location:
+      row: 6
+      column: 16
+    end_location:
+      row: 6
+      column: 57
+  parent: ~
+- kind:
+    UnnecessaryGeneratorSet: ~
+  location:
+    row: 7
+    column: 15
+  end_location:
+    row: 7
+    column: 39
+  fix:
+    content:
+      - " {a for a in range(3)} "
+    location:
+      row: 7
+      column: 15
+    end_location:
+      row: 7
+      column: 39
   parent: ~
 

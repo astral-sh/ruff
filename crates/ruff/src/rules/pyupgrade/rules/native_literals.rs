@@ -117,9 +117,7 @@ pub fn native_literals(
         // rust-python merges adjacent string/bytes literals into one node, but we can't
         // safely remove the outer call in this situation. We're following pyupgrade
         // here and skip.
-        let arg_code = checker
-            .locator
-            .slice_source_code_range(&Range::from_located(arg));
+        let arg_code = checker.locator.slice(&Range::from_located(arg));
         if lexer::make_tokenizer(arg_code)
             .flatten()
             .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))

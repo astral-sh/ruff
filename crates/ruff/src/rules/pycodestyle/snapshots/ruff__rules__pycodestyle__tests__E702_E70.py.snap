@@ -42,4 +42,24 @@ expression: diagnostics
     column: 11
   fix: ~
   parent: ~
+- kind:
+    MultipleStatementsOnOneLineSemicolon: ~
+  location:
+    row: 54
+    column: 12
+  end_location:
+    row: 54
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    MultipleStatementsOnOneLineSemicolon: ~
+  location:
+    row: 56
+    column: 12
+  end_location:
+    row: 56
+    column: 13
+  fix: ~
+  parent: ~
 

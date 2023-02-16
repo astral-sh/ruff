@@ -9,9 +9,10 @@ use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    pub struct UsePEP604Annotation;
+    // TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
+    pub struct TypingUnion;
 );
-impl AlwaysAutofixableViolation for UsePEP604Annotation {
+impl AlwaysAutofixableViolation for TypingUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `X | Y` for type annotations")
@@ -95,7 +96,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
 
     match typing_member {
         TypingMember::Optional => {
-            let mut diagnostic = Diagnostic::new(UsePEP604Annotation, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from_located(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
@@ -106,7 +107,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             checker.diagnostics.push(diagnostic);
         }
         TypingMember::Union => {
-            let mut diagnostic = Diagnostic::new(UsePEP604Annotation, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from_located(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
                     ExprKind::Slice { .. } => {
