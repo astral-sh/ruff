@@ -90,6 +90,17 @@ mod tests {
             fp.write(line)
             fp.write("\n")
 
+    text = ""
+    with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
+        while (line := next(fp)).strip() != "// ruff":
+            text += line
+        text += " "*8 + f"// {plugin}\n"
+        text += line
+        text += fp.read()
+
+    with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
+        fp.write(text)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

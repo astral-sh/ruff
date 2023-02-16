@@ -196,7 +196,8 @@ mod tests {
     use anyhow::Result;
 
     use super::{parse_files_to_codes_mapping, parse_prefix_codes, parse_strings};
-    use crate::registry::RuleCodePrefix;
+    use crate::codes;
+    use crate::registry::Linter;
     use crate::rule_selector::RuleSelector;
     use crate::settings::types::PatternPrefixPair;
 
@@ -211,19 +212,25 @@ mod tests {
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401");
-        let expected = vec![RuleCodePrefix::F401.into()];
+        let expected = vec![codes::Pyflakes::_401.into()];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401,");
-        let expected = vec![RuleCodePrefix::F401.into()];
+        let expected = vec![codes::Pyflakes::_401.into()];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401,E501");
-        let expected = vec![RuleCodePrefix::F401.into(), RuleCodePrefix::E501.into()];
+        let expected = vec![
+            codes::Pyflakes::_401.into(),
+            codes::Pycodestyle::E501.into(),
+        ];
         assert_eq!(actual, expected);
 
         let actual = parse_prefix_codes("F401, E501");
-        let expected = vec![RuleCodePrefix::F401.into(), RuleCodePrefix::E501.into()];
+        let expected = vec![
+            codes::Pyflakes::_401.into(),
+            codes::Pycodestyle::E501.into(),
+        ];
         assert_eq!(actual, expected);
     }
 
@@ -276,11 +283,11 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "locust/test/*".to_string(),
-                prefix: RuleCodePrefix::F841.into(),
+                prefix: codes::Pyflakes::_841.into(),
             },
             PatternPrefixPair {
                 pattern: "examples/*".to_string(),
-                prefix: RuleCodePrefix::F841.into(),
+                prefix: codes::Pyflakes::_841.into(),
             },
         ];
         assert_eq!(actual, expected);
@@ -296,23 +303,23 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "t/*".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
             PatternPrefixPair {
                 pattern: "setup.py".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
             PatternPrefixPair {
                 pattern: "examples/*".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
             PatternPrefixPair {
                 pattern: "docs/*".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
             PatternPrefixPair {
                 pattern: "extra/*".to_string(),
-                prefix: RuleCodePrefix::D.into(),
+                prefix: Linter::Pydocstyle.into(),
             },
         ];
         assert_eq!(actual, expected);
@@ -334,47 +341,47 @@ mod tests {
         let expected: Vec<PatternPrefixPair> = vec![
             PatternPrefixPair {
                 pattern: "scrapy/__init__.py".to_string(),
-                prefix: RuleCodePrefix::E402.into(),
+                prefix: codes::Pycodestyle::E402.into(),
             },
             PatternPrefixPair {
                 pattern: "scrapy/core/downloader/handlers/http.py".to_string(),
-                prefix: RuleCodePrefix::F401.into(),
+                prefix: codes::Pyflakes::_401.into(),
             },
             PatternPrefixPair {
                 pattern: "scrapy/http/__init__.py".to_string(),
-                prefix: RuleCodePrefix::F401.into(),
+                prefix: codes::Pyflakes::_401.into(),
             },
             PatternPrefixPair {
                 pattern: "scrapy/linkextractors/__init__.py".to_string(),
-                prefix: RuleCodePrefix::E402.into(),
+                prefix: codes::Pycodestyle::E402.into(),
             },
             PatternPrefixPair {
                 pattern: "scrapy/linkextractors/__init__.py".to_string(),
-                prefix: RuleCodePrefix::F401.into(),
+                prefix: codes::Pyflakes::_401.into(),
             },
             PatternPrefixPair {
                 pattern: "scrapy/selector/__init__.py".to_string(),
-                prefix: RuleCodePrefix::F401.into(),
+                prefix: codes::Pyflakes::_401.into(),
             },
             PatternPrefixPair {
                 pattern: "scrapy/spiders/__init__.py".to_string(),
-                prefix: RuleCodePrefix::E402.into(),
+                prefix: codes::Pycodestyle::E402.into(),
             },
             PatternPrefixPair {
                 pattern: "scrapy/spiders/__init__.py".to_string(),
-                prefix: RuleCodePrefix::F401.into(),
+                prefix: codes::Pyflakes::_401.into(),
             },
             PatternPrefixPair {
                 pattern: "scrapy/utils/url.py".to_string(),
-                prefix: RuleCodePrefix::F403.into(),
+                prefix: codes::Pyflakes::_403.into(),
             },
             PatternPrefixPair {
                 pattern: "scrapy/utils/url.py".to_string(),
-                prefix: RuleCodePrefix::F405.into(),
+                prefix: codes::Pyflakes::_405.into(),
             },
             PatternPrefixPair {
                 pattern: "tests/test_loader.py".to_string(),
-                prefix: RuleCodePrefix::E741.into(),
+                prefix: codes::Pycodestyle::E741.into(),
             },
         ];
         assert_eq!(actual, expected);

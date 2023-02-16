@@ -12,7 +12,7 @@ define_violation!(
 impl Violation for ShebangPython {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Shebang should contain \"python\"")
+        format!("Shebang should contain `python`")
     }
 }
 

@@ -38,8 +38,8 @@ use crate::rules::{
     flake8_django, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise,
     flake8_return, flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, mccabe, pandas_vet, pep8_naming, pycodestyle,
-    pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_unused_arguments, flake8_use_pathlib, mccabe, numpy, pandas_vet, pep8_naming,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -786,7 +786,7 @@ where
                 if self.settings.rules.enabled(&Rule::NullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
-                            self, bases, body,
+                            self, body,
                         ));
                 }
                 if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
@@ -1320,8 +1320,8 @@ where
                                 stmt,
                                 level.as_ref(),
                                 module.as_deref(),
+                                self.module_path.as_ref(),
                                 &self.settings.flake8_tidy_imports.ban_relative_imports,
-                                self.path,
                             )
                         {
                             self.diagnostics.push(diagnostic);
@@ -1560,12 +1560,7 @@ where
                     pyflakes::rules::assert_tuple(self, stmt, test);
                 }
                 if self.settings.rules.enabled(&Rule::AssertFalse) {
-                    flake8_bugbear::rules::assert_false(
-                        self,
-                        stmt,
-                        test,
-                        msg.as_ref().map(|expr| &**expr),
-                    );
+                    flake8_bugbear::rules::assert_false(self, stmt, test, msg.as_deref());
                 }
                 if self.settings.rules.enabled(&Rule::Assert) {
                     self.diagnostics
@@ -1577,11 +1572,12 @@ where
                     }
                 }
                 if self.settings.rules.enabled(&Rule::CompositeAssertion) {
-                    if let Some(diagnostic) =
-                        flake8_pytest_style::rules::composite_condition(stmt, test)
-                    {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_pytest_style::rules::composite_condition(
+                        self,
+                        stmt,
+                        test,
+                        msg.as_deref(),
+                    );
                 }
             }
             StmtKind::With { items, body, .. } => {
@@ -1648,9 +1644,7 @@ where
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
                 if matches!(stmt.node, StmtKind::For { .. }) {
-                    if self.settings.rules.enabled(&Rule::ConvertLoopToAny)
-                        || self.settings.rules.enabled(&Rule::ConvertLoopToAll)
-                    {
+                    if self.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
@@ -1799,6 +1793,13 @@ where
                     .enabled(&Rule::UseCapitalEnvironmentVariables)
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, value);
+                }
+                if self.settings.rules.enabled(&Rule::AsyncioDanglingTask) {
+                    if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
+                        self.resolve_call_path(expr)
+                    }) {
+                        self.diagnostics.push(diagnostic);
+                    }
                 }
             }
             _ => {}
@@ -2145,6 +2146,9 @@ where
                         if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
                             pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
+                        if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
+                            numpy::rules::deprecated_type_alias(self, expr);
+                        }
 
                         // Ex) List[...]
                         if !self.in_deferred_string_type_definition
@@ -2210,6 +2214,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
                     pyupgrade::rules::typing_text_str_alias(self, expr);
+                }
+                if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
+                    numpy::rules::deprecated_type_alias(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::RewriteMockImport) {
                     pyupgrade::rules::rewrite_mock_attribute(self, expr);
@@ -5220,10 +5227,8 @@ impl<'a> Checker<'a> {
 
                 // Extract a `Docstring` from a `Definition`.
                 let expr = definition.docstring.unwrap();
-                let contents = self
-                    .locator
-                    .slice_source_code_range(&Range::from_located(expr));
-                let indentation = self.locator.slice_source_code_range(&Range::new(
+                let contents = self.locator.slice(&Range::from_located(expr));
+                let indentation = self.locator.slice(&Range::new(
                     Location::new(expr.location.row(), 0),
                     Location::new(expr.location.row(), expr.location.column()),
                 ));

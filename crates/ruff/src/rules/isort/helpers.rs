@@ -10,7 +10,7 @@ use crate::source_code::Locator;
 /// Return `true` if a `StmtKind::ImportFrom` statement ends with a magic
 /// trailing comma.
 pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
-    let contents = locator.slice_source_code_range(&Range::from_located(stmt));
+    let contents = locator.slice(&Range::from_located(stmt));
     let mut count: usize = 0;
     let mut trailing_comma = TrailingComma::Absent;
     for (_, tok, _) in lexer::make_tokenizer(contents).flatten() {
@@ -63,7 +63,7 @@ pub fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     //   # Direct comment.
     //   def f(): pass
     let mut seen_blank = false;
-    for line in locator.slice_source_code_until(stmt.location).lines().rev() {
+    for line in locator.take(stmt.location).lines().rev() {
         let line = line.trim();
         if seen_blank {
             if line.starts_with('#') {
@@ -109,8 +109,8 @@ pub fn find_splice_location(body: &[Stmt], locator: &Locator) -> Location {
     let mut splice = match_docstring_end(body).unwrap_or_default();
 
     // Find the first token that isn't a comment or whitespace.
-    let contents = locator.slice_source_code_at(splice);
-    for (.., tok, end) in lexer::make_tokenizer(contents).flatten() {
+    let contents = locator.skip(splice);
+    for (.., tok, end) in lexer::make_tokenizer_located(contents, splice).flatten() {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
             splice = end;
         } else {

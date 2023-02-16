@@ -44,7 +44,7 @@ mod tests {
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     #[test_case(Rule::UselessSemicolon, Path::new("E70.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
@@ -77,7 +77,7 @@ mod tests {
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
     fn logical(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pycodestyle").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),

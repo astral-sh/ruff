@@ -354,8 +354,7 @@ impl<'a> ImportReplacer<'a> {
 
             let matched = ImportReplacer::format_import_from(&matched_names, target);
             let unmatched = fixes::remove_import_members(
-                self.locator
-                    .slice_source_code_range(&Range::from_located(self.stmt)),
+                self.locator.slice(&Range::from_located(self.stmt)),
                 &matched_names
                     .iter()
                     .map(|name| name.name.as_str())

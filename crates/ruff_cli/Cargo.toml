@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.246"
+version = "0.0.247"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -33,7 +33,7 @@ bincode = { version = "1.3.3" }
 bitflags = { version = "1.3.2" }
 cachedir = { version = "0.3.0" }
 chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
-clap = { version = "4.0.1", features = ["derive", "env"] }
+clap = { workspace = true, features = ["derive", "env"] }
 clap_complete_command = { version = "0.4.0" }
 clearscreen = { version = "2.0.0" }
 colored = { version = "2.0.0" }

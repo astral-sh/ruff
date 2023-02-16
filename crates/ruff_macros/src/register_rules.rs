@@ -1,28 +1,21 @@
-use std::collections::HashMap;
-
-use proc_macro2::Span;
 use quote::quote;
 use syn::parse::Parse;
-use syn::{Attribute, Ident, LitStr, Path, Token};
+use syn::{Attribute, Ident, Path, Token};
 
-pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
+pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
     let mut rule_variants = quote!();
     let mut diagnostic_kind_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_autofixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
-    let mut rule_code_match_arms = quote!();
-    let mut rule_from_code_match_arms = quote!();
     let mut diagnostic_kind_code_match_arms = quote!();
     let mut diagnostic_kind_body_match_arms = quote!();
     let mut diagnostic_kind_fixable_match_arms = quote!();
     let mut diagnostic_kind_commit_match_arms = quote!();
     let mut from_impls_for_diagnostic_kind = quote!();
 
-    for (code, path, name, attr) in &mapping.entries {
-        let code_str = LitStr::new(&code.to_string(), Span::call_site());
+    for (path, name, attr) in &input.entries {
         rule_variants.extend(quote! {
-            #[doc = #code_str]
             #(#attr)*
             #name,
         });
@@ -34,8 +27,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         rule_autofixable_match_arms
             .extend(quote! {#(#attr)* Self::#name => <#path as Violation>::AUTOFIX,});
         rule_explanation_match_arms.extend(quote! {#(#attr)* Self::#name => #path::explanation(),});
-        rule_code_match_arms.extend(quote! {#(#attr)* Self::#name => #code_str,});
-        rule_from_code_match_arms.extend(quote! {#(#attr)* #code_str => Ok(Rule::#name), });
         diagnostic_kind_code_match_arms
             .extend(quote! {#(#attr)* Self::#name(..) => &Rule::#name, });
         diagnostic_kind_body_match_arms
@@ -55,19 +46,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         });
     }
 
-    let code_to_name: HashMap<_, _> = mapping
-        .entries
-        .iter()
-        .map(|(code, _, name, _)| (code.to_string(), name))
-        .collect();
-
-    let rule_code_prefix = super::rule_code_prefix::expand(
-        &Ident::new("Rule", Span::call_site()),
-        &Ident::new("RuleCodePrefix", Span::call_site()),
-        mapping.entries.iter().map(|(code, .., attr)| (code, attr)),
-        |code| code_to_name[code],
-    );
-
     quote! {
         #[derive(
             EnumIter,
@@ -79,6 +57,7 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
             PartialOrd,
             Ord,
             AsRefStr,
+            ::strum_macros::IntoStaticStr,
         )]
         #[strum(serialize_all = "kebab-case")]
         pub enum Rule { #rule_variants }
@@ -86,11 +65,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
         pub enum DiagnosticKind { #diagnostic_kind_variants }
 
-        #[derive(thiserror::Error, Debug)]
-        pub enum FromCodeError {
-            #[error("unknown rule code")]
-            Unknown,
-        }
 
         impl Rule {
             /// Returns the format strings used to report violations of this rule.
@@ -104,17 +78,6 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
 
             pub fn autofixable(&self) -> Option<crate::violation::AutofixKind> {
                 match self { #rule_autofixable_match_arms }
-            }
-
-            pub fn code(&self) -> &'static str {
-                match self { #rule_code_match_arms }
-            }
-
-            pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
-                match code {
-                    #rule_from_code_match_arms
-                    _ => Err(FromCodeError::Unknown),
-                }
             }
         }
 
@@ -141,29 +104,24 @@ pub fn define_rule_mapping(mapping: &Mapping) -> proc_macro2::TokenStream {
         }
 
         #from_impls_for_diagnostic_kind
-
-        #rule_code_prefix
     }
 }
 
-pub struct Mapping {
-    entries: Vec<(Ident, Path, Ident, Vec<Attribute>)>,
+pub struct Input {
+    entries: Vec<(Path, Ident, Vec<Attribute>)>,
 }
 
-impl Parse for Mapping {
+impl Parse for Input {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let mut entries = Vec::new();
         while !input.is_empty() {
             // Grab the `#[cfg(...)]` attributes.
             let attrs = input.call(Attribute::parse_outer)?;
 
-            // Parse the `RuleCodePrefix::... => ...` part.
-            let code: Ident = input.parse()?;
-            let _: Token![=>] = input.parse()?;
             let path: Path = input.parse()?;
             let name = path.segments.last().unwrap().ident.clone();
             let _: Token![,] = input.parse()?;
-            entries.push((code, path, name, attrs));
+            entries.push((path, name, attrs));
         }
         Ok(Self { entries })
     }
