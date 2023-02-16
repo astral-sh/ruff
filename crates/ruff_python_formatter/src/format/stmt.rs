@@ -34,9 +34,9 @@ fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatRe
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     Ok(())
@@ -220,9 +220,9 @@ fn format_func_def(
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     write!(f, [block_indent(&format_args![block(body)])])
@@ -269,9 +269,9 @@ fn format_assign(
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     Ok(())
@@ -557,9 +557,9 @@ fn format_import_from(
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     Ok(())
@@ -606,9 +606,9 @@ fn format_expr(
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     Ok(())
