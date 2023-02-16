@@ -2804,6 +2804,11 @@ where
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
                 }
 
+                // numpy
+                if self.settings.rules.enabled(&Rule::NumpyLegacyRandom) {
+                    numpy::rules::numpy_legacy_random(self, func);
+                }
+
                 // flake8-logging-format
                 if self.settings.rules.enabled(&Rule::LoggingStringFormat)
                     || self.settings.rules.enabled(&Rule::LoggingPercentFormat)
