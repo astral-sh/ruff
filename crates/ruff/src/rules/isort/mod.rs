@@ -351,8 +351,8 @@ mod tests {
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
     #[test_case(Path::new("force_sort_within_sections.py"))]
-    #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("force_to_top.py"))]
+    #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("inline_comments.py"))]
     #[test_case(Path::new("insert_empty_lines.py"))]
@@ -392,21 +392,6 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
-                isort: super::settings::Settings {
-                    force_to_top: vec![
-                        "z".to_string(),
-                        "lib1".to_string(),
-                        "lib3".to_string(),
-                        "lib5".to_string(),
-                        "lib3.lib4".to_string(),
-                    ]
-                    .into_iter()
-                    .collect::<BTreeSet<_>>(),
-                    known_local_folder: vec!["ruff".to_string()]
-                        .into_iter()
-                        .collect::<BTreeSet<_>>(),
-                    ..super::settings::Settings::default()
-                },
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -431,6 +416,48 @@ mod tests {
     //     insta::assert_yaml_snapshot!(snapshot, diagnostics);
     //     Ok(())
     // }
+
+    #[test_case(Path::new("separate_local_folder_imports.py"))]
+    fn known_local_folder(path: &Path) -> Result<()> {
+        let snapshot = format!("known_local_folder_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_local_folder: BTreeSet::from(["ruff".to_string()]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("force_to_top.py"))]
+    fn force_to_top(path: &Path) -> Result<()> {
+        let snapshot = format!("force_to_top_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    force_to_top: BTreeSet::from([
+                        "z".to_string(),
+                        "lib1".to_string(),
+                        "lib3".to_string(),
+                        "lib5".to_string(),
+                        "lib3.lib4".to_string(),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
 
     #[test_case(Path::new("combine_as_imports.py"))]
     fn combine_as_imports(path: &Path) -> Result<()> {

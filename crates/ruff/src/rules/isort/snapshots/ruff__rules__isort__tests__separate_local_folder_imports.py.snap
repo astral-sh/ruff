@@ -15,9 +15,10 @@ expression: diagnostics
       - import os
       - import sys
       - ""
+      - import ruff
+      - ""
       - import leading_prefix
       - ""
-      - import ruff
       - from . import leading_prefix
       - ""
     location:
