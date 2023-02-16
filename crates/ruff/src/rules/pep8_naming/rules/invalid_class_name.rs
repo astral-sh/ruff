@@ -8,10 +8,11 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for class names that do not follow the [`CamelCase`] convention.
+    /// Checks for class names that do not follow the `CamelCase` convention.
     ///
     /// ## Why is this bad?
-    /// Following the `CapitalizedWords` convention for class names is recommended by [PEP8]:
+    /// [PEP 8] recommends the use of the `CapWords` (or `CamelCase`) convention
+    /// for class names:
     ///
     /// > Class names should normally use the `CapWords` convention.
     /// >
@@ -34,9 +35,7 @@ define_violation!(
     ///     pass
     /// ```
     ///
-    /// [PEP8]: https://peps.python.org/pep-0008/#class-names
-    /// [`CamelCase`]: https://en.wikipedia.org/wiki/Camel_case
-    ///
+    /// [PEP 8]: https://peps.python.org/pep-0008/#class-names
     pub struct InvalidClassName {
         pub name: String,
     }

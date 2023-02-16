@@ -8,10 +8,11 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for functions names that are following the [`snake_case`] naming convention.
+    /// Checks for functions names that do not follow the `snake_case` naming
+    /// convention.
     ///
     /// ## Why is this bad?
-    /// [PEP8] recommends that function names follow `snake_case`:
+    /// [PEP 8] recommends that function names follow `snake_case`:
     ///
     /// > Function names should be lowercase, with words separated by underscores as necessary to
     /// > improve readability. mixedCase is allowed only in contexts where that’s already the
@@ -32,8 +33,7 @@ define_violation!(
     ///     pass
     /// ```
     ///
-    /// [PEP8]: https://peps.python.org/pep-0008/#function-and-variable-names
-    /// [`snake_case`]: https://en.wikipedia.org/wiki/Snake_case
+    /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
     pub struct InvalidFunctionName {
         pub name: String,
     }

@@ -9,10 +9,12 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for class methods to have `cls` as the first argument.
+    /// Checks for class methods that use a name other than `cls` for their
+    /// first argument.
     ///
     /// ## Why is this bad?
-    /// Using `cls` as first argument for class methods is recommended by [PEP8]:
+    /// [PEP 8] recommends the use of `cls` as the first argument for all class
+    /// methods:
     ///
     /// > Always use cls for the first argument to class methods.
     /// >
@@ -41,7 +43,7 @@ define_violation!(
     ///         ...
     /// ```
     ///
-    /// [PEP8]: https://peps.python.org/pep-0008/#function-and-method-arguments
+    /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
     ///
     pub struct InvalidFirstArgumentNameForClassMethod;
 );

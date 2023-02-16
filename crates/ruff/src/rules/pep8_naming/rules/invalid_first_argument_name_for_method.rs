@@ -9,10 +9,12 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for instance methods to have `self` as the first argument.
+    /// Checks for instance methods that use a name other than `self` for their
+    /// first argument.
     ///
     /// ## Why is this bad?
-    /// Using `self` as first argument for instance methods is recommended by [PEP8]:
+    /// [PEP 8] recommends the use of `self` as first argument for all instance
+    /// methods:
     ///
     /// > Always use self for the first argument to instance methods.
     /// >
@@ -39,8 +41,7 @@ define_violation!(
     ///         ...
     /// ```
     ///
-    /// [PEP8]: https://peps.python.org/pep-0008/#function-and-method-arguments
-    ///
+    /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
     pub struct InvalidFirstArgumentNameForMethod;
 );
 impl Violation for InvalidFirstArgumentNameForMethod {

@@ -9,10 +9,10 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for non-lowercase variables in functions.
+    /// Checks for the use of non-lowercase variable names in functions.
     ///
     /// ## Why is this bad?
-    /// Variable names in functions should be lowercase as recommended by [PEP8]:
+    /// [PEP 8] recommends that all function variables use lowercase names:
     ///
     /// > Function names should be lowercase, with words separated by underscores as necessary to
     /// > improve readability. Variable names follow the same convention as function names. mixedCase
@@ -36,8 +36,7 @@ define_violation!(
     ///     return b
     /// ```
     ///
-    /// [PEP8]: https://peps.python.org/pep-0008/#function-and-variable-names
-    ///
+    /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
     pub struct NonLowercaseVariableInFunction {
         pub name: String,
     }

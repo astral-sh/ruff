@@ -9,15 +9,17 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for constant imports that are aliased as non constant.
+    /// Checks for constant imports that are aliased to non-constant-style
+    /// names.
     ///
     /// ## Why is this bad?
-    /// [PEP8] recommends naming conventions for class names,
-    /// function names, constants etc. Inconsistenct [naming styles]
-    /// between import name and the alias may lead developers to expect an import to be of another
-    /// type (e.g. a confuse class with a constant).
+    /// [PEP 8] recommends naming conventions for classes, functions,
+    /// constants, and more. The use of inconsistent naming styles between
+    /// import and alias names may lead readers to expect an import to be of
+    /// another type (e.g., confuse a Python class with a constant).
     ///
-    /// Importing aliases should thus follow the same naming conventions.
+    /// Import aliases should thus follow the same naming style as the member
+    /// being imported.
     ///
     /// ## Example
     /// ```python
@@ -29,8 +31,7 @@ define_violation!(
     /// from example import CONSTANT_VALUE
     /// ```
     ///
-    /// [PEP8]: https://peps.python.org/pep-0008/
-    /// [naming styles]: https://peps.python.org/pep-0008/#descriptive-naming-styles
+    /// [PEP 8]: https://peps.python.org/pep-0008/
     pub struct ConstantImportedAsNonConstant {
         pub name: String,
         pub asname: String,

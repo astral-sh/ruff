@@ -9,10 +9,12 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for module names that do not follow the [`snake_case`] naming convention.
+    /// Checks for module names that do not follow the `snake_case` naming
+    /// convention.
     ///
     /// ## Why is this bad?
-    /// Module names that follow the `snake_case` naming convention are recommended by [PEP8]:
+    /// [PEP 8] recommends the use of the `snake_case` naming convention for
+    /// module names:
     ///
     /// > Modules should have short, all-lowercase names. Underscores can be used in the
     /// > module name if it improves readability. Python packages should also have short,
@@ -23,12 +25,10 @@ define_violation!(
     /// > a leading underscore (e.g. `_socket`).
     ///
     /// ## Example
-    /// * Instead of `example-module-name` or `example module name`, use `example_module_name`
-    /// * Instead of `ExampleModule`, use `example_module`,
+    /// * Instead of `example-module-name` or `example module name`, use `example_module_name`.
+    /// * Instead of `ExampleModule`, use `example_module`.
     ///
-    /// [PEP8]: https://peps.python.org/pep-0008/#package-and-module-names
-    /// [`snake_case`]: https://en.wikipedia.org/wiki/Snake_case
-    ///
+    /// [PEP 8]: https://peps.python.org/pep-0008/#package-and-module-names
     pub struct InvalidModuleName {
         pub name: String,
     }

@@ -830,7 +830,7 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/) on PyPI.
 | N814 | [camelcase-imported-as-constant](https://beta.ruff.rs/docs/rules/camelcase-imported-as-constant/) | Camelcase `{name}` imported as constant `{asname}` |  |
 | N815 | mixed-case-variable-in-class-scope | Variable `{name}` in class scope should not be mixedCase |  |
 | N816 | mixed-case-variable-in-global-scope | Variable `{name}` in global scope should not be mixedCase |  |
-| N817 | [camelcase-imported-as-acronym](https://beta.ruff.rs/docs/rules/camelcase-imported-as-acronym/) | Camelcase `{name}` imported as acronym `{asname}` |  |
+| N817 | [camelcase-imported-as-acronym](https://beta.ruff.rs/docs/rules/camelcase-imported-as-acronym/) | CamelCase `{name}` imported as acronym `{asname}` |  |
 | N818 | [error-suffix-on-exception-name](https://beta.ruff.rs/docs/rules/error-suffix-on-exception-name/) | Exception name `{name}` should be named with an Error suffix |  |
 | N999 | [invalid-module-name](https://beta.ruff.rs/docs/rules/invalid-module-name/) | Invalid module name: '{name}' |  |
 
@@ -3236,7 +3236,7 @@ raises-require-match-for = ["requests.RequestException"]
 #### [`avoid-escape`](#avoid-escape)
 
 Whether to avoid using single quotes if a string contains single quotes,
-or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+or vice-versa with double quotes, as per [PEP 8](https://peps.python.org/pep-0008/#string-quotes).
 This minimizes the need to escape quotation marks within strings.
 
 **Default value**: `true`

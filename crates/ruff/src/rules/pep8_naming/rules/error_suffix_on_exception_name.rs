@@ -8,13 +8,14 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for definitions of custom exceptions without the `Error` suffix.
+    /// Checks for custom exception definitions that omit the `Error` suffix.
     ///
     /// ## Why is this bad?
-    /// The `Error` suffix is recommended by [PEP8]:
+    /// The `Error` suffix is recommended by [PEP 8]:
     ///
-    /// > Because exceptions should be classes, the class naming convention applies here. However,
-    /// > you should use the suffix `“Error”` on your exception names (if the exception actually is an error).
+    /// > Because exceptions should be classes, the class naming convention
+    /// > applies here. However, you should use the suffix `"Error"` on your
+    /// > exception names (if the exception actually is an error).
     ///
     /// ## Example
     /// ```python
@@ -28,7 +29,7 @@ define_violation!(
     ///     ...
     /// ```
     ///
-    /// [PEP8]: https://peps.python.org/pep-0008/#exception-names
+    /// [PEP 8]: https://peps.python.org/pep-0008/#exception-names
     pub struct ErrorSuffixOnExceptionName {
         pub name: String,
     }

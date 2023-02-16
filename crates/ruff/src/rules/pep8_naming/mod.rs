@@ -1,5 +1,4 @@
 //! Rules from [pep8-naming](https://pypi.org/project/pep8-naming/).
-//! Rule N999 from [flake8-module-name](https://pypi.org/project/flake8-module-name/).
 mod helpers;
 pub(crate) mod rules;
 pub mod settings;

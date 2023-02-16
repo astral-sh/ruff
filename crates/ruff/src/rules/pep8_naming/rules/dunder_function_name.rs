@@ -9,14 +9,15 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for functions with “dunder” names (i.e. names with two leading and two trailing underscores).
+    /// Checks for functions with "dunder" names (that is, names with two
+    /// leading and trailing underscores) that are not documented.
     ///
     /// ## Why is this bad?
-    /// [PEP8] recommends to only use documented
-    /// dunder methods:
+    /// [PEP 8] recommends that only documented "dunder" methods are used:
     ///
-    /// > “magic” objects or attributes that live in user-controlled namespaces. E.g. `__init__`,
-    /// > `__import__` or `__file__`. Never invent such names; only use them as documented.
+    /// > ..."magic" objects or attributes that live in user-controlled
+    /// > namespaces. E.g. `__init__`, `__import__` or `__file__`. Never invent
+    /// such names; only use them as documented.
     ///
     /// ## Example
     /// ```python
@@ -30,7 +31,7 @@ define_violation!(
     ///     pass
     /// ```
     ///
-    /// [PEP8]: https://peps.python.org/pep-0008/
+    /// [PEP 8]: https://peps.python.org/pep-0008/
     pub struct DunderFunctionName;
 );
 impl Violation for DunderFunctionName {
