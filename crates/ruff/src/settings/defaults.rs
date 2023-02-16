@@ -40,6 +40,7 @@ pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
         FilePattern::Builtin(".mypy_cache"),
         FilePattern::Builtin(".nox"),
         FilePattern::Builtin(".pants.d"),
+        FilePattern::Builtin(".pytype"),
         FilePattern::Builtin(".ruff_cache"),
         FilePattern::Builtin(".svn"),
         FilePattern::Builtin(".tox"),
