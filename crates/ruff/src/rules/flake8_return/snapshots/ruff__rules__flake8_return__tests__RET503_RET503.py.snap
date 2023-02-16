@@ -3,30 +3,45 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImplicitReturn:
-      fixable: false
+    ImplicitReturn: ~
   location:
     row: 18
     column: 4
   end_location:
     row: 19
     column: 16
-  fix: ~
+  fix:
+    content:
+      - ""
+      - "    return None"
+    location:
+      row: 19
+      column: 16
+    end_location:
+      row: 19
+      column: 16
   parent: ~
 - kind:
-    ImplicitReturn:
-      fixable: false
+    ImplicitReturn: ~
   location:
     row: 25
     column: 8
   end_location:
     row: 25
     column: 15
-  fix: ~
+  fix:
+    content:
+      - ""
+      - "        return None"
+    location:
+      row: 25
+      column: 15
+    end_location:
+      row: 25
+      column: 15
   parent: ~
 - kind:
-    ImplicitReturn:
-      fixable: true
+    ImplicitReturn: ~
   location:
     row: 34
     column: 4
@@ -35,40 +50,55 @@ expression: diagnostics
     column: 11
   fix:
     content:
-      - "    return None"
       - ""
+      - "    return None"
     location:
-      row: 35
-      column: 0
+      row: 34
+      column: 11
     end_location:
-      row: 35
-      column: 0
+      row: 34
+      column: 11
   parent: ~
 - kind:
-    ImplicitReturn:
-      fixable: false
+    ImplicitReturn: ~
   location:
-    row: 40
-    column: 8
+    row: 39
+    column: 4
   end_location:
     row: 41
     column: 20
-  fix: ~
+  fix:
+    content:
+      - ""
+      - "    return None"
+    location:
+      row: 41
+      column: 20
+    end_location:
+      row: 41
+      column: 20
   parent: ~
 - kind:
-    ImplicitReturn:
-      fixable: false
+    ImplicitReturn: ~
   location:
     row: 50
     column: 8
   end_location:
     row: 50
     column: 15
-  fix: ~
+  fix:
+    content:
+      - ""
+      - "        return None"
+    location:
+      row: 50
+      column: 15
+    end_location:
+      row: 50
+      column: 15
   parent: ~
 - kind:
-    ImplicitReturn:
-      fixable: true
+    ImplicitReturn: ~
   location:
     row: 57
     column: 4
@@ -77,18 +107,17 @@ expression: diagnostics
     column: 22
   fix:
     content:
-      - "    return None"
       - ""
+      - "    return None"
     location:
-      row: 58
-      column: 0
+      row: 57
+      column: 22
     end_location:
-      row: 58
-      column: 0
+      row: 57
+      column: 22
   parent: ~
 - kind:
-    ImplicitReturn:
-      fixable: true
+    ImplicitReturn: ~
   location:
     row: 64
     column: 4
@@ -97,13 +126,127 @@ expression: diagnostics
     column: 21
   fix:
     content:
-      - "    return None"
       - ""
+      - "    return None"
     location:
-      row: 65
-      column: 0
+      row: 64
+      column: 21
     end_location:
-      row: 65
-      column: 0
+      row: 64
+      column: 21
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 80
+    column: 4
+  end_location:
+    row: 83
+    column: 14
+  fix:
+    content:
+      - ""
+      - "    return None"
+    location:
+      row: 83
+      column: 14
+    end_location:
+      row: 83
+      column: 14
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 111
+    column: 4
+  end_location:
+    row: 114
+    column: 16
+  fix:
+    content:
+      - ""
+      - "    return None"
+    location:
+      row: 114
+      column: 16
+    end_location:
+      row: 114
+      column: 16
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 118
+    column: 4
+  end_location:
+    row: 124
+    column: 19
+  fix:
+    content:
+      - ""
+      - "    return None"
+    location:
+      row: 124
+      column: 19
+    end_location:
+      row: 124
+      column: 19
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 128
+    column: 4
+  end_location:
+    row: 131
+    column: 16
+  fix:
+    content:
+      - ""
+      - "    return None"
+    location:
+      row: 131
+      column: 16
+    end_location:
+      row: 131
+      column: 16
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 135
+    column: 4
+  end_location:
+    row: 141
+    column: 19
+  fix:
+    content:
+      - ""
+      - "    return None"
+    location:
+      row: 141
+      column: 19
+    end_location:
+      row: 141
+      column: 19
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 260
+    column: 4
+  end_location:
+    row: 261
+    column: 20
+  fix:
+    content:
+      - ""
+      - "    return None"
+    location:
+      row: 261
+      column: 20
+    end_location:
+      row: 261
+      column: 20
   parent: ~
 
