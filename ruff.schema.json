@@ -775,7 +775,7 @@
       "type": "object",
       "properties": {
         "avoid-escape": {
-          "description": "Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.",
+          "description": "Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP 8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.",
           "type": [
             "boolean",
             "null"
@@ -1666,6 +1666,9 @@
         "N816",
         "N817",
         "N818",
+        "N9",
+        "N99",
+        "N999",
         "NPY",
         "NPY0",
         "NPY00",
@@ -1874,6 +1877,7 @@
         "RUF003",
         "RUF004",
         "RUF005",
+        "RUF006",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -1921,7 +1925,6 @@
         "SIM109",
         "SIM11",
         "SIM110",
-        "SIM111",
         "SIM112",
         "SIM114",
         "SIM115",

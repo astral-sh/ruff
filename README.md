@@ -469,7 +469,7 @@ Options:
       --show-settings
           See the settings Ruff will use to lint a given Python file
   -h, --help
-          Print help (see more with '--help')
+          Print help
 
 Rule selection:
       --select <RULE_CODE>
@@ -818,21 +818,22 @@ For more, see [pep8-naming](https://pypi.org/project/pep8-naming/) on PyPI.
 
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
-| N801 | invalid-class-name | Class name `{name}` should use CapWords convention  |  |
-| N802 | invalid-function-name | Function name `{name}` should be lowercase |  |
+| N801 | [invalid-class-name](https://beta.ruff.rs/docs/rules/invalid-class-name/) | Class name `{name}` should use CapWords convention  |  |
+| N802 | [invalid-function-name](https://beta.ruff.rs/docs/rules/invalid-function-name/) | Function name `{name}` should be lowercase |  |
 | N803 | invalid-argument-name | Argument name `{name}` should be lowercase |  |
-| N804 | invalid-first-argument-name-for-class-method | First argument of a class method should be named `cls` |  |
-| N805 | invalid-first-argument-name-for-method | First argument of a method should be named `self` |  |
-| N806 | non-lowercase-variable-in-function | Variable `{name}` in function should be lowercase |  |
-| N807 | dunder-function-name | Function name should not start and end with `__` |  |
-| N811 | constant-imported-as-non-constant | Constant `{name}` imported as non-constant `{asname}` |  |
-| N812 | lowercase-imported-as-non-lowercase | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
-| N813 | camelcase-imported-as-lowercase | Camelcase `{name}` imported as lowercase `{asname}` |  |
-| N814 | camelcase-imported-as-constant | Camelcase `{name}` imported as constant `{asname}` |  |
+| N804 | [invalid-first-argument-name-for-class-method](https://beta.ruff.rs/docs/rules/invalid-first-argument-name-for-class-method/) | First argument of a class method should be named `cls` |  |
+| N805 | [invalid-first-argument-name-for-method](https://beta.ruff.rs/docs/rules/invalid-first-argument-name-for-method/) | First argument of a method should be named `self` |  |
+| N806 | [non-lowercase-variable-in-function](https://beta.ruff.rs/docs/rules/non-lowercase-variable-in-function/) | Variable `{name}` in function should be lowercase |  |
+| N807 | [dunder-function-name](https://beta.ruff.rs/docs/rules/dunder-function-name/) | Function name should not start and end with `__` |  |
+| N811 | [constant-imported-as-non-constant](https://beta.ruff.rs/docs/rules/constant-imported-as-non-constant/) | Constant `{name}` imported as non-constant `{asname}` |  |
+| N812 | [lowercase-imported-as-non-lowercase](https://beta.ruff.rs/docs/rules/lowercase-imported-as-non-lowercase/) | Lowercase `{name}` imported as non-lowercase `{asname}` |  |
+| N813 | [camelcase-imported-as-lowercase](https://beta.ruff.rs/docs/rules/camelcase-imported-as-lowercase/) | Camelcase `{name}` imported as lowercase `{asname}` |  |
+| N814 | [camelcase-imported-as-constant](https://beta.ruff.rs/docs/rules/camelcase-imported-as-constant/) | Camelcase `{name}` imported as constant `{asname}` |  |
 | N815 | mixed-case-variable-in-class-scope | Variable `{name}` in class scope should not be mixedCase |  |
 | N816 | mixed-case-variable-in-global-scope | Variable `{name}` in global scope should not be mixedCase |  |
-| N817 | camelcase-imported-as-acronym | Camelcase `{name}` imported as acronym `{asname}` |  |
-| N818 | error-suffix-on-exception-name | Exception name `{name}` should be named with an Error suffix |  |
+| N817 | [camelcase-imported-as-acronym](https://beta.ruff.rs/docs/rules/camelcase-imported-as-acronym/) | CamelCase `{name}` imported as acronym `{asname}` |  |
+| N818 | [error-suffix-on-exception-name](https://beta.ruff.rs/docs/rules/error-suffix-on-exception-name/) | Exception name `{name}` should be named with an Error suffix |  |
+| N999 | [invalid-module-name](https://beta.ruff.rs/docs/rules/invalid-module-name/) | Invalid module name: '{name}' |  |
 
 ### pydocstyle (D)
 
@@ -1237,8 +1238,8 @@ For more, see [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style
 | PT013 | incorrect-pytest-import | Found incorrect import of pytest, use simple `import pytest` instead |  |
 | PT015 | assert-always-false | Assertion always fails, replace with `pytest.fail()` |  |
 | PT016 | fail-without-message | No message passed to `pytest.fail()` |  |
-| PT017 | assert-in-except | Found assertion on exception `{name}` in except block, use `pytest.raises()` instead |  |
-| PT018 | composite-assertion | Assertion should be broken down into multiple parts |  |
+| PT017 | assert-in-except | Found assertion on exception `{name}` in `except` block, use `pytest.raises()` instead |  |
+| PT018 | [composite-assertion](https://beta.ruff.rs/docs/rules/composite-assertion/) | Assertion should be broken down into multiple parts | 🛠 |
 | PT019 | fixture-param-without-value | Fixture `{name}` without value is injected as parameter, use `@pytest.mark.usefixtures` instead |  |
 | PT020 | deprecated-yield-fixture | `@pytest.yield_fixture` is deprecated, use `@pytest.fixture` |  |
 | PT021 | fixture-finalizer-callback | Use `yield` instead of `request.addfinalizer` |  |
@@ -1303,8 +1304,7 @@ For more, see [flake8-simplify](https://pypi.org/project/flake8-simplify/) on Py
 | SIM107 | return-in-try-except-finally | Don't use `return` in `try`/`except` and `finally` |  |
 | SIM108 | use-ternary-operator | Use ternary operator `{contents}` instead of if-else-block | 🛠 |
 | SIM109 | compare-with-tuple | Use `{replacement}` instead of multiple equality comparisons | 🛠 |
-| SIM110 | convert-loop-to-any | Use `{any}` instead of `for` loop | 🛠 |
-| SIM111 | convert-loop-to-all | Use `{all}` instead of `for` loop | 🛠 |
+| SIM110 | reimplemented-builtin | Use `{repl}` instead of `for` loop | 🛠 |
 | SIM112 | use-capital-environment-variables | Use capitalized environment variable `{expected}` instead of `{original}` | 🛠 |
 | SIM114 | [if-with-same-arms](https://beta.ruff.rs/docs/rules/if-with-same-arms/) | Combine `if` branches using logical `or` operator |  |
 | SIM115 | open-file-with-context-handler | Use context handler for opening files |  |
@@ -1503,6 +1503,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | RUF003 | ambiguous-unicode-character-comment | Comment contains ambiguous unicode character `{confusable}` (did you mean `{representant}`?) | 🛠 |
 | RUF004 | keyword-argument-before-star-argument | Keyword argument `{name}` must come after starred arguments |  |
 | RUF005 | unpack-instead-of-concatenating-to-collection-literal | Consider `{expr}` instead of concatenation | 🛠 |
+| RUF006 | [asyncio-dangling-task](https://beta.ruff.rs/docs/rules/asyncio-dangling-task/) | Store a reference to the return value of `asyncio.{method}` |  |
 | RUF100 | unused-noqa | Unused `noqa` directive | 🛠 |
 
 <!-- End auto-generated sections. -->
@@ -3236,7 +3237,7 @@ raises-require-match-for = ["requests.RequestException"]
 #### [`avoid-escape`](#avoid-escape)
 
 Whether to avoid using single quotes if a string contains single quotes,
-or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+or vice-versa with double quotes, as per [PEP 8](https://peps.python.org/pep-0008/#string-quotes).
 This minimizes the need to escape quotation marks within strings.
 
 **Default value**: `true`

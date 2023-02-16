@@ -12,38 +12,20 @@ use crate::source_code::Stylist;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
-    pub struct ConvertLoopToAny {
-        pub any: String,
+    pub struct ReimplementedBuiltin {
+        pub repl: String,
     }
 );
-impl AlwaysAutofixableViolation for ConvertLoopToAny {
+impl AlwaysAutofixableViolation for ReimplementedBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertLoopToAny { any } = self;
-        format!("Use `{any}` instead of `for` loop")
+        let ReimplementedBuiltin { repl } = self;
+        format!("Use `{repl}` instead of `for` loop")
     }
 
     fn autofix_title(&self) -> String {
-        let ConvertLoopToAny { any } = self;
-        format!("Replace with `{any}`")
-    }
-}
-
-define_violation!(
-    pub struct ConvertLoopToAll {
-        pub all: String,
-    }
-);
-impl AlwaysAutofixableViolation for ConvertLoopToAll {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        let ConvertLoopToAll { all } = self;
-        format!("Use `{all}` instead of `for` loop")
-    }
-
-    fn autofix_title(&self) -> String {
-        let ConvertLoopToAll { all } = self;
-        format!("Replace with `{all}`")
+        let ReimplementedBuiltin { repl } = self;
+        format!("Replace with `{repl}`")
     }
 }
 
@@ -219,7 +201,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
         .or_else(|| sibling.and_then(|sibling| return_values_for_siblings(stmt, sibling)))
     {
         if loop_info.return_value && !loop_info.next_return_value {
-            if checker.settings.rules.enabled(&Rule::ConvertLoopToAny) {
+            if checker.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
                 let contents = return_stmt(
                     "any",
                     loop_info.test,
@@ -234,8 +216,8 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 }
 
                 let mut diagnostic = Diagnostic::new(
-                    ConvertLoopToAny {
-                        any: contents.clone(),
+                    ReimplementedBuiltin {
+                        repl: contents.clone(),
                     },
                     Range::from_located(stmt),
                 );
@@ -251,7 +233,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
         }
 
         if !loop_info.return_value && loop_info.next_return_value {
-            if checker.settings.rules.enabled(&Rule::ConvertLoopToAll) {
+            if checker.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
                 // Invert the condition.
                 let test = {
                     if let ExprKind::UnaryOp {
@@ -311,8 +293,8 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 }
 
                 let mut diagnostic = Diagnostic::new(
-                    ConvertLoopToAll {
-                        all: contents.clone(),
+                    ReimplementedBuiltin {
+                        repl: contents.clone(),
                     },
                     Range::from_located(stmt),
                 );

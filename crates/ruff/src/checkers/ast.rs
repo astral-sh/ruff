@@ -1572,11 +1572,12 @@ where
                     }
                 }
                 if self.settings.rules.enabled(&Rule::CompositeAssertion) {
-                    if let Some(diagnostic) =
-                        flake8_pytest_style::rules::composite_condition(stmt, test)
-                    {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_pytest_style::rules::composite_condition(
+                        self,
+                        stmt,
+                        test,
+                        msg.as_deref(),
+                    );
                 }
             }
             StmtKind::With { items, body, .. } => {
@@ -1643,9 +1644,7 @@ where
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
                 if matches!(stmt.node, StmtKind::For { .. }) {
-                    if self.settings.rules.enabled(&Rule::ConvertLoopToAny)
-                        || self.settings.rules.enabled(&Rule::ConvertLoopToAll)
-                    {
+                    if self.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
@@ -1794,6 +1793,13 @@ where
                     .enabled(&Rule::UseCapitalEnvironmentVariables)
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, value);
+                }
+                if self.settings.rules.enabled(&Rule::AsyncioDanglingTask) {
+                    if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
+                        self.resolve_call_path(expr)
+                    }) {
+                        self.diagnostics.push(diagnostic);
+                    }
                 }
             }
             _ => {}

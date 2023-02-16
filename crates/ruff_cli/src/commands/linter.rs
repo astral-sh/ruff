@@ -63,24 +63,6 @@ pub fn linter(format: HelpFormat) -> Result<()> {
             output.push_str(&serde_json::to_string_pretty(&linters)?);
             output.push('\n');
         }
-
-        HelpFormat::Pretty => {
-            output.push_str(&format!("| {:>6} | {:<27} |\n", "Prefix", "Name"));
-            output.push_str(&format!("| {:>6} | {:<27} |\n", "------", "-".repeat(27)));
-
-            for linter in Linter::iter() {
-                let prefix = match linter.common_prefix() {
-                    "" => linter
-                        .upstream_categories()
-                        .unwrap()
-                        .iter()
-                        .map(|UpstreamCategory(prefix, ..)| prefix.short_code())
-                        .join("/"),
-                    prefix => prefix.to_string(),
-                };
-                output.push_str(&format!("| {:>6} | {:<27} |\n", prefix, linter.name()));
-            }
-        }
     }
 
     write!(stdout, "{output}")?;

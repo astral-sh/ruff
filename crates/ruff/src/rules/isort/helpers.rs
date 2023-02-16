@@ -110,7 +110,7 @@ pub fn find_splice_location(body: &[Stmt], locator: &Locator) -> Location {
 
     // Find the first token that isn't a comment or whitespace.
     let contents = locator.skip(splice);
-    for (.., tok, end) in lexer::make_tokenizer(contents).flatten() {
+    for (.., tok, end) in lexer::make_tokenizer_located(contents, splice).flatten() {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
             splice = end;
         } else {
