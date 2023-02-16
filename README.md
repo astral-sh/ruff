@@ -1494,7 +1494,7 @@ For more, see [tryceratops](https://pypi.org/project/tryceratops/1.1.0/) on PyPI
 | Code | Name | Message | Fix |
 | ---- | ---- | ------- | --- |
 | NPY001 | [numpy-deprecated-type-alias](https://beta.ruff.rs/docs/rules/numpy-deprecated-type-alias/) | Type alias `np.{type_name}` is deprecated, replace with builtin type | 🛠 |
-| NPY002 | [numpy-legacy-random](https://beta.ruff.rs/docs/rules/numpy-legacy-random/) | Using legacy method `np.random.{method_name}`, replace with the new random number generator |  |
+| NPY002 | [numpy-legacy-random](https://beta.ruff.rs/docs/rules/numpy-legacy-random/) | Replace legacy `np.random.{method_name}` call with `np.random.Generator` |  |
 
 ### Ruff-specific rules (RUF)
 

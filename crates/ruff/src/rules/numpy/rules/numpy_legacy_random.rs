@@ -8,23 +8,25 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks for legacy NumPy random functions.
+    /// Checks for the use of legacy `np.random` function calls.
     ///
     /// ## Why is this bad?
-    /// According to the NumPy documentation the [Legacy Random Generation]:
-    /// > The `RandomState` provides access to legacy generators. This generator is considered frozen and will
-    /// > have no further improvements. It is guaranteed to produce the same values as the final point release
-    /// > of NumPy v1.16. These all depend on Box-Muller normals or inverse CDF exponentials or gammas. This class
-    /// > should only be used if it is essential to have randoms that are identical to what would have been produced
-    /// > by previous versions of NumPy.
+    /// According to the NumPy documentation's [Legacy Random Generation]:
     ///
-    /// This is a convenience, legacy function that exists to support older code that uses the singleton `RandomState`.
-    /// Best practice is to use a dedicated `Generator` instance rather than the random variate generation methods
-    /// exposed directly in the random module.
+    /// > The `RandomState` provides access to legacy generators... This class
+    /// > should only be used if it is essential to have randoms that are
+    /// > identical to what would have been produced by previous versions of
+    /// > NumPy.
     ///
-    /// The new `Generator` uses bits provided by `PCG64` which by default has better statistical properties than the
-    /// legacy `MT19937` used in `RandomState`. See the documentation on [Random Sampling] and [NEP 19] for further details.
+    /// The members exposed directly on the `random` module are convenience
+    /// functions that alias to methods on a global singleton `RandomState`
+    /// instance. NumPy recommends using a dedicated `Generator` instance
+    /// rather than the random variate generation methods exposed directly on
+    /// the `random` module, as the new `Generator` is both faster and has
+    /// better statistical properties.
     ///
+    /// See the documentation on [Random Sampling] and [NEP 19] for further
+    /// details.
     ///
     /// ## Examples
     /// ```python
@@ -51,7 +53,7 @@ impl Violation for NumpyLegacyRandom {
     #[derive_message_formats]
     fn message(&self) -> String {
         let NumpyLegacyRandom { method_name } = self;
-        format!("Using legacy method `np.random.{method_name}`, replace with the new random number generator")
+        format!("Replace legacy `np.random.{method_name}` call with `np.random.Generator`")
     }
 }
 
