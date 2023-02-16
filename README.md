@@ -282,6 +282,7 @@ exclude = [
     ".mypy_cache",
     ".nox",
     ".pants.d",
+    ".pytype",
     ".ruff_cache",
     ".svn",
     ".tox",
@@ -2211,7 +2212,7 @@ For more information on the glob syntax, refer to the [`globset` documentation](
 Note that you'll typically want to use
 [`extend-exclude`](#extend-exclude) to modify the excluded paths.
 
-**Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
+**Default value**: `[".bzr", ".direnv", ".eggs", ".git", ".hg", ".mypy_cache", ".nox", ".pants.d", ".pytype", ".ruff_cache", ".svn", ".tox", ".venv", "__pypackages__", "_build", "buck-out", "build", "dist", "node_modules", "venv"]`
 
 **Type**: `list[str]`
 
