@@ -3517,6 +3517,23 @@ force-sort-within-sections = true
 
 ---
 
+#### [`force-to-top`](#force-to-top)
+
+Force specific imports to the top of their appropriate section.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+```toml
+[tool.ruff.isort]
+force-to-top = ["src"]
+```
+
+---
+
 #### [`force-wrap-aliases`](#force-wrap-aliases)
 
 Force `import from` statements with multiple members and at least one

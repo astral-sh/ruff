@@ -122,6 +122,15 @@ pub struct Options {
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
+            force-to-top = ["src"]
+        "#
+    )]
+    /// Force specific imports to the top of their appropriate section.
+    pub force_to_top: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
             known-first-party = ["src"]
         "#
     )]
@@ -265,6 +274,7 @@ pub struct Settings {
     pub force_single_line: bool,
     pub force_sort_within_sections: bool,
     pub force_wrap_aliases: bool,
+    pub force_to_top: BTreeSet<String>,
     pub known_first_party: BTreeSet<String>,
     pub known_third_party: BTreeSet<String>,
     pub known_local_folder: BTreeSet<String>,
@@ -290,6 +300,7 @@ impl Default for Settings {
             force_single_line: false,
             force_sort_within_sections: false,
             force_wrap_aliases: false,
+            force_to_top: BTreeSet::new(),
             known_first_party: BTreeSet::new(),
             known_third_party: BTreeSet::new(),
             known_local_folder: BTreeSet::new(),
@@ -319,6 +330,7 @@ impl From<Options> for Settings {
             force_single_line: options.force_single_line.unwrap_or(false),
             force_sort_within_sections: options.force_sort_within_sections.unwrap_or(false),
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
+            force_to_top: BTreeSet::from_iter(options.force_to_top.unwrap_or_default()),
             known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
             known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
             known_local_folder: BTreeSet::from_iter(options.known_local_folder.unwrap_or_default()),
@@ -348,6 +360,7 @@ impl From<Settings> for Options {
             force_single_line: Some(settings.force_single_line),
             force_sort_within_sections: Some(settings.force_sort_within_sections),
             force_wrap_aliases: Some(settings.force_wrap_aliases),
+            force_to_top: Some(settings.force_to_top.into_iter().collect()),
             known_first_party: Some(settings.known_first_party.into_iter().collect()),
             known_third_party: Some(settings.known_third_party.into_iter().collect()),
             known_local_folder: Some(settings.known_local_folder.into_iter().collect()),
