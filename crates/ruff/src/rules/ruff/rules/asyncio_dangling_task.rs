@@ -50,7 +50,7 @@ define_violation!(
     ///
     /// ## References
     /// * [_The Heisenbug lurking in your async code_](https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/)
-    /// * [`asyncio.create_task`](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
+    /// * [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
     pub struct AsyncioDanglingTask {
         pub method: Method,
     }
