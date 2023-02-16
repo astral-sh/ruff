@@ -6,13 +6,24 @@ def test_ok():
     assert something or something_else
     assert something or something_else and something_third
     assert not (something and something_else)
-
+    assert something, "something message"
+    assert something or something_else and something_third, "another message"
 
 def test_error():
     assert something and something_else
     assert something and something_else and something_third
     assert something and not something_else
     assert something and (something_else or something_third)
+    assert not something and something_else
     assert not (something or something_else)
     assert not (something or something_else or something_third)
+
+    # recursive case
+    assert not (a or not (b or c))
+    assert not (a or not (b and c))  # note that we only reduce once here
+
+    # detected, but no autofix for messages
+    assert something and something_else, "error message"
+    assert not (something or something_else and something_third), "with message"
+    # detected, but no autofix for mixed conditions (e.g. `a or b and c`)
     assert not (something or something_else and something_third)

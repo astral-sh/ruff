@@ -1,26 +1,68 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{
     Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
 };
 
-use super::helpers::is_falsy_constant;
-use super::unittest_assert::UnittestAssert;
-use crate::ast::helpers::unparse_stmt;
+use ruff_macros::{define_violation, derive_message_formats};
+
+use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::source_code::Stylist;
+use crate::violation::{AlwaysAutofixableViolation, AutofixKind, Availability, Violation};
+
+use super::helpers::is_falsy_constant;
+use super::unittest_assert::UnittestAssert;
 
 define_violation!(
-    pub struct CompositeAssertion;
+    /// ## What it does
+    /// Checks for assertions that combine multiple independent conditions.
+    ///
+    /// ## Why is this bad?
+    /// Composite assertion statements are harder debug upon failure, as the
+    /// failure message will not indicate which condition failed.
+    ///
+    /// ## Example
+    /// ```python
+    /// def test_foo():
+    ///     assert something and something_else
+    ///
+    /// def test_bar():
+    ///     assert not (something or something_else)
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def test_foo():
+    ///     assert something
+    ///     assert something_else
+    ///
+    /// def test_bar():
+    ///     assert not something
+    ///     assert not something_else
+    /// ```
+    pub struct CompositeAssertion {
+        pub fixable: bool,
+    }
 );
 impl Violation for CompositeAssertion {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Assertion should be broken down into multiple parts")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let CompositeAssertion { fixable } = self;
+        if *fixable {
+            Some(|_| format!("Break down assertion into multiple parts"))
+        } else {
+            None
+        }
     }
 }
 
@@ -34,7 +76,7 @@ impl Violation for AssertInExcept {
     fn message(&self) -> String {
         let AssertInExcept { name } = self;
         format!(
-            "Found assertion on exception `{name}` in except block, use `pytest.raises()` instead"
+            "Found assertion on exception `{name}` in `except` block, use `pytest.raises()` instead"
         )
     }
 }
@@ -119,22 +161,6 @@ where
     }
 }
 
-/// Check if the test expression is a composite condition.
-/// For example, `a and b` or `not (a or b)`. The latter is equivalent
-/// to `not a and not b` by De Morgan's laws.
-const fn is_composite_condition(test: &Expr) -> bool {
-    match &test.node {
-        ExprKind::BoolOp {
-            op: Boolop::And, ..
-        } => true,
-        ExprKind::UnaryOp {
-            op: Unaryop::Not,
-            operand,
-        } => matches!(&operand.node, ExprKind::BoolOp { op: Boolop::Or, .. }),
-        _ => false,
-    }
-}
-
 fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
     // Walk body to find assert statements that reference the exception name
     let mut visitor = ExceptionHandlerVisitor::new(name);
@@ -180,11 +206,11 @@ pub fn unittest_assertion(
 }
 
 /// PT015
-pub fn assert_falsy(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Diagnostic> {
-    if is_falsy_constant(test_expr) {
+pub fn assert_falsy(stmt: &Stmt, test: &Expr) -> Option<Diagnostic> {
+    if is_falsy_constant(test) {
         Some(Diagnostic::new(
             AssertAlwaysFalse,
-            Range::from_located(assert_stmt),
+            Range::from_located(stmt),
         ))
     } else {
         None
@@ -207,14 +233,129 @@ pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic
         .collect()
 }
 
+/// Check if the test expression is a composite condition.
+/// For example, `a and b` or `not (a or b)`. The latter is equivalent
+/// to `not a and not b` by De Morgan's laws.
+const fn is_composite_condition(test: &Expr) -> bool {
+    match &test.node {
+        ExprKind::BoolOp {
+            op: Boolop::And, ..
+        } => true,
+        ExprKind::UnaryOp {
+            op: Unaryop::Not,
+            operand,
+        } => matches!(&operand.node, ExprKind::BoolOp { op: Boolop::Or, .. }),
+        _ => false,
+    }
+}
+
+/// Negate condition, i.e. `a` => `not a` and `not a` => `a`
+fn negate(f: Expr) -> Expr {
+    match f.node {
+        ExprKind::UnaryOp {
+            op: Unaryop::Not,
+            operand,
+        } => *operand,
+        _ => create_expr(ExprKind::UnaryOp {
+            op: Unaryop::Not,
+            operand: Box::new(f),
+        }),
+    }
+}
+
+/// Return `true` if the condition appears to be a fixable composite condition.
+fn is_fixable_composite_condition(test: &Expr) -> bool {
+    let ExprKind::UnaryOp {
+        op: Unaryop::Not,
+        operand,
+    } = &test.node else {
+         return true;
+    };
+    let ExprKind::BoolOp {
+        op: Boolop::Or,
+        values,
+    } = &operand.node else {
+         return true;
+     };
+    // Only take cases without mixed `and` and `or`
+    values.iter().all(|expr| {
+        !matches!(
+            expr.node,
+            ExprKind::BoolOp {
+                op: Boolop::And,
+                ..
+            }
+        )
+    })
+}
+
+/// Replace composite condition `assert a == "hello" and b == "world"` with two statements
+/// `assert a == "hello"` and `assert b == "world"`.
+///
+/// It's assumed that the condition is fixable, i.e., that `is_fixable_composite_condition`
+/// returns `true`.
+fn fix_composite_condition(stylist: &Stylist, stmt: &Stmt, test: &Expr) -> Fix {
+    let mut conditions: Vec<Expr> = vec![];
+    match &test.node {
+        ExprKind::BoolOp {
+            op: Boolop::And,
+            values,
+        } => {
+            // Compound, so split (Split)
+            conditions.extend(values.clone());
+        }
+        ExprKind::UnaryOp {
+            op: Unaryop::Not,
+            operand,
+        } => {
+            match &operand.node {
+                ExprKind::BoolOp {
+                    op: Boolop::Or,
+                    values,
+                } => {
+                    // `not (a or b)` equals `not a and not b`
+                    let vals = values
+                        .iter()
+                        .map(|f| negate(f.clone()))
+                        .collect::<Vec<Expr>>();
+
+                    // Compound, so split (Split)
+                    conditions.extend(vals);
+                }
+                _ => {
+                    // Do not split
+                    conditions.push(*operand.clone());
+                }
+            }
+        }
+        _ => {}
+    };
+
+    // for each condition create `assert condition`
+    let mut content: Vec<String> = Vec::with_capacity(conditions.len());
+    for condition in conditions {
+        content.push(unparse_stmt(
+            &create_stmt(StmtKind::Assert {
+                test: Box::new(condition.clone()),
+                msg: None,
+            }),
+            stylist,
+        ));
+    }
+
+    let content = content.join(stylist.line_ending().as_str());
+    Fix::replacement(content, stmt.location, stmt.end_location.unwrap())
+}
+
 /// PT018
-pub fn composite_condition(assert_stmt: &Stmt, test_expr: &Expr) -> Option<Diagnostic> {
-    if is_composite_condition(test_expr) {
-        Some(Diagnostic::new(
-            CompositeAssertion,
-            Range::from_located(assert_stmt),
-        ))
-    } else {
-        None
+pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
+    if is_composite_condition(test) {
+        let fixable = msg.is_none() && is_fixable_composite_condition(test);
+        let mut diagnostic =
+            Diagnostic::new(CompositeAssertion { fixable }, Range::from_located(stmt));
+        if fixable && checker.patch(diagnostic.kind.rule()) {
+            diagnostic.amend(fix_composite_condition(checker.stylist, stmt, test));
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }
