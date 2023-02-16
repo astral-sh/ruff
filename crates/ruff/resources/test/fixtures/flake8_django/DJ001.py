@@ -12,7 +12,16 @@ class IncorrectModel(models.Model):
     urlfield = models.URLField(max_length=255, null=True)
 
 
-class IncorrectModelWithAliasedBase(DjangoModel):
+class IncorrectModelWithAlias(DjangoModel):
+    charfield = DjangoModel.CharField(max_length=255, null=True)
+    textfield = SmthCharField(max_length=255, null=True)
+    slugfield = models.SlugField(max_length=255, null=True)
+    emailfield = models.EmailField(max_length=255, null=True)
+    filepathfield = models.FilePathField(max_length=255, null=True)
+    urlfield = models.URLField(max_length=255, null=True)
+
+
+class IncorrectModelWithoutSuperclass:
     charfield = DjangoModel.CharField(max_length=255, null=True)
     textfield = SmthCharField(max_length=255, null=True)
     slugfield = models.SlugField(max_length=255, null=True)

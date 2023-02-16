@@ -1,12 +1,7 @@
 use std::io::{self, BufWriter, Write};
 
 use anyhow::Result;
-use colored::control::SHOULD_COLORIZE;
-use mdcat::terminal::{TerminalProgram, TerminalSize};
-use mdcat::{Environment, ResourceAccess, Settings};
-use pulldown_cmark::{Options, Parser};
 use serde::Serialize;
-use syntect::parsing::SyntaxSet;
 
 use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::AutofixAvailability;
@@ -27,7 +22,7 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
     let mut output = String::new();
 
     match format {
-        HelpFormat::Text | HelpFormat::Pretty => {
+        HelpFormat::Text => {
             output.push_str(&format!("# {} ({})", rule.as_ref(), rule.noqa_code()));
             output.push('\n');
             output.push('\n');
@@ -65,35 +60,7 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
         }
     };
 
-    match format {
-        HelpFormat::Json | HelpFormat::Text => {
-            writeln!(stdout, "{output}")?;
-        }
-        HelpFormat::Pretty => {
-            let parser = Parser::new_ext(
-                &output,
-                Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH,
-            );
-
-            let cwd = std::env::current_dir()?;
-            let env = &Environment::for_local_directory(&cwd)?;
-
-            let terminal = if SHOULD_COLORIZE.should_colorize() {
-                TerminalProgram::detect()
-            } else {
-                TerminalProgram::Dumb
-            };
-
-            let settings = &Settings {
-                resource_access: ResourceAccess::LocalOnly,
-                syntax_set: SyntaxSet::load_defaults_newlines(),
-                terminal_capabilities: terminal.capabilities(),
-                terminal_size: TerminalSize::detect().unwrap_or_default(),
-            };
-
-            mdcat::push_tty(settings, env, &mut stdout, parser)?;
-        }
-    };
+    writeln!(stdout, "{output}")?;
 
     Ok(())
 }

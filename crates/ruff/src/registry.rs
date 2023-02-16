@@ -259,8 +259,7 @@ ruff_macros::register_rules!(
     rules::flake8_simplify::rules::ReturnInTryExceptFinally,
     rules::flake8_simplify::rules::UseTernaryOperator,
     rules::flake8_simplify::rules::CompareWithTuple,
-    rules::flake8_simplify::rules::ConvertLoopToAny,
-    rules::flake8_simplify::rules::ConvertLoopToAll,
+    rules::flake8_simplify::rules::ReimplementedBuiltin,
     rules::flake8_simplify::rules::UseCapitalEnvironmentVariables,
     rules::flake8_simplify::rules::IfWithSameArms,
     rules::flake8_simplify::rules::OpenFileWithContextHandler,
@@ -377,6 +376,7 @@ ruff_macros::register_rules!(
     rules::pep8_naming::rules::MixedCaseVariableInGlobalScope,
     rules::pep8_naming::rules::CamelcaseImportedAsAcronym,
     rules::pep8_naming::rules::ErrorSuffixOnExceptionName,
+    rules::pep8_naming::rules::InvalidModuleName,
     // isort
     rules::isort::rules::UnsortedImports,
     rules::isort::rules::MissingRequiredImport,
@@ -559,6 +559,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::AmbiguousUnicodeCharacterComment,
     rules::ruff::rules::KeywordArgumentBeforeStarArgument,
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
+    rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
@@ -797,7 +798,7 @@ impl Rule {
             | Rule::TrailingCommaProhibited => &LintSource::Tokens,
             Rule::IOError => &LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
-            Rule::ImplicitNamespacePackage => &LintSource::Filesystem,
+            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => &LintSource::Filesystem,
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment

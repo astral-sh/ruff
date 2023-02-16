@@ -270,8 +270,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "107") => Rule::ReturnInTryExceptFinally,
         (Flake8Simplify, "108") => Rule::UseTernaryOperator,
         (Flake8Simplify, "109") => Rule::CompareWithTuple,
-        (Flake8Simplify, "110") => Rule::ConvertLoopToAny,
-        (Flake8Simplify, "111") => Rule::ConvertLoopToAll,
+        (Flake8Simplify, "110") => Rule::ReimplementedBuiltin,
+        // (Flake8Simplify, "111") => Rule::ReimplementedBuiltin,
         (Flake8Simplify, "112") => Rule::UseCapitalEnvironmentVariables,
         (Flake8Simplify, "114") => Rule::IfWithSameArms,
         (Flake8Simplify, "115") => Rule::OpenFileWithContextHandler,
@@ -391,6 +391,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (PEP8Naming, "816") => Rule::MixedCaseVariableInGlobalScope,
         (PEP8Naming, "817") => Rule::CamelcaseImportedAsAcronym,
         (PEP8Naming, "818") => Rule::ErrorSuffixOnExceptionName,
+        (PEP8Naming, "999") => Rule::InvalidModuleName,
 
         // isort
         (Isort, "001") => Rule::UnsortedImports,
@@ -597,6 +598,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "003") => Rule::AmbiguousUnicodeCharacterComment,
         (Ruff, "004") => Rule::KeywordArgumentBeforeStarArgument,
         (Ruff, "005") => Rule::UnpackInsteadOfConcatenatingToCollectionLiteral,
+        (Ruff, "006") => Rule::AsyncioDanglingTask,
         (Ruff, "100") => Rule::UnusedNOQA,
 
         // flake8-django

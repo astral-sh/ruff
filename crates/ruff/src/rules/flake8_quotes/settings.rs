@@ -66,7 +66,7 @@ pub struct Options {
         "#
     )]
     /// Whether to avoid using single quotes if a string contains single quotes,
-    /// or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes).
+    /// or vice-versa with double quotes, as per [PEP 8](https://peps.python.org/pep-0008/#string-quotes).
     /// This minimizes the need to escape quotation marks within strings.
     pub avoid_escape: Option<bool>,
 }

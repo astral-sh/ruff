@@ -475,9 +475,9 @@ pub fn definition(
 
         // ANN001, ANN401
         for arg in args
-            .args
+            .posonlyargs
             .iter()
-            .chain(args.posonlyargs.iter())
+            .chain(args.args.iter())
             .chain(args.kwonlyargs.iter())
             .skip(
                 // If this is a non-static method, skip `cls` or `self`.
@@ -581,7 +581,7 @@ pub fn definition(
 
         // ANN101, ANN102
         if is_method && !visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
-            if let Some(arg) = args.args.first() {
+            if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
                 if arg.node.annotation.is_none() {
                     if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
                         if checker.settings.rules.enabled(&Rule::MissingTypeCls) {

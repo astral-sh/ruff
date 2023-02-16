@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.246"
+version = "0.0.247"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = "2021"
 rust-version = "1.65.0"
@@ -42,10 +42,8 @@ glob = { version = "0.3.0" }
 ignore = { version = "0.4.18" }
 itertools = { workspace = true }
 log = { version = "0.4.17" }
-mdcat = { version = "1.0.0", default-features = false }
 notify = { version = "5.0.0" }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache"] }
-pulldown-cmark = { version = "0.9.2", default-features = false, features = ['simd'] }
 quick-junit = { version = "0.3.2" }
 rayon = { version = "1.5.3" }
 regex = { workspace = true }
@@ -54,7 +52,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { version = "2.2.1" }
 strum = { version = "0.24.1" }
-syntect = { version = "5.0.0", default-features = false, features = ["parsing", "regex-fancy", "default-themes", "default-syntaxes"] }
 textwrap = { version = "0.16.0" }
 walkdir = { version = "2.3.2" }
 
@@ -66,8 +63,8 @@ ureq = { version = "2.5.0", features = [] }
 [package.metadata.maturin]
 name = "ruff"
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = "0.1.29"
 
-[target.'cfg(all(not(windows), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dependencies]
 tikv-jemallocator = "0.5.0"

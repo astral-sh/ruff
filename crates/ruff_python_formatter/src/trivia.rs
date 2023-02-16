@@ -225,7 +225,6 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 for decorator in decorator_list {
                     result.push(Node::Expr(decorator));
                 }
-                // TODO(charlie): Retain order.
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
                         result.push(Node::Expr(expr));
