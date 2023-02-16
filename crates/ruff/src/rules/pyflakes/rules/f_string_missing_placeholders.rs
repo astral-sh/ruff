@@ -2,6 +2,7 @@ use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use crate::ast::helpers::find_useless_f_strings;
+use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
@@ -46,6 +47,26 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
     }
 }
 
+fn unescape_f_string(content: &str) -> String {
+    content.replace("{{", "{").replace("}}", "}")
+}
+
+fn fix_f_string_missing_placeholders(
+    prefix_range: &Range,
+    tok_range: &Range,
+    checker: &mut Checker,
+) -> Fix {
+    let content = checker.locator.slice(&Range::new(
+        prefix_range.end_location,
+        tok_range.end_location,
+    ));
+    Fix::replacement(
+        unescape_f_string(content),
+        prefix_range.location,
+        tok_range.end_location,
+    )
+}
+
 /// F541
 pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut Checker) {
     if !values
@@ -55,9 +76,10 @@ pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Fix::deletion(
-                    prefix_range.location,
-                    prefix_range.end_location,
+                diagnostic.amend(fix_f_string_missing_placeholders(
+                    &prefix_range,
+                    &tok_range,
+                    checker,
                 ));
             }
             checker.diagnostics.push(diagnostic);
