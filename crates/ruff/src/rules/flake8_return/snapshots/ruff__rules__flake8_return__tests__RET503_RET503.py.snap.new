@@ -1,0 +1,217 @@
+---
+source: crates/ruff/src/rules/flake8_return/mod.rs
+assertion_line: 33
+expression: diagnostics
+---
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 18
+    column: 4
+  end_location:
+    row: 19
+    column: 16
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 20
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 34
+    column: 4
+  end_location:
+    row: 34
+    column: 11
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 35
+      column: 0
+    end_location:
+      row: 35
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 39
+    column: 4
+  end_location:
+    row: 41
+    column: 20
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 42
+      column: 0
+    end_location:
+      row: 42
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: false
+  location:
+    row: 50
+    column: 8
+  end_location:
+    row: 50
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 57
+    column: 4
+  end_location:
+    row: 57
+    column: 22
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 58
+      column: 0
+    end_location:
+      row: 58
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 64
+    column: 4
+  end_location:
+    row: 64
+    column: 21
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 65
+      column: 0
+    end_location:
+      row: 65
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 111
+    column: 4
+  end_location:
+    row: 114
+    column: 16
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 115
+      column: 0
+    end_location:
+      row: 115
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 118
+    column: 4
+  end_location:
+    row: 124
+    column: 19
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 125
+      column: 0
+    end_location:
+      row: 125
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 128
+    column: 4
+  end_location:
+    row: 131
+    column: 16
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 132
+      column: 0
+    end_location:
+      row: 132
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 135
+    column: 4
+  end_location:
+    row: 141
+    column: 19
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 142
+      column: 0
+    end_location:
+      row: 142
+      column: 0
+  parent: ~
+- kind:
+    ImplicitReturn:
+      fixable: true
+  location:
+    row: 260
+    column: 4
+  end_location:
+    row: 261
+    column: 20
+  fix:
+    content:
+      - "    return None"
+      - ""
+    location:
+      row: 262
+      column: 0
+    end_location:
+      row: 262
+      column: 0
+  parent: ~
+

@@ -209,31 +209,52 @@ fn is_noreturn_func(checker: &Checker, func: &Expr) -> bool {
 fn implicit_return(checker: &mut Checker, stmt: &Stmt, top_level: bool) {
     match &stmt.node {
         StmtKind::If { body, orelse, .. } => {
-            if body.is_empty() || orelse.is_empty() {
-                checker.diagnostics.push(Diagnostic::new(
-                    ImplicitReturn { fixable: false },
-                    Range::from_located(stmt),
-                ));
-                return;
-            }
-
-            if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt, false);
-            }
             if let Some(last_stmt) = orelse.last() {
-                implicit_return(checker, last_stmt, false);
+                implicit_return(checker, last_stmt, true);
+            } else {
+                let fixable = top_level;
+                let mut diagnostic =
+                    Diagnostic::new(ImplicitReturn { fixable }, Range::from_located(stmt));
+                if fixable && checker.patch(diagnostic.kind.rule()) {
+                    if let Some(indent) = indentation(checker.locator, stmt) {
+                        let mut content = String::new();
+                        content.push_str(indent);
+                        content.push_str("return None");
+                        content.push_str(checker.stylist.line_ending().as_str());
+                        diagnostic.amend(Fix::insertion(
+                            content,
+                            Location::new(stmt.end_location.unwrap().row() + 1, 0),
+                        ));
+                    }
+                }
+                checker.diagnostics.push(diagnostic);
             }
         }
         StmtKind::For { body, orelse, .. } | StmtKind::AsyncFor { body, orelse, .. } => {
             if let Some(last_stmt) = orelse.last() {
-                implicit_return(checker, last_stmt, false);
-            } else if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt, false);
+                implicit_return(checker, last_stmt, true);
+            } else {
+                let fixable = top_level;
+                let mut diagnostic =
+                    Diagnostic::new(ImplicitReturn { fixable }, Range::from_located(stmt));
+                if fixable && checker.patch(diagnostic.kind.rule()) {
+                    if let Some(indent) = indentation(checker.locator, stmt) {
+                        let mut content = String::new();
+                        content.push_str(indent);
+                        content.push_str("return None");
+                        content.push_str(checker.stylist.line_ending().as_str());
+                        diagnostic.amend(Fix::insertion(
+                            content,
+                            Location::new(stmt.end_location.unwrap().row() + 1, 0),
+                        ));
+                    }
+                }
+                checker.diagnostics.push(diagnostic);
             }
         }
         StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => {
             if let Some(last_stmt) = body.last() {
-                implicit_return(checker, last_stmt, false);
+                implicit_return(checker, last_stmt, true);
             }
         }
         StmtKind::Assert { test, .. }

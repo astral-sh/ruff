@@ -251,3 +251,11 @@ def noreturn_pytest_xfail_2():
     if x > 0:
         return 1
     py_xfail("oof")
+
+
+def nested(values):
+    if not values:
+        return False
+
+    for value in values:
+        print(value)
