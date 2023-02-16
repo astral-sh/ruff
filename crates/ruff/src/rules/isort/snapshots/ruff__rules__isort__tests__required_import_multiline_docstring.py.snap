@@ -1,0 +1,24 @@
+---
+source: crates/ruff/src/rules/isort/mod.rs
+expression: diagnostics
+---
+- kind:
+    MissingRequiredImport: from __future__ import annotations
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 0
+  fix:
+    content:
+      - ""
+      - from __future__ import annotations
+    location:
+      row: 3
+      column: 3
+    end_location:
+      row: 3
+      column: 3
+  parent: ~
+
