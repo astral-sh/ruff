@@ -1,5 +1,6 @@
 //! `NoQA` enforcement and validation.
 
+use log::warn;
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
@@ -7,7 +8,7 @@ use crate::ast::types::Range;
 use crate::codes::NoqaCode;
 use crate::fix::Fix;
 use crate::noqa;
-use crate::noqa::{is_file_exempt, Directive, Exemption};
+use crate::noqa::{extract_file_exemption, Directive, Exemption};
 use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
@@ -23,30 +24,31 @@ pub fn check_noqa(
 ) {
     let enforce_noqa = settings.rules.enabled(&Rule::UnusedNOQA);
 
+    // Whether the file is exempted from all checks.
+    let mut file_exempted = false;
+
+    // Codes that are globally exempted (within the current file).
+    let mut file_exemptions: Vec<NoqaCode> = vec![];
+
     // Map from line number to `noqa` directive on that line, along with any codes
     // that were matched by the directive.
     let mut noqa_directives: IntMap<usize, (Directive, Vec<NoqaCode>)> = IntMap::default();
-
-    // Codes that are globally exempted (within the current file).
-    let mut exemptions: Vec<NoqaCode> = vec![];
 
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
 
     let lines: Vec<&str> = contents.lines().collect();
     for lineno in commented_lines {
-        match is_file_exempt(lines[lineno - 1]) {
+        match extract_file_exemption(lines[lineno - 1]) {
             Exemption::All => {
-                // If we hit an exemption for the entire file, bail.
-                diagnostics.drain(..);
-                return;
+                file_exempted = true;
             }
             Exemption::Codes(codes) => {
-                // If specific codes are exempted, add them to the list.
-                exemptions.extend(codes.into_iter().filter_map(|code| {
+                file_exemptions.extend(codes.into_iter().filter_map(|code| {
                     if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code)) {
                         Some(rule.noqa_code())
                     } else {
+                        warn!("Invalid code provided to `# ruff: noqa`: {}", code);
                         None
                     }
                 }));
@@ -67,9 +69,15 @@ pub fn check_noqa(
             continue;
         }
 
+        // If the file is exempted, ignore all diagnostics.
+        if file_exempted {
+            ignored_diagnostics.push(index);
+            continue;
+        }
+
         // If the diagnostic is ignored by a global exemption, ignore it.
-        if !exemptions.is_empty() {
-            if exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
+        if !file_exemptions.is_empty() {
+            if file_exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
                 ignored_diagnostics.push(index);
                 continue;
             }
@@ -113,11 +121,13 @@ pub fn check_noqa(
                 (Directive::All(..), matches) => {
                     matches.push(diagnostic.kind.rule().noqa_code());
                     ignored_diagnostics.push(index);
+                    continue;
                 }
                 (Directive::Codes(.., codes), matches) => {
                     if noqa::includes(diagnostic.kind.rule(), codes) {
                         matches.push(diagnostic.kind.rule().noqa_code());
                         ignored_diagnostics.push(index);
+                        continue;
                     }
                 }
                 (Directive::None, ..) => {}
