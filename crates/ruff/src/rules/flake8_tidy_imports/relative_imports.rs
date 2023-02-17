@@ -99,19 +99,29 @@ fn fix_banned_relative_import(
             parts.pop();
         }
 
-        let call_path = from_relative_import(&parts, module.unwrap());
-        let module_name = call_path.as_slice();
+        let module_name = if let Some(module) = module {
+            let call_path = from_relative_import(&parts, module);
+            call_path.as_slice().join(".")
+        } else {
+            if parts.len() > 1 {
+                let module = parts.last().unwrap();
+                let call_path = from_relative_import(&parts, module);
+                call_path.as_slice().join(".")
+            } else {
+                parts.join(".")
+            }
+        };
 
         // Require import to be a valid PEP 8 module:
         // https://python.org/dev/peps/pep-0008/#package-and-module-names
-        if module_name.iter().any(|f| !is_lower_with_underscore(f)) {
+        if module_name.split('.').any(|f| !is_lower_with_underscore(f)) {
             return None;
         }
 
         let content = match &stmt.node {
             StmtKind::ImportFrom { names, .. } => unparse_stmt(
                 &create_stmt(StmtKind::ImportFrom {
-                    module: Some(module_name.join(".")),
+                    module: Some(module_name),
                     names: names.clone(),
                     level: Some(0),
                 }),
