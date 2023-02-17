@@ -51,28 +51,8 @@ Ruff is extremely actively developed and used in major open-source projects like
 * [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
 * [Apache Airflow](https://github.com/apache/airflow)
 * [SciPy](https://github.com/scipy/scipy)
-* [Zulip](https://github.com/zulip/zulip)
-* [Bokeh](https://github.com/bokeh/bokeh)
-* [Pydantic](https://github.com/pydantic/pydantic)
-* [Dagster](https://github.com/dagster-io/dagster)
-* [Dagger](https://github.com/dagger/dagger)
-* [Sphinx](https://github.com/sphinx-doc/sphinx)
-* [Hatch](https://github.com/pypa/hatch)
-* [Jupyter](https://github.com/jupyter-server/jupyter_server)
-* [Great Expectations](https://github.com/great-expectations/great_expectations)
-* [Polars](https://github.com/pola-rs/polars)
-* [Ibis](https://github.com/ibis-project/ibis)
-* [Synapse (Matrix)](https://github.com/matrix-org/synapse)
-* [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
-* [Saleor](https://github.com/saleor/saleor)
-* [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
-* [Home Assistant](https://github.com/home-assistant/core)
-* [Cryptography (PyCA)](https://github.com/pyca/cryptography)
-* [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
-* [build (PyPA)](https://github.com/pypa/build)
-* [Babel](https://github.com/python-babel/babel)
-* [featuretools](https://github.com/alteryx/featuretools)
-* [meson-python](https://github.com/mesonbuild/meson-python)
+
+...and many more.
 
 Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster) or
 the most recent [project update](https://notes.crmarsh.com/ruff-the-first-200-releases).
@@ -114,21 +94,20 @@ developer of [Zulip](https://github.com/zulip/zulip):
 
 ## Table of Contents
 
-This README is also available as [documentation](https://beta.ruff.rs/docs/).
+For more, see the [documentation](https://beta.ruff.rs/docs/).
 
 1. [Installation and Usage](#installation-and-usage)
 2. [Configuration](#configuration)
 3. [Supported Rules](#supported-rules)
-4. [Editor Integrations](#editor-integrations)
-5. [FAQ](#faq)
-6. [Contributing](#contributing)
-7. [Support](#support)
-8. [Acknowledgements](#acknowledgements)
-9. [License](#license)
+4. [Contributing](#contributing)
+5. [Support](#support)
+6. [Acknowledgements](#acknowledgements)
+7. [Who's Using Ruff?](#whos-using-ruff)
+8. [License](#license)
 
 ## Installation and Usage
 
-This README is also available as [documentation](https://beta.ruff.rs/docs/).
+For more, see the [documentation](https://beta.ruff.rs/docs/).
 
 <!-- Begin section: Installation and Usage -->
 
@@ -721,6 +700,63 @@ Ruff is the beneficiary of a large number of [contributors](https://github.com/c
 Ruff is released under the MIT license.
 
 <!-- End section: Acknowledgements -->
+
+## Who's Using Ruff?
+
+Ruff is used in a number of major open-source projects, including:
+
+* [pandas](https://github.com/pandas-dev/pandas)
+* [FastAPI](https://github.com/tiangolo/fastapi)
+* [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
+* [Apache Airflow](https://github.com/apache/airflow)
+* [SciPy](https://github.com/scipy/scipy)
+* [Zulip](https://github.com/zulip/zulip)
+* [Bokeh](https://github.com/bokeh/bokeh)
+* [Pydantic](https://github.com/pydantic/pydantic)
+* [Dagster](https://github.com/dagster-io/dagster)
+* [Dagger](https://github.com/dagger/dagger)
+* [Sphinx](https://github.com/sphinx-doc/sphinx)
+* [Hatch](https://github.com/pypa/hatch)
+* [Jupyter](https://github.com/jupyter-server/jupyter_server)
+* [Great Expectations](https://github.com/great-expectations/great_expectations)
+* [Polars](https://github.com/pola-rs/polars)
+* [Ibis](https://github.com/ibis-project/ibis)
+* [Synapse (Matrix)](https://github.com/matrix-org/synapse)
+* [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
+* [Saleor](https://github.com/saleor/saleor)
+* [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
+* [Home Assistant](https://github.com/home-assistant/core)
+* [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+* [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
+* [build (PyPA)](https://github.com/pypa/build)
+* [Babel](https://github.com/python-babel/babel)
+* [featuretools](https://github.com/alteryx/featuretools)
+* [meson-python](https://github.com/mesonbuild/meson-python)
+* [Zulip](https://github.com/zulip/zulip)
+* [Bokeh](https://github.com/bokeh/bokeh)
+* [Pydantic](https://github.com/pydantic/pydantic)
+* [Dagster](https://github.com/dagster-io/dagster)
+* [Dagger](https://github.com/dagger/dagger)
+* [Sphinx](https://github.com/sphinx-doc/sphinx)
+* [Hatch](https://github.com/pypa/hatch)
+* [Jupyter](https://github.com/jupyter-server/jupyter_server)
+* [Great Expectations](https://github.com/great-expectations/great_expectations)
+* [Polars](https://github.com/pola-rs/polars)
+* [Ibis](https://github.com/ibis-project/ibis)
+* [Synapse (Matrix)](https://github.com/matrix-org/synapse)
+* [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
+* [Dispatch (Netflix)](https://github.com/Netflix/dispatch)
+* [Saleor](https://github.com/saleor/saleor)
+* [Pynecone](https://github.com/pynecone-io/pynecone)
+* [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
+* [Home Assistant](https://github.com/home-assistant/core)
+* [Pylint](https://github.com/PyCQA/pylint)
+* [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+* [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
+* [build (PyPA)](https://github.com/pypa/build)
+* [Babel](https://github.com/python-babel/babel)
+* [featuretools](https://github.com/alteryx/featuretools)
+* [meson-python](https://github.com/mesonbuild/meson-python)
 
 ## License
 
