@@ -158,70 +158,44 @@ fn compare(left: &Expr, cmpop: Cmpop, right: &Expr) -> Expr {
     })
 }
 
-pub struct Arguments<'a> {
-    positional: Vec<&'a str>,
-    keyword: Vec<&'a str>,
-}
-
-impl<'a> Arguments<'a> {
-    pub fn new(positional: Vec<&'a str>, keyword: Vec<&'a str>) -> Self {
-        Self {
-            positional,
-            keyword,
-        }
-    }
-
-    pub fn contains(&self, arg: &str) -> bool {
-        self.positional.contains(&arg) || self.keyword.contains(&arg)
-    }
-}
-
 impl UnittestAssert {
-    pub fn arguments(&self) -> Arguments {
+    fn arg_spec(&self) -> &[&str] {
         match self {
-            UnittestAssert::AlmostEqual => {
-                Arguments::new(vec!["first", "second"], vec!["places", "msg", "delta"])
-            }
-            UnittestAssert::AlmostEquals => {
-                Arguments::new(vec!["first", "second"], vec!["places", "msg", "delta"])
-            }
-            UnittestAssert::CountEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::DictContainsSubset => {
-                Arguments::new(vec!["subset", "dictionary"], vec!["msg"])
-            }
-            UnittestAssert::DictEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::Equal => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::Equals => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::False => Arguments::new(vec!["expr"], vec!["msg"]),
-            UnittestAssert::Greater => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::GreaterEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::In => Arguments::new(vec!["member", "container"], vec!["msg"]),
-            UnittestAssert::Is => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::IsInstance => Arguments::new(vec!["obj", "cls"], vec!["msg"]),
-            UnittestAssert::IsNone => Arguments::new(vec!["expr"], vec!["msg"]),
-            UnittestAssert::IsNot => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::IsNotNone => Arguments::new(vec!["expr"], vec!["msg"]),
-            UnittestAssert::Less => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::LessEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::ListEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::MultiLineEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::NotAlmostEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::NotAlmostEquals => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::NotEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::NotEquals => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::NotIn => Arguments::new(vec!["member", "container"], vec!["msg"]),
-            UnittestAssert::NotIsInstance => Arguments::new(vec!["obj", "cls"], vec!["msg"]),
-            UnittestAssert::NotRegex => Arguments::new(vec!["text", "regex"], vec!["msg"]),
-            UnittestAssert::NotRegexpMatches => Arguments::new(vec!["text", "regex"], vec!["msg"]),
-            UnittestAssert::Regex => Arguments::new(vec!["text", "regex"], vec!["msg"]),
-            UnittestAssert::RegexpMatches => Arguments::new(vec!["text", "regex"], vec!["msg"]),
-            UnittestAssert::SequenceEqual => {
-                Arguments::new(vec!["first", "second"], vec!["msg", "seq_type"])
-            }
-            UnittestAssert::SetEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::True => Arguments::new(vec!["expr"], vec!["msg"]),
-            UnittestAssert::TupleEqual => Arguments::new(vec!["first", "second"], vec!["msg"]),
-            UnittestAssert::Underscore => Arguments::new(vec!["expr"], vec!["msg"]),
+            UnittestAssert::AlmostEqual => &["first", "second", "places", "msg", "delta"],
+            UnittestAssert::AlmostEquals => &["first", "second", "places", "msg", "delta"],
+            UnittestAssert::CountEqual => &["first", "second", "msg"],
+            UnittestAssert::DictContainsSubset => &["subset", "dictionary", "msg"],
+            UnittestAssert::DictEqual => &["first", "second", "msg"],
+            UnittestAssert::Equal => &["first", "second", "msg"],
+            UnittestAssert::Equals => &["first", "second", "msg"],
+            UnittestAssert::False => &["expr", "msg"],
+            UnittestAssert::Greater => &["first", "second", "msg"],
+            UnittestAssert::GreaterEqual => &["first", "second", "msg"],
+            UnittestAssert::In => &["member", "container", "msg"],
+            UnittestAssert::Is => &["first", "second", "msg"],
+            UnittestAssert::IsInstance => &["obj", "cls", "msg"],
+            UnittestAssert::IsNone => &["expr", "msg"],
+            UnittestAssert::IsNot => &["first", "second", "msg"],
+            UnittestAssert::IsNotNone => &["expr", "msg"],
+            UnittestAssert::Less => &["first", "second", "msg"],
+            UnittestAssert::LessEqual => &["first", "second", "msg"],
+            UnittestAssert::ListEqual => &["first", "second", "msg"],
+            UnittestAssert::MultiLineEqual => &["first", "second", "msg"],
+            UnittestAssert::NotAlmostEqual => &["first", "second", "msg"],
+            UnittestAssert::NotAlmostEquals => &["first", "second", "msg"],
+            UnittestAssert::NotEqual => &["first", "second", "msg"],
+            UnittestAssert::NotEquals => &["first", "second", "msg"],
+            UnittestAssert::NotIn => &["member", "container", "msg"],
+            UnittestAssert::NotIsInstance => &["obj", "cls", "msg"],
+            UnittestAssert::NotRegex => &["text", "regex", "msg"],
+            UnittestAssert::NotRegexpMatches => &["text", "regex", "msg"],
+            UnittestAssert::Regex => &["text", "regex", "msg"],
+            UnittestAssert::RegexpMatches => &["text", "regex", "msg"],
+            UnittestAssert::SequenceEqual => &["first", "second", "msg", "seq_type"],
+            UnittestAssert::SetEqual => &["first", "second", "msg"],
+            UnittestAssert::True => &["expr", "msg"],
+            UnittestAssert::TupleEqual => &["first", "second", "msg"],
+            UnittestAssert::Underscore => &["expr", "msg"],
         }
     }
 
@@ -231,29 +205,56 @@ impl UnittestAssert {
         args: &'a [Expr],
         keywords: &'a [Keyword],
     ) -> Result<FxHashMap<&'a str, &'a Expr>> {
+        // If we have variable-length arguments, abort.
         if args
             .iter()
             .any(|arg| matches!(arg.node, ExprKind::Starred { .. }))
             || keywords.iter().any(|kw| kw.node.arg.is_none())
         {
-            bail!("Contains variable-length arguments. Cannot autofix.".to_string());
+            bail!("Variable-length arguments are not supported");
         }
 
+        let arg_spec = self.arg_spec();
+
+        // If any of the keyword arguments are not in the argument spec, abort.
+        if keywords.iter().any(|kw| {
+            kw.node
+                .arg
+                .as_ref()
+                .map_or(false, |kwarg_name| !arg_spec.contains(&kwarg_name.as_str()))
+        }) {
+            bail!("Unknown keyword argument");
+        }
+
+        // Generate a map from argument name to value.
         let mut args_map: FxHashMap<&str, &Expr> = FxHashMap::with_capacity_and_hasher(
             args.len() + keywords.len(),
             BuildHasherDefault::default(),
         );
-        let arguments = self.arguments();
-        for (arg, value) in arguments.positional.iter().zip(args.iter()) {
-            args_map.insert(arg, value);
+
+        // Process positional arguments.
+        for (arg_name, value) in arg_spec.iter().zip(args.iter()) {
+            args_map.insert(arg_name, value);
         }
-        for kw in keywords {
-            let arg = kw.node.arg.as_ref().unwrap();
-            if !arguments.contains((*arg).as_str()) {
-                bail!("Unexpected keyword argument `{arg}`");
+
+        // Process keyword arguments.
+        for arg_name in arg_spec.iter().skip(args.len()) {
+            if let Some(value) = keywords.iter().find_map(|keyword| {
+                if keyword
+                    .node
+                    .arg
+                    .as_ref()
+                    .map_or(false, |kwarg_name| kwarg_name == arg_name)
+                {
+                    Some(&keyword.node.value)
+                } else {
+                    None
+                }
+            }) {
+                args_map.insert(arg_name, value);
             }
-            args_map.insert(kw.node.arg.as_ref().unwrap().as_str(), &kw.node.value);
         }
+
         Ok(args_map)
     }
 
