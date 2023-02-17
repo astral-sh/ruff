@@ -12,12 +12,102 @@ expression: diagnostics
     column: 13
   fix:
     content:
-      - "{ \"foo\": \"bar\", \"bar\": \"baz\", \"boo\": \"ooh\" }.get(a, 42)"
+      - "return { \"boo\": \"ooh\", \"foo\": \"bar\", \"bar\": \"baz\" }.get(a, 42)"
     location:
       row: 4
       column: 0
     end_location:
       row: 11
       column: 13
+  parent: ~
+- kind:
+    IfToDict: ~
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 20
+    column: 23
+  fix:
+    content:
+      - "return { 3: (7, 8, 9), 1: (1, 2, 3), 2: (4, 5, 6) }.get(a, (10, 11, 12))"
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 20
+      column: 23
+  parent: ~
+- kind:
+    IfToDict: ~
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 27
+    column: 20
+  fix:
+    content:
+      - "return { 2: (4, 5, 6), 3: (7, 8, 9), 1: (1, 2, 3) }.get(a)"
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 27
+      column: 20
+  parent: ~
+- kind:
+    IfToDict: ~
+  location:
+    row: 29
+    column: 0
+  end_location:
+    row: 36
+    column: 23
+  fix:
+    content:
+      - "return { \"Fairwell 'mister'\": (7, 8, 9), \"hello 'sir'\": (1, 2, 3), 'goodbye \"mam\"': (4, 5, 6) }.get(a, (10, 11, 12))"
+    location:
+      row: 29
+      column: 0
+    end_location:
+      row: 36
+      column: 23
+  parent: ~
+- kind:
+    IfToDict: ~
+  location:
+    row: 38
+    column: 0
+  end_location:
+    row: 43
+    column: 12
+  fix:
+    content:
+      - "return { b\"one\": 1, b\"three\": 3, b\"two\": 2 }.get(a)"
+    location:
+      row: 38
+      column: 0
+    end_location:
+      row: 43
+      column: 12
+  parent: ~
+- kind:
+    IfToDict: ~
+  location:
+    row: 45
+    column: 0
+  end_location:
+    row: 52
+    column: 23
+  fix:
+    content:
+      - "return { \"Fairwell 'mister'\": (7, 8, 9), \"hello 'sir'\": (\"hello'\", 'hi\"', 3), 'goodbye \"mam\"': (4, 5, 6) }.get(a, (10, 11, 12))"
+    location:
+      row: 45
+      column: 0
+    end_location:
+      row: 52
+      column: 23
   parent: ~
 
