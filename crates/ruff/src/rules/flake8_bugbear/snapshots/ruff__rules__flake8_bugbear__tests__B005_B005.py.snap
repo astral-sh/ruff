@@ -72,4 +72,14 @@ expression: diagnostics
     column: 13
   fix: ~
   parent: ~
+- kind:
+    StripWithMultiCharacters: ~
+  location:
+    row: 24
+    column: 0
+  end_location:
+    row: 24
+    column: 35
+  fix: ~
+  parent: ~
 

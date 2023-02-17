@@ -591,6 +591,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // numpy
         (Numpy, "001") => Rule::NumpyDeprecatedTypeAlias,
+        (Numpy, "002") => Rule::NumpyLegacyRandom,
 
         // ruff
         (Ruff, "001") => Rule::AmbiguousUnicodeCharacterString,

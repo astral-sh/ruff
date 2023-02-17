@@ -553,6 +553,7 @@ ruff_macros::register_rules!(
     rules::flake8_self::rules::PrivateMemberAccess,
     // numpy
     rules::numpy::rules::NumpyDeprecatedTypeAlias,
+    rules::numpy::rules::NumpyLegacyRandom,
     // ruff
     rules::ruff::rules::AmbiguousUnicodeCharacterString,
     rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,

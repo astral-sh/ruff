@@ -109,6 +109,16 @@ mod tests {
     }
 
     #[test]
+    fn ruff_targeted_noqa() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_targeted_noqa.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn redirects() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/redirects.py"),

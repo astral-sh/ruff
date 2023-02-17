@@ -20,6 +20,8 @@ s.rstrip(r"\n\t ")  # warning
 s.strip("a")  # no warning
 s.strip("あ")  # no warning
 s.strip("ああ")  # warning
+s.strip("\ufeff")  # no warning
+s.strip("\u0074\u0065\u0073\u0074")  # warning
 
 from somewhere import other_type, strip
 
