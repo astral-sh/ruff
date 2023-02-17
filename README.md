@@ -189,8 +189,10 @@ Or, to enable autofix:
 
 <!-- Begin section: Configuration -->
 
-Ruff is configurable both via `pyproject.toml`, `ruff.toml`, and the command line.
-For a full list of configurable options, see the [list of all options](https://beta.ruff.rs/docs/settings/).
+Ruff can be configured via a `pyproject.toml` file, a `ruff.toml` file, or through the command line.
+
+For a complete enumeration of the available configuration options, see the
+[documentation](https://beta.ruff.rs/docs/settings/).
 
 ### Configure via `pyproject.toml`
 
