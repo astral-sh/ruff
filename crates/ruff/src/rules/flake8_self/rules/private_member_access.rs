@@ -22,6 +22,9 @@ define_violation!(
     /// versions, that it will have the same type, or that it will have the same
     /// behavior. Instead, use the class's public interface.
     ///
+    /// ## Options
+    /// * `flake8-self.ignore-names`
+    ///
     /// ## Example
     /// ```python
     /// class Class:
@@ -62,6 +65,10 @@ pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
         if (attr.starts_with("__") && !attr.ends_with("__"))
             || (attr.starts_with('_') && !attr.starts_with("__"))
         {
+            if checker.settings.flake8_self.ignore_names.contains(attr) {
+                return;
+            }
+
             if let ExprKind::Call { func, .. } = &value.node {
                 // Ignore `super()` calls.
                 let call_path = collect_call_path(func);

@@ -56,12 +56,6 @@ class Foo(metaclass=BazMeta):
 
 foo = Foo()
 
-print(foo.public_thing)
-print(foo.public_func())
-print(foo.__dict__)
-print(foo.__str__())
-print(foo().__class__)
-
 print(foo._private_thing)  # SLF001
 print(foo.__really_private_thing)  # SLF001
 print(foo._private_func())  # SLF001
@@ -69,3 +63,10 @@ print(foo.__really_private_func(1))  # SLF001
 print(foo.bar._private)  # SLF001
 print(foo()._private_thing)  # SLF001
 print(foo()._private_thing__)  # SLF001
+
+print(foo.public_thing)
+print(foo.public_func())
+print(foo.__dict__)
+print(foo.__str__())
+print(foo().__class__)
+print(foo._asdict())
