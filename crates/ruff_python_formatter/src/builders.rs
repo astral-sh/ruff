@@ -37,7 +37,7 @@ impl Format<ASTFormatContext<'_>> for LeadingComments<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         for comment in self.comments {
             if matches!(comment.relationship, Relationship::Leading) {
-                if let TriviaKind::StandaloneComment(range) = comment.kind {
+                if let TriviaKind::OwnLineComment(range) = comment.kind {
                     write!(f, [hard_line_break()])?;
                     write!(f, [literal(range)])?;
                 }
@@ -61,7 +61,7 @@ impl Format<ASTFormatContext<'_>> for TrailingComments<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         for comment in self.comments {
             if matches!(comment.relationship, Relationship::Trailing) {
-                if let TriviaKind::StandaloneComment(range) = comment.kind {
+                if let TriviaKind::OwnLineComment(range) = comment.kind {
                     write!(f, [hard_line_break()])?;
                     write!(f, [literal(range)])?;
                 }

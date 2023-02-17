@@ -5,6 +5,7 @@
 //!
 //! [Ruff]: https://github.com/charliermarsh/ruff
 
+pub use ast::types::Range;
 use cfg_if::cfg_if;
 pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;

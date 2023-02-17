@@ -12,8 +12,6 @@ SECTIONS: list[tuple[str, str]] = [
     ("Configuration", "configuration.md"),
     ("Rules", "rules.md"),
     ("Settings", "settings.md"),
-    ("Editor Integrations", "editor-integrations.md"),
-    ("FAQ", "faq.md"),
     ("Acknowledgements", "acknowledgements.md"),
 ]
 
@@ -49,6 +47,10 @@ def main() -> None:
     # Split the README.md into sections.
     for title, filename in SECTIONS:
         with Path(f"docs/{filename}").open("w+") as f:
+            if filename == "settings.md":
+                f.write(subprocess.check_output(["cargo", "dev", "generate-options"], encoding="utf-8"))
+                continue
+
             block = content.split(f"<!-- Begin section: {title} -->")
             if len(block) != 2:
                 msg = f"Section {title} not found in README.md"
@@ -60,6 +62,9 @@ def main() -> None:
                 raise ValueError(msg)
 
             f.write(block[0])
+
+            if filename == "rules.md":
+                f.write(subprocess.check_output(["cargo", "dev", "generate-rules-table"], encoding="utf-8"))
 
     # Copy the CONTRIBUTING.md.
     shutil.copy("CONTRIBUTING.md", "docs/contributing.md")

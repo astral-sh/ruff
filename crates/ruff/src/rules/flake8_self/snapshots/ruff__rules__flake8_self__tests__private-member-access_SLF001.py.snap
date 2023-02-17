@@ -50,10 +50,10 @@ expression: diagnostics
     PrivateMemberAccess:
       access: _private_thing
   location:
-    row: 65
+    row: 59
     column: 6
   end_location:
-    row: 65
+    row: 59
     column: 24
   fix: ~
   parent: ~
@@ -61,10 +61,10 @@ expression: diagnostics
     PrivateMemberAccess:
       access: __really_private_thing
   location:
-    row: 66
+    row: 60
     column: 6
   end_location:
-    row: 66
+    row: 60
     column: 32
   fix: ~
   parent: ~
@@ -72,10 +72,10 @@ expression: diagnostics
     PrivateMemberAccess:
       access: _private_func
   location:
-    row: 67
+    row: 61
     column: 6
   end_location:
-    row: 67
+    row: 61
     column: 23
   fix: ~
   parent: ~
@@ -83,10 +83,10 @@ expression: diagnostics
     PrivateMemberAccess:
       access: __really_private_func
   location:
-    row: 68
+    row: 62
     column: 6
   end_location:
-    row: 68
+    row: 62
     column: 31
   fix: ~
   parent: ~
@@ -94,10 +94,10 @@ expression: diagnostics
     PrivateMemberAccess:
       access: _private
   location:
-    row: 69
+    row: 63
     column: 6
   end_location:
-    row: 69
+    row: 63
     column: 22
   fix: ~
   parent: ~
@@ -105,10 +105,10 @@ expression: diagnostics
     PrivateMemberAccess:
       access: _private_thing
   location:
-    row: 70
+    row: 64
     column: 6
   end_location:
-    row: 70
+    row: 64
     column: 26
   fix: ~
   parent: ~
@@ -116,10 +116,10 @@ expression: diagnostics
     PrivateMemberAccess:
       access: _private_thing__
   location:
-    row: 71
+    row: 65
     column: 6
   end_location:
-    row: 71
+    row: 65
     column: 28
   fix: ~
   parent: ~

@@ -1,5 +1,6 @@
 //! Rules from [flake8-self](https://pypi.org/project/flake8-self/).
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {

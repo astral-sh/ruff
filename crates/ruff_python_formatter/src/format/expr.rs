@@ -27,11 +27,11 @@ fn format_starred(
 ) -> FormatResult<()> {
     write!(f, [text("*"), value.format()])?;
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -56,11 +56,11 @@ fn format_name(
 ) -> FormatResult<()> {
     write!(f, [literal(Range::from_located(expr))])?;
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -310,11 +310,11 @@ fn format_call(
         write!(f, [text("(")])?;
         write!(f, [text(")")])?;
 
-        // Apply any inline comments.
+        // Format any end-of-line comments.
         let mut first = true;
         for range in expr.trivia.iter().filter_map(|trivia| {
             if matches!(trivia.relationship, Relationship::Trailing) {
-                if let TriviaKind::InlineComment(range) = trivia.kind {
+                if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                     Some(range)
                 } else {
                     None
@@ -331,11 +331,11 @@ fn format_call(
     } else {
         write!(f, [text("(")])?;
 
-        // Apply any inline comments.
+        // Format any end-of-line comments.
         let mut first = true;
         for range in expr.trivia.iter().filter_map(|trivia| {
             if matches!(trivia.relationship, Relationship::Trailing) {
-                if let TriviaKind::InlineComment(range) = trivia.kind {
+                if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                     Some(range)
                 } else {
                     None
@@ -400,7 +400,7 @@ fn format_call(
                 // Apply any dangling trailing comments.
                 for trivia in &expr.trivia {
                     if matches!(trivia.relationship, Relationship::Dangling) {
-                        if let TriviaKind::StandaloneComment(range) = trivia.kind {
+                        if let TriviaKind::OwnLineComment(range) = trivia.kind {
                             write!(f, [expand_parent()])?;
                             write!(f, [hard_line_break()])?;
                             write!(f, [literal(range)])?;
@@ -593,11 +593,11 @@ fn format_compare(
         write!(f, [group(&format_args![comparators[i].format()])])?;
     }
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -709,11 +709,11 @@ fn format_attribute(
     write!(f, [text(".")])?;
     write!(f, [dynamic_text(attr, TextSize::default())])?;
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -749,11 +749,11 @@ fn format_bool_op(
         }
     }
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -791,11 +791,11 @@ fn format_bin_op(
     }
     write!(f, [group(&format_args![right.format()])])?;
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -886,7 +886,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
         // Any leading comments come on the line before.
         for trivia in &self.item.trivia {
             if matches!(trivia.relationship, Relationship::Leading) {
-                if let TriviaKind::StandaloneComment(range) = trivia.kind {
+                if let TriviaKind::OwnLineComment(range) = trivia.kind {
                     write!(f, [expand_parent()])?;
                     write!(f, [literal(range)])?;
                     write!(f, [hard_line_break()])?;
@@ -958,7 +958,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
         // Any trailing comments come on the lines after.
         for trivia in &self.item.trivia {
             if matches!(trivia.relationship, Relationship::Trailing) {
-                if let TriviaKind::StandaloneComment(range) = trivia.kind {
+                if let TriviaKind::OwnLineComment(range) = trivia.kind {
                     write!(f, [expand_parent()])?;
                     write!(f, [literal(range)])?;
                     write!(f, [hard_line_break()])?;

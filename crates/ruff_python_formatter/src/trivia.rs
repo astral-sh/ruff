@@ -28,8 +28,8 @@ impl Node<'_> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TriviaTokenKind {
-    StandaloneComment,
-    InlineComment,
+    OwnLineComment,
+    EndOfLineComment,
     MagicTrailingComma,
     EmptyLine,
     Parentheses,
@@ -44,8 +44,27 @@ pub struct TriviaToken {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TriviaKind {
-    StandaloneComment(Range),
-    InlineComment(Range),
+    /// A Comment that is separated by at least one line break from the preceding token.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// a = 1
+    /// # This is an own-line comment.
+    /// b = 2
+    /// ```
+    OwnLineComment(Range),
+    /// A comment that is on the same line as the preceding token.
+    ///
+    /// # Examples
+    ///
+    /// ## End of line
+    ///
+    /// ```ignore
+    /// a = 1  # This is an end-of-line comment.
+    /// b = 2
+    /// ```
+    EndOfLineComment(Range),
     MagicTrailingComma,
     EmptyLine,
     Parentheses,
@@ -85,12 +104,12 @@ impl Trivia {
                 kind: TriviaKind::EmptyLine,
                 relationship,
             },
-            TriviaTokenKind::StandaloneComment => Self {
-                kind: TriviaKind::StandaloneComment(Range::new(token.start, token.end)),
+            TriviaTokenKind::OwnLineComment => Self {
+                kind: TriviaKind::OwnLineComment(Range::new(token.start, token.end)),
                 relationship,
             },
-            TriviaTokenKind::InlineComment => Self {
-                kind: TriviaKind::InlineComment(Range::new(token.start, token.end)),
+            TriviaTokenKind::EndOfLineComment => Self {
+                kind: TriviaKind::EndOfLineComment(Range::new(token.start, token.end)),
                 relationship,
             },
             TriviaTokenKind::Parentheses => Self {
@@ -125,9 +144,9 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
                 start: *start,
                 end: *end,
                 kind: if prev_non_newline_tok.map_or(true, |(prev, ..)| prev.row() < start.row()) {
-                    TriviaTokenKind::StandaloneComment
+                    TriviaTokenKind::OwnLineComment
                 } else {
-                    TriviaTokenKind::InlineComment
+                    TriviaTokenKind::EndOfLineComment
                 },
             });
         }
@@ -774,7 +793,7 @@ pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaI
     for (index, token) in tokens.into_iter().enumerate() {
         let (preceding_node, following_node, enclosing_node, enclosed_node) = &stack[index];
         match token.kind {
-            TriviaTokenKind::EmptyLine | TriviaTokenKind::StandaloneComment => {
+            TriviaTokenKind::EmptyLine | TriviaTokenKind::OwnLineComment => {
                 if let Some(following_node) = following_node {
                     // Always a leading comment.
                     add_comment(
@@ -799,7 +818,7 @@ pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaI
                     unreachable!("Attach token to the ast: {:?}", token);
                 }
             }
-            TriviaTokenKind::InlineComment => {
+            TriviaTokenKind::EndOfLineComment => {
                 if let Some(preceding_node) = preceding_node {
                     // There is content before this comment on the same line, but
                     // none after it, so prefer a trailing comment of the previous node.

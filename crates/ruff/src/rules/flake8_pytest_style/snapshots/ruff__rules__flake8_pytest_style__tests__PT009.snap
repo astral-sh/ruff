@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_pytest_style/mod.rs
+source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -51,7 +51,7 @@ expression: diagnostics
     column: 23
   fix:
     content:
-      - assert expr
+      - "assert expr, msg"
     location:
       row: 13
       column: 8
