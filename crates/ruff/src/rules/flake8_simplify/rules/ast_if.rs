@@ -84,7 +84,7 @@ impl Violation for NeedlessBool {
 
 define_violation!(
     /// ### What it does
-    /// Checks for three or more consective if-statements with direct returns
+    /// Checks for three or more consecutive if-statements with direct returns
     ///
     /// ### Why is this bad?
     /// These can be simplified by using a dictionary
@@ -749,14 +749,14 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
     if key_value_pairs.len() < 3 {
         return;
     }
-    let mut new_str = format!(
-        "return {{ {} }}",
-        key_value_pairs
-            .iter()
-            .map(|(k, v)| format!("{}: {}", k, v))
-            .collect::<Vec<String>>()
-            .join(", ")
-    );
+    let mut dict_vals = key_value_pairs
+        .iter()
+        .map(|(k, v)| format!("{}: {}", k, v))
+        .collect::<Vec<String>>();
+    // Without this sort, the order of the keys in the dict is not deterministic, leading tests to
+    // fail
+    dict_vals.sort();
+    let mut new_str = format!("return {{ {} }}", dict_vals.join(", "));
     new_str.push_str(&format!(".get({variable}"));
     if let Some(else_val) = &else_value {
         new_str.push_str(&format!(", {}", else_val));

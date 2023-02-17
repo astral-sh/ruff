@@ -5,7 +5,7 @@ Derived from the **flake8-simplify** linter.
 Autofix is always available.
 
 ### What it does
-Checks for three or more consective if-statements with direct returns
+Checks for three or more consecutive if-statements with direct returns
 
 ### Why is this bad?
 These can be simplified by using a dictionary

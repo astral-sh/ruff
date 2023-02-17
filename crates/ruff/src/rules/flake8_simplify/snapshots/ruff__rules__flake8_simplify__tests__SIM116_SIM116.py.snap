@@ -12,7 +12,7 @@ expression: diagnostics
     column: 13
   fix:
     content:
-      - "return { \"boo\": \"ooh\", \"foo\": \"bar\", \"bar\": \"baz\" }.get(a, 42)"
+      - "return { \"bar\": \"baz\", \"boo\": \"ooh\", \"foo\": \"bar\" }.get(a, 42)"
     location:
       row: 4
       column: 0
@@ -30,7 +30,7 @@ expression: diagnostics
     column: 23
   fix:
     content:
-      - "return { 3: (7, 8, 9), 1: (1, 2, 3), 2: (4, 5, 6) }.get(a, (10, 11, 12))"
+      - "return { 1: (1, 2, 3), 2: (4, 5, 6), 3: (7, 8, 9) }.get(a, (10, 11, 12))"
     location:
       row: 13
       column: 0
@@ -48,7 +48,7 @@ expression: diagnostics
     column: 20
   fix:
     content:
-      - "return { 2: (4, 5, 6), 3: (7, 8, 9), 1: (1, 2, 3) }.get(a)"
+      - "return { 1: (1, 2, 3), 2: (4, 5, 6), 3: (7, 8, 9) }.get(a)"
     location:
       row: 22
       column: 0
