@@ -18,7 +18,10 @@ impl Violation for FirstLineCapitalized {
 
 /// D403
 pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
-    if !matches!(docstring.kind, DefinitionKind::Function(_)) {
+    if !matches!(
+        docstring.kind,
+        DefinitionKind::Function(_) | DefinitionKind::NestedFunction(_) | DefinitionKind::Method(_)
+    ) {
         return;
     }
 
