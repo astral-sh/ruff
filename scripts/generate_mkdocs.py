@@ -12,7 +12,6 @@ SECTIONS: list[tuple[str, str]] = [
     ("Configuration", "configuration.md"),
     ("Rules", "rules.md"),
     ("Settings", "settings.md"),
-    ("FAQ", "faq.md"),
     ("Acknowledgements", "acknowledgements.md"),
 ]
 
