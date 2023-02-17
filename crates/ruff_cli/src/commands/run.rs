@@ -10,10 +10,10 @@ use log::{debug, error};
 use rayon::prelude::*;
 
 use ruff::message::{Location, Message};
-use ruff::registry::Rule;
+use ruff::registry::{Diagnostic, Rule};
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
-use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError};
+use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError, Range};
 
 use crate::args::Overrides;
 use crate::cache;
@@ -108,14 +108,14 @@ pub fn run(
                     );
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(&Rule::IOError) {
-                        Diagnostics::new(vec![Message {
-                            kind: IOError { message }.into(),
-                            location: Location::default(),
-                            end_location: Location::default(),
-                            fix: None,
-                            filename: format!("{}", path.display()),
-                            source: None,
-                        }])
+                        Diagnostics::new(vec![Message::from_diagnostic(
+                            Diagnostic::new(
+                                IOError { message },
+                                Range::new(Location::default(), Location::default()),
+                            ),
+                            format!("{}", path.display()),
+                            None,
+                        )])
                     } else {
                         Diagnostics::default()
                     }
