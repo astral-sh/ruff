@@ -42,6 +42,15 @@ elif a == b"two":
 elif a == b"three":
     return 3
 
+if a == "hello 'sir'":
+    return ("hello'", 'hi"', 3)
+elif a == 'goodbye "mam"':
+    return (4, 5, 6)
+elif a == """Fairwell 'mister'""":
+    return (7, 8, 9)
+else:
+    return (10, 11, 12)
+
 # These Should NOT change
 if a == "foo":
     return "bar"
