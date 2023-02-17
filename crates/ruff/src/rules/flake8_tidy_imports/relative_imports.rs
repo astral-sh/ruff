@@ -92,43 +92,50 @@ fn fix_banned_relative_import(
     module_path: Option<&Vec<String>>,
     stylist: &Stylist,
 ) -> Option<Fix> {
-    // Only fix is the module path is known
+    // Only fix is the module path is known.
     if let Some(mut parts) = module_path.cloned() {
-        // Remove relative level from module path
+        // Remove relative level from module path.
         for _ in 0..*level? {
             parts.pop();
         }
 
         let module_name = if let Some(module) = module {
             let call_path = from_relative_import(&parts, module);
+            // Require import to be a valid PEP 8 module:
+            // https://python.org/dev/peps/pep-0008/#package-and-module-names
+            if !call_path.iter().all(|part| is_lower_with_underscore(part)) {
+                return None;
+            }
+            call_path.as_slice().join(".")
+        } else if parts.len() > 1 {
+            let module = parts.last().unwrap();
+            let call_path = from_relative_import(&parts, module);
+            // Require import to be a valid PEP 8 module:
+            // https://python.org/dev/peps/pep-0008/#package-and-module-names
+            if !call_path.iter().all(|part| is_lower_with_underscore(part)) {
+                return None;
+            }
             call_path.as_slice().join(".")
         } else {
-            if parts.len() > 1 {
-                let module = parts.last().unwrap();
-                let call_path = from_relative_import(&parts, module);
-                call_path.as_slice().join(".")
-            } else {
-                parts.join(".")
+            // Require import to be a valid PEP 8 module:
+            // https://python.org/dev/peps/pep-0008/#package-and-module-names
+            if !parts.iter().all(|part| is_lower_with_underscore(part)) {
+                return None;
             }
+            parts.join(".")
         };
 
-        // Require import to be a valid PEP 8 module:
-        // https://python.org/dev/peps/pep-0008/#package-and-module-names
-        if module_name.split('.').any(|f| !is_lower_with_underscore(f)) {
-            return None;
-        }
-
-        let content = match &stmt.node {
-            StmtKind::ImportFrom { names, .. } => unparse_stmt(
-                &create_stmt(StmtKind::ImportFrom {
-                    module: Some(module_name),
-                    names: names.clone(),
-                    level: Some(0),
-                }),
-                stylist,
-            ),
-            _ => return None,
+        let StmtKind::ImportFrom { names, .. } = &stmt.node else {
+            unreachable!("Expected StmtKind::ImportFrom");
         };
+        let content = unparse_stmt(
+            &create_stmt(StmtKind::ImportFrom {
+                module: Some(module_name),
+                names: names.clone(),
+                level: Some(0),
+            }),
+            stylist,
+        );
 
         Some(Fix::replacement(
             content,
