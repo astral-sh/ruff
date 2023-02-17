@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use crate::ast::comparable::{ComparableExpr, ComparableStmt};
 use crate::ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
-    has_comments_in, unparse_expr, unparse_stmt,
+    has_comments_in, unparse_constant, unparse_expr, unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -611,23 +611,31 @@ fn should_proceed_main(test: &Expr, body: &[Stmt], orelse: &[Stmt]) -> bool {
         comparators,
     } = &test.node
     {
-        if let ExprKind::Name { .. } = &left.node {
-            if ops.len() == 1 && ops[0] == Cmpop::Eq {
-                if comparators.len() == 1 {
-                    if let ExprKind::Constant { .. } = &comparators[0].node {
-                        if body.len() == 1 {
-                            if let StmtKind::Return { .. } = &body[0].node {
-                                if orelse.len() == 1 {
-                                    if let StmtKind::If { .. } = &orelse[0].node {
-                                        return true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        return matches!(
+            (
+                &left.node,
+                ops.as_slice(),
+                comparators.as_slice(),
+                body,
+                orelse
+            ),
+            (
+                ExprKind::Name { .. },
+                [Cmpop::Eq],
+                [Expr {
+                    node: ExprKind::Constant { .. },
+                    ..
+                }],
+                [Stmt {
+                    node: StmtKind::Return { .. },
+                    ..
+                }],
+                [Stmt {
+                    node: StmtKind::If { .. },
+                    ..
+                }]
+            )
+        );
     }
     false
 }
@@ -660,34 +668,6 @@ fn should_proceed_child(stmt: &Stmt, var_id: &str) -> bool {
     false
 }
 
-fn constant_to_str(value: &Constant) -> String {
-    match value {
-        Constant::None => "None".to_string(),
-        Constant::Str(s) => format!("{:?}", s),
-        Constant::Int(i) => i.to_string(),
-        Constant::Float(f) => f.to_string(),
-        Constant::Ellipsis => "...".to_string(),
-        Constant::Bytes(b) => {
-            let the_string = String::from_utf8(b.clone()).unwrap();
-            format!("b\"{the_string}\"")
-        }
-        Constant::Complex { real, imag } => format!("{}+{}j", real, imag),
-        Constant::Bool(b) => match b {
-            true => "True".to_string(),
-            false => "False".to_string(),
-        },
-        Constant::Tuple(items) => {
-            let mut result = "(".to_string();
-            for item in items {
-                result.push_str(&constant_to_str(item));
-                result.push_str(", ");
-            }
-            result.push(')');
-            result
-        }
-    }
-}
-
 /// SIM116
 pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt], orelse: &[Stmt]) {
     if !should_proceed_main(test, body, orelse) {
@@ -703,12 +683,10 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
     } = &test.node
     {
         if let ExprKind::Constant { value, .. } = &comparators[0].node {
-            let key = constant_to_str(value);
+            let key = unparse_constant(value, checker.stylist);
             if let StmtKind::Return { value } = &body[0].node {
                 let final_value = match value {
-                    Some(value) => checker
-                        .locator
-                        .slice_source_code_range(&Range::from_located(value)),
+                    Some(value) => checker.locator.slice(&Range::from_located(value)),
                     None => return,
                 };
                 key_value_pairs.insert(key, final_value.to_string());
@@ -722,16 +700,13 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
     } else {
         return;
     }
-    while child.is_some() {
-        if !should_proceed_child(child.unwrap(), &variable) {
+    while let Some(current) = child.take() {
+        if !should_proceed_child(current, &variable) {
             return;
         }
-        if let StmtKind::If { test, body, orelse } = &child.unwrap().node {
+        if let StmtKind::If { test, body, orelse } = &current.node {
             if let StmtKind::Return { value } = &body[0].node {
-                let clean_value = match value {
-                    Some(item) => item,
-                    None => return,
-                };
+                let Some(clean_value) = value else { return; };
                 if let ExprKind::Call { .. } = &clean_value.node {
                     return;
                 }
@@ -740,17 +715,14 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
                         value: const_val, ..
                     } = &comparators[0].node
                     {
-                        let key = constant_to_str(const_val);
-                        let final_value = checker
-                            .locator
-                            .slice_source_code_range(&Range::from_located(clean_value));
+                        let key = unparse_constant(const_val, checker.stylist);
+                        let final_value = checker.locator.slice(&Range::from_located(clean_value));
                         key_value_pairs.insert(key, final_value.to_string());
                     }
                 }
             } else {
                 return;
             }
-            // let current = checker.locator.slice_source_code_range(&Range::from_located(child.unwrap()));
 
             if orelse.len() == 1 {
                 match &orelse[0].node {
@@ -759,9 +731,7 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
                     }
                     StmtKind::Return { value } => {
                         let final_value = match value {
-                            Some(item) => checker
-                                .locator
-                                .slice_source_code_range(&Range::from_located(item)),
+                            Some(item) => checker.locator.slice(&Range::from_located(item)),
                             None => "None",
                         };
                         else_value = Some(final_value.to_string());
