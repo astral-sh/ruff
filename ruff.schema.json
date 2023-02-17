@@ -209,6 +209,17 @@
         }
       ]
     },
+    "flake8-self": {
+      "description": "Options for the `flake8_self` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8SelfOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-tidy-imports": {
       "description": "Options for the `flake8-tidy-imports` plugin.",
       "anyOf": [
@@ -813,6 +824,22 @@
               "type": "null"
             }
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8SelfOptions": {
+      "type": "object",
+      "properties": {
+        "ignore-names": {
+          "description": "A list of names to ignore when considering `flake8-self` violations.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
