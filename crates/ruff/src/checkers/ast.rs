@@ -2556,7 +2556,14 @@ where
                     .enabled(&Rule::UnnecessaryCollectionCall)
                 {
                     flake8_comprehensions::rules::unnecessary_collection_call(
-                        self, expr, func, args, keywords,
+                        self,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        self.settings
+                            .flake8_comprehensions
+                            .allow_dict_calls_with_keyword_arguments,
                     );
                 }
                 if self
