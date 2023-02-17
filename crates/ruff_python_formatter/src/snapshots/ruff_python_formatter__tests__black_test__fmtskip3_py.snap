@@ -1,0 +1,83 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtskip3.py
+---
+## Input
+
+
+```py
+a  =    3
+# fmt: off
+b,    c = 1, 2
+d =    6  # fmt: skip
+e = 5
+# fmt: on
+f = ["This is a very long line that should be formatted into a clearer line ", "by rearranging."]
+
+```
+
+
+## Black Differences
+
+
+```diff
+--- Black
++++ Ruff
+@@ -1,11 +1,10 @@
+ a = 3
+ # fmt: off
+-b,    c = 1, 2
+-d =    6  # fmt: skip
++b, c = 1, 2
++d = 6  # fmt: skip
+ e = 5
+ # fmt: on
+ f = [
+     "This is a very long line that should be formatted into a clearer line ",
+     "by rearranging.",
+-]
+-
++]
+\ No newline at end of file
+
+```
+
+
+## Ruff Output
+
+
+```py
+a = 3
+# fmt: off
+b, c = 1, 2
+d = 6  # fmt: skip
+e = 5
+# fmt: on
+f = [
+    "This is a very long line that should be formatted into a clearer line ",
+    "by rearranging.",
+]
+```
+
+
+## Black Output
+
+
+```py
+a = 3
+# fmt: off
+b,    c = 1, 2
+d =    6  # fmt: skip
+e = 5
+# fmt: on
+f = [
+    "This is a very long line that should be formatted into a clearer line ",
+    "by rearranging.",
+]
+
+
+```
+
+
+

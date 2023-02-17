@@ -1,7 +1,6 @@
 ---
-source: src/source_code/mod.rs
-assertion_line: 0
-expression: formatted
+source: crates/ruff_python_formatter/src/lib.rs
+expression: formatted.print()?.as_code()
 ---
 """The asyncio package, tracking PEP 3156."""
 
@@ -67,4 +66,3 @@ __all__ = (
     + streams.__all__
     + tasks.__all__
 )
-

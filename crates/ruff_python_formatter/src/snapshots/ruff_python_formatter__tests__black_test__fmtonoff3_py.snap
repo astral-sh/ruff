@@ -1,0 +1,118 @@
+---
+source: crates/ruff_python_formatter/src/lib.rs
+expression: snapshot
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_cases/fmtonoff3.py
+---
+## Input
+
+
+```py
+# fmt: off
+x = [
+    1, 2,
+    3, 4,
+]
+# fmt: on
+
+# fmt: off
+x = [
+    1, 2,
+    3, 4,
+]
+# fmt: on
+
+x = [
+    1, 2, 3, 4
+]
+
+```
+
+
+## Black Differences
+
+
+```diff
+--- Black
++++ Ruff
+@@ -1,16 +1,19 @@
+ # fmt: off
+ x = [
+-    1, 2,
+-    3, 4,
++    1,
++    2,
++    3,
++    4,
+ ]
+ # fmt: on
+ 
+ # fmt: off
+ x = [
+-    1, 2,
+-    3, 4,
++    1,
++    2,
++    3,
++    4,
+ ]
+ # fmt: on
+ 
+-x = [1, 2, 3, 4]
+-
++x = [1, 2, 3, 4]
+\ No newline at end of file
+
+```
+
+
+## Ruff Output
+
+
+```py
+# fmt: off
+x = [
+    1,
+    2,
+    3,
+    4,
+]
+# fmt: on
+
+# fmt: off
+x = [
+    1,
+    2,
+    3,
+    4,
+]
+# fmt: on
+
+x = [1, 2, 3, 4]
+```
+
+
+## Black Output
+
+
+```py
+# fmt: off
+x = [
+    1, 2,
+    3, 4,
+]
+# fmt: on
+
+# fmt: off
+x = [
+    1, 2,
+    3, 4,
+]
+# fmt: on
+
+x = [1, 2, 3, 4]
+
+
+```
+
+
+

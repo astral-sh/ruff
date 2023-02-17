@@ -1,7 +1,6 @@
 ---
-source: src/source_code/mod.rs
-assertion_line: 0
-expression: formatted
+source: crates/ruff_python_formatter/src/lib.rs
+expression: formatted.print()?.as_code()
 ---
 def function(**kwargs):
     t = a**2 + b**3
@@ -66,4 +65,3 @@ if hasattr(view, "sum_of_weights"):
 return np.divide(
     where=view.sum_of_weights_of_weight_long**2 > view.sum_of_weights_squared,  # type: ignore
 )
-

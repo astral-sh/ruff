@@ -18,3 +18,5 @@ rustpython-parser = { workspace = true }
 [dev-dependencies]
 insta = { version = "1.19.0", features = [] }
 test-case = { version = "2.2.2" }
+ruff_testing_macros = { path = "../ruff_testing_macros" }
+similar = "2.2.1"

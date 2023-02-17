@@ -1,7 +1,6 @@
 ---
-source: src/source_code/mod.rs
-assertion_line: 0
-expression: formatted
+source: crates/ruff_python_formatter/src/lib.rs
+expression: adjust_quotes(formatted.print()?.as_code())
 ---
 import core, time, a
 

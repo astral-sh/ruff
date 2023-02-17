@@ -2075,11 +2075,24 @@ dependencies = [
  "insta",
  "once_cell",
  "ruff_formatter",
+ "ruff_testing_macros",
  "ruff_text_size",
  "rustc-hash",
  "rustpython-common",
  "rustpython-parser",
+ "similar",
  "test-case",
+]
+
+[[package]]
+name = "ruff_testing_macros"
+version = "0.0.0"
+dependencies = [
+ "glob",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
