@@ -1,4 +1,4 @@
-# These SHOULD change
+# Errors
 a = "hello"
 
 if a == "foo":
@@ -51,7 +51,7 @@ elif a == """Fairwell 'mister'""":
 else:
     return (10, 11, 12)
 
-# These Should NOT change
+# OK
 if a == "foo":
     return "bar"
 elif a == "bar":

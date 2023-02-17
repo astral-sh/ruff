@@ -1557,7 +1557,7 @@ where
                     flake8_simplify::rules::return_bool_condition_directly(self, stmt);
                 }
                 if self.settings.rules.enabled(&Rule::IfToDict) {
-                    flake8_simplify::rules::if_to_dict(self, stmt, test, body, orelse);
+                    flake8_simplify::rules::manual_dict_lookup(self, stmt, test, body, orelse);
                 }
                 if self.settings.rules.enabled(&Rule::UseTernaryOperator) {
                     flake8_simplify::rules::use_ternary_operator(

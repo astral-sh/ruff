@@ -2,9 +2,9 @@ use log::error;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_macros::{define_violation, derive_message_formats};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-use crate::ast::comparable::{ComparableExpr, ComparableStmt};
+use crate::ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use crate::ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_constant, unparse_expr, unparse_stmt,
@@ -103,9 +103,9 @@ define_violation!(
     /// ```python
     /// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
     /// ```
-    pub struct IfToDict;
+    pub struct ManualDictLookup;
 );
-impl AlwaysAutofixableViolation for IfToDict {
+impl AlwaysAutofixableViolation for ManualDictLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a dictionary instead of consecutive `if` statements")
@@ -611,7 +611,7 @@ fn should_proceed_main(test: &Expr, body: &[Stmt], orelse: &[Stmt]) -> bool {
         comparators,
     } = &test.node
     {
-        return matches!(
+        matches!(
             (
                 &left.node,
                 ops.as_slice(),
@@ -635,9 +635,10 @@ fn should_proceed_main(test: &Expr, body: &[Stmt], orelse: &[Stmt]) -> bool {
                     ..
                 }]
             )
-        );
+        )
+    } else {
+        false
     }
-    false
 }
 
 fn should_proceed_child(stmt: &Stmt, var_id: &str) -> bool {
@@ -669,55 +670,61 @@ fn should_proceed_child(stmt: &Stmt, var_id: &str) -> bool {
 }
 
 /// SIM116
-pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt], orelse: &[Stmt]) {
+pub fn manual_dict_lookup(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    body: &[Stmt],
+    orelse: &[Stmt],
+) {
     if !should_proceed_main(test, body, orelse) {
         return;
     }
-    let variable: String;
-    let mut child: Option<&Stmt> = orelse.get(0);
-    let mut else_value: Option<String> = None;
-    let mut key_value_pairs: HashMap<String, String> = HashMap::new();
-    // This check is useless because we also check above, but it makes Rust happy
-    if let ExprKind::Compare {
+
+    let ExprKind::Compare {
         left, comparators, ..
-    } = &test.node
-    {
-        if let ExprKind::Constant { value, .. } = &comparators[0].node {
-            let key = unparse_constant(value, checker.stylist);
-            if let StmtKind::Return { value } = &body[0].node {
-                let final_value = match value {
-                    Some(value) => checker.locator.slice(&Range::from_located(value)),
-                    None => return,
-                };
-                key_value_pairs.insert(key, final_value.to_string());
-            }
-        }
-        if let ExprKind::Name { id, .. } = &left.node {
-            variable = id.clone();
-        } else {
-            return;
-        }
-    } else {
+    } = &test.node else {
+        unreachable!("Expected ExprKind::Compare");
+    };
+
+    let ExprKind::Name { id, .. } = &left.node else {
         return;
+    };
+
+    let mut key_value_pairs: BTreeMap<String, &str> = BTreeMap::new();
+    if let ExprKind::Constant {
+        value: constant, ..
+    } = &comparators[0].node
+    {
+        if let StmtKind::Return { value } = &body[0].node {
+            let key = unparse_constant(constant, checker.stylist);
+            let value = match value {
+                Some(value) => checker.locator.slice(&Range::from_located(value)),
+                None => return,
+            };
+            key_value_pairs.insert(key, value);
+        }
     }
+
+    let mut child: Option<&Stmt> = orelse.get(0);
+    let mut else_value: Option<&str> = None;
     while let Some(current) = child.take() {
-        if !should_proceed_child(current, &variable) {
+        if !should_proceed_child(current, &id) {
             return;
         }
         if let StmtKind::If { test, body, orelse } = &current.node {
-            if let StmtKind::Return { value } = &body[0].node {
-                let Some(clean_value) = value else { return; };
-                if let ExprKind::Call { .. } = &clean_value.node {
+            if let StmtKind::Return { value: Some(value) } = &body[0].node {
+                if matches!(value.node, ExprKind::Call { .. }) {
                     return;
                 }
                 if let ExprKind::Compare { comparators, .. } = &test.node {
                     if let ExprKind::Constant {
-                        value: const_val, ..
+                        value: constant, ..
                     } = &comparators[0].node
                     {
-                        let key = unparse_constant(const_val, checker.stylist);
-                        let final_value = checker.locator.slice(&Range::from_located(clean_value));
-                        key_value_pairs.insert(key, final_value.to_string());
+                        let key = unparse_constant(constant, checker.stylist);
+                        let value = checker.locator.slice(&Range::from_located(clean_value));
+                        key_value_pairs.insert(key, value);
                     }
                 }
             } else {
@@ -730,11 +737,11 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
                         child = orelse.get(0);
                     }
                     StmtKind::Return { value } => {
-                        let final_value = match value {
+                        let value = match value {
                             Some(item) => checker.locator.slice(&Range::from_located(item)),
                             None => "None",
                         };
-                        else_value = Some(final_value.to_string());
+                        else_value = Some(value);
                         child = None;
                     }
                     _ => return,
@@ -746,24 +753,25 @@ pub fn if_to_dict(checker: &mut Checker, stmt: &Stmt, test: &Expr, body: &[Stmt]
             return;
         }
     }
+
     if key_value_pairs.len() < 3 {
         return;
     }
-    let mut dict_vals = key_value_pairs
-        .iter()
-        .map(|(k, v)| format!("{}: {}", k, v))
-        .collect::<Vec<String>>();
-    // Without this sort, the order of the keys in the dict is not deterministic, leading tests to
-    // fail
-    dict_vals.sort();
-    let mut new_str = format!("return {{ {} }}", dict_vals.join(", "));
-    new_str.push_str(&format!(".get({variable}"));
-    if let Some(else_val) = &else_value {
-        new_str.push_str(&format!(", {}", else_val));
-    }
-    new_str.push(')');
-    let mut diagnostic = Diagnostic::new(IfToDict, Range::from_located(stmt));
+
+    let mut diagnostic = Diagnostic::new(ManualDictLookup, Range::from_located(stmt));
     if checker.patch(diagnostic.kind.rule()) {
+        let dict_vals = key_value_pairs
+            .iter()
+            .map(|(k, v)| format!("{}: {}", k, v))
+            .collect::<Vec<String>>();
+
+        let mut new_str = format!("return {{ {} }}", dict_vals.join(", "));
+        new_str.push_str(&format!(".get({variable}"));
+        if let Some(else_val) = &else_value {
+            new_str.push_str(&format!(", {}", else_val));
+        }
+        new_str.push(')');
+
         diagnostic.amend(Fix::replacement(
             new_str,
             stmt.location,
