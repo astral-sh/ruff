@@ -69,6 +69,7 @@ mod tests {
     #[test_case(Path::new("simple_cases/class_methods_new_line.py"); "class_methods_new_line")]
     #[test_case(Path::new("simple_cases/beginning_backslash.py"); "beginning_backslash")]
     #[test_case(Path::new("simple_cases/import_spacing.py"); "import_spacing")]
+    #[test_case(Path::new("simple_cases/power_op_spacing.py"); "power_op_spacing")]
     fn passing(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.display());
         let content = std::fs::read_to_string(test_resource_path(
@@ -103,7 +104,8 @@ mod tests {
     #[test_case(Path::new("simple_cases/expression.py"); "expression")]
     #[test_case(Path::new("simple_cases/function.py"); "function")]
     #[test_case(Path::new("simple_cases/function2.py"); "function2")]
-    #[test_case(Path::new("simple_cases/power_op_spacing.py"); "power_op_spacing")]
+    #[test_case(Path::new("simple_cases/function_trailing_comma.py"); "function_trailing_comma")]
+    #[test_case(Path::new("simple_cases/composition.py"); "composition")]
     fn failing(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.display());
         let content = std::fs::read_to_string(test_resource_path(

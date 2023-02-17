@@ -900,7 +900,38 @@ where
                 }
 
                 for alias in names {
-                    if alias.node.name.contains('.') && alias.node.asname.is_none() {
+                    if alias.node.name == "__future__" {
+                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
+                        self.add_binding(
+                            name,
+                            Binding {
+                                kind: BindingKind::FutureImportation,
+                                runtime_usage: None,
+                                // Always mark `__future__` imports as used.
+                                synthetic_usage: Some((
+                                    self.scopes[*(self
+                                        .scope_stack
+                                        .last()
+                                        .expect("No current scope found"))]
+                                    .id,
+                                    Range::from_located(alias),
+                                )),
+                                typing_usage: None,
+                                range: Range::from_located(alias),
+                                source: Some(self.current_stmt().clone()),
+                                context: self.execution_context(),
+                            },
+                        );
+
+                        if self.settings.rules.enabled(&Rule::LateFutureImport)
+                            && !self.futures_allowed
+                        {
+                            self.diagnostics.push(Diagnostic::new(
+                                pyflakes::rules::LateFutureImport,
+                                Range::from_located(stmt),
+                            ));
+                        }
+                    } else if alias.node.name.contains('.') && alias.node.asname.is_none() {
                         // Given `import foo.bar`, `name` would be "foo", and `full_name` would be
                         // "foo.bar".
                         let name = alias.node.name.split('.').next().unwrap();
@@ -918,10 +949,6 @@ where
                             },
                         );
                     } else {
-                        if let Some(asname) = &alias.node.asname {
-                            self.check_builtin_shadowing(asname, stmt, false);
-                        }
-
                         // Given `import foo`, `name` and `full_name` would both be `foo`.
                         // Given `import foo as bar`, `name` would be `bar` and `full_name` would
                         // be `foo`.
@@ -957,6 +984,10 @@ where
                                 context: self.execution_context(),
                             },
                         );
+
+                        if let Some(asname) = &alias.node.asname {
+                            self.check_builtin_shadowing(asname, stmt, false);
+                        }
                     }
 
                     // flake8-debugger
@@ -2808,6 +2839,11 @@ where
                     || self.settings.rules.enabled(&Rule::PathlibPyPath)
                 {
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
+                }
+
+                // numpy
+                if self.settings.rules.enabled(&Rule::NumpyLegacyRandom) {
+                    numpy::rules::numpy_legacy_random(self, func);
                 }
 
                 // flake8-logging-format

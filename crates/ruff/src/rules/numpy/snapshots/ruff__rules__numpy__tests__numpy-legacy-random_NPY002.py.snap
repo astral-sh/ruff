@@ -1,0 +1,555 @@
+---
+source: crates/ruff/src/rules/numpy/mod.rs
+expression: diagnostics
+---
+- kind:
+    NumpyLegacyRandom:
+      method_name: standard_normal
+  location:
+    row: 10
+    column: 7
+  end_location:
+    row: 10
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: standard_normal
+  location:
+    row: 11
+    column: 12
+  end_location:
+    row: 11
+    column: 34
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: seed
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: get_state
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: set_state
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: rand
+  location:
+    row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: randn
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: randint
+  location:
+    row: 20
+    column: 0
+  end_location:
+    row: 20
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: random_integers
+  location:
+    row: 21
+    column: 0
+  end_location:
+    row: 21
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: random_sample
+  location:
+    row: 22
+    column: 0
+  end_location:
+    row: 22
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: choice
+  location:
+    row: 23
+    column: 0
+  end_location:
+    row: 23
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: bytes
+  location:
+    row: 24
+    column: 0
+  end_location:
+    row: 24
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: shuffle
+  location:
+    row: 25
+    column: 0
+  end_location:
+    row: 25
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: permutation
+  location:
+    row: 26
+    column: 0
+  end_location:
+    row: 26
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: beta
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 27
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: binomial
+  location:
+    row: 28
+    column: 0
+  end_location:
+    row: 28
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: chisquare
+  location:
+    row: 29
+    column: 0
+  end_location:
+    row: 29
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: dirichlet
+  location:
+    row: 30
+    column: 0
+  end_location:
+    row: 30
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: exponential
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 31
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: f
+  location:
+    row: 32
+    column: 0
+  end_location:
+    row: 32
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: gamma
+  location:
+    row: 33
+    column: 0
+  end_location:
+    row: 33
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: geometric
+  location:
+    row: 34
+    column: 0
+  end_location:
+    row: 34
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: get_state
+  location:
+    row: 35
+    column: 0
+  end_location:
+    row: 35
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: gumbel
+  location:
+    row: 36
+    column: 0
+  end_location:
+    row: 36
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: hypergeometric
+  location:
+    row: 37
+    column: 0
+  end_location:
+    row: 37
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: laplace
+  location:
+    row: 38
+    column: 0
+  end_location:
+    row: 38
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: logistic
+  location:
+    row: 39
+    column: 0
+  end_location:
+    row: 39
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: lognormal
+  location:
+    row: 40
+    column: 0
+  end_location:
+    row: 40
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: logseries
+  location:
+    row: 41
+    column: 0
+  end_location:
+    row: 41
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: multinomial
+  location:
+    row: 42
+    column: 0
+  end_location:
+    row: 42
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: multivariate_normal
+  location:
+    row: 43
+    column: 0
+  end_location:
+    row: 43
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: negative_binomial
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: noncentral_chisquare
+  location:
+    row: 45
+    column: 0
+  end_location:
+    row: 45
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: noncentral_f
+  location:
+    row: 46
+    column: 0
+  end_location:
+    row: 46
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: normal
+  location:
+    row: 47
+    column: 0
+  end_location:
+    row: 47
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: pareto
+  location:
+    row: 48
+    column: 0
+  end_location:
+    row: 48
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: poisson
+  location:
+    row: 49
+    column: 0
+  end_location:
+    row: 49
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: power
+  location:
+    row: 50
+    column: 0
+  end_location:
+    row: 50
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: rayleigh
+  location:
+    row: 51
+    column: 0
+  end_location:
+    row: 51
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: standard_cauchy
+  location:
+    row: 52
+    column: 0
+  end_location:
+    row: 52
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: standard_exponential
+  location:
+    row: 53
+    column: 0
+  end_location:
+    row: 53
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: standard_gamma
+  location:
+    row: 54
+    column: 0
+  end_location:
+    row: 54
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: standard_normal
+  location:
+    row: 55
+    column: 0
+  end_location:
+    row: 55
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: standard_t
+  location:
+    row: 56
+    column: 0
+  end_location:
+    row: 56
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: triangular
+  location:
+    row: 57
+    column: 0
+  end_location:
+    row: 57
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: uniform
+  location:
+    row: 58
+    column: 0
+  end_location:
+    row: 58
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: vonmises
+  location:
+    row: 59
+    column: 0
+  end_location:
+    row: 59
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: wald
+  location:
+    row: 60
+    column: 0
+  end_location:
+    row: 60
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: weibull
+  location:
+    row: 61
+    column: 0
+  end_location:
+    row: 61
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    NumpyLegacyRandom:
+      method_name: zipf
+  location:
+    row: 62
+    column: 0
+  end_location:
+    row: 62
+    column: 17
+  fix: ~
+  parent: ~
+

@@ -20,11 +20,11 @@ fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatRe
     // Write the statement body.
     write!(f, [text("pass")])?;
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -34,9 +34,9 @@ fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatRe
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     Ok(())
@@ -206,11 +206,11 @@ fn format_func_def(
 
     write!(f, [text(":")])?;
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -220,9 +220,9 @@ fn format_func_def(
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     write!(f, [block_indent(&format_args![block(body)])])
@@ -255,11 +255,11 @@ fn format_assign(
         )?;
     }
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -269,9 +269,9 @@ fn format_assign(
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     Ok(())
@@ -543,11 +543,11 @@ fn format_import_from(
         )?;
     }
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -557,9 +557,9 @@ fn format_import_from(
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     Ok(())
@@ -592,11 +592,11 @@ fn format_expr(
         )?;
     }
 
-    // Apply any inline comments.
+    // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
                 None
@@ -606,9 +606,9 @@ fn format_expr(
         }
     }) {
         if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
+            write!(f, [line_suffix(&text("  "))])?;
         }
-        write!(f, [literal(range)])?;
+        write!(f, [line_suffix(&literal(range))])?;
     }
 
     Ok(())
@@ -665,7 +665,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                     TriviaKind::EmptyLine => {
                         write!(f, [empty_line()])?;
                     }
-                    TriviaKind::StandaloneComment(range) => {
+                    TriviaKind::OwnLineComment(range) => {
                         write!(f, [literal(range), hard_line_break()])?;
                     }
                     _ => {}
@@ -808,7 +808,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                     TriviaKind::EmptyLine => {
                         write!(f, [empty_line()])?;
                     }
-                    TriviaKind::StandaloneComment(range) => {
+                    TriviaKind::OwnLineComment(range) => {
                         write!(f, [literal(range), hard_line_break()])?;
                     }
                     _ => {}
