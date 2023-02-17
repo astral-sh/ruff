@@ -33,3 +33,11 @@ f"{f'{v:0.2f}'}"
 # Errors
 f"{v:{f'0.2f'}}"
 f"{f''}"
+f"{{test}}"
+f'{{ 40 }}'
+f"{{a {{x}}"
+f"{{{{x}}}}"
+
+# To be fixed
+# Error: f-string: single '}' is not allowed at line 41 column 8
+# f"\{{x}}"  
