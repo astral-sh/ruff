@@ -23,16 +23,39 @@ static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
+#[derive(Debug)]
+pub enum Exemption<'a> {
+    None,
+    All,
+    Codes(Vec<&'a str>),
+}
+
 /// Return `true` if a file is exempt from checking based on the contents of the
 /// given line.
-pub fn is_file_exempt(line: &str) -> bool {
+pub fn is_file_exempt(line: &str) -> Exemption {
     let line = line.trim_start();
-    line.starts_with("# flake8: noqa")
-        || line.starts_with("# flake8: NOQA")
-        || line.starts_with("# flake8: NoQA")
-        || line.starts_with("# ruff: noqa")
-        || line.starts_with("# ruff: NOQA")
-        || line.starts_with("# ruff: NoQA")
+    if line == "# flake8: noqa" || line == "# flake8: NOQA" || line == "# flake8: NoQA" {
+        return Exemption::All;
+    }
+
+    if let Some(remainder) = line
+        .strip_prefix("# ruff: noqa")
+        .or_else(|| line.strip_prefix("# ruff: NOQA"))
+        .or_else(|| line.strip_prefix("# ruff: NoQA"))
+    {
+        if remainder.is_empty() {
+            return Exemption::All;
+        } else if let Some(codes) = remainder.strip_prefix(":") {
+            return Exemption::Codes(
+                SPLIT_COMMA_REGEX
+                    .split(codes.trim())
+                    .map(str::trim)
+                    .collect(),
+            );
+        }
+    }
+
+    Exemption::None
 }
 
 #[derive(Debug)]
@@ -53,7 +76,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
                         noqa.start(),
                         noqa.end(),
                         SPLIT_COMMA_REGEX
-                            .split(codes.as_str())
+                            .split(codes.as_str().trim())
                             .map(str::trim)
                             .filter(|code| !code.is_empty())
                             .collect(),
@@ -124,20 +147,50 @@ fn add_noqa_inner(
     noqa_line_for: &IntMap<usize, usize>,
     line_ending: &LineEnding,
 ) -> (usize, String) {
+    // Map of line number to set of (non-ignored) diagnostic codes that are triggered on that line.
     let mut matches_by_line: FxHashMap<usize, FxHashSet<&Rule>> = FxHashMap::default();
-    let lines: Vec<&str> = contents.lines().collect();
-    for (lineno, line) in lines.iter().enumerate() {
-        // If we hit an exemption for the entire file, bail.
-        if is_file_exempt(line) {
-            return (0, contents.to_string());
-        }
 
+    // Codes that are globally disabled (within the current file).
+    let mut disabled_codes: Vec<&str> = vec![];
+
+    let lines: Vec<&str> = contents.lines().collect();
+
+    // Gather up any global exemptions. A global exemption can be placed anywhere in the file,
+    // so we scan the file in advance to detect them.
+    for line in &lines {
+        match is_file_exempt(line) {
+            Exemption::All => {
+                // If we hit an exemption for the entire file, bail.
+                return (0, contents.to_string());
+            }
+            Exemption::Codes(codes) => {
+                // If specific codes are disabled, add them to the list.
+                disabled_codes.extend(
+                    codes
+                        .iter()
+                        .map(|code| get_redirect_target(*code).unwrap_or(*code)),
+                );
+            }
+            Exemption::None => {}
+        }
+    }
+
+    // Scan the file for violations.
+    for lineno in 0..lines.len() {
         // Grab the noqa (logical) line number for the current (physical) line.
         let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
 
         let mut codes: FxHashSet<&Rule> = FxHashSet::default();
         for diagnostic in diagnostics {
             if diagnostic.location.row() == lineno + 1 {
+                // Is the violation ignored by a global `noqa` directive?
+                if disabled_codes
+                    .iter()
+                    .any(|code| diagnostic.kind.rule().noqa_code() == *code)
+                {
+                    continue;
+                }
+
                 // Is the violation ignored by a `noqa` directive on the parent line?
                 if let Some(parent_lineno) = diagnostic.parent.map(|location| location.row()) {
                     let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
