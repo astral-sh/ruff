@@ -621,12 +621,24 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.
 """  # noqa: E501
 ```
 
-To ignore all violations across an entire file, Ruff supports Flake8's `# flake8: noqa` directive
-(or, equivalently, `# ruff: noqa`). Adding either of those directives to any part of a file will
-disable enforcement across the entire file.
+To ignore all violations across an entire file, add `# ruff: noqa` to any line in the file, like so:
 
-For targeted exclusions across entire files (e.g., "Ignore all F841 violations in
-`/path/to/file.py`"), see the [`per-file-ignores`](#per-file-ignores) configuration setting.
+```python
+# ruff: noqa
+```
+
+To ignore a specific rule across an entire file, add `# ruff: noqa: {code}` to any line in the file,
+like so:
+
+```python
+# ruff: noqa: F841
+```
+
+Or see the [`per-file-ignores`](#per-file-ignores) configuration setting, which enables the same
+functionality via a `pyproject.toml` file.
+
+Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
+equivalent to `# ruff: noqa`.
 
 #### Automatic error suppression
 

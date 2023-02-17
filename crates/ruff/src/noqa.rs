@@ -4,6 +4,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use itertools::Itertools;
+use log::warn;
 use nohash_hasher::IntMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -11,6 +12,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
+use crate::codes::NoqaCode;
 use crate::registry::{Diagnostic, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::source_code::{LineEnding, Locator};
@@ -23,16 +25,47 @@ static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
+#[derive(Debug)]
+pub enum Exemption<'a> {
+    None,
+    All,
+    Codes(Vec<&'a str>),
+}
+
 /// Return `true` if a file is exempt from checking based on the contents of the
 /// given line.
-pub fn is_file_exempt(line: &str) -> bool {
+pub fn extract_file_exemption(line: &str) -> Exemption {
     let line = line.trim_start();
-    line.starts_with("# flake8: noqa")
+
+    if line.starts_with("# flake8: noqa")
         || line.starts_with("# flake8: NOQA")
         || line.starts_with("# flake8: NoQA")
-        || line.starts_with("# ruff: noqa")
-        || line.starts_with("# ruff: NOQA")
-        || line.starts_with("# ruff: NoQA")
+    {
+        return Exemption::All;
+    }
+
+    if let Some(remainder) = line
+        .strip_prefix("# ruff: noqa")
+        .or_else(|| line.strip_prefix("# ruff: NOQA"))
+        .or_else(|| line.strip_prefix("# ruff: NoQA"))
+    {
+        if remainder.is_empty() {
+            return Exemption::All;
+        } else if let Some(codes) = remainder.strip_prefix(':') {
+            let codes: Vec<&str> = SPLIT_COMMA_REGEX
+                .split(codes.trim())
+                .map(str::trim)
+                .filter(|code| !code.is_empty())
+                .collect();
+            if codes.is_empty() {
+                warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+            }
+            return Exemption::Codes(codes);
+        }
+        warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
+    }
+
+    Exemption::None
 }
 
 #[derive(Debug)]
@@ -48,16 +81,22 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
         Some(caps) => match caps.name("spaces") {
             Some(spaces) => match caps.name("noqa") {
                 Some(noqa) => match caps.name("codes") {
-                    Some(codes) => Directive::Codes(
-                        spaces.as_str().chars().count(),
-                        noqa.start(),
-                        noqa.end(),
-                        SPLIT_COMMA_REGEX
-                            .split(codes.as_str())
+                    Some(codes) => {
+                        let codes: Vec<&str> = SPLIT_COMMA_REGEX
+                            .split(codes.as_str().trim())
                             .map(str::trim)
                             .filter(|code| !code.is_empty())
-                            .collect(),
-                    ),
+                            .collect();
+                        if codes.is_empty() {
+                            warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+                        }
+                        Directive::Codes(
+                            spaces.as_str().chars().count(),
+                            noqa.start(),
+                            noqa.end(),
+                            codes,
+                        )
+                    }
                     None => {
                         Directive::All(spaces.as_str().chars().count(), noqa.start(), noqa.end())
                     }
@@ -124,68 +163,93 @@ fn add_noqa_inner(
     noqa_line_for: &IntMap<usize, usize>,
     line_ending: &LineEnding,
 ) -> (usize, String) {
+    // Map of line number to set of (non-ignored) diagnostic codes that are triggered on that line.
     let mut matches_by_line: FxHashMap<usize, FxHashSet<&Rule>> = FxHashMap::default();
+
+    // Whether the file is exempted from all checks.
+    let mut file_exempted = false;
+
+    // Codes that are globally exempted (within the current file).
+    let mut file_exemptions: Vec<NoqaCode> = vec![];
+
     let lines: Vec<&str> = contents.lines().collect();
-    for (lineno, line) in lines.iter().enumerate() {
-        // If we hit an exemption for the entire file, bail.
-        if is_file_exempt(line) {
-            return (0, contents.to_string());
+    for lineno in commented_lines {
+        match extract_file_exemption(lines[lineno - 1]) {
+            Exemption::All => {
+                file_exempted = true;
+            }
+            Exemption::Codes(codes) => {
+                file_exemptions.extend(codes.into_iter().filter_map(|code| {
+                    if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code)) {
+                        Some(rule.noqa_code())
+                    } else {
+                        warn!("Invalid code provided to `# ruff: noqa`: {}", code);
+                        None
+                    }
+                }));
+            }
+            Exemption::None => {}
+        }
+    }
+
+    // Mark any non-ignored diagnostics.
+    for diagnostic in diagnostics {
+        // If the file is exempted, don't add any noqa directives.
+        if file_exempted {
+            continue;
         }
 
-        // Grab the noqa (logical) line number for the current (physical) line.
-        let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
-
-        let mut codes: FxHashSet<&Rule> = FxHashSet::default();
-        for diagnostic in diagnostics {
-            if diagnostic.location.row() == lineno + 1 {
-                // Is the violation ignored by a `noqa` directive on the parent line?
-                if let Some(parent_lineno) = diagnostic.parent.map(|location| location.row()) {
-                    let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
-                    if commented_lines.contains(noqa_lineno) {
-                        match extract_noqa_directive(lines[noqa_lineno - 1]) {
-                            Directive::All(..) => {
-                                continue;
-                            }
-                            Directive::Codes(.., codes) => {
-                                if includes(diagnostic.kind.rule(), &codes) {
-                                    continue;
-                                }
-                            }
-                            Directive::None => {}
-                        }
-                    }
-                }
-
-                // Is the diagnostic ignored by a `noqa` directive on the same line?
-                let diagnostic_lineno = diagnostic.location.row();
-                let noqa_lineno = noqa_line_for
-                    .get(&diagnostic_lineno)
-                    .unwrap_or(&diagnostic_lineno);
-                if commented_lines.contains(noqa_lineno) {
-                    match extract_noqa_directive(lines[noqa_lineno - 1]) {
-                        Directive::All(..) => {
-                            continue;
-                        }
-                        Directive::Codes(.., codes) => {
-                            if includes(diagnostic.kind.rule(), &codes) {
-                                continue;
-                            }
-                        }
-                        Directive::None => {}
-                    }
-                }
-
-                // The diagnostic is not ignored by any `noqa` directive; add it to the list.
-                codes.insert(diagnostic.kind.rule());
+        // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
+        if !file_exemptions.is_empty() {
+            if file_exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
+                continue;
             }
         }
 
-        if !codes.is_empty() {
-            matches_by_line
-                .entry(noqa_lineno)
-                .or_default()
-                .extend(codes);
+        // Is the violation ignored by a `noqa` directive on the parent line?
+        if let Some(parent_lineno) = diagnostic.parent.map(|location| location.row()) {
+            let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
+            if commented_lines.contains(noqa_lineno) {
+                match extract_noqa_directive(lines[noqa_lineno - 1]) {
+                    Directive::All(..) => {
+                        continue;
+                    }
+                    Directive::Codes(.., codes) => {
+                        if includes(diagnostic.kind.rule(), &codes) {
+                            continue;
+                        }
+                    }
+                    Directive::None => {}
+                }
+            }
         }
+
+        // Is the diagnostic ignored by a `noqa` directive on the same line?
+        let diagnostic_lineno = diagnostic.location.row();
+        let noqa_lineno = noqa_line_for
+            .get(&diagnostic_lineno)
+            .unwrap_or(&diagnostic_lineno);
+        if commented_lines.contains(noqa_lineno) {
+            match extract_noqa_directive(lines[noqa_lineno - 1]) {
+                Directive::All(..) => {
+                    continue;
+                }
+                Directive::Codes(.., codes) => {
+                    if includes(diagnostic.kind.rule(), &codes) {
+                        continue;
+                    }
+                }
+                Directive::None => {}
+            }
+        }
+
+        // The diagnostic is not ignored by any `noqa` directive; add it to the list.
+        let lineno = diagnostic.location.row() - 1;
+        let noqa_lineno = noqa_line_for.get(&(lineno + 1)).unwrap_or(&(lineno + 1)) - 1;
+        matches_by_line
+            .entry(noqa_lineno)
+            .or_default()
+            .insert(diagnostic.kind.rule());
     }
 
     let mut count: usize = 0;
