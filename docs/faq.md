@@ -1,4 +1,4 @@
-### Is Ruff compatible with Black?
+## Is Ruff compatible with Black?
 
 Yes. Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
 the `line-length` setting is consistent between the two.
@@ -6,7 +6,7 @@ the `line-length` setting is consistent between the two.
 As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
 stylistic lint rules that are obviated by autoformatting.
 
-### How does Ruff compare to Flake8?
+## How does Ruff compare to Flake8?
 
 (Coming from Flake8? Try [`flake8-to-ruff`](https://pypi.org/project/flake8-to-ruff/) to
 automatically convert your existing configuration.)
@@ -84,7 +84,7 @@ There are a few other minor incompatibilities between Ruff and the originating F
   code. (This is often solved by modifying the `src` property, e.g., to `src = ["src"]`, if your
   code is nested in a `src` directory.)
 
-### How does Ruff compare to Pylint?
+## How does Ruff compare to Pylint?
 
 At time of writing, Pylint implements ~409 total rules, while Ruff implements 440, of which at least
 89 overlap with the Pylint rule set (you can find the mapping in [#970](https://github.com/charliermarsh/ruff/issues/970)).
@@ -103,7 +103,7 @@ Unlike Pylint, Ruff is capable of automatically fixing its own lint violations.
 
 Pylint parity is being tracked in [#970](https://github.com/charliermarsh/ruff/issues/970).
 
-### How does Ruff compare to Mypy, or Pyright, or Pyre?
+## How does Ruff compare to Mypy, or Pyright, or Pyre?
 
 Ruff is a linter, not a type checker. It can detect some of the same problems that a type checker
 can, but a type checker will catch certain errors that Ruff would miss. The opposite is also true:
@@ -118,7 +118,7 @@ It's recommended that you use Ruff in conjunction with a type checker, like Mypy
 with Ruff providing faster feedback on lint violations and the type checker providing more detailed
 feedback on type errors.
 
-### Which tools does Ruff replace?
+## Which tools does Ruff replace?
 
 Today, Ruff can be used to replace Flake8 when used with any of the following plugins:
 
@@ -166,7 +166,7 @@ implemented in [pyupgrade](https://pypi.org/project/pyupgrade/) ([#827](https://
 
 If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an Issue.
 
-### What versions of Python does Ruff support?
+## What versions of Python does Ruff support?
 
 Ruff can lint code for any Python version from 3.7 onwards. However, Ruff lacks support for a few
 language features that were introduced in Python 3.10 and later. Specifically, Ruff does not
@@ -182,7 +182,7 @@ are not officially supported (e.g., Ruff does _not_ respect type comments).
 
 Ruff is installable under any Python version from 3.7 onwards.
 
-### Do I need to install Rust to use Ruff?
+## Do I need to install Rust to use Ruff?
 
 Nope! Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI:
 
@@ -193,12 +193,12 @@ pip install ruff
 Ruff ships with wheels for all major platforms, which enables `pip` to install Ruff without relying
 on Rust at all.
 
-### Can I write my own plugins for Ruff?
+## Can I write my own plugins for Ruff?
 
 Ruff does not yet support third-party plugins, though a plugin system is within-scope for the
 project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
 
-### How does Ruff's import sorting compare to [isort](https://pypi.org/project/isort/)?
+## How does Ruff's import sorting compare to [isort](https://pypi.org/project/isort/)?
 
 Ruff's import sorting is intended to be nearly equivalent to isort when used `profile = "black"`.
 There are a few known, minor differences in how Ruff and isort break ties between similar imports,
@@ -228,7 +228,7 @@ src = ["src", "tests"]
 known-first-party = ["my_module1", "my_module2"]
 ```
 
-### Does Ruff support Jupyter Notebooks?
+## Does Ruff support Jupyter Notebooks?
 
 Ruff is integrated into [nbQA](https://github.com/nbQA-dev/nbQA), a tool for running linters and
 code formatters over Jupyter Notebooks.
@@ -244,7 +244,7 @@ Found 3 errors.
 1 potentially fixable with the --fix option.
 ```
 
-### Does Ruff support NumPy- or Google-style docstrings?
+## Does Ruff support NumPy- or Google-style docstrings?
 
 Yes! To enable specific docstring convention, add the following to your `pyproject.toml`:
 
@@ -272,11 +272,11 @@ convention = "google"
 Setting a `convention` force-disables any rules that are incompatible with that convention, no
 matter how they're provided, which avoids accidental incompatibilities and simplifies configuration.
 
-### How can I tell what settings Ruff is using to check my code?
+## How can I tell what settings Ruff is using to check my code?
 
 Run `ruff check /path/to/code.py --show-settings` to view the resolved settings for a given file.
 
-### I want to use Ruff, but I don't want to use `pyproject.toml`. Is that possible?
+## I want to use Ruff, but I don't want to use `pyproject.toml`. Is that possible?
 
 Yes! In lieu of a `pyproject.toml` file, you can use a `ruff.toml` file for configuration. The two
 files are functionally equivalent and have an identical schema, with the exception that a `ruff.toml`
@@ -303,7 +303,7 @@ convention = "google"
 
 Ruff doesn't currently support INI files, like `setup.cfg` or `tox.ini`.
 
-### How can I change Ruff's default configuration?
+## How can I change Ruff's default configuration?
 
 When no configuration file is found, Ruff will look for a user-specific `pyproject.toml` or
 `ruff.toml` file as a last resort. This behavior is similar to Flake8's `~/.config/flake8`.
@@ -316,7 +316,7 @@ On Windows, Ruff expects that file to be located at `C:\Users\Alice\AppData\Roam
 
 For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate.
 
-### Ruff tried to fix something, but it broke my code. What should I do?
+## Ruff tried to fix something, but it broke my code. What should I do?
 
 Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
 have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.
@@ -334,7 +334,7 @@ unfixable = ["B", "SIM", "TRY", "RUF"]
 
 If you find a case where Ruff's autofix breaks your code, please file an Issue!
 
-### How can I disable Ruff's color output?
+## How can I disable Ruff's color output?
 
 Ruff's color output is powered by the [`colored`](https://crates.io/crates/colored) crate, which
 attempts to automatically detect whether the output stream supports color. However, you can force

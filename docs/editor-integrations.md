@@ -1,11 +1,11 @@
-### VS Code (Official)
+## VS Code (Official)
 
 Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff),
 which supports autofix actions, import sorting, and more.
 
 ![Ruff VS Code extension](https://user-images.githubusercontent.com/1309177/205175763-cf34871d-5c05-4abf-9916-440afc82dbf8.gif)
 
-### Language Server Protocol (Official)
+## Language Server Protocol (Official)
 
 Ruff supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
 via the [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp) Python package, available on
@@ -80,7 +80,7 @@ Upon successful installation, you should see Ruff's diagnostics surfaced directl
 
 To use `ruff-lsp` with other editors, including Sublime Text and Helix, see the [`ruff-lsp` documentation](https://github.com/charliermarsh/ruff-lsp#installation-and-usage).
 
-### Language Server Protocol (Unofficial)
+## Language Server Protocol (Unofficial)
 
 Ruff is also available as the [`python-lsp-ruff`](https://github.com/python-lsp/python-lsp-ruff)
 plugin for [`python-lsp-server`](https://github.com/python-lsp/python-lsp-ruff), both of which are
@@ -118,7 +118,7 @@ require'lspconfig'.pylsp.setup {
 }
 ```
 
-### Vim & Neovim
+## Vim & Neovim
 
 Ruff can be integrated into any editor that supports the Language Server Protocol via [`ruff-lsp`](https://github.com/charliermarsh/ruff-lsp)
 (see: [Language Server Protocol](#language-server-protocol-official)), including Vim and Neovim.
@@ -175,7 +175,7 @@ null_ls.setup({
 
 </details>
 
-### PyCharm (External Tool)
+## PyCharm (External Tool)
 
 Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
 in PyCharm. Open the Preferences pane, then navigate to "Tools", then "External Tools". From there,
@@ -187,12 +187,12 @@ Ruff should then appear as a runnable action:
 
 ![Ruff as a runnable action](https://user-images.githubusercontent.com/1309177/193156026-732b0aaf-3dd9-4549-9b4d-2de6d2168a33.png)
 
-### PyCharm (Unofficial)
+## PyCharm (Unofficial)
 
 Ruff is also available as the [Ruff](https://plugins.jetbrains.com/plugin/20574-ruff) plugin on the
 IntelliJ Marketplace (maintained by @koxudaxi).
 
-### GitHub Actions
+## GitHub Actions
 
 GitHub Actions has everything you need to run Ruff out-of-the-box:
 
