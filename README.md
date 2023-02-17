@@ -31,7 +31,7 @@ An extremely fast Python linter, written in Rust.
 * 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
 * 📏  Over [400 built-in rules](https://beta.ruff.rs/docs/rules/) (and growing)
 * ⚖️  [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
-* 🔌  Native re-implementations of dozens of Flake8 plugins, like [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
+* 🔌  Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
 * ⌨️  First-party editor integrations for [VS Code](https://github.com/charliermarsh/ruff-vscode) and [more](https://github.com/charliermarsh/ruff-lsp)
 * 🌎  Monorepo-friendly, with [hierarchical and cascading configuration](#pyprojecttoml-discovery)
 
