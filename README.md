@@ -29,6 +29,7 @@ An extremely fast Python linter, written in Rust.
 * 🛠️  `pyproject.toml` support
 * 📦  Built-in caching, to avoid re-analyzing unchanged files
 * 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
+* 📏  Over [400 built-in rules](https://beta.ruff.rs/docs/rules/) (and growing)
 * ⚖️  [Near-parity](#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
 * 🔌  Native re-implementations of dozens of Flake8 plugins, like [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
 * ⌨️  First-party editor integrations for [VS Code](https://github.com/charliermarsh/ruff-vscode) and [more](https://github.com/charliermarsh/ruff-lsp)
@@ -494,7 +495,7 @@ There are a few exceptions to these rules:
 Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
 Ruff does not merge settings across configuration files; instead, the "closest" configuration file
 is used, and any parent configuration files are ignored. In lieu of this implicit cascade, Ruff
-supports an [`extend`](#extend) field, which allows you to inherit the settings from another
+supports an [`extend`](https://beta.ruff.rs/docs/settings#extend) field, which allows you to inherit the settings from another
 `pyproject.toml` file, like so:
 
 ```toml
@@ -510,19 +511,22 @@ and `pyproject.toml` file, it will defer to the `ruff.toml`.
 ### Python file discovery
 
 When passed a path on the command-line, Ruff will automatically discover all Python files in that
-path, taking into account the [`exclude`](#exclude) and [`extend-exclude`](#extend-exclude) settings
-in each directory's `pyproject.toml` file.
+path, taking into account the [`exclude`](https://beta.ruff.rs/docs/settings#exclude) and
+[`extend-exclude`](https://beta.ruff.rs/docs/settings#extend-exclude) settings in each directory's
+`pyproject.toml` file.
 
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
-`.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](#respect-gitignore)).
+`.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](https://beta.ruff.rs/docs/settings#respect-gitignore)).
 
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
 For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Rule resolution
 
-The set of enabled rules is controlled via the [`select`](#select) and [`ignore`](#ignore) settings,
-along with the [`extend-select`](#extend-select) and [`extend-ignore`](#extend-ignore) modifiers.
+The set of enabled rules is controlled via the [`select`](https://beta.ruff.rs/docs/settings#select)
+and [`ignore`](https://beta.ruff.rs/docs/settings#ignore) settings, along with the
+[`extend-select`](https://beta.ruff.rs/docs/settings#extend-select) and
+[`extend-ignore`](https://beta.ruff.rs/docs/settings#extend-ignore) modifiers.
 
 To resolve the enabled rule set, Ruff may need to reconcile `select` and `ignore` from a variety
 of sources, including the current `pyproject.toml`, any inherited `pyproject.toml` files, and the
@@ -548,8 +552,9 @@ the exception of `F401`.
 
 ### Suppressing errors
 
-To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](#ignore) or
-[`extend-ignore`](#extend-ignore), either on the command-line or in your `pyproject.toml` file.
+To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](https://beta.ruff.rs/docs/settings#ignore)
+or [`extend-ignore`](https://beta.ruff.rs/docs/settings#extend-ignore), either on the command-line
+or in your `pyproject.toml` file.
 
 To ignore a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
@@ -588,8 +593,8 @@ like so:
 # ruff: noqa: F841
 ```
 
-Or see the [`per-file-ignores`](#per-file-ignores) configuration setting, which enables the same
-functionality via a `pyproject.toml` file.
+Or see the [`per-file-ignores`](https://beta.ruff.rs/docs/settings#per-file-ignores) configuration
+setting, which enables the same functionality via a `pyproject.toml` file.
 
 Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
 equivalent to `# ruff: noqa`.
@@ -665,7 +670,9 @@ autoload -Uz compinit && compinit
 
 <!-- Begin section: Rules -->
 
-Regardless of the rule's origin, Ruff re-implements every rule in Rust as a first-party feature.
+Ruff supports over 400 lint rules, many of which are inspired by popular tools like Flake8, isort,
+pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
+Rust as a first-party feature.
 
 By default, Ruff enables Flake8's `E` and `F` rules. Ruff supports all rules from the `F` category,
 and a [subset](#error-e) of the `E` category, omitting those stylistic rules made obsolete by the
@@ -673,7 +680,8 @@ use of an autoformatter, like [Black](https://github.com/psf/black).
 
 <!-- End section: Rules -->
 
-See the [list of all rules](https://beta.ruff.rs/docs/rules/).
+For a complete enumeration, see the [list of rules](https://beta.ruff.rs/docs/rules/) in the
+Ruff documentation.
 
 ## Editor Integrations
 
@@ -1114,8 +1122,8 @@ and in how Ruff and isort treat inline comments in some cases (see: [#1381](http
 Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
-them. You can find the supported settings in the [API reference](#isort). For example, you can set
-`known-first-party` like so:
+them. You can find the supported settings in the [API reference](https://beta.ruff.rs/docs/settings/#isort).
+For example, you can set `known-first-party` like so:
 
 ```toml
 [tool.ruff]
@@ -1230,8 +1238,9 @@ have _complete_ certainty when making changes to code, even for the seemingly tr
 In the future, Ruff will support enabling autofix behavior based on the safety of the patch.
 
 In the meantime, if you find that the autofix is too aggressive, you can disable it on a per-rule or
-per-category basis using the [`unfixable`](#unfixable) mechanic. For example, to disable autofix
-for some possibly-unsafe rules, you could add the following to your `pyproject.toml`:
+per-category basis using the [`unfixable`](https://beta.ruff.rs/docs/settings/#unfixable) mechanic.
+For example, to disable autofix for some possibly-unsafe rules, you could add the following to your
+`pyproject.toml`:
 
 ```toml
 [tool.ruff]
