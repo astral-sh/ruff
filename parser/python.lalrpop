@@ -348,6 +348,7 @@ AssertStatement: ast::Stmt = {
 };
 
 CompoundStatement: ast::Stmt = {
+    MatchStatement,
     IfStatement,
     WhileStatement,
     ForStatement,
@@ -356,6 +357,561 @@ CompoundStatement: ast::Stmt = {
     FuncDef,
     ClassDef,
 };
+
+MatchStatement: ast::Stmt = {
+    <location:@L> "match" <subject:TestOrStarNamedExpr> ":" "\n" Indent <cases:MatchCase+> Dedent <end_location:@R> => {
+        ast::Stmt {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::StmtKind::Match {
+                subject: Box::new(subject),
+                cases
+            }
+        }
+    },
+    <location:@L> "match" <subject:TestOrStarNamedExpr> "," ":" "\n" Indent <cases:MatchCase+> Dedent <end_location:@R> => {
+        ast::Stmt {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::StmtKind::Match {
+                subject: Box::new(subject),
+                cases
+            }
+        }
+    },
+    <location:@L> "match" <subject:TestOrStarNamedExpr> "," <subjects:OneOrMore<TestOrStarNamedExpr>> ","? ":" "\n" Indent <cases:MatchCase+> Dedent <end_location:@R> => {
+        let mut subjects = subjects;
+        subjects.insert(0, subject);
+        ast::Stmt {
+            custom: (),
+            location,
+            end_location: Some(end_location),
+            node: ast::StmtKind::Match {
+                subject: Box::new(ast::Expr {
+                    location,
+                    end_location: Some(end_location),
+                    custom: (),
+                    node: ast::ExprKind::Tuple {
+                        elts: subjects,
+                        ctx: ast::ExprContext::Load,
+                    },
+                }),
+                cases
+            }
+        }
+    }
+}
+
+MatchCase: ast::MatchCase = {
+    "case" <pattern:Patterns> <guard:(Guard)?> ":" <body:Suite> => {
+        ast::MatchCase {
+            pattern,
+            guard: guard.map(Box::new),
+            body
+        }
+    },
+}
+
+Guard: ast::Expr = {
+    "if" <guard:NamedExpressionTest> => {
+        guard
+    }
+}
+
+Patterns: ast::Pattern = {
+    <location:@L> <pattern:Pattern> "," <end_location:@R> => ast::Pattern {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::PatternKind::MatchSequence {
+            patterns: vec![pattern]
+        },
+    },
+    <location:@L> <pattern:Pattern> "," <patterns:OneOrMore<Pattern>> ","? <end_location:@R> => {
+        let mut patterns = patterns;
+        patterns.insert(0, pattern);
+        ast::Pattern {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::PatternKind::MatchSequence {
+                patterns
+            },
+        }
+    },
+    <pattern:Pattern> => pattern
+}
+
+Pattern: ast::Pattern = {
+    <pattern:AsPattern> => pattern,
+    <pattern:OrPattern> => pattern,
+}
+
+AsPattern: ast::Pattern = {
+    <location:@L> <pattern:OrPattern> "as" <name:Identifier> <end_location:@R> =>? {
+        if name == "_" {
+            Err(LexicalError {
+                error: LexicalErrorType::OtherError("cannot use '_' as a target".to_string()),
+                location,
+            })?
+        } else {
+            Ok(ast::Pattern {
+                location,
+                end_location: Some(end_location),
+                custom: (),
+                node: ast::PatternKind::MatchAs {
+                   pattern: Some(Box::new(pattern)),
+                   name: Some(name),
+               },
+            })
+        }
+    },
+}
+
+OrPattern: ast::Pattern = {
+    <pattern:ClosedPattern> => pattern,
+    <location:@L> <pattern:ClosedPattern> <patterns:("|" <ClosedPattern>)+> <end_location:@R> => {
+        let mut patterns = patterns;
+        patterns.insert(0, pattern);
+        ast::Pattern {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::PatternKind::MatchOr { patterns }
+        }
+    }
+}
+
+ClosedPattern: ast::Pattern = {
+    <location:@L> <node:LiteralPattern> <end_location:@R> => ast::Pattern {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node,
+    },
+    <location:@L> <node:CapturePattern> <end_location:@R> => ast::Pattern {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node,
+    },
+    <location:@L> <node:StarPattern> <end_location:@R> => ast::Pattern {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node,
+    },
+    <location:@L> <node:ValuePattern> <end_location:@R> => ast::Pattern {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node,
+    },
+    <location:@L> <node:SequencePattern> <end_location:@R> => ast::Pattern {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node,
+    },
+    <location:@L> <node:MappingPattern> <end_location:@R> => ast::Pattern {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node,
+    },
+    <location:@L> <node:ClassPattern> <end_location:@R> => ast::Pattern {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node,
+    },
+}
+
+SequencePattern: ast::PatternKind = {
+    // A single-item tuple is a special case: it's a group pattern, _not_ a sequence pattern.
+    <location:@L> "(" <pattern:Pattern> ")" <end_location:@R> => pattern.node,
+    <location:@L> "(" ")" <end_location:@R> => ast::PatternKind::MatchSequence {
+        patterns: vec![],
+    },
+    <location:@L> "(" <pattern:Pattern> "," <patterns:Comma<Pattern>> ")" <end_location:@R> => {
+        let mut patterns = patterns;
+        patterns.insert(0, pattern);
+        ast::PatternKind::MatchSequence {
+            patterns
+        }
+    },
+    <location:@L> "[" <patterns:Comma<Pattern>> "]" <end_location:@R> => ast::PatternKind::MatchSequence {
+        patterns
+    },
+}
+
+StarPattern: ast::PatternKind = {
+    <location:@L> "*" <name:Identifier> <end_location:@R> => ast::PatternKind::MatchStar {
+        name: if name == "_" { None } else { Some(name) }
+    },
+}
+
+LiteralPattern: ast::PatternKind = {
+    "None" => ast::PatternKind::MatchSingleton {
+        value: ast::Constant::None
+    },
+    "True" => ast::PatternKind::MatchSingleton {
+        value: true.into()
+    },
+    "False" => ast::PatternKind::MatchSingleton {
+        value: false.into()
+    },
+    <location:@L> <value:Constant> <end_location:@R> => ast::PatternKind::MatchValue {
+        value: Box::new(ast::Expr {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::ExprKind::Constant { value, kind: None }
+        })
+    },
+    <location:@L> "-" <value:Constant> <end_location:@R> => ast::PatternKind::MatchValue {
+        value: Box::new(ast::Expr {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::ExprKind::UnaryOp {
+                op: ast::Unaryop::USub,
+                operand: Box::new(ast::Expr {
+                    location,
+                    end_location: Some(end_location),
+                    custom: (),
+                    node: ast::ExprKind::Constant { value, kind: None }
+                })
+            }
+        })
+    },
+    <location:@L> <left:Constant> <op:AddOp> <right:Constant> <end_location:@R> => ast::PatternKind::MatchValue {
+        value: Box::new(ast::Expr {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::ExprKind::BinOp {
+                left: Box::new(ast::Expr {
+                    location,
+                    end_location: Some(end_location),
+                    custom: (),
+                    node: ast::ExprKind::Constant { value: left, kind: None }
+                }),
+                op,
+                right: Box::new(ast::Expr {
+                    location,
+                    end_location: Some(end_location),
+                    custom: (),
+                    node: ast::ExprKind::Constant { value: right, kind: None }
+                }),
+            }
+        })
+    },
+    <location:@L> "-" <left:Constant> <op:AddOp> <right:Constant> <end_location:@R> => ast::PatternKind::MatchValue {
+        value: Box::new(ast::Expr {
+            location,
+            end_location: Some(end_location),
+            custom: (),
+            node: ast::ExprKind::BinOp {
+                left: Box::new(ast::Expr {
+                    location,
+                    end_location: Some(end_location),
+                    custom: (),
+                    node: ast::ExprKind::UnaryOp {
+                        op: ast::Unaryop::USub,
+                        operand: Box::new(ast::Expr {
+                            location,
+                            end_location: Some(end_location),
+                            custom: (),
+                            node: ast::ExprKind::Constant { value: left, kind: None }
+                        })
+                    }
+                }),
+                op,
+                right: Box::new(ast::Expr {
+                    location,
+                    end_location: Some(end_location),
+                    custom: (),
+                    node: ast::ExprKind::Constant { value: right, kind: None }
+                }),
+            }
+        })
+    },
+    <location:@L> <s:(@L string @R)+> =>? Ok(ast::PatternKind::MatchValue {
+        value: Box::new(parse_strings(s)?)
+    }),
+}
+
+CapturePattern: ast::PatternKind = {
+    <location:@L> <name:Identifier> <end_location:@R> => ast::PatternKind::MatchAs {
+        pattern: None,
+        name: if name == "_" { None } else { Some(name) }
+    },
+}
+
+MatchName: ast::Expr = {
+    <location:@L> <name:Identifier> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::Name { id: name, ctx: ast::ExprContext::Load },
+    },
+}
+
+MatchNameOrAttr: ast::Expr = {
+    <location:@L> <name:MatchName> "." <attr:Identifier> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::Attribute {
+            value: Box::new(name),
+            attr,
+            ctx: ast::ExprContext::Load,
+        },
+    },
+    <location:@L> <e:MatchNameOrAttr> "." <attr:Identifier> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::Attribute {
+            value: Box::new(e),
+            attr,
+            ctx: ast::ExprContext::Load,
+        }
+    }
+}
+
+ValuePattern: ast::PatternKind = {
+   <e:MatchNameOrAttr> => ast::PatternKind::MatchValue {
+       value: Box::new(e)
+   },
+}
+
+MappingKey: ast::Expr = {
+    <location:@L> "None" <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::Constant {
+            value: ast::Constant::None,
+            kind: None,
+        },
+    },
+    <location:@L> "True" <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::Constant {
+            value: true.into(),
+            kind: None,
+        },
+    },
+    <location:@L> "False" <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::Constant {
+            value: false.into(),
+            kind: None,
+        },
+    },
+    <location:@L> <value:Constant> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::Constant { value, kind: None }
+    },
+    <location:@L> "-" <value:Constant> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::UnaryOp {
+            op: ast::Unaryop::USub,
+            operand: Box::new(ast::Expr {
+                location,
+                end_location: Some(end_location),
+                custom: (),
+                node: ast::ExprKind::Constant { value, kind: None }
+            })
+        }
+    },
+    <location:@L> <left:Constant> <op:AddOp> <right:Constant> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::BinOp {
+            left: Box::new(ast::Expr {
+                location,
+                end_location: Some(end_location),
+                custom: (),
+                node: ast::ExprKind::Constant { value: left, kind: None }
+            }),
+            op,
+            right: Box::new(ast::Expr {
+                location,
+                end_location: Some(end_location),
+                custom: (),
+                node: ast::ExprKind::Constant { value: right, kind: None }
+            }),
+        }
+    },
+    <location:@L> "-" <left:Constant> <op:AddOp> <right:Constant> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::BinOp {
+            left: Box::new(ast::Expr {
+                location,
+                end_location: Some(end_location),
+                custom: (),
+                node: ast::ExprKind::UnaryOp {
+                    op: ast::Unaryop::USub,
+                    operand: Box::new(ast::Expr {
+                        location,
+                        end_location: Some(end_location),
+                        custom: (),
+                        node: ast::ExprKind::Constant { value: left, kind: None }
+                    })
+                }
+            }),
+            op,
+            right: Box::new(ast::Expr {
+                location,
+                end_location: Some(end_location),
+                custom: (),
+                node: ast::ExprKind::Constant { value: right, kind: None }
+            }),
+        }
+    },
+    <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?),
+    MatchNameOrAttr,
+}
+
+MatchMappingEntry: (ast::Expr, ast::Pattern) = {
+    <k:MappingKey> ":" <v:Pattern> => (k, v),
+};
+
+MappingPattern: ast::PatternKind = {
+    <location:@L> "{" "}" <end_location:@R> => {
+        return ast::PatternKind::MatchMapping {
+            keys: vec![],
+            patterns: vec![],
+            rest: None,
+        };
+    },
+    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> "}" <end_location:@R> => {
+        let (keys, patterns) = e
+            .into_iter()
+            .unzip();
+        return ast::PatternKind::MatchMapping {
+            keys,
+            patterns,
+            rest: None,
+        };
+    },
+    <location:@L> "{" "**" <rest:Identifier> "}" <end_location:@R> => {
+        return ast::PatternKind::MatchMapping {
+            keys: vec![],
+            patterns: vec![],
+            rest: Some(rest),
+        };
+    },
+    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","  "**" <rest:Identifier> "}" <end_location:@R> => {
+        let (keys, patterns) = e
+            .into_iter()
+            .unzip();
+        return ast::PatternKind::MatchMapping {
+            keys,
+            patterns,
+            rest: Some(rest),
+        };
+    },
+}
+
+MatchKeywordEntry: (String, ast::Pattern) = {
+    <k:Identifier> "=" <v:Pattern> => (k, v),
+};
+
+ClassPattern: ast::PatternKind = {
+    <location:@L> <e:MatchName> "(" <patterns: OneOrMore<Pattern>> "," <kwds:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
+        let (kwd_attrs, kwd_patterns) = kwds
+            .into_iter()
+            .unzip();
+        ast::PatternKind::MatchClass {
+            cls: Box::new(e),
+            patterns,
+            kwd_attrs,
+            kwd_patterns,
+        }
+    },
+    <location:@L> <e:MatchName> "(" <patterns: OneOrMore<Pattern>> ","? ")" <end_location:@R> => {
+        ast::PatternKind::MatchClass {
+            cls: Box::new(e),
+            patterns,
+            kwd_attrs: vec![],
+            kwd_patterns: vec![],
+        }
+    },
+    <location:@L> <e:MatchName> "(" <kwds:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
+         let (kwd_attrs, kwd_patterns) = kwds
+            .into_iter()
+            .unzip();
+        ast::PatternKind::MatchClass {
+            cls: Box::new(e),
+            patterns: vec![],
+            kwd_attrs,
+            kwd_patterns,
+        }
+    },
+    <location:@L> <e:MatchName> "(" ")" <end_location:@R> => {
+        ast::PatternKind::MatchClass {
+            cls: Box::new(e),
+            patterns: vec![],
+            kwd_attrs: vec![],
+            kwd_patterns: vec![],
+        }
+    },
+    <location:@L> <e:MatchNameOrAttr> "(" <patterns: OneOrMore<Pattern>> "," <kwds:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
+        let (kwd_attrs, kwd_patterns) = kwds
+            .into_iter()
+            .unzip();
+        ast::PatternKind::MatchClass {
+            cls: Box::new(e),
+            patterns,
+            kwd_attrs,
+            kwd_patterns,
+        }
+    },
+    <location:@L> <e:MatchNameOrAttr> "(" <patterns: OneOrMore<Pattern>> ","? ")" <end_location:@R> => {
+        ast::PatternKind::MatchClass {
+            cls: Box::new(e),
+            patterns,
+            kwd_attrs: vec![],
+            kwd_patterns: vec![],
+        }
+    },
+    <location:@L> <e:MatchNameOrAttr> "(" <kwds:OneOrMore<MatchKeywordEntry>> ","? ")" <end_location:@R> => {
+         let (kwd_attrs, kwd_patterns) = kwds
+            .into_iter()
+            .unzip();
+        ast::PatternKind::MatchClass {
+            cls: Box::new(e),
+            patterns: vec![],
+            kwd_attrs,
+            kwd_patterns,
+        }
+    },
+    <location:@L> <e:MatchNameOrAttr> "(" ")" <end_location:@R> => {
+        ast::PatternKind::MatchClass {
+            cls: Box::new(e),
+            patterns: vec![],
+            kwd_attrs: vec![],
+            kwd_patterns: vec![],
+        }
+    },
+}
 
 IfStatement: ast::Stmt = {
     <location:@L> "if" <test:NamedExpressionTest> ":" <body:Suite> <s2:(@L "elif" NamedExpressionTest ":" Suite)*> <s3:("else" ":" Suite)?> => {
@@ -685,7 +1241,7 @@ ParameterListStarArgs<ArgType>: (Option<Box<ast::Arg>>, Vec<ast::Arg>, Vec<ast::
         if va.is_none() && kwargs.is_empty() && kwarg.is_none() {
             Err(LexicalError {
                 error: LexicalErrorType::OtherError("named arguments must follow bare *".to_string()),
-                location: location,
+                location,
             })?
         }
 
@@ -1132,7 +1688,7 @@ Atom<Goal>: ast::Expr = {
     "(" <location:@L> "**" <e:Expression<"all">> ")" <end_location:@R> =>? {
         Err(LexicalError{
             error : LexicalErrorType::OtherError("cannot use double starred expression here".to_string()),
-            location: location,
+            location,
         }.into())
     },
     <location:@L> "{" <e:DictLiteralValues?> "}" <end_location:@R> => {
@@ -1414,6 +1970,8 @@ extern {
         "return" => lexer::Tok::Return,
         "try" => lexer::Tok::Try,
         "while" => lexer::Tok::While,
+        "match" => lexer::Tok::Match,
+        "case" => lexer::Tok::Case,
         "with" => lexer::Tok::With,
         "yield" => lexer::Tok::Yield,
         "True" => lexer::Tok::True,

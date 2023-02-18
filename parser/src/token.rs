@@ -184,6 +184,8 @@ pub enum Tok {
     Return,
     Try,
     While,
+    Match,
+    Case,
     With,
     Yield,
 
@@ -297,6 +299,8 @@ impl fmt::Display for Tok {
             Return => f.write_str("'return'"),
             Try => f.write_str("'try'"),
             While => f.write_str("'while'"),
+            Match => f.write_str("'match'"),
+            Case => f.write_str("'case'"),
             With => f.write_str("'with'"),
             Yield => f.write_str("'yield'"),
             ColonEqual => f.write_str("':='"),

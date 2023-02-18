@@ -18,6 +18,7 @@ use crate::{ast, error::ParseError, lexer, python};
 use ast::Location;
 use itertools::Itertools;
 use std::iter;
+use crate::soft_keywords::soft_keywords;
 
 /// Parse a full Python program usually consisting of multiple lines.
 ///  
@@ -188,9 +189,8 @@ pub fn parse_tokens(
     let tokenizer = iter::once(Ok(marker_token))
         .chain(lxr)
         .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
-
     python::TopParser::new()
-        .parse(tokenizer)
+        .parse(soft_keywords(tokenizer, mode).into_iter())
         .map_err(|e| crate::error::parse_error_from_lalrpop(e, source_path))
 }
 
@@ -418,5 +418,206 @@ with (0 as a, 1 as b,): pass
         assert!(parse(&source, Mode::Expression, "<embedded>").is_ok());
         assert!(parse(&source, Mode::Module, "<embedded>").is_ok());
         assert!(parse(&source, Mode::Interactive, "<embedded>").is_ok());
+    }
+
+    #[test]
+    fn test_match_as_identifier() {
+        let parse_ast = parse_program(
+            r#"
+match *a + b, c   # ((match * a) + b), c
+match *(a + b), c   # (match * (a + b)), c
+match (*a + b, c)   # match ((*(a + b)), c)
+match -a * b + c   # (match - (a * b)) + c
+match -(a * b) + c   # (match - (a * b)) + c
+match (-a) * b + c   # (match (-(a * b))) + c
+match ().a   # (match()).a
+match (()).a   # (match(())).a
+match ((),).a   # (match(())).a
+match [a].b   # (match[a]).b
+match [a,].b   # (match[(a,)]).b  (not (match[a]).b)
+match [(a,)].b   # (match[(a,)]).b
+match()[a:
+    b]  # (match())[a: b]
+if match := 1: pass
+match match:
+    case 1: pass
+    case 2:
+        pass
+"#,
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_match_complex() {
+        let source = r#"# Cases sampled from Lib/test/test_patma.py
+
+# case test_patma_098
+match x:
+    case -0j:
+        y = 0
+# case test_patma_142
+match x:
+    case bytes(z):
+        y = 0
+# case test_patma_073
+match x:
+    case 0 if 0:
+        y = 0
+    case 0 if 1:
+        y = 1
+# case test_patma_006
+match 3:
+    case 0 | 1 | 2 | 3:
+        x = True
+# case test_patma_049
+match x:
+    case [0, 1] | [1, 0]:
+        y = 0
+# case black_check_sequence_then_mapping
+match x:
+    case [*_]:
+        return "seq"
+    case {}:
+        return "map"
+# case test_patma_035
+match x:
+    case {0: [1, 2, {}]}:
+        y = 0
+    case {0: [1, 2, {}] | True} | {1: [[]]} | {0: [1, 2, {}]} | [] | "X" | {}:
+        y = 1
+    case []:
+        y = 2
+# case test_patma_107
+match x:
+    case 0.25 + 1.75j:
+        y = 0
+# case test_patma_097
+match x:
+    case -0j:
+        y = 0
+# case test_patma_007
+match 4:
+    case 0 | 1 | 2 | 3:
+        x = True
+# case test_patma_154
+match x:
+    case 0 if x:
+        y = 0
+# case test_patma_134
+match x:
+    case {1: 0}:
+        y = 0
+    case {0: 0}:
+        y = 1
+    case {**z}:
+        y = 2
+# case test_patma_185
+match Seq():
+    case [*_]:
+        y = 0
+# case test_patma_063
+match x:
+    case 1:
+        y = 0
+    case 1:
+        y = 1
+# case test_patma_248
+match x:
+    case {"foo": bar}:
+        y = bar
+# case test_patma_019
+match (0, 1, 2):
+    case [0, 1, *x, 2]:
+        y = 0
+# case test_patma_052
+match x:
+    case [0]:
+        y = 0
+    case [1, 0] if (x := x[:0]):
+        y = 1
+    case [1, 0]:
+        y = 2
+# case test_patma_191
+match w:
+    case [x, y, *_]:
+        z = 0
+# case test_patma_110
+match x:
+    case -0.25 - 1.75j:
+        y = 0
+# case test_patma_151
+match (x,):
+    case [y]:
+        z = 0
+# case test_patma_114
+match x:
+    case A.B.C.D:
+        y = 0
+# case test_patma_232
+match x:
+    case None:
+        y = 0
+# case test_patma_058
+match x:
+    case 0:
+        y = 0
+# case test_patma_233
+match x:
+    case False:
+        y = 0
+# case test_patma_078
+match x:
+    case []:
+        y = 0
+    case [""]:
+        y = 1
+    case "":
+        y = 2
+# case test_patma_156
+match x:
+    case z:
+        y = 0
+# case test_patma_189
+match w:
+    case [x, y, *rest]:
+        z = 0
+# case test_patma_042
+match x:
+    case (0 as z) | (1 as z) | (2 as z) if z == x % 2:
+        y = 0
+# case test_patma_034
+match x:
+    case {0: [1, 2, {}]}:
+        y = 0
+    case {0: [1, 2, {}] | False} | {1: [[]]} | {0: [1, 2, {}]} | [] | "X" | {}:
+        y = 1
+    case []:
+        y = 2
+# case test_patma_123
+match (0, 1, 2):
+    case 0, *x:
+        y = 0
+# case test_patma_126
+match (0, 1, 2):
+    case *x, 2,:
+        y = 0
+# case test_patma_151
+match x,:
+    case y,:
+        z = 0
+# case test_patma_152
+match w, x:
+    case y, z:
+        v = 0
+# case test_patma_153
+match w := x,:
+    case y as v,:
+        z = 0
+"#;
+        let parse_ast = parse_program(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
     }
 }
