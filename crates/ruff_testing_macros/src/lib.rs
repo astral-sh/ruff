@@ -9,27 +9,48 @@ use std::path::{Component, PathBuf};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, parse_quote, Error, FnArg, ItemFn, LitStr, Pat, Token};
+use syn::{bracketed, parse_macro_input, parse_quote, Error, FnArg, ItemFn, LitStr, Pat, Token};
 
 #[derive(Debug)]
 struct FixtureConfiguration {
-    pattern: String,
+    pattern: Pattern,
     pattern_span: Span,
+    exclude: Vec<Pattern>,
 }
 
 struct Arg {
     name: syn::Ident,
-    _equal_token: Token![=],
-    value: LitStr,
+    value: ArgValue,
 }
 
 impl Parse for Arg {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        Ok(Self {
-            name: input.parse()?,
-            _equal_token: input.parse()?,
-            value: input.parse()?,
-        })
+        let name = input.parse()?;
+        let _equal_token: Token![=] = input.parse()?;
+        let value = input.parse()?;
+
+        Ok(Self { name, value })
+    }
+}
+
+enum ArgValue {
+    LitStr(LitStr),
+    List(Punctuated<LitStr, Token![,]>),
+}
+
+impl Parse for ArgValue {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let value = if input.peek(syn::token::Bracket) {
+            let inner;
+            let _ = bracketed!(inner in input);
+
+            let values = inner.parse_terminated(|parser| parser.parse())?;
+            ArgValue::List(values)
+        } else {
+            ArgValue::LitStr(input.parse()?)
+        };
+
+        Ok(value)
     }
 }
 
@@ -38,27 +59,51 @@ impl Parse for FixtureConfiguration {
         let args: Punctuated<_, Token![,]> = input.parse_terminated(Arg::parse)?;
 
         let mut pattern = None;
+        let mut exclude = None;
 
         for arg in args {
-            if arg.name == "pattern" {
-                let raw_pattern = arg.value.value();
-                // Validate that it is a valid pattern
-                match Pattern::new(&raw_pattern) {
-                    Ok(_) => pattern = Some((raw_pattern, arg.value.span())),
-                    Err(err) => {
+            match arg.name.to_string().as_str() {
+                "pattern" => match arg.value {
+                    ArgValue::LitStr(value) => {
+                        pattern = Some(try_parse_pattern(value)?);
+                    }
+                    ArgValue::List(list) => {
                         return Err(Error::new(
-                            arg.value.span(),
-                            format!("'{raw_pattern}' is not a valid glob pattern: '{}'", err.msg),
-                        ));
+                            list.span(),
+                            "The pattern must be a string literal",
+                        ))
+                    }
+                },
+
+                "exclude" => {
+                    match arg.value {
+                        ArgValue::LitStr(lit) => return Err(Error::new(
+                            lit.span(),
+                            "The exclude argument must be an array of globs: 'exclude=[\"a.py\"]",
+                        )),
+                        ArgValue::List(list) => {
+                            let mut exclude_patterns = Vec::with_capacity(list.len());
+
+                            for pattern in list {
+                                let (pattern, _) = try_parse_pattern(pattern)?;
+                                exclude_patterns.push(pattern);
+                            }
+
+                            exclude = Some(exclude_patterns);
+                        }
                     }
                 }
-            } else {
-                return Err(Error::new(
-                    arg.name.span(),
-                    format!("Unknown argument {}.", arg.name),
-                ));
+
+                _ => {
+                    return Err(Error::new(
+                        arg.name.span(),
+                        format!("Unknown argument {}.", arg.name),
+                    ));
+                }
             }
         }
+
+        let exclude = exclude.unwrap_or(vec![]);
 
         match pattern {
             None => Err(Error::new(
@@ -68,11 +113,56 @@ impl Parse for FixtureConfiguration {
             Some((pattern, pattern_span)) => Ok(Self {
                 pattern,
                 pattern_span,
+                exclude,
             }),
         }
     }
 }
 
+fn try_parse_pattern(pattern_lit: LitStr) -> syn::Result<(Pattern, Span)> {
+    let raw_pattern = pattern_lit.value();
+    match Pattern::new(&raw_pattern) {
+        Ok(pattern) => Ok((pattern, pattern_lit.span())),
+        Err(err) => Err(Error::new(
+            pattern_lit.span(),
+            format!("'{raw_pattern}' is not a valid glob pattern: '{}'", err.msg),
+        )),
+    }
+}
+
+/// Generates a test for each file that matches the specified pattern.
+///
+/// The attributed function must have exactly one argument of the type `&Path`.
+/// The `#[test]` attribute must come after the `#[fixture]` argument or `test` will complain
+/// that your function can not have any arguments.
+///
+/// ## Examples
+///
+/// Creates a test for every python file file in the `fixtures` directory.
+///
+/// ```ignore
+/// #[fixture(pattern="fixtures/*.py")]
+/// #[test]
+/// fn my_test(path: &Path) -> std::io::Result<()> {
+///     // ... implement the test
+///     Ok(())
+/// }
+/// ```
+///
+/// ### Excluding Files
+///
+/// You can exclude files by specifying optional `exclude` patterns.
+///
+/// ```ignore
+/// #[fixture(pattern="fixtures/*.py", exclude=["a_*.py"])]
+/// #[test]
+/// fn my_test(path: &Path) -> std::io::Result<()> {
+///     // ... implement the test
+///     Ok(())
+/// }
+/// ```
+///
+/// Creates tests for each python file in the `fixtures` directory except for files matching the `a_*.py` pattern.
 #[proc_macro_attribute]
 pub fn fixture(attribute: TokenStream, item: TokenStream) -> TokenStream {
     let test_fn = parse_macro_input!(item as ItemFn);
@@ -130,15 +220,15 @@ fn generate_fixtures(
         "#[fixture] requires CARGO_MANIFEST_DIR to be set during the build to resolve the relative paths to the test files.",
     ));
 
-    let pattern = if configuration.pattern.starts_with('/') {
-        Cow::from(&configuration.pattern)
+    let pattern = if configuration.pattern.as_str().starts_with('/') {
+        Cow::from(configuration.pattern.as_str())
     } else {
         Cow::from(format!(
             "{}/{}",
             crate_dir
                 .to_str()
                 .expect("CARGO_MANIFEST_DIR must point to a directory with a UTF8 path"),
-            configuration.pattern
+            configuration.pattern.as_str()
         ))
     };
 
@@ -146,6 +236,14 @@ fn generate_fixtures(
     let mut modules = Modules::default();
 
     for file in files {
+        if configuration
+            .exclude
+            .iter()
+            .any(|exclude| exclude.matches_path(&file))
+        {
+            continue;
+        }
+
         let mut test_fn = test_fn.clone();
 
         let test_name = file
