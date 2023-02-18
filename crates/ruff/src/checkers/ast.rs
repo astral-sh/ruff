@@ -324,6 +324,7 @@ where
                 self.futures_allowed = false;
                 if !self.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(stmt)
+                    && !helpers::is_docstring_stmt(stmt)
                     && !operations::in_nested_block(
                         self.parents.iter().rev().map(std::convert::Into::into),
                     )
