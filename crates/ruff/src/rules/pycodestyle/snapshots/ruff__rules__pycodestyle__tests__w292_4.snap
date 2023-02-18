@@ -11,7 +11,7 @@ expression: diagnostics
     row: 1
     column: 1
   fix:
-    content: "\n"
+    content: "<LineEnding>"
     location:
       row: 1
       column: 1

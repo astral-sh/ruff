@@ -16,6 +16,7 @@ mod tests {
     use super::settings::Settings;
     use crate::registry::Rule;
     use crate::settings;
+    use crate::source_code::LineEnding;
     use crate::test::test_path;
 
     #[test_case(Rule::AmbiguousClassName, Path::new("E742.py"))]
@@ -36,7 +37,6 @@ mod tests {
     #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_1.py"))]
     #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_2.py"))]
     #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_3.py"))]
-    #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_4.py"))]
     #[test_case(Rule::NoneComparison, Path::new("E711.py"))]
     #[test_case(Rule::NotInTest, Path::new("E713.py"))]
     #[test_case(Rule::NotIsTest, Path::new("E714.py"))]
@@ -51,6 +51,26 @@ mod tests {
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn w292_4() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pycodestyle/W292_4.py"),
+            &settings::Settings::for_rule(Rule::NoNewLineAtEndOfFile),
+        )?;
+
+        assert_yaml_snapshot!(
+            diagnostics,
+            // Replaces the platform's default line ending with `<LineEnding>` to make the test platform-
+            // agnostic
+            {
+                "[].fix.content" => insta::dynamic_redaction(|value, _path| {
+                    value.as_str().unwrap().replace(LineEnding::default().as_str(), "<LineEnding>")
+                })
+            }
+        );
         Ok(())
     }
 
