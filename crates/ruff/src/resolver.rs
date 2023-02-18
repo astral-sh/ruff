@@ -203,6 +203,11 @@ fn is_python_path(path: &Path) -> bool {
         .map_or(false, |ext| ext == "py" || ext == "pyi")
 }
 
+/// Return `true` if the `Path` appears to be that of a stub file.
+pub fn is_stub_path(path: &Path) -> bool {
+    path.extension().map_or(false, |ext| ext == "pyi")
+}
+
 /// Return `true` if the `Entry` appears to be that of a Python file.
 pub fn is_python_entry(entry: &DirEntry) -> bool {
     is_python_path(entry.path())

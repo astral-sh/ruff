@@ -32,6 +32,7 @@ use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::registry::{Diagnostic, Rule};
+use crate::resolver::is_stub_path;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
@@ -60,6 +61,7 @@ pub struct Checker<'a> {
     package: Option<&'a Path>,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
+    is_stub: bool,
     pub(crate) settings: &'a Settings,
     pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
     pub(crate) locator: &'a Locator<'a>,
@@ -126,11 +128,13 @@ impl<'a> Checker<'a> {
         style: &'a Stylist,
         indexer: &'a Indexer,
     ) -> Checker<'a> {
+        let is_stub = is_stub_path(path);
         Checker {
             settings,
             noqa_line_for,
             autofix,
             noqa,
+            is_stub,
             path,
             package,
             module_path,
@@ -173,7 +177,7 @@ impl<'a> Checker<'a> {
             in_type_checking_block: false,
             seen_import_boundary: false,
             futures_allowed: true,
-            annotations_future_enabled: path.extension().map_or(false, |ext| ext == "pyi"),
+            annotations_future_enabled: is_stub,
             except_handlers: vec![],
             // Check-specific state.
             flake8_bugbear_seen: vec![],
@@ -1770,7 +1774,7 @@ where
                 }
 
                 if self.settings.rules.enabled(&Rule::PrefixTypeParams) {
-                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                    if self.is_stub {
                         flake8_pyi::rules::prefix_type_params(self, value, targets);
                     }
                 }
@@ -3215,7 +3219,7 @@ where
                     .enabled(&Rule::UnrecognizedPlatformCheck)
                     || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
                 {
-                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                    if self.is_stub {
                         flake8_pyi::rules::unrecognized_platform(
                             self,
                             expr,
