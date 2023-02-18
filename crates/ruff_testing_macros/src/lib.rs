@@ -44,7 +44,10 @@ impl Parse for ArgValue {
             let inner;
             let _ = bracketed!(inner in input);
 
-            let values = inner.parse_terminated(|parser| parser.parse())?;
+            let values = inner.parse_terminated(|parser| {
+                let value: LitStr = parser.parse()?;
+                Ok(value)
+            })?;
             ArgValue::List(values)
         } else {
             ArgValue::LitStr(input.parse()?)
@@ -65,7 +68,7 @@ impl Parse for FixtureConfiguration {
             match arg.name.to_string().as_str() {
                 "pattern" => match arg.value {
                     ArgValue::LitStr(value) => {
-                        pattern = Some(try_parse_pattern(value)?);
+                        pattern = Some(try_parse_pattern(&value)?);
                     }
                     ArgValue::List(list) => {
                         return Err(Error::new(
@@ -85,7 +88,7 @@ impl Parse for FixtureConfiguration {
                             let mut exclude_patterns = Vec::with_capacity(list.len());
 
                             for pattern in list {
-                                let (pattern, _) = try_parse_pattern(pattern)?;
+                                let (pattern, _) = try_parse_pattern(&pattern)?;
                                 exclude_patterns.push(pattern);
                             }
 
@@ -103,7 +106,7 @@ impl Parse for FixtureConfiguration {
             }
         }
 
-        let exclude = exclude.unwrap_or(vec![]);
+        let exclude = exclude.unwrap_or_default();
 
         match pattern {
             None => Err(Error::new(
@@ -119,7 +122,7 @@ impl Parse for FixtureConfiguration {
     }
 }
 
-fn try_parse_pattern(pattern_lit: LitStr) -> syn::Result<(Pattern, Span)> {
+fn try_parse_pattern(pattern_lit: &LitStr) -> syn::Result<(Pattern, Span)> {
     let raw_pattern = pattern_lit.value();
     match Pattern::new(&raw_pattern) {
         Ok(pattern) => Ok((pattern, pattern_lit.span())),
