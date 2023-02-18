@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 """The asyncio package, tracking PEP 3156."""
 
@@ -59,9 +58,7 @@ __all__ = (
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -77,9 +74,7 @@ __all__ = (
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 """The asyncio package, tracking PEP 3156."""
@@ -147,11 +142,9 @@ __all__ = (
     + tasks.__all__
 )
 ```
-
 
 ## Black Output
 
-
 ```py
 """The asyncio package, tracking PEP 3156."""
 
@@ -220,6 +213,5 @@ __all__ = (
 
 
 ```
-
 
 

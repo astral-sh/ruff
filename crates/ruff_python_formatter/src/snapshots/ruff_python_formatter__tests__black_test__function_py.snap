@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 #!/usr/bin/env python3
 import asyncio
@@ -105,9 +104,7 @@ def __await__(): return (yield)
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -192,9 +189,7 @@ def __await__(): return (yield)
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 #!/usr/bin/env python3
@@ -342,9 +337,7 @@ def __await__():
 
 ```
 
-
 ## Black Output
-
 
 ```py
 #!/usr/bin/env python3
@@ -498,6 +491,5 @@ def __await__():
 
 
 ```
-
 
 

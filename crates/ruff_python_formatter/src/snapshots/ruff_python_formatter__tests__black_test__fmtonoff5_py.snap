@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 # Regression test for https://github.com/psf/black/issues/3129.
 setup(
@@ -94,9 +93,7 @@ elif   unformatted:
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -196,9 +193,7 @@ elif   unformatted:
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 # Regression test for https://github.com/psf/black/issues/3129.
@@ -287,9 +282,7 @@ elif unformatted:
 
 ```
 
-
 ## Black Output
-
 
 ```py
 # Regression test for https://github.com/psf/black/issues/3129.
@@ -382,6 +375,5 @@ elif   unformatted:
 
 
 ```
-
 
 

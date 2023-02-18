@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 # We should not treat the trailing comma
 # in a single-element subscript.
@@ -22,9 +21,7 @@ list_of_types = [tuple[int,],]
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -40,9 +37,7 @@ list_of_types = [tuple[int,],]
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 # We should not treat the trailing comma
@@ -68,11 +63,9 @@ list_of_types = [
     tuple[int,],
 ]
 ```
-
 
 ## Black Output
 
-
 ```py
 # We should not treat the trailing comma
 # in a single-element subscript.
@@ -99,6 +92,5 @@ list_of_types = [
 
 
 ```
-
 
 

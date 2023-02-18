@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 # Control
 def double(a: int) -> int:
@@ -98,9 +97,7 @@ def foo() -> tuple[int, int, int,]:
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -250,9 +247,7 @@ def foo() -> tuple[int, int, int,]:
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 # Control
@@ -373,9 +368,7 @@ def foo() -> tuple[
 
 ```
 
-
 ## Black Output
-
 
 ```py
 # Control
@@ -501,6 +494,5 @@ def foo() -> (
 
 
 ```
-
 
 

@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 a, b, c = 3, 4,       5
 if (
@@ -19,9 +18,7 @@ else:
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -41,9 +38,7 @@ else:
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 a, b, c = 3, 4, 5
@@ -54,9 +49,7 @@ else:
 
 ```
 
-
 ## Black Output
-
 
 ```py
 a, b, c = 3, 4, 5
@@ -71,6 +64,5 @@ else:
 
 
 ```
-
 
 

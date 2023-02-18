@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 for ((x in {}) or {})['a'] in x:
     pass
@@ -16,9 +15,7 @@ lambda x=lambda y={1: 3}: y['x':lambda y: {1: 2}]: x
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -35,9 +32,7 @@ lambda x=lambda y={1: 3}: y['x':lambda y: {1: 2}]: x
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 for ((x in {}) or {})['a'] in x:
@@ -46,9 +41,7 @@ pem_spam = lambda l, spam={"x": 3}: not spam.get(l.strip())
 lambda x=lambda y={1: 3}: y['x' : lambda y: {1: 2}]: x
 ```
 
-
 ## Black Output
-
 
 ```py
 for ((x in {}) or {})["a"] in x:
@@ -58,6 +51,5 @@ lambda x=lambda y={1: 3}: y["x" : lambda y: {1: 2}]: x
 
 
 ```
-
 
 

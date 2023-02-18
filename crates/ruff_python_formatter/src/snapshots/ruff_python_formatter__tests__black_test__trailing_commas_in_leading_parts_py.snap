@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 zero(one,).two(three,).four(five,)
 
@@ -43,9 +42,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -77,9 +74,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 zero(
@@ -130,9 +125,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx(), (
 )
 ```
 
-
 ## Black Output
-
 
 ```py
 zero(
@@ -188,6 +181,5 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 
 
 ```
-
 
 

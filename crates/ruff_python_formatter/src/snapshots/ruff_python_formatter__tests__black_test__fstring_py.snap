@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 f"f-string without formatted values is just a string"
 f"{{NOT a formatted value}}"
@@ -19,9 +18,7 @@ f'Hello \'{tricky + "example"}\''
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -43,9 +40,7 @@ f'Hello \'{tricky + "example"}\''
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 f"f-string without formatted values is just a string"
@@ -59,9 +54,7 @@ f"space between opening braces: { {a for a in (1, 2, 3)}}"
 f'Hello \'{tricky + "example"}\''
 ```
 
-
 ## Black Output
-
 
 ```py
 f"f-string without formatted values is just a string"
@@ -76,6 +69,5 @@ f'Hello \'{tricky + "example"}\''
 
 
 ```
-
 
 

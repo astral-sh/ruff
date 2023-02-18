@@ -123,23 +123,23 @@ mod tests {
             // Black and Ruff have different formatting. Write out a snapshot that covers the differences
             // today.
             let mut snapshot = String::new();
-            writeln!(snapshot, "{}", Header::new("Input"))?;
-            writeln!(snapshot, "{}", CodeFrame::new("py", &content))?;
+            write!(snapshot, "{}", Header::new("Input"))?;
+            write!(snapshot, "{}", CodeFrame::new("py", &content))?;
 
-            writeln!(snapshot, "{}", Header::new("Black Differences"))?;
+            write!(snapshot, "{}", Header::new("Black Differences"))?;
 
             let diff = TextDiff::from_lines(expected_output.as_str(), formatted_code)
                 .unified_diff()
                 .header("Black", "Ruff")
                 .to_string();
 
-            writeln!(snapshot, "{}", CodeFrame::new("diff", &diff))?;
+            write!(snapshot, "{}", CodeFrame::new("diff", &diff))?;
 
-            writeln!(snapshot, "{}", Header::new("Ruff Output"))?;
-            writeln!(snapshot, "{}", CodeFrame::new("py", formatted_code))?;
+            write!(snapshot, "{}", Header::new("Ruff Output"))?;
+            write!(snapshot, "{}", CodeFrame::new("py", formatted_code))?;
 
-            writeln!(snapshot, "{}", Header::new("Black Output"))?;
-            writeln!(snapshot, "{}", CodeFrame::new("py", &expected_output))?;
+            write!(snapshot, "{}", Header::new("Black Output"))?;
+            write!(snapshot, "{}", CodeFrame::new("py", &expected_output))?;
 
             insta::with_settings!({ omit_expression => false, input_file => input_path }, {
                 insta::assert_snapshot!(snapshot);

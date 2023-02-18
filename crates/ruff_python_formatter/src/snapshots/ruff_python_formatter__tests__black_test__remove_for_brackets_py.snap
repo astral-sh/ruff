@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 # Only remove tuple brackets after `for`
 for (k, v) in d.items():
@@ -29,9 +28,7 @@ for (((((k, v))))) in d.items():
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -70,9 +67,7 @@ for (((((k, v))))) in d.items():
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 # Only remove tuple brackets after `for`
@@ -103,9 +98,7 @@ for k, v in d.items():
 
 ```
 
-
 ## Black Output
-
 
 ```py
 # Only remove tuple brackets after `for`
@@ -138,6 +131,5 @@ for k, v in d.items():
 
 
 ```
-
 
 

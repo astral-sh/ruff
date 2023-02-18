@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 \
 
@@ -17,9 +16,7 @@ print("hello, world")
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -32,23 +29,18 @@ print("hello, world")
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 print("hello, world")
 ```
-
 
 ## Black Output
 
-
 ```py
 print("hello, world")
 
 
 ```
-
 
 

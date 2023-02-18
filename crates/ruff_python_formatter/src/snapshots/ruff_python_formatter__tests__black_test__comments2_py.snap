@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
     MyLovelyCompanyTeamProjectComponent  # NOT DRY
@@ -175,9 +174,7 @@ instruction()#comment with bad spacing
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -369,9 +366,7 @@ instruction()#comment with bad spacing
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
@@ -557,9 +552,7 @@ instruction()  #comment with bad spacing
 
 ```
 
-
 ## Black Output
-
 
 ```py
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
@@ -738,6 +731,5 @@ instruction()  # comment with bad spacing
 
 
 ```
-
 
 

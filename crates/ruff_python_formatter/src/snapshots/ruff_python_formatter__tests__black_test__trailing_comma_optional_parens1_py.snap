@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 if e1234123412341234.winerror not in (_winapi.ERROR_SEM_TIMEOUT,
                         _winapi.ERROR_PIPE_BUSY) or _check_timeout(t):
@@ -35,9 +34,7 @@ class A:
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -94,9 +91,7 @@ class A:
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 if e1234123412341234.winerror
@@ -141,9 +136,7 @@ class A:
 
 ```
 
-
 ## Black Output
-
 
 ```py
 if e1234123412341234.winerror not in (
@@ -183,6 +176,5 @@ class A:
 
 
 ```
-
 
 

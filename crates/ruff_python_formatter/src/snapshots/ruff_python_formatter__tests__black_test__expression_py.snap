@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 ...
 'some_string'
@@ -264,9 +263,7 @@ last_call()
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -524,9 +521,7 @@ last_call()
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 ...
@@ -906,9 +901,7 @@ last_call()# standalone comment at ENDMARKER
 
 ```
 
-
 ## Black Output
-
 
 ```py
 "some_string"
@@ -1284,6 +1277,5 @@ last_call()
 
 
 ```
-
 
 

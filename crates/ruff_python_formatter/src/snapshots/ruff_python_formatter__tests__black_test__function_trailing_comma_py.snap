@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 def f(a,):
     d = {'key': 'value',}
@@ -71,9 +70,7 @@ some_module.some_function(
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -190,9 +187,7 @@ some_module.some_function(
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 def f(
@@ -310,9 +305,7 @@ some_module.some_function(
 )
 ```
 
-
 ## Black Output
-
 
 ```py
 def f(
@@ -432,6 +425,5 @@ some_module.some_function(
 
 
 ```
-
 
 

@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 def function(**kwargs):
     t = a**2 + b**3
@@ -73,9 +72,7 @@ return np.divide(
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -91,9 +88,7 @@ return np.divide(
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 def function(**kwargs):
@@ -160,11 +155,9 @@ return np.divide(
     where=view.sum_of_weights_of_weight_long**2 > view.sum_of_weights_squared,  # type: ignore
 )
 ```
-
 
 ## Black Output
 
-
 ```py
 def function(**kwargs):
     t = a**2 + b**3
@@ -232,6 +225,5 @@ return np.divide(
 
 
 ```
-
 
 

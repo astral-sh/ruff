@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 import random
 
@@ -118,9 +117,7 @@ with open("/path/to/file.txt", mode="r") as read_file:
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -133,9 +130,7 @@ with open("/path/to/file.txt", mode="r") as read_file:
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 import random
@@ -218,11 +213,9 @@ with open("/path/to/file.txt", mode="r") as read_file:
         write_file.writelines(read_file.readlines())
 
 ```
-
 
 ## Black Output
 
-
 ```py
 import random
 
@@ -305,6 +298,5 @@ with open("/path/to/file.txt", mode="r") as read_file:
 
 
 ```
-
 
 

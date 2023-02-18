@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 # Test cases separate from `prefer_rhs_split.py` that contains unformatted source.
 
@@ -22,9 +21,7 @@ xxxxxxxxx_yyy_zzzzzzzz[xx.xxxxxx(x_yyy_zzzzzz.xxxxx[0]), x_yyy_zzzzzz.xxxxxx(xxx
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -49,9 +46,7 @@ xxxxxxxxx_yyy_zzzzzzzz[xx.xxxxxx(x_yyy_zzzzzz.xxxxx[0]), x_yyy_zzzzzz.xxxxxx(xxx
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 # Test cases separate from `prefer_rhs_split.py` that contains unformatted source.
@@ -77,9 +72,7 @@ xxxxxxxxx_yyy_zzzzzzzz[
 ] = 1
 ```
 
-
 ## Black Output
-
 
 ```py
 # Test cases separate from `prefer_rhs_split.py` that contains unformatted source.
@@ -106,6 +99,5 @@ xxxxxxxxx_yyy_zzzzzzzz[
 
 
 ```
-
 
 

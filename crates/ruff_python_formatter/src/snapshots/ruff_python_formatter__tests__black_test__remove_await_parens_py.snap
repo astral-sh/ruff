@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 import asyncio
 
@@ -91,9 +90,7 @@ async def main():
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -205,9 +202,7 @@ async def main():
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 import asyncio
@@ -310,9 +305,7 @@ async def main():
 
 ```
 
-
 ## Black Output
-
 
 ```py
 import asyncio
@@ -411,6 +404,5 @@ async def main():
 
 
 ```
-
 
 

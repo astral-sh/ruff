@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 class SimpleClassWithBlankParentheses():
     pass
@@ -33,9 +32,7 @@ class NormalClass (
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -48,9 +45,7 @@ class NormalClass (
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 class SimpleClassWithBlankParentheses:
@@ -85,11 +80,9 @@ class NormalClass:
         return sum
 
 ```
-
 
 ## Black Output
 
-
 ```py
 class SimpleClassWithBlankParentheses:
     pass
@@ -124,6 +117,5 @@ class NormalClass:
 
 
 ```
-
 
 

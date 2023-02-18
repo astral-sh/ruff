@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 a =   2
 # fmt: skip
@@ -13,9 +12,7 @@ l = [1, 2, 3,]
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -31,9 +28,7 @@ l = [1, 2, 3,]
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 a = 2
@@ -44,11 +39,9 @@ l = [
     3,
 ]
 ```
-
 
 ## Black Output
 
-
 ```py
 a = 2
 # fmt: skip
@@ -60,6 +53,5 @@ l = [
 
 
 ```
-
 
 

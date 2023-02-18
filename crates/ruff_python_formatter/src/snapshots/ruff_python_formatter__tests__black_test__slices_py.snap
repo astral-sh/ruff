@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 slice[a.b : c.d]
 slice[d :: d + 1]
@@ -41,9 +40,7 @@ ham[lower + offset : upper + offset]
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -86,9 +83,7 @@ ham[lower + offset : upper + offset]
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 slice[a.b : c.d]
@@ -124,9 +119,7 @@ ham[: upper_fn(x) : step_fn(x)], ham[:: step_fn(x)]
 ham[lower + offset : upper + offset]
 ```
 
-
 ## Black Output
-
 
 ```py
 slice[a.b : c.d]
@@ -163,6 +156,5 @@ ham[lower + offset : upper + offset]
 
 
 ```
-
 
 

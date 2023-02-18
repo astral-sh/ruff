@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 # We should not remove the trailing comma in a single-element subscript.
 a: tuple[int,]
@@ -57,9 +56,7 @@ func(
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -141,9 +138,7 @@ func(
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 # We should not remove the trailing comma in a single-element subscript.
@@ -211,9 +206,7 @@ func(
 )
 ```
 
-
 ## Black Output
-
 
 ```py
 # We should not remove the trailing comma in a single-element subscript.
@@ -244,6 +237,5 @@ func(argument1, (one, two), argument4, argument5, argument6)
 
 
 ```
-
 
 

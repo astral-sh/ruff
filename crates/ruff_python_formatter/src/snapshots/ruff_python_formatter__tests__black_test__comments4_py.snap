@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
     MyLovelyCompanyTeamProjectComponent,  # NOT DRY
@@ -104,9 +103,7 @@ def foo3(list_a, list_b):
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -251,9 +248,7 @@ def foo3(list_a, list_b):
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
@@ -353,9 +348,7 @@ def foo3(list_a, list_b):
 
 ```
 
-
 ## Black Output
-
 
 ```py
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
@@ -455,6 +448,5 @@ def foo3(list_a, list_b):
 
 
 ```
-
 
 

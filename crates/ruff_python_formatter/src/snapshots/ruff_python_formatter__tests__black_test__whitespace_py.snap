@@ -5,15 +5,12 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -25,24 +22,19 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 
 ```
-
 
 ## Black Output
 
-
 ```py
 
 
 
 
 ```
-
 
 

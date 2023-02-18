@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 import core, time, a
 
@@ -81,9 +80,7 @@ if True:
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -118,9 +115,7 @@ if True:
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 import core, time, a
@@ -225,9 +220,7 @@ if True:
 
 ```
 
-
 ## Black Output
-
 
 ```py
 import core, time, a
@@ -332,6 +325,5 @@ if True:
 
 
 ```
-
 
 

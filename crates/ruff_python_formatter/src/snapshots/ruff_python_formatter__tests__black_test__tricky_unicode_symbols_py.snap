@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 ä = 1
 µ = 2
@@ -19,9 +18,7 @@ A፩ = 8
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -37,9 +34,7 @@ A፩ = 8
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 ä = 1
@@ -52,11 +47,9 @@ Q̇_per_meter = 4
 A᧚ = 3
 A፩ = 8
 ```
-
 
 ## Black Output
 
-
 ```py
 ä = 1
 µ = 2
@@ -70,6 +63,5 @@ A፩ = 8
 
 
 ```
-
 
 

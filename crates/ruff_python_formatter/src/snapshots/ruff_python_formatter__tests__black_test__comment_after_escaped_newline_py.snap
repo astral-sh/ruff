@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 def bob(): \
          # pylint: disable=W9016
@@ -19,9 +18,7 @@ def bobtwo(): \
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -41,9 +38,7 @@ def bobtwo(): \
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 def bob():
@@ -57,9 +52,7 @@ def bobtwo():
 
 ```
 
-
 ## Black Output
-
 
 ```py
 def bob():  # pylint: disable=W9016
@@ -71,6 +64,5 @@ def bobtwo():  # some comment here
 
 
 ```
-
 
 

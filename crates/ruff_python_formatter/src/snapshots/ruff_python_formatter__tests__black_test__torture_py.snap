@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 importA;() << 0 ** 101234234242352525425252352352525234890264906820496920680926538059059209922523523525 #
 
@@ -39,9 +38,7 @@ assert (
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -140,9 +137,7 @@ assert (
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 importA
@@ -213,9 +208,7 @@ assert (
 )
 ```
 
-
 ## Black Output
-
 
 ```py
 importA
@@ -279,6 +272,5 @@ assert a_function(
 
 
 ```
-
 
 

@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 from typing import Any, Tuple
 
@@ -128,9 +127,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -298,9 +295,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 from typing import Any, Tuple
@@ -435,9 +430,7 @@ call_to_some_function_asdf(
 aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
 ```
 
-
 ## Black Output
-
 
 ```py
 from typing import Any, Tuple
@@ -561,6 +554,5 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 
 
 ```
-
 
 

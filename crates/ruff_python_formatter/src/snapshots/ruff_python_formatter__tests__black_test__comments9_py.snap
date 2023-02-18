@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 # Test for https://github.com/psf/black/issues/246.
 
@@ -149,9 +148,7 @@ def bar():
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -276,9 +273,7 @@ def bar():
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 # Test for https://github.com/psf/black/issues/246.
@@ -445,9 +440,7 @@ def bar():
 
 ```
 
-
 ## Black Output
-
 
 ```py
 # Test for https://github.com/psf/black/issues/246.
@@ -614,6 +607,5 @@ def bar():
 
 
 ```
-
 
 

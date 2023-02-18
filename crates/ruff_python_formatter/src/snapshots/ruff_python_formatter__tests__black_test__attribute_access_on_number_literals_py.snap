@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 x = 123456789 .bit_count()
 x = (123456).__abs__()
@@ -32,9 +31,7 @@ y = 100(no)
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -84,9 +81,7 @@ y = 100(no)
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 x = 123456789.bit_count()
@@ -113,9 +108,7 @@ y = 100[no]
 y = 100((no))
 ```
 
-
 ## Black Output
-
 
 ```py
 x = (123456789).bit_count()
@@ -143,6 +136,5 @@ y = 100(no)
 
 
 ```
-
 
 

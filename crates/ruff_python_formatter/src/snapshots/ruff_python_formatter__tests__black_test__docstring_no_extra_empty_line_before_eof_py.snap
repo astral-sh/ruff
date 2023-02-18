@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 # Make sure when the file ends with class's docstring,
 # It doesn't add extra blank lines.
@@ -14,9 +13,7 @@ class ClassWithDocstring:
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -29,9 +26,7 @@ class ClassWithDocstring:
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 # Make sure when the file ends with class's docstring,
@@ -40,11 +35,9 @@ class ClassWithDocstring:
     """A docstring."""
 
 ```
-
 
 ## Black Output
 
-
 ```py
 # Make sure when the file ends with class's docstring,
 # It doesn't add extra blank lines.
@@ -53,6 +46,5 @@ class ClassWithDocstring:
 
 
 ```
-
 
 

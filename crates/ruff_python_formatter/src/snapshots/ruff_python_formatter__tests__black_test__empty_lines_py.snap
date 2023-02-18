@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 """Docstring."""
 
@@ -102,9 +101,7 @@ def g():
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -219,9 +216,7 @@ def g():
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 """Docstring."""
@@ -326,9 +321,7 @@ def g():
 
 ```
 
-
 ## Black Output
-
 
 ```py
 """Docstring."""
@@ -423,6 +416,5 @@ def g():
 
 
 ```
-
 
 

@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 a =     "this is some code"
 b =     5  #fmt:skip
@@ -14,9 +13,7 @@ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasu
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -34,9 +31,7 @@ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasu
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 a = "this is some code"
@@ -45,9 +40,7 @@ c = 9  #fmt: skip
 d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  #fmt:skip
 ```
 
-
 ## Black Output
-
 
 ```py
 a = "this is some code"
@@ -57,6 +50,5 @@ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasu
 
 
 ```
-
 
 

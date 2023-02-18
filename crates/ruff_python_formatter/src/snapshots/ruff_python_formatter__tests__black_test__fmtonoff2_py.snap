@@ -5,7 +5,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 ---
 ## Input
 
-
 ```py
 import pytest
 
@@ -50,9 +49,7 @@ def test_calculate_fades():
 
 ```
 
-
 ## Black Differences
-
 
 ```diff
 --- Black
@@ -113,9 +110,7 @@ def test_calculate_fades():
 
 ```
 
-
 ## Ruff Output
-
 
 ```py
 import pytest
@@ -164,9 +159,7 @@ def test_calculate_fades():
 
 ```
 
-
 ## Black Output
-
 
 ```py
 import pytest
@@ -212,6 +205,5 @@ def test_calculate_fades():
 
 
 ```
-
 
 
