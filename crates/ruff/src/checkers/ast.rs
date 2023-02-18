@@ -848,9 +848,11 @@ where
                         .rules
                         .enabled(&Rule::EmptyMethodWithoutAbstractDecorator)
                 {
-                    flake8_bugbear::rules::abstract_base_class(
-                        self, stmt, name, bases, keywords, body,
-                    );
+                    if !self.is_stub {
+                        flake8_bugbear::rules::abstract_base_class(
+                            self, stmt, name, bases, keywords, body,
+                        );
+                    }
                 }
 
                 if self
