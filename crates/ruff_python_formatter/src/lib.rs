@@ -112,12 +112,16 @@ mod tests {
                 ));
 
             if snapshot_path.exists() && snapshot_path.is_file() {
-                let _ = fs::remove_file(&snapshot_path);
+                // SAFETY: This is a convenience feature. That's why we don't want to abort
+                // when deleting a no longer needed snapshot fails.
+                fs::remove_file(&snapshot_path).ok();
             }
 
             let new_snapshot_path = snapshot_path.with_extension("snap.new");
             if new_snapshot_path.exists() && new_snapshot_path.is_file() {
-                let _ = fs::remove_file(&new_snapshot_path);
+                // SAFETY: This is a convenience feature. That's why we don't want to abort
+                // when deleting a no longer needed snapshot fails.
+                fs::remove_file(&new_snapshot_path).ok();
             }
         } else {
             // Black and Ruff have different formatting. Write out a snapshot that covers the differences
