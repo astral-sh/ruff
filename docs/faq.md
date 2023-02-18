@@ -172,8 +172,8 @@ Ruff can lint code for any Python version from 3.7 onwards. However, Ruff lacks 
 language features that were introduced in Python 3.10 and later. Specifically, Ruff does not
 support:
 
-- "Structural Pattern Matching" ([PEP 622](https://peps.python.org/pep-0622/)), introduced in Python 3.10.
-- "Exception Groups and except* ([PEP 654](https://www.python.org/dev/peps/pep-0654/)), introduced in Python 3.11.
+* "Structural Pattern Matching" ([PEP 622](https://peps.python.org/pep-0622/)), introduced in Python 3.10.
+* "Exception Groups and except* ([PEP 654](https://www.python.org/dev/peps/pep-0654/)), introduced in Python 3.11.
 
 Support for these features is planned.
 
@@ -208,7 +208,7 @@ and in how Ruff and isort treat inline comments in some cases (see: [#1381](http
 Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
-them. You can find the supported settings in the [API reference](#isort). For example, you can set
+them. You can find the supported settings in the [API reference](https://beta.ruff.rs/docs/settings/#isort). For example, you can set
 `known-first-party` like so:
 
 ```toml
@@ -324,7 +324,7 @@ have _complete_ certainty when making changes to code, even for the seemingly tr
 In the future, Ruff will support enabling autofix behavior based on the safety of the patch.
 
 In the meantime, if you find that the autofix is too aggressive, you can disable it on a per-rule or
-per-category basis using the [`unfixable`](#unfixable) mechanic. For example, to disable autofix
+per-category basis using the [`unfixable`](https://beta.ruff.rs/docs/settings/#unfixable) mechanic. For example, to disable autofix
 for some possibly-unsafe rules, you could add the following to your `pyproject.toml`:
 
 ```toml
