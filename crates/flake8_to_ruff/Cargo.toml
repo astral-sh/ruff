@@ -2,6 +2,7 @@
 name = "flake8-to-ruff"
 version = "0.0.247"
 edition = "2021"
+rust-version = "1.65.0"
 
 [dependencies]
 anyhow = { workspace = true }

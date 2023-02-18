@@ -3,6 +3,7 @@ name = "ruff_dev"
 version = "0.0.0"
 publish = false
 edition = "2021"
+rust-version = "1.65.0"
 
 [dependencies]
 anyhow = { workspace = true }
