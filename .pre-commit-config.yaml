@@ -1,3 +1,4 @@
+fail_fast: true
 repos:
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.10.1
