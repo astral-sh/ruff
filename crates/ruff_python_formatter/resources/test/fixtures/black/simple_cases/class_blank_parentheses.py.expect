@@ -1,8 +1,3 @@
----
-source: src/source_code/mod.rs
-assertion_line: 0
-expression: formatted
----
 class SimpleClassWithBlankParentheses:
     pass
 

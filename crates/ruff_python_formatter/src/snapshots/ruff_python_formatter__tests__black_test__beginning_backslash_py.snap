@@ -24,12 +24,7 @@ print("hello, world")
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1 @@
-----
--source: src/source_code/mod.rs
--assertion_line: 0
--expression: formatted
-----
+@@ -1,2 +1 @@
 -print("hello, world")
 -
 +print("hello, world")
@@ -50,11 +45,6 @@ print("hello, world")
 
 
 ```py
----
-source: src/source_code/mod.rs
-assertion_line: 0
-expression: formatted
----
 print("hello, world")
 
 

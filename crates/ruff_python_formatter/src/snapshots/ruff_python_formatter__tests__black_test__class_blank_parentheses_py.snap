@@ -40,16 +40,7 @@ class NormalClass (
 ```diff
 --- Black
 +++ Ruff
-@@ -1,8 +1,3 @@
-----
--source: src/source_code/mod.rs
--assertion_line: 0
--expression: formatted
-----
- class SimpleClassWithBlankParentheses:
-     pass
- 
-@@ -33,4 +28,3 @@
+@@ -28,4 +28,3 @@
      def func_for_testing(self, first, second):
          sum = first + second
          return sum
@@ -100,11 +91,6 @@ class NormalClass:
 
 
 ```py
----
-source: src/source_code/mod.rs
-assertion_line: 0
-expression: formatted
----
 class SimpleClassWithBlankParentheses:
     pass
 

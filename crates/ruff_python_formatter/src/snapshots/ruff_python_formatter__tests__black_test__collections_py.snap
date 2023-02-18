@@ -88,16 +88,7 @@ if True:
 ```diff
 --- Black
 +++ Ruff
-@@ -1,8 +1,3 @@
-----
--source: src/source_code/mod.rs
--assertion_line: 0
--expression: formatted
-----
- import core, time, a
- 
- from . import A, B, C
-@@ -52,7 +47,7 @@
+@@ -47,7 +47,7 @@
      "oneple": (1,),
  }
  {"oneple": (1,)}
@@ -106,7 +97,7 @@ if True:
  x = {"oneple": (1,)}
  y = {
      "oneple": (1,),
-@@ -84,10 +79,10 @@
+@@ -79,10 +79,10 @@
      )
  
  if True:
@@ -119,7 +110,7 @@ if True:
          },
      )
      ec2client.get_waiter("instance_stopped").wait(
-@@ -102,4 +97,3 @@
+@@ -97,4 +97,3 @@
              "Delay": 5,
          },
      )
@@ -239,11 +230,6 @@ if True:
 
 
 ```py
----
-source: src/source_code/mod.rs
-assertion_line: 0
-expression: formatted
----
 import core, time, a
 
 from . import A, B, C
