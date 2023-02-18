@@ -45,21 +45,27 @@ impl Violation for YieldInInit {
 
 /// PLE0100
 pub fn yield_in_init(checker: &mut Checker, expr: &Expr) {
+    if in_dunder_init(checker) {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(YieldInInit, Range::from_located(expr)));
+    }
+}
+
+pub fn in_dunder_init(checker: &mut Checker) -> bool {
     let scope = checker.current_scope();
     let ScopeKind::Function(FunctionDef {
         name,
         decorator_list,
         ..
     }) = &scope.kind else {
-        return;
+        return false;
     };
-
     if *name != "__init__" {
-        return;
+        return false;
     }
-
     let Some(parent) = checker.current_scope_parent() else {
-        return;
+        return false;
     };
 
     if !matches!(
@@ -73,10 +79,7 @@ pub fn yield_in_init(checker: &mut Checker, expr: &Expr) {
         ),
         FunctionType::Method
     ) {
-        return;
+        return false;
     }
-
-    checker
-        .diagnostics
-        .push(Diagnostic::new(YieldInInit, Range::from_located(expr)));
+    true
 }
