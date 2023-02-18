@@ -1,5 +1,0 @@
----
-source: crates/ruff_python_formatter/src/lib.rs
-expression: formatted.print()?.as_code()
----
-print("hello, world")
