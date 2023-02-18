@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,13 +11,7 @@ expression: diagnostics
     row: 5
     column: 0
   fix:
-    content:
-      - import os
-      - import sys
-      - ""
-      - import numpy as np
-      - import pandas as pd
-      - ""
+    content: "import os\nimport sys\n\nimport numpy as np\nimport pandas as pd\n"
     location:
       row: 1
       column: 0

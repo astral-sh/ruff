@@ -1,5 +1,5 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -14,10 +14,7 @@ expression: diagnostics
     row: 8
     column: 7
   fix:
-    content:
-      - from models import (
-      - "    Fruit,"
-      - )
+    content: "from models import (\n    Fruit,\n)"
     location:
       row: 6
       column: 0

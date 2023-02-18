@@ -15,8 +15,7 @@ expression: diagnostics
     row: 2
     column: 31
   fix:
-    content:
-      - from collections.abc import Mapping
+    content: from collections.abc import Mapping
     location:
       row: 2
       column: 0
@@ -37,8 +36,7 @@ expression: diagnostics
     row: 4
     column: 38
   fix:
-    content:
-      - from collections.abc import Mapping as MAP
+    content: from collections.abc import Mapping as MAP
     location:
       row: 4
       column: 0
@@ -60,8 +58,7 @@ expression: diagnostics
     row: 6
     column: 41
   fix:
-    content:
-      - "from collections.abc import Mapping, Sequence"
+    content: "from collections.abc import Mapping, Sequence"
     location:
       row: 6
       column: 0
@@ -82,9 +79,7 @@ expression: diagnostics
     row: 8
     column: 40
   fix:
-    content:
-      - from collections import Counter
-      - from collections.abc import Mapping
+    content: "from collections import Counter\nfrom collections.abc import Mapping"
     location:
       row: 8
       column: 0
@@ -105,9 +100,7 @@ expression: diagnostics
     row: 10
     column: 42
   fix:
-    content:
-      - from collections import (Counter)
-      - from collections.abc import Mapping
+    content: "from collections import (Counter)\nfrom collections.abc import Mapping"
     location:
       row: 10
       column: 0
@@ -128,9 +121,7 @@ expression: diagnostics
     row: 13
     column: 33
   fix:
-    content:
-      - from collections import (Counter)
-      - from collections.abc import Mapping
+    content: "from collections import (Counter)\nfrom collections.abc import Mapping"
     location:
       row: 12
       column: 0
@@ -151,9 +142,7 @@ expression: diagnostics
     row: 16
     column: 32
   fix:
-    content:
-      - from collections import Counter
-      - from collections.abc import Mapping
+    content: "from collections import Counter\nfrom collections.abc import Mapping"
     location:
       row: 15
       column: 0
@@ -175,9 +164,7 @@ expression: diagnostics
     row: 18
     column: 50
   fix:
-    content:
-      - from collections import Counter
-      - "from collections.abc import Mapping, Sequence"
+    content: "from collections import Counter\nfrom collections.abc import Mapping, Sequence"
     location:
       row: 18
       column: 0
@@ -198,9 +185,7 @@ expression: diagnostics
     row: 20
     column: 51
   fix:
-    content:
-      - from collections import Counter
-      - from collections.abc import Mapping as mapping
+    content: "from collections import Counter\nfrom collections.abc import Mapping as mapping"
     location:
       row: 20
       column: 0
@@ -221,9 +206,7 @@ expression: diagnostics
     row: 23
     column: 44
   fix:
-    content:
-      - from collections import Counter
-      - "    from collections.abc import Mapping"
+    content: "from collections import Counter\n    from collections.abc import Mapping"
     location:
       row: 23
       column: 4
@@ -244,9 +227,7 @@ expression: diagnostics
     row: 28
     column: 44
   fix:
-    content:
-      - from collections import Counter
-      - "    from collections.abc import Mapping"
+    content: "from collections import Counter\n    from collections.abc import Mapping"
     location:
       row: 28
       column: 4
@@ -267,8 +248,7 @@ expression: diagnostics
     row: 30
     column: 40
   fix:
-    content:
-      - from collections.abc import Mapping
+    content: from collections.abc import Mapping
     location:
       row: 30
       column: 9
@@ -289,9 +269,7 @@ expression: diagnostics
     row: 33
     column: 40
   fix:
-    content:
-      - from collections import Counter
-      - from collections.abc import Mapping
+    content: "from collections import Counter\nfrom collections.abc import Mapping"
     location:
       row: 33
       column: 0
@@ -313,12 +291,7 @@ expression: diagnostics
     row: 42
     column: 5
   fix:
-    content:
-      - from collections import (
-      - "        Bad,"
-      - "        Good,"
-      - "    )"
-      - "    from collections.abc import Mapping, Callable"
+    content: "from collections import (\n        Bad,\n        Good,\n    )\n    from collections.abc import Mapping, Callable"
     location:
       row: 37
       column: 4
@@ -339,9 +312,7 @@ expression: diagnostics
     row: 44
     column: 49
   fix:
-    content:
-      - "from typing import Match, Pattern, List"
-      - from collections.abc import Callable
+    content: "from typing import Match, Pattern, List\nfrom collections.abc import Callable"
     location:
       row: 44
       column: 0
@@ -363,9 +334,7 @@ expression: diagnostics
     row: 44
     column: 49
   fix:
-    content:
-      - "from typing import Callable, List"
-      - "from re import Match, Pattern"
+    content: "from typing import Callable, List\nfrom re import Match, Pattern"
     location:
       row: 44
       column: 0

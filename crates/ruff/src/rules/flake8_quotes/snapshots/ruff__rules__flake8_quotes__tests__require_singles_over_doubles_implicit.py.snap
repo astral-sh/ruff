@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_quotes/mod.rs
+source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 2
     column: 10
   fix:
-    content:
-      - "'This'"
+    content: "'This'"
     location:
       row: 2
       column: 4
@@ -31,8 +30,7 @@ expression: diagnostics
     row: 3
     column: 8
   fix:
-    content:
-      - "'is'"
+    content: "'is'"
     location:
       row: 3
       column: 4
@@ -50,8 +48,7 @@ expression: diagnostics
     row: 4
     column: 9
   fix:
-    content:
-      - "'not'"
+    content: "'not'"
     location:
       row: 4
       column: 4
@@ -69,8 +66,7 @@ expression: diagnostics
     row: 8
     column: 10
   fix:
-    content:
-      - "'This'"
+    content: "'This'"
     location:
       row: 8
       column: 4
@@ -88,8 +84,7 @@ expression: diagnostics
     row: 9
     column: 8
   fix:
-    content:
-      - "'is'"
+    content: "'is'"
     location:
       row: 9
       column: 4
@@ -107,8 +102,7 @@ expression: diagnostics
     row: 10
     column: 9
   fix:
-    content:
-      - "'not'"
+    content: "'not'"
     location:
       row: 10
       column: 4
@@ -126,8 +120,7 @@ expression: diagnostics
     row: 27
     column: 30
   fix:
-    content:
-      - "'But this needs to be changed'"
+    content: "'But this needs to be changed'"
     location:
       row: 27
       column: 0

@@ -7,10 +7,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
 
     use crate::registry::Rule;
+    use crate::settings;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test]
     fn defaults() -> Result<()> {

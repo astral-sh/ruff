@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_comprehensions/mod.rs
+source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,8 +11,7 @@ expression: diagnostics
     row: 1
     column: 29
   fix:
-    content:
-      - "[x for x in range(3)]"
+    content: "[x for x in range(3)]"
     location:
       row: 1
       column: 4
@@ -29,10 +28,7 @@ expression: diagnostics
     row: 4
     column: 1
   fix:
-    content:
-      - "["
-      - "    x for x in range(3)"
-      - "]"
+    content: "[\n    x for x in range(3)\n]"
     location:
       row: 2
       column: 4

@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_quotes/mod.rs
+source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 3
     column: 26
   fix:
-    content:
-      - "\"\"\" not a docstring\"\"\""
+    content: "\"\"\" not a docstring\"\"\""
     location:
       row: 3
       column: 4
@@ -31,8 +30,7 @@ expression: diagnostics
     row: 11
     column: 26
   fix:
-    content:
-      - "\"\"\" not a docstring\"\"\""
+    content: "\"\"\" not a docstring\"\"\""
     location:
       row: 11
       column: 4
@@ -50,10 +48,7 @@ expression: diagnostics
     row: 17
     column: 3
   fix:
-    content:
-      - "\"\"\""
-      - "    not a"
-      - "\"\"\""
+    content: "\"\"\"\n    not a\n\"\"\""
     location:
       row: 15
       column: 38
@@ -71,8 +66,7 @@ expression: diagnostics
     row: 17
     column: 19
   fix:
-    content:
-      - "\"\"\"docstring\"\"\""
+    content: "\"\"\"docstring\"\"\""
     location:
       row: 17
       column: 4
@@ -90,8 +84,7 @@ expression: diagnostics
     row: 22
     column: 27
   fix:
-    content:
-      - "\"\"\" not a docstring \"\"\""
+    content: "\"\"\" not a docstring \"\"\""
     location:
       row: 22
       column: 4

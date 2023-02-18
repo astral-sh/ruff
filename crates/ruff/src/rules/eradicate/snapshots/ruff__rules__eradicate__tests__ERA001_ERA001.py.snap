@@ -1,5 +1,5 @@
 ---
-source: src/rules/eradicate/mod.rs
+source: crates/ruff/src/rules/eradicate/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,8 +11,7 @@ expression: diagnostics
     row: 1
     column: 10
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 1
       column: 0
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 2
     column: 22
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 2
       column: 0
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 3
     column: 6
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 3
       column: 0
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 5
     column: 13
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 5
       column: 0
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 12
     column: 16
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 12
       column: 0

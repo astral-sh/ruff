@@ -11,16 +11,7 @@ expression: diagnostics
     row: 6
     column: 0
   fix:
-    content:
-      - import os
-      - import sys
-      - ""
-      - import ruff
-      - ""
-      - import leading_prefix
-      - ""
-      - from . import leading_prefix
-      - ""
+    content: "import os\nimport sys\n\nimport ruff\n\nimport leading_prefix\n\nfrom . import leading_prefix\n"
     location:
       row: 1
       column: 0

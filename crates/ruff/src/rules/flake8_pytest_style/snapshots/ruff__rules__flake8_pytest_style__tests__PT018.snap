@@ -12,9 +12,7 @@ expression: diagnostics
     row: 13
     column: 39
   fix:
-    content:
-      - assert something
-      - assert something_else
+    content: "assert something\nassert something_else"
     location:
       row: 13
       column: 4
@@ -32,10 +30,7 @@ expression: diagnostics
     row: 14
     column: 59
   fix:
-    content:
-      - assert something
-      - assert something_else
-      - assert something_third
+    content: "assert something\nassert something_else\nassert something_third"
     location:
       row: 14
       column: 4
@@ -53,9 +48,7 @@ expression: diagnostics
     row: 15
     column: 43
   fix:
-    content:
-      - assert something
-      - assert not something_else
+    content: "assert something\nassert not something_else"
     location:
       row: 15
       column: 4
@@ -73,9 +66,7 @@ expression: diagnostics
     row: 16
     column: 60
   fix:
-    content:
-      - assert something
-      - assert something_else or something_third
+    content: "assert something\nassert something_else or something_third"
     location:
       row: 16
       column: 4
@@ -93,9 +84,7 @@ expression: diagnostics
     row: 17
     column: 43
   fix:
-    content:
-      - assert not something
-      - assert something_else
+    content: "assert not something\nassert something_else"
     location:
       row: 17
       column: 4
@@ -113,9 +102,7 @@ expression: diagnostics
     row: 18
     column: 44
   fix:
-    content:
-      - assert not something
-      - assert not something_else
+    content: "assert not something\nassert not something_else"
     location:
       row: 18
       column: 4
@@ -133,10 +120,7 @@ expression: diagnostics
     row: 19
     column: 63
   fix:
-    content:
-      - assert not something
-      - assert not something_else
-      - assert not something_third
+    content: "assert not something\nassert not something_else\nassert not something_third"
     location:
       row: 19
       column: 4
@@ -154,9 +138,7 @@ expression: diagnostics
     row: 22
     column: 34
   fix:
-    content:
-      - assert not a
-      - assert b or c
+    content: "assert not a\nassert b or c"
     location:
       row: 22
       column: 4
@@ -174,9 +156,7 @@ expression: diagnostics
     row: 23
     column: 35
   fix:
-    content:
-      - assert not a
-      - assert b and c
+    content: "assert not a\nassert b and c"
     location:
       row: 23
       column: 4

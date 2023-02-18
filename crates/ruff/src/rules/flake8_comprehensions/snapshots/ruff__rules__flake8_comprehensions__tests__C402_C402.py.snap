@@ -11,8 +11,7 @@ expression: diagnostics
     row: 1
     column: 30
   fix:
-    content:
-      - "{x: x for x in range(3)}"
+    content: "{x: x for x in range(3)}"
     location:
       row: 1
       column: 0
@@ -29,10 +28,7 @@ expression: diagnostics
     row: 4
     column: 1
   fix:
-    content:
-      - "{"
-      - "    x: x for x in range(3)"
-      - "}"
+    content: "{\n    x: x for x in range(3)\n}"
     location:
       row: 2
       column: 0
@@ -49,8 +45,7 @@ expression: diagnostics
     row: 6
     column: 37
   fix:
-    content:
-      - " {x: x for x in range(3)} "
+    content: " {x: x for x in range(3)} "
     location:
       row: 6
       column: 7
@@ -67,8 +62,7 @@ expression: diagnostics
     row: 7
     column: 45
   fix:
-    content:
-      - " {x: x for x in range(3)} "
+    content: " {x: x for x in range(3)} "
     location:
       row: 7
       column: 15
