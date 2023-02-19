@@ -1,4 +1,0 @@
-try:
-    ...
-except Exception:
-    Ellipsis

@@ -9,6 +9,31 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
+    /// ### What it does
+    /// Check for no handling of a general exception
+    ///
+    /// ### Why is this bad?
+    /// The user will not know about silenced errors
+    ///
+    /// ### Example
+    /// ```python
+    /// try:
+    ///     ...
+    /// except CustomException:
+    ///     ...
+    /// except Exception:
+    ///     ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// try:
+    ///     ...
+    /// except CustomException:
+    ///     ...
+    /// except Exception:
+    ///     logger.exception("Something unexpected happen")
+    /// ```
     pub struct IgnoringException;
 );
 impl Violation for IgnoringException {
