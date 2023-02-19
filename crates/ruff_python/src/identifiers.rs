@@ -22,3 +22,28 @@ pub fn is_identifier(s: &str) -> bool {
 pub fn is_mangled_private(id: &str) -> bool {
     id.starts_with("__") && !id.ends_with("__")
 }
+
+/// Returns `true` if a string is a PEP 8-compliant module name (i.e., consists of lowercase
+/// letters, numbers, and underscores).
+pub fn is_module_name(s: &str) -> bool {
+    s.chars()
+        .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::identifiers::is_module_name;
+
+    #[test]
+    fn test_is_module_name() {
+        assert!(is_module_name("a"));
+        assert!(is_module_name("abc"));
+        assert!(is_module_name("abc0"));
+        assert!(is_module_name("abc_"));
+        assert!(is_module_name("a_b_c"));
+        assert!(is_module_name("0abc"));
+        assert!(is_module_name("_abc"));
+        assert!(!is_module_name("a-b-c"));
+        assert!(!is_module_name("a_B_c"));
+    }
+}

@@ -3,7 +3,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::string::is_lower_with_underscore;
+use ruff_python::identifiers::is_module_name;
 
 use crate::ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
 use crate::ast::types::Range;
@@ -103,7 +103,7 @@ fn fix_banned_relative_import(
             let call_path = from_relative_import(&parts, module);
             // Require import to be a valid PEP 8 module:
             // https://python.org/dev/peps/pep-0008/#package-and-module-names
-            if !call_path.iter().all(|part| is_lower_with_underscore(part)) {
+            if !call_path.iter().all(|part| is_module_name(part)) {
                 return None;
             }
             call_path.as_slice().join(".")
@@ -112,14 +112,14 @@ fn fix_banned_relative_import(
             let call_path = from_relative_import(&parts, module);
             // Require import to be a valid PEP 8 module:
             // https://python.org/dev/peps/pep-0008/#package-and-module-names
-            if !call_path.iter().all(|part| is_lower_with_underscore(part)) {
+            if !call_path.iter().all(|part| is_module_name(part)) {
                 return None;
             }
             call_path.as_slice().join(".")
         } else {
             // Require import to be a valid PEP 8 module:
             // https://python.org/dev/peps/pep-0008/#package-and-module-names
-            if !parts.iter().all(|part| is_lower_with_underscore(part)) {
+            if !parts.iter().all(|part| is_module_name(part)) {
                 return None;
             }
             parts.join(".")
