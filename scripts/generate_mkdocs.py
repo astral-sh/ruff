@@ -16,7 +16,7 @@ SECTIONS: list[tuple[str, str]] = [
 ]
 
 DOCUMENTATION_LINK: str = (
-    "This README is also available as [documentation](https://beta.ruff.rs/docs/)."
+    "For more, see the [documentation](https://beta.ruff.rs/docs/)."
 )
 
 FATHOM_SCRIPT: str = (

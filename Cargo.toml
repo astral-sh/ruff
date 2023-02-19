@@ -1,6 +1,5 @@
 [workspace]
 members = ["crates/*"]
-default-members = ["crates/ruff", "crates/ruff_cli"]
 
 [workspace.dependencies]
 anyhow = { version = "1.0.66" }
