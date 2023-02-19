@@ -12,6 +12,30 @@ use crate::violation::{AutofixKind, Availability, Violation};
 use super::fix_with;
 
 define_violation!(
+    /// ## What it does
+    /// Checks if multiple context managers have been unnecessarily nested.
+    ///
+    /// ## Why is this bad?
+    /// In Python 3, a single `with` block is allowed to contain multiple
+    /// context managers. Therefore, it is advisable to do so whenever
+    /// possible, in order to minimize the number of indentation levels
+    /// in your code.
+    ///
+    /// ## Example
+    /// ```python
+    /// with A() as a:
+    ///     with B() as b:
+    ///         pass
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// with A() as a, B() as b:
+    ///     pass
+    /// ```
+    ///
+    /// ## References
+    /// * [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
     pub struct MultipleWithStatements {
         pub fixable: bool,
     }
