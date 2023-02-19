@@ -9,6 +9,23 @@ use crate::rules::flake8_implicit_str_concat::settings::Settings;
 use crate::violation::Violation;
 
 define_violation!(
+    /// ## What it does
+    /// Checks if there are implicitly concatenated strings on a single line.
+    ///
+    /// ## Why is this bad?
+    /// While it is valid Python syntax to concatenate multiple string / byte
+    /// literals delimited by whitespace, it is unnecessary and negatively
+    /// affects code readability.
+    ///
+    /// ## Example
+    /// ```python
+    /// z = "The quick " "brown fox."
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// z = "The quick brown fox."
+    /// ```
     pub struct SingleLineImplicitStringConcatenation;
 );
 impl Violation for SingleLineImplicitStringConcatenation {
@@ -19,6 +36,33 @@ impl Violation for SingleLineImplicitStringConcatenation {
 }
 
 define_violation!(
+    /// ## What it does
+    /// Checks if there are implicitly concatenated strings on multiple
+    /// lines.
+    ///
+    /// ## Why is this bad?
+    /// For long string literals that are wrapped across multiple lines, the
+    /// PEP-8 style guide recommends to perform string concatenation
+    /// implicitly within parentheses instead of using a backslash for line
+    /// continuation. The former code style is arguably more readable than
+    /// the latter, even though both are syntactically equivalent.
+    ///
+    /// ## Example
+    /// ```python
+    /// z = "The quick brown fox jumps over the lazy "\
+    ///     "dog."
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// z = (
+    ///     "The quick brown fox jumps over the lazy "
+    ///     "dog."
+    /// )
+    ///
+    /// ## References
+    /// * [PEP 8](https://peps.python.org/pep-0008/#maximum-line-length)
+    /// ```
     pub struct MultiLineImplicitStringConcatenation;
 );
 impl Violation for MultiLineImplicitStringConcatenation {
@@ -29,6 +73,32 @@ impl Violation for MultiLineImplicitStringConcatenation {
 }
 
 define_violation!(
+    /// ## What it does
+    /// Checks if there are string literals that are explicitly concatenated
+    /// (using `+`).
+    ///
+    /// ## Why is this bad?
+    /// For long string literals that are wrapped across multiple lines, it
+    /// is recommended to perform string concatenation implicitly within
+    /// parentheses instead of explicitly concatenating using `+`.
+    /// The former code style is arguably more readable than the latter, even
+    /// though both are equally valid.
+    ///
+    /// ## Example
+    /// ```python
+    /// z = (
+    ///     "The quick brown fox jumps over the lazy "
+    ///     + "dog"
+    /// )
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// z = (
+    ///     "The quick brown fox jumps over the lazy "
+    ///     "dog"
+    /// )
+    /// ```
     pub struct ExplicitStringConcatenation;
 );
 impl Violation for ExplicitStringConcatenation {
