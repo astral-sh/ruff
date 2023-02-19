@@ -203,6 +203,11 @@ fn is_python_path(path: &Path) -> bool {
         .map_or(false, |ext| ext == "py" || ext == "pyi")
 }
 
+/// Return `true` if the `Path` appears to be that of a Python interface definition file (`.pyi`).
+pub fn is_interface_definition_path(path: &Path) -> bool {
+    path.extension().map_or(false, |ext| ext == "pyi")
+}
+
 /// Return `true` if the `Entry` appears to be that of a Python file.
 pub fn is_python_entry(entry: &DirEntry) -> bool {
     is_python_path(entry.path())

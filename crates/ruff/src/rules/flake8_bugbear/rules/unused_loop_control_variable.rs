@@ -75,7 +75,7 @@ impl Violation for UnusedLoopControlVariable {
         if matches!(certainty, Certainty::Certain) && rename.is_some() {
             Some(|UnusedLoopControlVariable { name, rename, .. }| {
                 let rename = rename.as_ref().unwrap();
-                format!("Rename unused `{name}` to `_{rename}`")
+                format!("Rename unused `{name}` to `{rename}`")
             })
         } else {
             None
