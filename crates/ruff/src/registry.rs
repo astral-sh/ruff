@@ -137,6 +137,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::UsedPriorGlobalDeclaration,
     rules::pylint::rules::AwaitOutsideAsync,
     rules::pylint::rules::PropertyWithParameters,
+    rules::pylint::rules::ReturnInInit,
     rules::pylint::rules::ConsiderUsingFromImport,
     rules::pylint::rules::ComparisonOfConstant,
     rules::pylint::rules::ConsiderMergingIsinstance,
