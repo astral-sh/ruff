@@ -722,6 +722,7 @@ Ruff is used in a number of major open-source projects, including:
 * [Hatch](https://github.com/pypa/hatch)
 * [Jupyter](https://github.com/jupyter-server/jupyter_server)
 * [Great Expectations](https://github.com/great-expectations/great_expectations)
+* [ONNX](https://github.com/onnx/onnx)
 * [Polars](https://github.com/pola-rs/polars)
 * [Ibis](https://github.com/ibis-project/ibis)
 * [Synapse (Matrix)](https://github.com/matrix-org/synapse)
@@ -738,6 +739,7 @@ Ruff is used in a number of major open-source projects, including:
 * [Babel](https://github.com/python-babel/babel)
 * [featuretools](https://github.com/alteryx/featuretools)
 * [meson-python](https://github.com/mesonbuild/meson-python)
+* [ZenML](https://github.com/zenml-io/zenml)
 
 ## License
 
