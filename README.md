@@ -710,6 +710,7 @@ Ruff is used in a number of major open-source projects, including:
 * [pandas](https://github.com/pandas-dev/pandas)
 * [FastAPI](https://github.com/tiangolo/fastapi)
 * [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
+* [Diffusers (Hugging Face)](https://github.com/huggingface/diffusers)
 * [Apache Airflow](https://github.com/apache/airflow)
 * [SciPy](https://github.com/scipy/scipy)
 * [Zulip](https://github.com/zulip/zulip)
