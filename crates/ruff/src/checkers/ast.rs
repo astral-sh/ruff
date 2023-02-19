@@ -779,6 +779,9 @@ where
                 if self.settings.rules.enabled(&Rule::ReturnOutsideFunction) {
                     pyflakes::rules::return_outside_function(self, stmt);
                 }
+                if self.settings.rules.enabled(&Rule::ReturnInInit) {
+                    pylint::rules::return_in_init(self, stmt);
+                }
             }
             StmtKind::ClassDef {
                 name,
