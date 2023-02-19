@@ -5,9 +5,8 @@ use ruff_macros::{define_violation, derive_message_formats};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::rules::pylint::helpers::in_dunder_init;
 use crate::violation::Violation;
-
-use super::yield_in_init::in_dunder_init;
 
 define_violation!(
     /// ## What it does
@@ -17,14 +16,21 @@ define_violation!(
     /// The `__init__` method is the constructor for a given Python class,
     /// responsible for initializing, rather than creating, new objects.
     ///
-    /// The `__init__` method has to return `None`. If it returns `self` or any
-    /// other objects, this results in a runtime error.
+    /// The `__init__` method has to return `None`. Returning any value from
+    /// an `__init__` method will result in a runtime error.
     ///
     /// ## Example
     /// ```python
-    /// class InitReturnsValue:
-    ///     def __init__(self, i):
+    /// class Example:
+    ///     def __init__(self):
     ///         return []
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// class Example:
+    ///    def __init__(self):
+    ///       self.value = []
     /// ```
     ///
     /// ## References
@@ -49,11 +55,11 @@ pub fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
                     ..
                 }
             ) {
-                // return None
+                // Explicit `return None`.
                 return;
             }
         } else {
-            // return with no value
+            // Implicit `return`.
             return;
         }
     }
