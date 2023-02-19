@@ -23,6 +23,7 @@ def main_function():
         logger.exception(f"Foud an error: {bad} {bad}")
     except Exception as bad:
         logger.exception(f"Foud an error: {bad}")
+        logger.exception(f"Foud an error: {bad}")
 
 
 # These should NOT change
