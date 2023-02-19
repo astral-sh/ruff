@@ -1,3 +1,5 @@
+use std::fmt::Error;
+
 use num_bigint::BigInt;
 pub use rustpython_compiler_core::ConversionFlag;
 
@@ -42,7 +44,7 @@ impl std::fmt::Display for Constant {
             Constant::None => f.pad("None"),
             Constant::Bool(b) => f.pad(if *b { "True" } else { "False" }),
             Constant::Str(s) => rustpython_common::str::repr(s).fmt(f),
-            Constant::Bytes(b) => f.pad(&rustpython_common::bytes::repr(b)),
+            Constant::Bytes(b) => f.pad(&rustpython_common::bytes::repr(b).map_err(|_err| Error)?),
             Constant::Int(i) => i.fmt(f),
             Constant::Tuple(tup) => {
                 if let [elt] = &**tup {
