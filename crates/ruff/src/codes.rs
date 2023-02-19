@@ -542,6 +542,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Tryceratops, "004") => Rule::PreferTypeError,
         (Tryceratops, "200") => Rule::ReraiseNoCause,
         (Tryceratops, "201") => Rule::VerboseRaise,
+        (Tryceratops, "202") => Rule::IgnoringException,
         (Tryceratops, "300") => Rule::TryConsiderElse,
         (Tryceratops, "301") => Rule::RaiseWithinTry,
         (Tryceratops, "400") => Rule::ErrorInsteadOfException,
