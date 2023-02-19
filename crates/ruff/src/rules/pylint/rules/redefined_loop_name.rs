@@ -68,6 +68,7 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        // Collect target names.
         match &stmt.node {
             // For and async for.
             StmtKind::For { target, .. } | StmtKind::AsyncFor { target, .. } => {
@@ -90,15 +91,30 @@ where
             }
             _ => {}
         }
-        visitor::walk_stmt(self, stmt);
+        // Decide whether to recurse.
+        match &stmt.node {
+            // Don't recurse into blocks that create a new scope.
+            StmtKind::ClassDef { .. } => {}
+            StmtKind::FunctionDef { .. } => {}
+            // Otherwise, do recurse.
+            _ => {
+                visitor::walk_stmt(self, stmt);
+            }
+        }
     }
 }
 
-fn name_ranges_from_expr<'a, U>(target: &'a Expr<U>, locator: &Locator) -> Vec<Range> {
+fn name_ranges_from_expr<'a, U>(
+    target: &'a Expr<U>,
+    locator: &'a Locator,
+) -> impl Iterator<Item = Range> + 'a {
     find_names(target, locator)
 }
 
-fn name_ranges_from_with_items<'a, U>(items: &'a [Withitem<U>], locator: &Locator) -> Vec<Range> {
+fn name_ranges_from_with_items<'a, U>(
+    items: &'a [Withitem<U>],
+    locator: &'a Locator,
+) -> impl Iterator<Item = Range> + 'a {
     items
         .iter()
         .filter_map(|item| {
@@ -107,14 +123,15 @@ fn name_ranges_from_with_items<'a, U>(items: &'a [Withitem<U>], locator: &Locato
                 .map(|expr| find_names(&**expr, locator))
         })
         .flatten()
-        .collect()
 }
 
-fn name_ranges_from_assign_targets<'a, U>(targets: &'a [Expr<U>], locator: &Locator) -> Vec<Range> {
+fn name_ranges_from_assign_targets<'a, U>(
+    targets: &'a [Expr<U>],
+    locator: &'a Locator,
+) -> impl Iterator<Item = Range> + 'a {
     targets
         .iter()
         .flat_map(|target| find_names(target, locator))
-        .collect()
 }
 
 /// PLW2901
@@ -126,7 +143,8 @@ where
         Node::Stmt(stmt) => match &stmt.node {
             // With.
             StmtKind::With { items, body, .. } => {
-                let name_ranges = name_ranges_from_with_items(items, checker.locator);
+                let name_ranges: Vec<Range> =
+                    name_ranges_from_with_items(items, checker.locator).collect();
                 let mut visitor = InnerForWithAssignNamesVisitor {
                     locator: checker.locator,
                     name_ranges: vec![],
@@ -151,7 +169,8 @@ where
                 orelse: _,
                 ..
             } => {
-                let name_ranges = name_ranges_from_expr(target, checker.locator);
+                let name_ranges: Vec<Range> =
+                    name_ranges_from_expr(target, checker.locator).collect();
                 let mut visitor = InnerForWithAssignNamesVisitor {
                     locator: checker.locator,
                     name_ranges: vec![],
@@ -168,20 +187,19 @@ where
         Node::Expr(_) => panic!("redefined_loop_name called on Node that is not a Statement"),
     };
 
-    let outer_names: Vec<&str> = outer_name_ranges
+    let outer_names = outer_name_ranges
         .iter()
         .map(|range| checker.locator.slice(range))
         // Ignore dummy variables.
-        .filter(|name| !checker.settings.dummy_variable_rgx.is_match(name))
-        .collect();
+        .filter(|name| !checker.settings.dummy_variable_rgx.is_match(name));
     let inner_names: Vec<&str> = inner_name_ranges
         .iter()
         .map(|range| checker.locator.slice(range))
         .collect();
 
-    for outer_name in &outer_names {
-        for (inner_range, inner_name) in zip(&inner_name_ranges, &inner_names) {
-            if inner_name.eq(outer_name) {
+    for outer_name in outer_names {
+        for (inner_range, inner_name) in zip(inner_name_ranges.iter(), inner_names.iter()) {
+            if inner_name.eq(&outer_name) {
                 checker.diagnostics.push(Diagnostic::new(
                     RedefinedLoopName {
                         name: (*inner_name).to_string(),

@@ -189,4 +189,26 @@ expression: diagnostics
     column: 9
   fix: ~
   parent: ~
+- kind:
+    RedefinedLoopName:
+      name: i
+  location:
+    row: 112
+    column: 12
+  end_location:
+    row: 112
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    RedefinedLoopName:
+      name: i
+  location:
+    row: 118
+    column: 16
+  end_location:
+    row: 118
+    column: 17
+  fix: ~
+  parent: ~
 

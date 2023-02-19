@@ -94,3 +94,26 @@ for _ in []:
 for i, *j in []:
     for j in []:  # error
         pass
+
+# For -> function definition
+for i in []:
+    def f():
+        i = 2  # no error
+
+# For -> class definition
+for i in []:
+    class A:
+        i = 2  # no error
+
+# For -> function definition -> for -> assignment
+for i in []:
+    def f():
+        for i in []:  # no error
+            i = 2  # error
+
+# For -> class definition -> for -> for
+for i in []:
+    class A:
+        for i in []:  # no error
+            for i in []:  # error
+                pass

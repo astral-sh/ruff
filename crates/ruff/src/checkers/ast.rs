@@ -337,7 +337,7 @@ where
         match &stmt.node {
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
-                let ranges = helpers::find_names(stmt, self.locator);
+                let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     // Add the binding to the current scope.
                     let context = self.execution_context();
@@ -367,7 +367,7 @@ where
             }
             StmtKind::Nonlocal { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
-                let ranges = helpers::find_names(stmt, self.locator);
+                let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     let context = self.execution_context();
                     let scope = &mut self.scopes[scope_index];
