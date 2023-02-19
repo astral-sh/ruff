@@ -7,6 +7,7 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_comprehensions::fixes;
+use crate::rules::flake8_comprehensions::settings::Settings;
 use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
@@ -33,7 +34,7 @@ pub fn unnecessary_collection_call(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-    allow_dict_calls_with_keyword_arguments: bool,
+    settings: &Settings,
 ) {
     if !args.is_empty() {
         return;
@@ -44,7 +45,7 @@ pub fn unnecessary_collection_call(
     match id {
         "dict"
             if keywords.is_empty()
-                || (!allow_dict_calls_with_keyword_arguments
+                || (!settings.allow_dict_calls_with_keyword_arguments
                     && keywords.iter().all(|kw| kw.node.arg.is_some())) =>
         {
             // `dict()` or `dict(a=1)` (as opposed to `dict(**a)`)

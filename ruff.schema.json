@@ -670,7 +670,7 @@
       "type": "object",
       "properties": {
         "allow-dict-calls-with-keyword-arguments": {
-          "description": "Allow dict calls with keyword arguments.",
+          "description": "Allow `dict` calls that make use of keyword arguments (e.g., `dict(a=1, b=2)`).",
           "type": [
             "boolean",
             "null"

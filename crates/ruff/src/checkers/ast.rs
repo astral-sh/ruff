@@ -2561,9 +2561,7 @@ where
                         func,
                         args,
                         keywords,
-                        self.settings
-                            .flake8_comprehensions
-                            .allow_dict_calls_with_keyword_arguments,
+                        &self.settings.flake8_comprehensions,
                     );
                 }
                 if self

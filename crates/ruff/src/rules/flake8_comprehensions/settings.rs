@@ -18,7 +18,7 @@ pub struct Options {
         value_type = "bool",
         example = "allow-dict-calls-with-keyword-arguments = true"
     )]
-    /// Allow dict calls with keyword arguments.
+    /// Allow `dict` calls that make use of keyword arguments (e.g., `dict(a=1, b=2)`).
     pub allow_dict_calls_with_keyword_arguments: Option<bool>,
 }
 
