@@ -13,13 +13,16 @@ use super::fix_with;
 
 define_violation!(
     /// ## What it does
-    /// Checks if multiple context managers have been unnecessarily nested.
+    /// Checks for the unnecessary nesting of multiple consecutive context
+    /// managers.
     ///
     /// ## Why is this bad?
-    /// In Python 3, a single `with` block is allowed to contain multiple
-    /// context managers. Therefore, it is advisable to do so whenever
-    /// possible, in order to minimize the number of indentation levels
-    /// in your code.
+    /// In Python 3, a single `with` block can include multiple context
+    /// managers.
+    ///
+    /// Combining multiple context managers into a single `with` statement
+    /// will minimize the indentation depth of the code, making it more
+    /// readable.
     ///
     /// ## Example
     /// ```python
