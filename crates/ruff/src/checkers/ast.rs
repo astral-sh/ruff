@@ -1630,6 +1630,9 @@ where
                         self.current_stmt_parent().map(Into::into),
                     );
                 }
+                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
+                }
             }
             StmtKind::While { body, orelse, .. } => {
                 if self.settings.rules.enabled(&Rule::FunctionUsesLoopVariable) {
@@ -1673,6 +1676,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
+                }
+                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
                 if matches!(stmt.node, StmtKind::For { .. }) {
                     if self.settings.rules.enabled(&Rule::ReimplementedBuiltin) {

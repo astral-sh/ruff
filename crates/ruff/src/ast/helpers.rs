@@ -869,7 +869,7 @@ pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
 }
 
 // Return the ranges of `Name` tokens within a specified node.
-pub fn find_names<T>(located: &Located<T>, locator: &Locator) -> Vec<Range> {
+pub fn find_names<T, U>(located: &Located<T, U>, locator: &Locator) -> Vec<Range> {
     let contents = locator.slice(&Range::from_located(located));
     lexer::make_tokenizer_located(contents, located.location)
         .flatten()
