@@ -1743,6 +1743,9 @@ where
                 if self.settings.rules.enabled(&Rule::VerboseRaise) {
                     tryceratops::rules::verbose_raise(self, handlers);
                 }
+                if self.settings.rules.enabled(&Rule::VerboseRaise) {
+                    tryceratops::rules::verbose_log_message(self, handlers);
+                }
                 if self.settings.rules.enabled(&Rule::RaiseWithinTry) {
                     tryceratops::rules::raise_within_try(self, body);
                 }

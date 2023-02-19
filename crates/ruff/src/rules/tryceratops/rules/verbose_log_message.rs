@@ -1,5 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
@@ -9,17 +9,17 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct ErrorInsteadOfException;
+    pub struct VerboseLogMessage;
 );
-impl Violation for ErrorInsteadOfException {
+impl Violation for VerboseLogMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `logging.exception` instead of `logging.error`")
+        format!("Do not log the exception object")
     }
 }
 
-/// TRY400
-pub fn error_instead_of_exception(checker: &mut Checker, handlers: &[Excepthandler]) {
+/// TRY401
+pub fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
     for handler in handlers {
         let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
         let calls = {
@@ -29,9 +29,9 @@ pub fn error_instead_of_exception(checker: &mut Checker, handlers: &[Excepthandl
         };
         for (expr, func) in calls {
             if let ExprKind::Attribute { attr, .. } = &func.node {
-                if attr == "error" {
+                if attr == "exception" {
                     checker.diagnostics.push(Diagnostic::new(
-                        ErrorInsteadOfException,
+                        VerboseLogMessage,
                         Range::from_located(expr),
                     ));
                 }

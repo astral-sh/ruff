@@ -511,6 +511,7 @@ ruff_macros::register_rules!(
     rules::tryceratops::rules::TryConsiderElse,
     rules::tryceratops::rules::RaiseWithinTry,
     rules::tryceratops::rules::ErrorInsteadOfException,
+    rules::tryceratops::rules::VerboseLogMessage,
     // flake8-use-pathlib
     rules::flake8_use_pathlib::violations::PathlibAbspath,
     rules::flake8_use_pathlib::violations::PathlibChmod,

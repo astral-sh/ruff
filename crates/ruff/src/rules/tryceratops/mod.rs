@@ -1,4 +1,5 @@
 //! Rules from [tryceratops](https://pypi.org/project/tryceratops/1.1.0/).
+pub(crate) mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]
