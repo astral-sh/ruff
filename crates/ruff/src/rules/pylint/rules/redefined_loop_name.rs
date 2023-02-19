@@ -8,7 +8,26 @@ use crate::source_code::Locator;
 use crate::violation::Violation;
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, Stmt, StmtKind, Withitem};
+use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::iter::zip;
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
+pub enum BindingKind {
+    For,
+    With,
+    Assignment,
+}
+
+impl fmt::Display for BindingKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BindingKind::For => fmt.write_str("for loop"),
+            BindingKind::With => fmt.write_str("with statement"),
+            BindingKind::Assignment => fmt.write_str("assignment"),
+        }
+    }
+}
 
 define_violation!(
     /// ## What it does
@@ -48,19 +67,27 @@ define_violation!(
     /// ```
     pub struct RedefinedLoopName {
         pub name: String,
+        pub outer_kind: BindingKind,
+        pub inner_kind: BindingKind,
     }
 );
 impl Violation for RedefinedLoopName {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedLoopName { name } = self;
-        format!("For loop or with statement variable `{name}` overwritten in body")
+        let RedefinedLoopName {
+            name,
+            outer_kind,
+            inner_kind,
+        } = self;
+        format!(
+            "Outer {outer_kind} variable `{name}` overwritten by {inner_kind} target with same name"
+        )
     }
 }
 
 struct InnerForWithAssignNamesVisitor<'a> {
     locator: &'a Locator<'a>,
-    name_ranges: Vec<Range>,
+    name_ranges: Vec<(Range, BindingKind)>,
 }
 
 impl<'a, 'b> Visitor<'b> for InnerForWithAssignNamesVisitor<'_>
@@ -72,8 +99,11 @@ where
         match &stmt.node {
             // For and async for.
             StmtKind::For { target, .. } | StmtKind::AsyncFor { target, .. } => {
-                self.name_ranges
-                    .extend(name_ranges_from_expr(target, self.locator));
+                self.name_ranges.extend(name_ranges_from_expr(
+                    target,
+                    self.locator,
+                    BindingKind::For,
+                ));
             }
             // With.
             StmtKind::With { items, .. } => {
@@ -86,8 +116,11 @@ where
                     .extend(name_ranges_from_assign_targets(targets, self.locator));
             }
             StmtKind::AugAssign { target, .. } | StmtKind::AnnAssign { target, .. } => {
-                self.name_ranges
-                    .extend(name_ranges_from_expr(target, self.locator));
+                self.name_ranges.extend(name_ranges_from_expr(
+                    target,
+                    self.locator,
+                    BindingKind::Assignment,
+                ));
             }
             _ => {}
         }
@@ -107,14 +140,15 @@ where
 fn name_ranges_from_expr<'a, U>(
     target: &'a Expr<U>,
     locator: &'a Locator,
-) -> impl Iterator<Item = Range> + 'a {
-    find_names(target, locator)
+    kind: BindingKind,
+) -> impl Iterator<Item = (Range, BindingKind)> + 'a {
+    find_names(target, locator).map(move |item| (item, kind))
 }
 
 fn name_ranges_from_with_items<'a, U>(
     items: &'a [Withitem<U>],
     locator: &'a Locator,
-) -> impl Iterator<Item = Range> + 'a {
+) -> impl Iterator<Item = (Range, BindingKind)> + 'a {
     items
         .iter()
         .filter_map(|item| {
@@ -123,15 +157,17 @@ fn name_ranges_from_with_items<'a, U>(
                 .map(|expr| find_names(&**expr, locator))
         })
         .flatten()
+        .map(|item| (item, BindingKind::With))
 }
 
 fn name_ranges_from_assign_targets<'a, U>(
     targets: &'a [Expr<U>],
     locator: &'a Locator,
-) -> impl Iterator<Item = Range> + 'a {
+) -> impl Iterator<Item = (Range, BindingKind)> + 'a {
     targets
         .iter()
         .flat_map(|target| find_names(target, locator))
+        .map(|item| (item, BindingKind::Assignment))
 }
 
 /// PLW2901
@@ -143,7 +179,7 @@ where
         Node::Stmt(stmt) => match &stmt.node {
             // With.
             StmtKind::With { items, body, .. } => {
-                let name_ranges: Vec<Range> =
+                let name_ranges: Vec<(Range, BindingKind)> =
                     name_ranges_from_with_items(items, checker.locator).collect();
                 let mut visitor = InnerForWithAssignNamesVisitor {
                     locator: checker.locator,
@@ -169,8 +205,8 @@ where
                 orelse: _,
                 ..
             } => {
-                let name_ranges: Vec<Range> =
-                    name_ranges_from_expr(target, checker.locator).collect();
+                let name_ranges: Vec<(Range, BindingKind)> =
+                    name_ranges_from_expr(target, checker.locator, BindingKind::For).collect();
                 let mut visitor = InnerForWithAssignNamesVisitor {
                     locator: checker.locator,
                     name_ranges: vec![],
@@ -187,24 +223,26 @@ where
         Node::Expr(_) => panic!("redefined_loop_name called on Node that is not a Statement"),
     };
 
-    let outer_names = outer_name_ranges
-        .iter()
-        .map(|range| checker.locator.slice(range))
-        // Ignore dummy variables.
-        .filter(|name| !checker.settings.dummy_variable_rgx.is_match(name));
     let inner_names: Vec<&str> = inner_name_ranges
         .iter()
-        .map(|range| checker.locator.slice(range))
+        .map(|range| checker.locator.slice(&range.0))
         .collect();
 
-    for outer_name in outer_names {
+    for outer_range in &outer_name_ranges {
+        let outer_name = checker.locator.slice(&outer_range.0);
+        // Ignore dummy variables.
+        if checker.settings.dummy_variable_rgx.is_match(outer_name) {
+            continue;
+        }
         for (inner_range, inner_name) in zip(inner_name_ranges.iter(), inner_names.iter()) {
             if inner_name.eq(&outer_name) {
                 checker.diagnostics.push(Diagnostic::new(
                     RedefinedLoopName {
-                        name: (*inner_name).to_string(),
+                        name: (*outer_name).to_string(),
+                        outer_kind: outer_range.1,
+                        inner_kind: inner_range.1,
                     },
-                    *inner_range,
+                    inner_range.0,
                 ));
             }
         }
