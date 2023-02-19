@@ -8,14 +8,14 @@ behaviors.
 Running from the repo root should pick up and enforce the appropriate settings for each package:
 
 ```console
-∴ cargo run resources/test/project/
-resources/test/project/examples/.dotfiles/script.py:1:1: I001 Import block is un-sorted or un-formatted
-resources/test/project/examples/.dotfiles/script.py:1:8: F401 `numpy` imported but unused
-resources/test/project/examples/.dotfiles/script.py:2:17: F401 `app.app_file` imported but unused
-resources/test/project/examples/docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
-resources/test/project/examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
-resources/test/project/project/file.py:1:8: F401 `os` imported but unused
-resources/test/project/project/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
+∴ cargo run -p ruff_cli -- check crates/ruff/resources/test/project/
+crates/ruff/resources/test/project/examples/.dotfiles/script.py:1:1: I001 Import block is un-sorted or un-formatted
+crates/ruff/resources/test/project/examples/.dotfiles/script.py:1:8: F401 `numpy` imported but unused
+crates/ruff/resources/test/project/examples/.dotfiles/script.py:2:17: F401 `app.app_file` imported but unused
+crates/ruff/resources/test/project/examples/docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
+crates/ruff/resources/test/project/examples/docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
+crates/ruff/resources/test/project/project/file.py:1:8: F401 `os` imported but unused
+crates/ruff/resources/test/project/project/import_file.py:1:1: I001 Import block is un-sorted or un-formatted
 Found 7 errors.
 7 potentially fixable with the --fix option.
 ```
@@ -23,7 +23,7 @@ Found 7 errors.
 Running from the project directory itself should exhibit the same behavior:
 
 ```console
-∴ (cd resources/test/project/ && cargo run .)
+∴ (cd crates/ruff/resources/test/project/ && cargo run -p ruff_cli -- check .)
 examples/.dotfiles/script.py:1:1: I001 Import block is un-sorted or un-formatted
 examples/.dotfiles/script.py:1:8: F401 `numpy` imported but unused
 examples/.dotfiles/script.py:2:17: F401 `app.app_file` imported but unused
@@ -39,7 +39,7 @@ Running from the sub-package directory should exhibit the same behavior, but omi
 files:
 
 ```console
-∴ (cd resources/test/project/examples/docs && cargo run .)
+∴ (cd crates/ruff/resources/test/project/examples/docs && cargo run -p ruff_cli -- check .)
 docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
 Found 2 errors.
@@ -50,16 +50,16 @@ Found 2 errors.
 file paths from the current working directory:
 
 ```console
-∴ (cargo run -- --config=resources/test/project/pyproject.toml resources/test/project/)
-resources/test/project/examples/.dotfiles/script.py:1:8: F401 `numpy` imported but unused
-resources/test/project/examples/.dotfiles/script.py:2:17: F401 `app.app_file` imported but unused
-resources/test/project/examples/docs/docs/concepts/file.py:1:8: F401 `os` imported but unused
-resources/test/project/examples/docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
-resources/test/project/examples/docs/docs/file.py:1:8: F401 `os` imported but unused
-resources/test/project/examples/docs/docs/file.py:3:8: F401 `numpy` imported but unused
-resources/test/project/examples/docs/docs/file.py:4:27: F401 `docs.concepts.file` imported but unused
-resources/test/project/examples/excluded/script.py:1:8: F401 `os` imported but unused
-resources/test/project/project/file.py:1:8: F401 `os` imported but unused
+∴ (cargo run -p ruff_cli -- check --config=crates/ruff/resources/test/project/pyproject.toml crates/ruff/resources/test/project/)
+crates/ruff/resources/test/project/examples/.dotfiles/script.py:1:8: F401 `numpy` imported but unused
+crates/ruff/resources/test/project/examples/.dotfiles/script.py:2:17: F401 `app.app_file` imported but unused
+crates/ruff/resources/test/project/examples/docs/docs/concepts/file.py:1:8: F401 `os` imported but unused
+crates/ruff/resources/test/project/examples/docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
+crates/ruff/resources/test/project/examples/docs/docs/file.py:1:8: F401 `os` imported but unused
+crates/ruff/resources/test/project/examples/docs/docs/file.py:3:8: F401 `numpy` imported but unused
+crates/ruff/resources/test/project/examples/docs/docs/file.py:4:27: F401 `docs.concepts.file` imported but unused
+crates/ruff/resources/test/project/examples/excluded/script.py:1:8: F401 `os` imported but unused
+crates/ruff/resources/test/project/project/file.py:1:8: F401 `os` imported but unused
 Found 9 errors.
 9 potentially fixable with the --fix option.
 ```
@@ -68,7 +68,7 @@ Running from a parent directory should "ignore" the `exclude` (hence, `concepts/
 included in the output):
 
 ```console
-∴ (cd resources/test/project/examples && cargo run -- --config=docs/ruff.toml .)
+∴ (cd crates/ruff/resources/test/project/examples && cargo run -p ruff_cli -- check --config=docs/ruff.toml .)
 docs/docs/concepts/file.py:5:5: F841 Local variable `x` is assigned to but never used
 docs/docs/file.py:1:1: I001 Import block is un-sorted or un-formatted
 docs/docs/file.py:8:5: F841 Local variable `x` is assigned to but never used
@@ -80,8 +80,8 @@ Found 4 errors.
 Passing an excluded directory directly should report errors in the contained files:
 
 ```console
-∴ cargo run resources/test/project/examples/excluded/
-resources/test/project/examples/excluded/script.py:1:8: F401 `os` imported but unused
+∴ cargo run -p ruff_cli -- check crates/ruff/resources/test/project/examples/excluded/
+crates/ruff/resources/test/project/examples/excluded/script.py:1:8: F401 `os` imported but unused
 Found 1 error.
 1 potentially fixable with the --fix option.
 ```
@@ -89,8 +89,8 @@ Found 1 error.
 Unless we `--force-exclude`:
 
 ```console
-∴ cargo run resources/test/project/examples/excluded/ --force-exclude
+∴ cargo run -p ruff_cli -- check crates/ruff/resources/test/project/examples/excluded/ --force-exclude
 warning: No Python files found under the given path(s)
-∴ cargo run resources/test/project/examples/excluded/script.py --force-exclude
+∴ cargo run -p ruff_cli -- check crates/ruff/resources/test/project/examples/excluded/script.py --force-exclude
 warning: No Python files found under the given path(s)
 ```
