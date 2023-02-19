@@ -10,12 +10,16 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    /// Checks if there are implicitly concatenated strings on a single line.
+    /// Checks for implicitly concatenated strings on a single line.
     ///
     /// ## Why is this bad?
-    /// While it is valid Python syntax to concatenate multiple string / byte
-    /// literals delimited by whitespace, it is unnecessary and negatively
-    /// affects code readability.
+    /// While it is valid Python syntax to concatenate multiple string or byte
+    /// literals implicitly (via whitespace delimiters), it is unnecessary and
+    /// negatively affects code readability.
+    ///
+    /// In some cases, the implicit concatenation may also be unintentional, as
+    /// autoformatters are capable of introducing single-line implicit
+    /// concatenations when collapsing long lines.
     ///
     /// ## Example
     /// ```python
@@ -37,15 +41,21 @@ impl Violation for SingleLineImplicitStringConcatenation {
 
 define_violation!(
     /// ## What it does
-    /// Checks if there are implicitly concatenated strings on multiple
-    /// lines.
+    /// Checks for implicitly concatenated strings that span multiple lines.
     ///
     /// ## Why is this bad?
-    /// For long string literals that are wrapped across multiple lines, the
-    /// PEP-8 style guide recommends to perform string concatenation
-    /// implicitly within parentheses instead of using a backslash for line
-    /// continuation. The former code style is arguably more readable than
-    /// the latter, even though both are syntactically equivalent.
+    /// For string literals that wrap across multiple lines, PEP 8 recommends
+    /// the use of implicit string concatenation within parentheses instead of
+    /// using a backslash for line continuation, as the former is more readable
+    /// than the latter.
+    ///
+    /// By default, this rule will only trigger if the string literal is
+    /// concatenated via a backslash. To disallow implicit string concatenation
+    /// altogether, set the `flake8-implicit-str-concat.allow-multiline` option
+    /// to `false`.
+    ///
+    /// ## Options
+    /// * `flake8-implicit-str-concat.allow-multiline`
     ///
     /// ## Example
     /// ```python
@@ -74,15 +84,13 @@ impl Violation for MultiLineImplicitStringConcatenation {
 
 define_violation!(
     /// ## What it does
-    /// Checks if there are string literals that are explicitly concatenated
-    /// (using `+`).
+    /// Checks for string literals that are explicitly concatenated (using the
+    /// `+` operator).
     ///
     /// ## Why is this bad?
-    /// For long string literals that are wrapped across multiple lines, it
-    /// is recommended to perform string concatenation implicitly within
-    /// parentheses instead of explicitly concatenating using `+`.
-    /// The former code style is arguably more readable than the latter, even
-    /// though both are equally valid.
+    /// For string literals that wrap across multiple lines, implicit string
+    /// concatenation within parentheses is preferred over explicit
+    /// concatenation using the `+` operator, as the former is more readable.
     ///
     /// ## Example
     /// ```python
