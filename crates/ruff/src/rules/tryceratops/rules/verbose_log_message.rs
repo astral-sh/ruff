@@ -61,14 +61,12 @@ pub fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
             };
             for (expr, func) in calls {
                 if let ExprKind::Call { args, .. } = &expr.node {
-                    let all_names: Vec<&Expr> = args
-                        .iter()
-                        .filter_map(|arg| {
-                            let mut visitor = NameVisitor::default();
-                            visitor.visit_expr(arg);
-                            visitor.names.pop()
-                        })
-                        .collect();
+                    let mut all_names: Vec<&Expr> = vec![];
+                    for arg in args {
+                        let mut visitor = NameVisitor::default();
+                        visitor.visit_expr(arg);
+                        all_names.extend(visitor.names);
+                    }
                     if let ExprKind::Attribute { attr, .. } = &func.node {
                         if attr == "exception" {
                             check_names(checker, &all_names, clean_name);
