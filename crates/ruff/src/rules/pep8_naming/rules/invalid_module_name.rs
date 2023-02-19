@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::string::is_lower_with_underscore;
+use ruff_python::identifiers::is_module_name;
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
@@ -44,13 +44,18 @@ impl Violation for InvalidModuleName {
 /// N999
 pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
     if let Some(package) = package {
-        let module_name = if path.file_name().unwrap().to_string_lossy() == "__init__.py" {
+        let module_name = if path.file_name().map_or(false, |file_name| {
+            file_name == "__init__.py"
+                || file_name == "__init__.pyi"
+                || file_name == "__main__.py"
+                || file_name == "__main__.pyi"
+        }) {
             package.file_name().unwrap().to_string_lossy()
         } else {
             path.file_stem().unwrap().to_string_lossy()
         };
 
-        if !is_lower_with_underscore(&module_name) {
+        if !is_module_name(&module_name) {
             return Some(Diagnostic::new(
                 InvalidModuleName {
                     name: module_name.to_string(),
