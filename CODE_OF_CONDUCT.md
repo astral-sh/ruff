@@ -1,16 +1,16 @@
 # Contributor Covenant Code of Conduct
 
-- [Our Pledge](#our-pledge)
-- [Our Standards](#our-standards)
-- [Enforcement Responsibilities](#enforcement-responsibilities)
-- [Scope](#scope)
-- [Enforcement](#enforcement)
-- [Enforcement Guidelines](#enforcement-guidelines)
-  - [1. Correction](#1-correction)
-  - [2. Warning](#2-warning)
-  - [3. Temporary Ban](#3-temporary-ban)
-  - [4. Permanent Ban](#4-permanent-ban)
-- [Attribution](#attribution)
+* [Our Pledge](#our-pledge)
+* [Our Standards](#our-standards)
+* [Enforcement Responsibilities](#enforcement-responsibilities)
+* [Scope](#scope)
+* [Enforcement](#enforcement)
+* [Enforcement Guidelines](#enforcement-guidelines)
+  * [1. Correction](#1-correction)
+  * [2. Warning](#2-warning)
+  * [3. Temporary Ban](#3-temporary-ban)
+  * [4. Permanent Ban](#4-permanent-ban)
+* [Attribution](#attribution)
 
 ## Our Pledge
 

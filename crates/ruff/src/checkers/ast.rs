@@ -32,6 +32,7 @@ use crate::ast::visitor::{walk_excepthandler, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::registry::{Diagnostic, Rule};
+use crate::resolver::is_interface_definition_path;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
@@ -58,6 +59,7 @@ pub struct Checker<'a> {
     pub(crate) path: &'a Path,
     module_path: Option<Vec<String>>,
     package: Option<&'a Path>,
+    is_interface_definition: bool,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     pub(crate) settings: &'a Settings,
@@ -126,6 +128,7 @@ impl<'a> Checker<'a> {
         style: &'a Stylist,
         indexer: &'a Indexer,
     ) -> Checker<'a> {
+        let is_interface_definition = is_interface_definition_path(path);
         Checker {
             settings,
             noqa_line_for,
@@ -134,6 +137,7 @@ impl<'a> Checker<'a> {
             path,
             package,
             module_path,
+            is_interface_definition,
             locator,
             stylist: style,
             indexer,
@@ -173,7 +177,7 @@ impl<'a> Checker<'a> {
             in_type_checking_block: false,
             seen_import_boundary: false,
             futures_allowed: true,
-            annotations_future_enabled: path.extension().map_or(false, |ext| ext == "pyi"),
+            annotations_future_enabled: is_interface_definition,
             except_handlers: vec![],
             // Check-specific state.
             flake8_bugbear_seen: vec![],
@@ -835,18 +839,20 @@ where
                     flake8_bugbear::rules::useless_expression(self, body);
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::AbstractBaseClassWithoutAbstractMethod)
-                    || self
+                if !self.is_interface_definition {
+                    if self
                         .settings
                         .rules
-                        .enabled(&Rule::EmptyMethodWithoutAbstractDecorator)
-                {
-                    flake8_bugbear::rules::abstract_base_class(
-                        self, stmt, name, bases, keywords, body,
-                    );
+                        .enabled(&Rule::AbstractBaseClassWithoutAbstractMethod)
+                        || self
+                            .settings
+                            .rules
+                            .enabled(&Rule::EmptyMethodWithoutAbstractDecorator)
+                    {
+                        flake8_bugbear::rules::abstract_base_class(
+                            self, stmt, name, bases, keywords, body,
+                        );
+                    }
                 }
 
                 if self
@@ -1769,8 +1775,8 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::PrefixTypeParams) {
-                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PrefixTypeParams) {
                         flake8_pyi::rules::prefix_type_params(self, value, targets);
                     }
                 }
@@ -3209,13 +3215,13 @@ where
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::UnrecognizedPlatformCheck)
-                    || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
-                {
-                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                if self.is_interface_definition {
+                    if self
+                        .settings
+                        .rules
+                        .enabled(&Rule::UnrecognizedPlatformCheck)
+                        || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
+                    {
                         flake8_pyi::rules::unrecognized_platform(
                             self,
                             expr,
