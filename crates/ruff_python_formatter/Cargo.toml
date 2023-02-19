@@ -2,8 +2,8 @@
 name = "ruff_python_formatter"
 version = "0.0.0"
 publish = false
-edition = "2021"
-rust-version = "1.65.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
