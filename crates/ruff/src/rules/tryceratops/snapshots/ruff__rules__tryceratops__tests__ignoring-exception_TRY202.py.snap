@@ -1,0 +1,85 @@
+---
+source: crates/ruff/src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    IgnoringException: ~
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 7
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    IgnoringException: ~
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    IgnoringException: ~
+  location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    IgnoringException: ~
+  location:
+    row: 22
+    column: 4
+  end_location:
+    row: 22
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    IgnoringException: ~
+  location:
+    row: 27
+    column: 4
+  end_location:
+    row: 27
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    IgnoringException: ~
+  location:
+    row: 36
+    column: 8
+  end_location:
+    row: 36
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    IgnoringException: ~
+  location:
+    row: 45
+    column: 8
+  end_location:
+    row: 45
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    IgnoringException: ~
+  location:
+    row: 53
+    column: 12
+  end_location:
+    row: 53
+    column: 16
+  fix: ~
+  parent: ~
+
