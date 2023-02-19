@@ -10,6 +10,27 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 use crate::violation::Violation;
 
 define_violation!(
+    /// ### What it does
+    /// Checks for excessive logging of the exception object
+    ///
+    /// ### Why is this bad?
+    /// When using `logger.exception`, the exception object is logged automatically.
+    ///
+    /// ### Example
+    /// ```python
+    /// try:
+    ///     ...
+    /// except ValueError as e:
+    ///     logger.exception(f"Found an error: {e}")
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// try:
+    ///     ...
+    /// except ValueError as e:
+    ///     logger.exception(f"Found an error")
+    /// ```
     pub struct VerboseLogMessage;
 );
 impl Violation for VerboseLogMessage {
