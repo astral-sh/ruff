@@ -59,10 +59,10 @@ define_violation!(
     ///     "The quick brown fox jumps over the lazy "
     ///     "dog."
     /// )
+    /// ```
     ///
     /// ## References
     /// * [PEP 8](https://peps.python.org/pep-0008/#maximum-line-length)
-    /// ```
     pub struct MultiLineImplicitStringConcatenation;
 );
 impl Violation for MultiLineImplicitStringConcatenation {
