@@ -167,7 +167,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.247'
+  rev: 'v0.0.248'
   hooks:
     - id: ruff
 ```
@@ -177,7 +177,7 @@ Or, to enable autofix:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.247'
+  rev: 'v0.0.248'
   hooks:
     - id: ruff
       args: [--fix, --exit-non-zero-on-fix]
@@ -710,6 +710,7 @@ Ruff is used in a number of major open-source projects, including:
 * [pandas](https://github.com/pandas-dev/pandas)
 * [FastAPI](https://github.com/tiangolo/fastapi)
 * [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
+* [Diffusers (Hugging Face)](https://github.com/huggingface/diffusers)
 * [Apache Airflow](https://github.com/apache/airflow)
 * [SciPy](https://github.com/scipy/scipy)
 * [Zulip](https://github.com/zulip/zulip)
@@ -721,6 +722,7 @@ Ruff is used in a number of major open-source projects, including:
 * [Hatch](https://github.com/pypa/hatch)
 * [Jupyter](https://github.com/jupyter-server/jupyter_server)
 * [Great Expectations](https://github.com/great-expectations/great_expectations)
+* [ONNX](https://github.com/onnx/onnx)
 * [Polars](https://github.com/pola-rs/polars)
 * [Ibis](https://github.com/ibis-project/ibis)
 * [Synapse (Matrix)](https://github.com/matrix-org/synapse)
@@ -737,6 +739,7 @@ Ruff is used in a number of major open-source projects, including:
 * [Babel](https://github.com/python-babel/babel)
 * [featuretools](https://github.com/alteryx/featuretools)
 * [meson-python](https://github.com/mesonbuild/meson-python)
+* [ZenML](https://github.com/zenml-io/zenml)
 
 ## License
 
