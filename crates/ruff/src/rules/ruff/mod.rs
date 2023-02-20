@@ -7,14 +7,15 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings;
     use crate::settings::resolve_per_file_ignores;
     use crate::settings::types::PerFileIgnore;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::KeywordArgumentBeforeStarArgument, Path::new("RUF004.py"); "RUF004")]
     #[test_case(Rule::UnpackInsteadOfConcatenatingToCollectionLiteral, Path::new("RUF005.py"); "RUF005")]

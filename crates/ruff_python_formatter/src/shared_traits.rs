@@ -22,21 +22,6 @@ where
     }
 }
 
-/// Implement [`AsFormat`] for [`Option`] when `T` implements [`AsFormat`]
-///
-/// Allows to call format on optional AST fields without having to unwrap the
-/// field first.
-impl<T, C> AsFormat<C> for Option<T>
-where
-    T: AsFormat<C>,
-{
-    type Format<'a> = Option<T::Format<'a>> where Self: 'a;
-
-    fn format(&self) -> Self::Format<'_> {
-        self.as_ref().map(AsFormat::format)
-    }
-}
-
 /// Used to convert this object into an object that can be formatted.
 ///
 /// The difference to [`AsFormat`] is that this trait takes ownership of `self`.

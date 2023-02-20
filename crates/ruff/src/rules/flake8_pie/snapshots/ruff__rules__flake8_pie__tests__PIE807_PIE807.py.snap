@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_pie/mod.rs
+source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,8 +11,7 @@ expression: diagnostics
     row: 3
     column: 53
   fix:
-    content:
-      - list
+    content: list
     location:
       row: 3
       column: 43
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 7
     column: 45
   fix:
-    content:
-      - list
+    content: list
     location:
       row: 7
       column: 35
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 11
     column: 37
   fix:
-    content:
-      - list
+    content: list
     location:
       row: 11
       column: 27

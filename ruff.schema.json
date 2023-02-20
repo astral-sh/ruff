@@ -154,6 +154,17 @@
         }
       ]
     },
+    "flake8-comprehensions": {
+      "description": "Options for the `flake8-comprehensions` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8ComprehensionsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-errmsg": {
       "description": "Options for the `flake8-errmsg` plugin.",
       "anyOf": [
@@ -651,6 +662,19 @@
           "items": {
             "type": "string"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8ComprehensionsOptions": {
+      "type": "object",
+      "properties": {
+        "allow-dict-calls-with-keyword-arguments": {
+          "description": "Allow `dict` calls that make use of keyword arguments (e.g., `dict(a=1, b=2)`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -1755,6 +1779,7 @@
         "PLE01",
         "PLE010",
         "PLE0100",
+        "PLE0101",
         "PLE011",
         "PLE0117",
         "PLE0118",
@@ -1957,6 +1982,7 @@
         "SIM112",
         "SIM114",
         "SIM115",
+        "SIM116",
         "SIM117",
         "SIM118",
         "SIM2",
@@ -2018,6 +2044,7 @@
         "TRY4",
         "TRY40",
         "TRY400",
+        "TRY401",
         "UP",
         "UP0",
         "UP00",

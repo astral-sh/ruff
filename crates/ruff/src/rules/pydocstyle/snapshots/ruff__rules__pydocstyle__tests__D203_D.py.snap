@@ -1,5 +1,5 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,9 +12,7 @@ expression: diagnostics
     row: 161
     column: 32
   fix:
-    content:
-      - ""
-      - ""
+    content: "\n"
     location:
       row: 161
       column: 0
@@ -32,9 +30,7 @@ expression: diagnostics
     row: 192
     column: 45
   fix:
-    content:
-      - ""
-      - ""
+    content: "\n"
     location:
       row: 192
       column: 0
@@ -52,9 +48,7 @@ expression: diagnostics
     row: 532
     column: 7
   fix:
-    content:
-      - ""
-      - ""
+    content: "\n"
     location:
       row: 526
       column: 0

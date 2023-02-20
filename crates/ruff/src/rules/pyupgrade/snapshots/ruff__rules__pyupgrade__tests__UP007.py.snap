@@ -11,8 +11,7 @@ expression: diagnostics
     row: 6
     column: 22
   fix:
-    content:
-      - str | None
+    content: str | None
     location:
       row: 6
       column: 9
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 10
     column: 29
   fix:
-    content:
-      - str | None
+    content: str | None
     location:
       row: 10
       column: 9
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 14
     column: 45
   fix:
-    content:
-      - "str | int | Union[float, bytes]"
+    content: "str | int | Union[float, bytes]"
     location:
       row: 14
       column: 9
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 14
     column: 44
   fix:
-    content:
-      - float | bytes
+    content: float | bytes
     location:
       row: 14
       column: 25
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 18
     column: 31
   fix:
-    content:
-      - str | int
+    content: str | int
     location:
       row: 18
       column: 9
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 22
     column: 33
   fix:
-    content:
-      - str | int
+    content: str | int
     location:
       row: 22
       column: 9
@@ -119,8 +113,7 @@ expression: diagnostics
     row: 26
     column: 40
   fix:
-    content:
-      - "(str, int) | float"
+    content: "(str, int) | float"
     location:
       row: 26
       column: 9

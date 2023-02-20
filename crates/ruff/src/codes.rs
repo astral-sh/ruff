@@ -123,6 +123,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // pylint
         (Pylint, "E0100") => Rule::YieldInInit,
+        (Pylint, "E0101") => Rule::ReturnInInit,
         (Pylint, "E0604") => Rule::InvalidAllObject,
         (Pylint, "E0605") => Rule::InvalidAllFormat,
         (Pylint, "E1307") => Rule::BadStringFormatType,
@@ -276,6 +277,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "112") => Rule::UseCapitalEnvironmentVariables,
         (Flake8Simplify, "114") => Rule::IfWithSameArms,
         (Flake8Simplify, "115") => Rule::OpenFileWithContextHandler,
+        (Flake8Simplify, "116") => Rule::ManualDictLookup,
         (Flake8Simplify, "117") => Rule::MultipleWithStatements,
         (Flake8Simplify, "118") => Rule::KeyInDict,
         (Flake8Simplify, "201") => Rule::NegateEqualOp,
@@ -545,6 +547,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Tryceratops, "300") => Rule::TryConsiderElse,
         (Tryceratops, "301") => Rule::RaiseWithinTry,
         (Tryceratops, "400") => Rule::ErrorInsteadOfException,
+        (Tryceratops, "401") => Rule::VerboseLogMessage,
 
         // flake8-use-pathlib
         (Flake8UsePathlib, "100") => Rule::PathlibAbspath,

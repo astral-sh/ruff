@@ -1,17 +1,19 @@
 //! Rules from [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/).
 mod fixes;
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings::Settings;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::UnnecessaryGeneratorList, Path::new("C400.py"); "C400")]
     #[test_case(Rule::UnnecessaryGeneratorSet, Path::new("C401.py"); "C401")]
@@ -29,12 +31,31 @@ mod tests {
     #[test_case(Rule::UnnecessarySubscriptReversal, Path::new("C415.py"); "C415")]
     #[test_case(Rule::UnnecessaryComprehension, Path::new("C416.py"); "C416")]
     #[test_case(Rule::UnnecessaryMap, Path::new("C417.py"); "C417")]
-
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_comprehensions").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &Settings::for_rule(rule_code),
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::UnnecessaryCollectionCall, Path::new("C408.py"); "C408")]
+    fn allow_dict_calls_with_keyword_arguments(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "{}_{}_allow_dict_calls_with_keyword_arguments",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_comprehensions").join(path).as_path(),
+            &Settings {
+                flake8_comprehensions: super::settings::Settings {
+                    allow_dict_calls_with_keyword_arguments: true,
+                },
+                ..Settings::for_rule(rule_code)
+            },
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())

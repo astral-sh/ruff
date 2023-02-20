@@ -11,8 +11,7 @@ expression: diagnostics
     row: 5
     column: 53
   fix:
-    content:
-      - pass
+    content: pass
     location:
       row: 4
       column: 4
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 12
     column: 53
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 11
       column: 0
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 20
     column: 51
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 17
       column: 4
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 25
     column: 53
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 24
       column: 0
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 28
     column: 53
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 27
       column: 0
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 35
     column: 51
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 32
       column: 4
@@ -119,8 +113,7 @@ expression: diagnostics
     row: 40
     column: 51
   fix:
-    content:
-      - "    cmd = [sys.executable, \"-m\", \"test\", \"-j0\"]"
+    content: "    cmd = [sys.executable, \"-m\", \"test\", \"-j0\"]"
     location:
       row: 37
       column: 0
@@ -137,8 +130,7 @@ expression: diagnostics
     row: 45
     column: 51
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 42
       column: 4

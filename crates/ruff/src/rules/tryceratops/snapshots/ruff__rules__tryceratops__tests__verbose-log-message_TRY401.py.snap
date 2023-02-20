@@ -1,0 +1,105 @@
+---
+source: crates/ruff/src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 8
+    column: 44
+  end_location:
+    row: 8
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 19
+    column: 52
+  end_location:
+    row: 19
+    column: 55
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 21
+    column: 44
+  end_location:
+    row: 21
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 21
+    column: 50
+  end_location:
+    row: 21
+    column: 53
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 23
+    column: 44
+  end_location:
+    row: 23
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 24
+    column: 44
+  end_location:
+    row: 24
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 27
+    column: 48
+  end_location:
+    row: 27
+    column: 51
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 39
+    column: 46
+  end_location:
+    row: 39
+    column: 48
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 46
+    column: 52
+  end_location:
+    row: 46
+    column: 54
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 53
+    column: 46
+  end_location:
+    row: 53
+    column: 48
+  fix: ~
+  parent: ~
+

@@ -1,9 +1,10 @@
 use log::error;
+use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::comparable::{ComparableExpr, ComparableStmt};
+use crate::ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use crate::ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
@@ -78,6 +79,36 @@ impl Violation for NeedlessBool {
         } else {
             None
         }
+    }
+}
+
+define_violation!(
+    /// ### What it does
+    /// Checks for three or more consecutive if-statements with direct returns
+    ///
+    /// ### Why is this bad?
+    /// These can be simplified by using a dictionary
+    ///
+    /// ### Example
+    /// ```python
+    /// if x = 1:
+    ///     return "Hello"
+    /// elif x = 2:
+    ///     return "Goodbye"
+    /// else:
+    ///    return "Goodnight"
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
+    /// ```
+    pub struct ManualDictLookup;
+);
+impl Violation for ManualDictLookup {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use a dictionary instead of consecutive `if` statements")
     }
 }
 
@@ -567,6 +598,122 @@ pub fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stm
             ));
         }
     }
+}
+
+/// SIM116
+pub fn manual_dict_lookup(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    body: &[Stmt],
+    orelse: &[Stmt],
+) {
+    // Throughout this rule:
+    // * Each if-statement's test must consist of a constant equality check with the same variable.
+    // * Each if-statement's body must consist of a single `return`.
+    // * Each if-statement's orelse must be either another if-statement or empty.
+    // * The final if-statement's orelse must be empty, or a single `return`.
+    let ExprKind::Compare {
+        left,
+        ops,
+        comparators,
+    } = &test.node else {
+        return;
+    };
+    let ExprKind::Name { id: target, .. } = &left.node else {
+        return;
+    };
+    if body.len() != 1 {
+        return;
+    }
+    if orelse.len() != 1 {
+        return;
+    }
+    if !(ops.len() == 1 && ops[0] == Cmpop::Eq) {
+        return;
+    }
+    if comparators.len() != 1 {
+        return;
+    }
+    let ExprKind::Constant { value: constant, .. } = &comparators[0].node else {
+        return;
+    };
+    let StmtKind::Return { value, .. } = &body[0].node else {
+        return;
+    };
+    if value
+        .as_ref()
+        .map_or(false, |value| contains_effect(checker, value))
+    {
+        return;
+    }
+
+    let mut constants: FxHashSet<ComparableConstant> = FxHashSet::default();
+    constants.insert(constant.into());
+
+    let mut child: Option<&Stmt> = orelse.get(0);
+    while let Some(current) = child.take() {
+        let StmtKind::If { test, body, orelse } = &current.node else {
+            return;
+        };
+        if body.len() != 1 {
+            return;
+        }
+        if orelse.len() > 1 {
+            return;
+        }
+        let ExprKind::Compare {
+            left,
+            ops,
+            comparators,
+        } = &test.node else {
+            return;
+        };
+        let ExprKind::Name { id, .. } = &left.node else {
+            return;
+        };
+        if !(id == target && ops.len() == 1 && ops[0] == Cmpop::Eq) {
+            return;
+        }
+        if comparators.len() != 1 {
+            return;
+        }
+        let ExprKind::Constant { value: constant, .. } = &comparators[0].node else {
+            return;
+        };
+        let StmtKind::Return { value, .. } = &body[0].node else {
+            return;
+        };
+        if value
+            .as_ref()
+            .map_or(false, |value| contains_effect(checker, value))
+        {
+            return;
+        };
+
+        constants.insert(constant.into());
+        if let Some(orelse) = orelse.first() {
+            match &orelse.node {
+                StmtKind::If { .. } => {
+                    child = Some(orelse);
+                }
+                StmtKind::Return { .. } => {
+                    child = None;
+                }
+                _ => return,
+            }
+        } else {
+            child = None;
+        }
+    }
+
+    if constants.len() < 3 {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(ManualDictLookup, Range::from_located(stmt)));
 }
 
 /// SIM401

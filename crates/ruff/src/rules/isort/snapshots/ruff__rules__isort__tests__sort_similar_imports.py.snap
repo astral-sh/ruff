@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,30 +11,7 @@ expression: diagnostics
     row: 27
     column: 0
   fix:
-    content:
-      - import A
-      - import a
-      - import B
-      - import b
-      - import x
-      - import x as A
-      - import x as Y
-      - import x as a
-      - import x as y
-      - from a import BAD as DEF
-      - "from a import B, b"
-      - from a import B as A
-      - from a import B as Abc
-      - from a import B as DEF
-      - from a import Boo as DEF
-      - from a import b as a
-      - from a import b as c
-      - from a import b as d
-      - from a import b as x
-      - from a import b as y
-      - "from b import C, c"
-      - from b import c as d
-      - ""
+    content: "import A\nimport a\nimport B\nimport b\nimport x\nimport x as A\nimport x as Y\nimport x as a\nimport x as y\nfrom a import BAD as DEF\nfrom a import B, b\nfrom a import B as A\nfrom a import B as Abc\nfrom a import B as DEF\nfrom a import Boo as DEF\nfrom a import b as a\nfrom a import b as c\nfrom a import b as d\nfrom a import b as x\nfrom a import b as y\nfrom b import C, c\nfrom b import c as d\n"
     location:
       row: 1
       column: 0

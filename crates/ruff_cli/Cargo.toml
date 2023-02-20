@@ -1,9 +1,9 @@
 [package]
 name = "ruff_cli"
-version = "0.0.247"
+version = "0.0.249"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
-edition = "2021"
-rust-version = "1.65.0"
+edition = { workspace = true }
+rust-version = { workspace = true }
 documentation = "https://github.com/charliermarsh/ruff"
 homepage = "https://github.com/charliermarsh/ruff"
 repository = "https://github.com/charliermarsh/ruff"

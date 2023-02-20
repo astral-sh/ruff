@@ -11,8 +11,7 @@ expression: diagnostics
     row: 4
     column: 22
   fix:
-    content:
-      - "'{} {}'.format(a, b)"
+    content: "'{} {}'.format(a, b)"
     location:
       row: 4
       column: 6
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 6
     column: 21
   fix:
-    content:
-      - "'{}{}'.format(a, b)"
+    content: "'{}{}'.format(a, b)"
     location:
       row: 6
       column: 6
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 8
     column: 20
   fix:
-    content:
-      - "\"trivial\".format()"
+    content: "\"trivial\".format()"
     location:
       row: 8
       column: 6
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 10
     column: 24
   fix:
-    content:
-      - "\"{}\".format(\"simple\")"
+    content: "\"{}\".format(\"simple\")"
     location:
       row: 10
       column: 6
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 12
     column: 34
   fix:
-    content:
-      - "\"{}\".format(\"%s\" % (\"nested\",))"
+    content: "\"{}\".format(\"%s\" % (\"nested\",))"
     location:
       row: 12
       column: 6
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 12
     column: 32
   fix:
-    content:
-      - "\"{}\".format(\"nested\")"
+    content: "\"{}\".format(\"nested\")"
     location:
       row: 12
       column: 14
@@ -119,8 +113,7 @@ expression: diagnostics
     row: 14
     column: 28
   fix:
-    content:
-      - "\"{}% percent\".format(15)"
+    content: "\"{}% percent\".format(15)"
     location:
       row: 14
       column: 6
@@ -137,8 +130,7 @@ expression: diagnostics
     row: 16
     column: 18
   fix:
-    content:
-      - "\"{:f}\".format(15)"
+    content: "\"{:f}\".format(15)"
     location:
       row: 16
       column: 6
@@ -155,8 +147,7 @@ expression: diagnostics
     row: 18
     column: 19
   fix:
-    content:
-      - "\"{:.0f}\".format(15)"
+    content: "\"{:.0f}\".format(15)"
     location:
       row: 18
       column: 6
@@ -173,8 +164,7 @@ expression: diagnostics
     row: 20
     column: 20
   fix:
-    content:
-      - "\"{:.3f}\".format(15)"
+    content: "\"{:.3f}\".format(15)"
     location:
       row: 20
       column: 6
@@ -191,8 +181,7 @@ expression: diagnostics
     row: 22
     column: 19
   fix:
-    content:
-      - "\"{:3f}\".format(15)"
+    content: "\"{:3f}\".format(15)"
     location:
       row: 22
       column: 6
@@ -209,8 +198,7 @@ expression: diagnostics
     row: 24
     column: 19
   fix:
-    content:
-      - "\"{:<5f}\".format(5)"
+    content: "\"{:<5f}\".format(5)"
     location:
       row: 24
       column: 6
@@ -227,8 +215,7 @@ expression: diagnostics
     row: 26
     column: 18
   fix:
-    content:
-      - "\"{:9f}\".format(5)"
+    content: "\"{:9f}\".format(5)"
     location:
       row: 26
       column: 6
@@ -245,8 +232,7 @@ expression: diagnostics
     row: 28
     column: 20
   fix:
-    content:
-      - "\"{:#o}\".format(123)"
+    content: "\"{:#o}\".format(123)"
     location:
       row: 28
       column: 6
@@ -263,8 +249,7 @@ expression: diagnostics
     row: 30
     column: 26
   fix:
-    content:
-      - "\"brace {{}} {}\".format(1)"
+    content: "\"brace {{}} {}\".format(1)"
     location:
       row: 30
       column: 6
@@ -281,10 +266,7 @@ expression: diagnostics
     row: 35
     column: 9
   fix:
-    content:
-      - "\"{}\".format("
-      - "    \"trailing comma\","
-      - "        )"
+    content: "\"{}\".format(\n    \"trailing comma\",\n        )"
     location:
       row: 33
       column: 2
@@ -301,8 +283,7 @@ expression: diagnostics
     row: 38
     column: 22
   fix:
-    content:
-      - "\"foo {} \".format(x)"
+    content: "\"foo {} \".format(x)"
     location:
       row: 38
       column: 6
@@ -319,8 +300,7 @@ expression: diagnostics
     row: 40
     column: 26
   fix:
-    content:
-      - "\"{k}\".format(k=\"v\")"
+    content: "\"{k}\".format(k=\"v\")"
     location:
       row: 40
       column: 6
@@ -337,11 +317,7 @@ expression: diagnostics
     row: 45
     column: 1
   fix:
-    content:
-      - "\"{k}\".format("
-      - "    k=\"v\","
-      - "    i=\"j\","
-      - )
+    content: "\"{k}\".format(\n    k=\"v\",\n    i=\"j\",\n)"
     location:
       row: 42
       column: 6
@@ -358,8 +334,7 @@ expression: diagnostics
     row: 47
     column: 37
   fix:
-    content:
-      - "\"{to_list}\".format(to_list=[])"
+    content: "\"{to_list}\".format(to_list=[])"
     location:
       row: 47
       column: 6
@@ -376,8 +351,7 @@ expression: diagnostics
     row: 49
     column: 43
   fix:
-    content:
-      - "\"{k}\".format(k=\"v\", i=1, j=[])"
+    content: "\"{k}\".format(k=\"v\", i=1, j=[])"
     location:
       row: 49
       column: 6
@@ -394,8 +368,7 @@ expression: diagnostics
     row: 51
     column: 29
   fix:
-    content:
-      - "\"{ab}\".format(ab=1)"
+    content: "\"{ab}\".format(ab=1)"
     location:
       row: 51
       column: 6
@@ -412,8 +385,7 @@ expression: diagnostics
     row: 53
     column: 27
   fix:
-    content:
-      - "\"{a}\".format(a=1)"
+    content: "\"{a}\".format(a=1)"
     location:
       row: 53
       column: 6
@@ -430,9 +402,7 @@ expression: diagnostics
     row: 57
     column: 21
   fix:
-    content:
-      - "\"foo {} \""
-      - "    \"bar {}\".format(x, y)"
+    content: "\"foo {} \"\n    \"bar {}\".format(x, y)"
     location:
       row: 56
       column: 4
@@ -449,9 +419,7 @@ expression: diagnostics
     row: 62
     column: 40
   fix:
-    content:
-      - "\"foo {foo} \""
-      - "    \"bar {bar}\".format(foo=x, bar=y)"
+    content: "\"foo {foo} \"\n    \"bar {bar}\".format(foo=x, bar=y)"
     location:
       row: 61
       column: 4
@@ -468,9 +436,7 @@ expression: diagnostics
     row: 68
     column: 37
   fix:
-    content:
-      - "\"foo {foo} \""
-      - "    \"bar {bar}\".format(foo=x, **bar)"
+    content: "\"foo {foo} \"\n    \"bar {bar}\".format(foo=x, **bar)"
     location:
       row: 67
       column: 4
@@ -487,8 +453,7 @@ expression: diagnostics
     row: 71
     column: 29
   fix:
-    content:
-      - "\"{} \\N{snowman}\".format(a)"
+    content: "\"{} \\N{snowman}\".format(a)"
     location:
       row: 71
       column: 6
@@ -505,8 +470,7 @@ expression: diagnostics
     row: 73
     column: 40
   fix:
-    content:
-      - "\"{foo} \\N{snowman}\".format(foo=1)"
+    content: "\"{foo} \\N{snowman}\".format(foo=1)"
     location:
       row: 73
       column: 6
@@ -523,8 +487,7 @@ expression: diagnostics
     row: 75
     column: 35
   fix:
-    content:
-      - "(\"foo {} \" \"bar {}\").format(x, y)"
+    content: "(\"foo {} \" \"bar {}\").format(x, y)"
     location:
       row: 75
       column: 6

@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_quotes/mod.rs
+source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,10 +12,7 @@ expression: diagnostics
     row: 7
     column: 3
   fix:
-    content:
-      - "'''"
-      - this is not a docstring
-      - "'''"
+    content: "'''\nthis is not a docstring\n'''"
     location:
       row: 5
       column: 0
@@ -33,10 +30,7 @@ expression: diagnostics
     row: 18
     column: 7
   fix:
-    content:
-      - "'''"
-      - "    this is not a docstring"
-      - "    '''"
+    content: "'''\n    this is not a docstring\n    '''"
     location:
       row: 16
       column: 4
@@ -54,9 +48,7 @@ expression: diagnostics
     row: 22
     column: 37
   fix:
-    content:
-      - "'''"
-      - "        definitely not a docstring'''"
+    content: "'''\n        definitely not a docstring'''"
     location:
       row: 21
       column: 20
@@ -74,10 +66,7 @@ expression: diagnostics
     row: 32
     column: 11
   fix:
-    content:
-      - "'''"
-      - "        this is not a docstring"
-      - "        '''"
+    content: "'''\n        this is not a docstring\n        '''"
     location:
       row: 30
       column: 8
@@ -95,10 +84,7 @@ expression: diagnostics
     row: 37
     column: 15
   fix:
-    content:
-      - "'''"
-      - "            Looks like a docstring, but in reality it isn't - only modules, classes and functions"
-      - "            '''"
+    content: "'''\n            Looks like a docstring, but in reality it isn't - only modules, classes and functions\n            '''"
     location:
       row: 35
       column: 12

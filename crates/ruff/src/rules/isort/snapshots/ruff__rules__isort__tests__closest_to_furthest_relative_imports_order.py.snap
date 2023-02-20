@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,11 +11,7 @@ expression: diagnostics
     row: 4
     column: 0
   fix:
-    content:
-      - from . import c
-      - from .. import b
-      - from ... import a
-      - ""
+    content: "from . import c\nfrom .. import b\nfrom ... import a\n"
     location:
       row: 1
       column: 0

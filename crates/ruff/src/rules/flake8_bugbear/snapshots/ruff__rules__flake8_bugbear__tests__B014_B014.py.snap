@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -13,8 +13,7 @@ expression: diagnostics
     row: 17
     column: 25
   fix:
-    content:
-      - OSError
+    content: OSError
     location:
       row: 17
       column: 7
@@ -33,8 +32,7 @@ expression: diagnostics
     row: 28
     column: 25
   fix:
-    content:
-      - MyError
+    content: MyError
     location:
       row: 28
       column: 7
@@ -53,8 +51,7 @@ expression: diagnostics
     row: 49
     column: 27
   fix:
-    content:
-      - re.error
+    content: re.error
     location:
       row: 49
       column: 7

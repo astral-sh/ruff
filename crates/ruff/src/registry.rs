@@ -137,6 +137,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::UsedPriorGlobalDeclaration,
     rules::pylint::rules::AwaitOutsideAsync,
     rules::pylint::rules::PropertyWithParameters,
+    rules::pylint::rules::ReturnInInit,
     rules::pylint::rules::ConsiderUsingFromImport,
     rules::pylint::rules::ComparisonOfConstant,
     rules::pylint::rules::ConsiderMergingIsinstance,
@@ -253,6 +254,7 @@ ruff_macros::register_rules!(
     rules::flake8_2020::rules::SysVersionCmpStr10,
     rules::flake8_2020::rules::SysVersionSlice1Referenced,
     // flake8-simplify
+    rules::flake8_simplify::rules::ManualDictLookup,
     rules::flake8_simplify::rules::DuplicateIsinstanceCall,
     rules::flake8_simplify::rules::CollapsibleIf,
     rules::flake8_simplify::rules::NeedlessBool,
@@ -512,6 +514,7 @@ ruff_macros::register_rules!(
     rules::tryceratops::rules::TryConsiderElse,
     rules::tryceratops::rules::RaiseWithinTry,
     rules::tryceratops::rules::ErrorInsteadOfException,
+    rules::tryceratops::rules::VerboseLogMessage,
     // flake8-use-pathlib
     rules::flake8_use_pathlib::violations::PathlibAbspath,
     rules::flake8_use_pathlib::violations::PathlibChmod,

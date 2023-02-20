@@ -1,4 +1,5 @@
 //! Rules from [Pylint](https://pypi.org/project/pylint/).
+mod helpers;
 pub(crate) mod rules;
 pub mod settings;
 
@@ -7,15 +8,16 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use regex::Regex;
     use test_case::test_case;
 
-    use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::rules::pylint;
     use crate::settings::Settings;
     use crate::test::test_path;
 
+    #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"); "PLE0101")]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"); "PLE0117")]

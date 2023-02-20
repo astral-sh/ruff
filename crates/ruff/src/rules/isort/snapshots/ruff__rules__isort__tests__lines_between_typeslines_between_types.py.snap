@@ -11,24 +11,7 @@ expression: diagnostics
     row: 17
     column: 0
   fix:
-    content:
-      - from __future__ import annotations
-      - ""
-      - import datetime
-      - import json
-      - ""
-      - ""
-      - from binascii import hexlify
-      - ""
-      - import requests
-      - ""
-      - ""
-      - from loguru import Logger
-      - from sanic import Sanic
-      - ""
-      - from . import config
-      - from .data import Data
-      - ""
+    content: "from __future__ import annotations\n\nimport datetime\nimport json\n\n\nfrom binascii import hexlify\n\nimport requests\n\n\nfrom loguru import Logger\nfrom sanic import Sanic\n\nfrom . import config\nfrom .data import Data\n"
     location:
       row: 1
       column: 0

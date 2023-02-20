@@ -22,6 +22,7 @@ impl Violation for UselessElseOnLoop {
 fn loop_exits_early(body: &[Stmt]) -> bool {
     body.iter().any(|stmt| match &stmt.node {
         StmtKind::If { body, orelse, .. } => loop_exits_early(body) || loop_exits_early(orelse),
+        StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => loop_exits_early(body),
         StmtKind::Try {
             body,
             handlers,

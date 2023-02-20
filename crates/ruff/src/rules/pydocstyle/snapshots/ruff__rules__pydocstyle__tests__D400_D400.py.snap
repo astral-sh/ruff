@@ -1,5 +1,5 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,8 +11,7 @@ expression: diagnostics
     row: 2
     column: 36
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 2
       column: 35
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 7
     column: 40
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 7
       column: 37
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 15
     column: 7
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 14
       column: 28
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 20
     column: 40
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 20
       column: 37
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 27
     column: 31
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 27
       column: 28
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 34
     column: 52
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 34
       column: 48
@@ -119,8 +113,7 @@ expression: diagnostics
     row: 39
     column: 37
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 39
       column: 36
@@ -137,8 +130,7 @@ expression: diagnostics
     row: 44
     column: 41
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 44
       column: 38
@@ -155,8 +147,7 @@ expression: diagnostics
     row: 52
     column: 7
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 51
       column: 28
@@ -173,8 +164,7 @@ expression: diagnostics
     row: 57
     column: 41
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 57
       column: 38
@@ -191,8 +181,7 @@ expression: diagnostics
     row: 64
     column: 31
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 64
       column: 28
@@ -209,8 +198,7 @@ expression: diagnostics
     row: 71
     column: 52
   fix:
-    content:
-      - "."
+    content: "."
     location:
       row: 71
       column: 48
