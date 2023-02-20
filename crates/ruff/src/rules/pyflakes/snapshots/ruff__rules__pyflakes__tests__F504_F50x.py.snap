@@ -1,5 +1,5 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -13,8 +13,7 @@ expression: diagnostics
     row: 8
     column: 32
   fix:
-    content:
-      - "{'bar': 1, }"
+    content: "{'bar': 1, }"
     location:
       row: 8
       column: 12

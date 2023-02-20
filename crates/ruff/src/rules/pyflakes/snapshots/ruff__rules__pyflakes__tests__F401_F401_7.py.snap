@@ -1,5 +1,5 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -14,10 +14,7 @@ expression: diagnostics
     row: 30
     column: 9
   fix:
-    content:
-      - from typing import (
-      - "    Mapping,  # noqa: F401"
-      - "    )"
+    content: "from typing import (\n    Mapping,  # noqa: F401\n    )"
     location:
       row: 28
       column: 0
@@ -39,8 +36,7 @@ expression: diagnostics
     row: 66
     column: 28
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 66
       column: 0
@@ -60,8 +56,7 @@ expression: diagnostics
     row: 66
     column: 48
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 66
       column: 0

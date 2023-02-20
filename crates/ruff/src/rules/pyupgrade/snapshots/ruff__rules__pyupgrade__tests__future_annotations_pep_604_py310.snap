@@ -11,8 +11,7 @@ expression: diagnostics
     row: 40
     column: 16
   fix:
-    content:
-      - int | None
+    content: int | None
     location:
       row: 40
       column: 3
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 42
     column: 47
   fix:
-    content:
-      - "List[int] | List[str]"
+    content: "List[int] | List[str]"
     location:
       row: 42
       column: 20

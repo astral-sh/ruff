@@ -1,5 +1,5 @@
 ---
-source: src/rules/pylint/mod.rs
+source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 3
     column: 4
   fix:
-    content:
-      - sys.exit
+    content: sys.exit
     location:
       row: 3
       column: 0
@@ -31,8 +30,7 @@ expression: diagnostics
     row: 4
     column: 4
   fix:
-    content:
-      - sys.exit
+    content: sys.exit
     location:
       row: 4
       column: 0
@@ -50,8 +48,7 @@ expression: diagnostics
     row: 8
     column: 8
   fix:
-    content:
-      - sys.exit
+    content: sys.exit
     location:
       row: 8
       column: 4
@@ -69,8 +66,7 @@ expression: diagnostics
     row: 9
     column: 8
   fix:
-    content:
-      - sys.exit
+    content: sys.exit
     location:
       row: 9
       column: 4

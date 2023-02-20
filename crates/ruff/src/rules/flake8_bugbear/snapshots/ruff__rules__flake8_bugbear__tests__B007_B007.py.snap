@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -27,8 +27,7 @@ expression: diagnostics
     row: 18
     column: 13
   fix:
-    content:
-      - _k
+    content: _k
     location:
       row: 18
       column: 12
@@ -61,8 +60,7 @@ expression: diagnostics
     row: 30
     column: 13
   fix:
-    content:
-      - _k
+    content: _k
     location:
       row: 30
       column: 12
@@ -134,8 +132,7 @@ expression: diagnostics
     row: 52
     column: 16
   fix:
-    content:
-      - _bar
+    content: _bar
     location:
       row: 52
       column: 13
@@ -168,8 +165,7 @@ expression: diagnostics
     row: 68
     column: 16
   fix:
-    content:
-      - _bar
+    content: _bar
     location:
       row: 68
       column: 13
@@ -189,8 +185,7 @@ expression: diagnostics
     row: 77
     column: 16
   fix:
-    content:
-      - _bar
+    content: _bar
     location:
       row: 77
       column: 13

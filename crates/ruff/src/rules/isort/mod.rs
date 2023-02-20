@@ -334,11 +334,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use super::categorize::ImportType;
     use super::settings::RelativeImportsOrder;
-    use crate::assert_yaml_snapshot;
+
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};

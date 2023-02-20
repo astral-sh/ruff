@@ -1,5 +1,5 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 4
     column: 17
   fix:
-    content:
-      - "=="
+    content: "=="
     location:
       row: 4
       column: 9
@@ -31,8 +30,7 @@ expression: diagnostics
     row: 6
     column: 16
   fix:
-    content:
-      - "=="
+    content: "=="
     location:
       row: 6
       column: 9
@@ -50,8 +48,7 @@ expression: diagnostics
     row: 8
     column: 16
   fix:
-    content:
-      - "=="
+    content: "=="
     location:
       row: 8
       column: 8
@@ -69,8 +66,7 @@ expression: diagnostics
     row: 10
     column: 17
   fix:
-    content:
-      - "=="
+    content: "=="
     location:
       row: 10
       column: 9
@@ -88,8 +84,7 @@ expression: diagnostics
     row: 12
     column: 17
   fix:
-    content:
-      - "=="
+    content: "=="
     location:
       row: 12
       column: 9
@@ -108,8 +103,7 @@ expression: diagnostics
     row: 14
     column: 8
   fix:
-    content:
-      - False is None
+    content: False is None
     location:
       row: 14
       column: 3
@@ -126,8 +120,7 @@ expression: diagnostics
     row: 14
     column: 16
   fix:
-    content:
-      - False is None
+    content: False is None
     location:
       row: 14
       column: 3
@@ -144,8 +137,7 @@ expression: diagnostics
     row: 16
     column: 7
   fix:
-    content:
-      - None is False
+    content: None is False
     location:
       row: 16
       column: 3
@@ -164,8 +156,7 @@ expression: diagnostics
     row: 16
     column: 16
   fix:
-    content:
-      - None is False
+    content: None is False
     location:
       row: 16
       column: 3

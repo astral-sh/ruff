@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,21 +11,7 @@ expression: diagnostics
     row: 12
     column: 0
   fix:
-    content:
-      - "from a.prometheus.metrics import (  # type:ignore[attr-defined]"
-      - "    TERMINAL_CURRENTLY_RUNNING_TOTAL,"
-      - )
-      - from b.prometheus.metrics import (
-      - "    TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]"
-      - )
-      - from c.prometheus.metrics import (
-      - "    TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]"
-      - )
-      - "from d.prometheus.metrics import (  # type:ignore[attr-defined]"
-      - "    OTHER_RUNNING_TOTAL,"
-      - "    TERMINAL_CURRENTLY_RUNNING_TOTAL,"
-      - )
-      - ""
+    content: "from a.prometheus.metrics import (  # type:ignore[attr-defined]\n    TERMINAL_CURRENTLY_RUNNING_TOTAL,\n)\nfrom b.prometheus.metrics import (\n    TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]\n)\nfrom c.prometheus.metrics import (\n    TERMINAL_CURRENTLY_RUNNING_TOTAL,  # type:ignore[attr-defined]\n)\nfrom d.prometheus.metrics import (  # type:ignore[attr-defined]\n    OTHER_RUNNING_TOTAL,\n    TERMINAL_CURRENTLY_RUNNING_TOTAL,\n)\n"
     location:
       row: 1
       column: 0

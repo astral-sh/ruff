@@ -11,8 +11,7 @@ expression: diagnostics
     row: 2
     column: 21
   fix:
-    content:
-      - "b\"foo\""
+    content: "b\"foo\""
     location:
       row: 2
       column: 0
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 3
     column: 18
   fix:
-    content:
-      - "b\"foo\""
+    content: "b\"foo\""
     location:
       row: 3
       column: 0
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 4
     column: 14
   fix:
-    content:
-      - "b\"foo\""
+    content: "b\"foo\""
     location:
       row: 4
       column: 0
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 5
     column: 20
   fix:
-    content:
-      - "b\"foo\""
+    content: "b\"foo\""
     location:
       row: 5
       column: 0
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 6
     column: 22
   fix:
-    content:
-      - "b\"foo\""
+    content: "b\"foo\""
     location:
       row: 6
       column: 0
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 7
     column: 30
   fix:
-    content:
-      - "b\"foo\""
+    content: "b\"foo\""
     location:
       row: 7
       column: 0
@@ -119,12 +113,7 @@ expression: diagnostics
     row: 14
     column: 1
   fix:
-    content:
-      - "b\"\"\""
-      - Lorem
-      - ""
-      - Ipsum
-      - "\"\"\""
+    content: "b\"\"\"\nLorem\n\nIpsum\n\"\"\""
     location:
       row: 8
       column: 0
@@ -141,8 +130,7 @@ expression: diagnostics
     row: 26
     column: 27
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 26
       column: 19
@@ -159,8 +147,7 @@ expression: diagnostics
     row: 44
     column: 31
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 44
       column: 23
@@ -177,8 +164,7 @@ expression: diagnostics
     row: 46
     column: 39
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 46
       column: 23
@@ -195,8 +181,7 @@ expression: diagnostics
     row: 48
     column: 24
   fix:
-    content:
-      - "br\"foo\\o\""
+    content: "br\"foo\\o\""
     location:
       row: 48
       column: 0
@@ -213,8 +198,7 @@ expression: diagnostics
     row: 49
     column: 22
   fix:
-    content:
-      - "b\"foo\""
+    content: "b\"foo\""
     location:
       row: 49
       column: 0
@@ -231,8 +215,7 @@ expression: diagnostics
     row: 50
     column: 24
   fix:
-    content:
-      - "bR\"foo\\o\""
+    content: "bR\"foo\\o\""
     location:
       row: 50
       column: 0
@@ -249,8 +232,7 @@ expression: diagnostics
     row: 51
     column: 22
   fix:
-    content:
-      - "b\"foo\""
+    content: "b\"foo\""
     location:
       row: 51
       column: 0
@@ -267,8 +249,7 @@ expression: diagnostics
     row: 52
     column: 20
   fix:
-    content:
-      - "b\"foo\""
+    content: "b\"foo\""
     location:
       row: 52
       column: 6

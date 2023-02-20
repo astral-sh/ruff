@@ -11,8 +11,7 @@ expression: diagnostics
     row: 6
     column: 16
   fix:
-    content:
-      - "print(\"py3\")"
+    content: "print(\"py3\")"
     location:
       row: 3
       column: 0
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 14
     column: 16
   fix:
-    content:
-      - "print(\"py3\")"
+    content: "print(\"py3\")"
     location:
       row: 8
       column: 0
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 17
     column: 19
   fix:
-    content:
-      - "print(\"PY3!\")"
+    content: "print(\"PY3!\")"
     location:
       row: 16
       column: 0
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 23
     column: 20
   fix:
-    content:
-      - "    print(\"PY3\")"
+    content: "    print(\"PY3\")"
     location:
       row: 20
       column: 0
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 27
     column: 16
   fix:
-    content:
-      - "print(\"py3\")"
+    content: "print(\"py3\")"
     location:
       row: 25
       column: 0
@@ -101,10 +96,7 @@ expression: diagnostics
     row: 35
     column: 30
   fix:
-    content:
-      - "def f():"
-      - "    print(\"py3\")"
-      - "    print(\"This the next\")"
+    content: "def f():\n    print(\"py3\")\n    print(\"This the next\")"
     location:
       row: 29
       column: 0
@@ -121,8 +113,7 @@ expression: diagnostics
     row: 40
     column: 16
   fix:
-    content:
-      - "print(\"py3\")"
+    content: "print(\"py3\")"
     location:
       row: 37
       column: 0
@@ -139,8 +130,7 @@ expression: diagnostics
     row: 48
     column: 16
   fix:
-    content:
-      - "print(\"py3\")"
+    content: "print(\"py3\")"
     location:
       row: 45
       column: 0
@@ -157,8 +147,7 @@ expression: diagnostics
     row: 54
     column: 18
   fix:
-    content:
-      - "print(\"py3\")"
+    content: "print(\"py3\")"
     location:
       row: 53
       column: 0
@@ -175,8 +164,7 @@ expression: diagnostics
     row: 59
     column: 16
   fix:
-    content:
-      - "print(\"py3\")"
+    content: "print(\"py3\")"
     location:
       row: 56
       column: 0
@@ -193,8 +181,7 @@ expression: diagnostics
     row: 65
     column: 20
   fix:
-    content:
-      - "    print(\"py3\")"
+    content: "    print(\"py3\")"
     location:
       row: 62
       column: 0
@@ -211,8 +198,7 @@ expression: diagnostics
     row: 70
     column: 16
   fix:
-    content:
-      - "print(\"py3\")"
+    content: "print(\"py3\")"
     location:
       row: 67
       column: 0
@@ -229,8 +215,7 @@ expression: diagnostics
     row: 79
     column: 13
   fix:
-    content:
-      - "    yield"
+    content: "    yield"
     location:
       row: 73
       column: 0
@@ -247,9 +232,7 @@ expression: diagnostics
     row: 91
     column: 16
   fix:
-    content:
-      - "    def f(py3):"
-      - "        pass"
+    content: "    def f(py3):\n        pass"
     location:
       row: 86
       column: 0
@@ -266,8 +249,7 @@ expression: diagnostics
     row: 100
     column: 9
   fix:
-    content:
-      - "    3"
+    content: "    3"
     location:
       row: 97
       column: 0
@@ -284,11 +266,7 @@ expression: diagnostics
     row: 113
     column: 20
   fix:
-    content:
-      - "def f():"
-      - "    print(\"py3\")"
-      - "def g():"
-      - "    print(\"py3\")"
+    content: "def f():\n    print(\"py3\")\ndef g():\n    print(\"py3\")"
     location:
       row: 104
       column: 0
@@ -305,8 +283,7 @@ expression: diagnostics
     row: 117
     column: 16
   fix:
-    content:
-      - "    print(3)"
+    content: "    print(3)"
     location:
       row: 116
       column: 0
@@ -323,8 +300,7 @@ expression: diagnostics
     row: 122
     column: 40
   fix:
-    content:
-      - print(3)
+    content: print(3)
     location:
       row: 122
       column: 4
@@ -341,8 +317,7 @@ expression: diagnostics
     row: 126
     column: 16
   fix:
-    content:
-      - "    print(3)"
+    content: "    print(3)"
     location:
       row: 125
       column: 0
@@ -359,12 +334,7 @@ expression: diagnostics
     row: 137
     column: 9
   fix:
-    content:
-      - "    expected_error = ["
-      - "\"<stdin>:1:5: Generator expression must be parenthesized\","
-      - "\"max(1 for i in range(10), key=lambda x: x+1)\","
-      - "\"    ^\","
-      - "    ]"
+    content: "    expected_error = [\n\"<stdin>:1:5: Generator expression must be parenthesized\",\n\"max(1 for i in range(10), key=lambda x: x+1)\",\n\"    ^\",\n    ]"
     location:
       row: 130
       column: 0
@@ -381,12 +351,7 @@ expression: diagnostics
     row: 147
     column: 5
   fix:
-    content:
-      - "expected_error = ["
-      - "\"<stdin>:1:5: Generator expression must be parenthesized\","
-      - "\"max(1 for i in range(10), key=lambda x: x+1)\","
-      - "\"    ^\","
-      - "]"
+    content: "expected_error = [\n\"<stdin>:1:5: Generator expression must be parenthesized\",\n\"max(1 for i in range(10), key=lambda x: x+1)\",\n\"    ^\",\n]"
     location:
       row: 140
       column: 0
@@ -403,18 +368,7 @@ expression: diagnostics
     row: 161
     column: 28
   fix:
-    content:
-      - "\"\"\"this"
-      - "is valid\"\"\""
-      - ""
-      - "\"\"\"the indentation on"
-      - "    this line is significant\"\"\""
-      - ""
-      - "\"this is\" \\"
-      - "    \"allowed too\""
-      - ""
-      - "(\"so is\""
-      - " \"this for some reason\")"
+    content: "\"\"\"this\nis valid\"\"\"\n\n\"\"\"the indentation on\n    this line is significant\"\"\"\n\n\"this is\" \\\n    \"allowed too\"\n\n(\"so is\"\n \"this for some reason\")"
     location:
       row: 150
       column: 0
@@ -431,9 +385,7 @@ expression: diagnostics
     row: 164
     column: 6
   fix:
-    content:
-      - "expected_error = \\"
-      - "    []"
+    content: "expected_error = \\\n    []"
     location:
       row: 163
       column: 0
@@ -450,8 +402,7 @@ expression: diagnostics
     row: 166
     column: 49
   fix:
-    content:
-      - "expected_error = []"
+    content: "expected_error = []"
     location:
       row: 166
       column: 0
@@ -468,8 +419,7 @@ expression: diagnostics
     row: 169
     column: 23
   fix:
-    content:
-      - "expected_error = []"
+    content: "expected_error = []"
     location:
       row: 168
       column: 0
@@ -486,9 +436,7 @@ expression: diagnostics
     row: 173
     column: 6
   fix:
-    content:
-      - "expected_error = \\"
-      - "    []"
+    content: "expected_error = \\\n    []"
     location:
       row: 172
       column: 4
@@ -505,8 +453,7 @@ expression: diagnostics
     row: 176
     column: 53
   fix:
-    content:
-      - "expected_error = []"
+    content: "expected_error = []"
     location:
       row: 176
       column: 4
@@ -523,8 +470,7 @@ expression: diagnostics
     row: 180
     column: 23
   fix:
-    content:
-      - "    expected_error = []"
+    content: "    expected_error = []"
     location:
       row: 179
       column: 0

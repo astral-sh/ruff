@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,9 +11,7 @@ expression: diagnostics
     row: 1
     column: 0
   fix:
-    content:
-      - ""
-      - from __future__ import annotations
+    content: "\nfrom __future__ import annotations"
     location:
       row: 1
       column: 19

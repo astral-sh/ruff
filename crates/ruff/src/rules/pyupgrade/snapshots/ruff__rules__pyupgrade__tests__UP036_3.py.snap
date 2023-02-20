@@ -11,10 +11,7 @@ expression: diagnostics
     row: 10
     column: 28
   fix:
-    content:
-      - "print(\"py3\")"
-      - "for item in range(10):"
-      - "    print(f\"PY3-{item}\")"
+    content: "print(\"py3\")\nfor item in range(10):\n    print(f\"PY3-{item}\")"
     location:
       row: 3
       column: 0
@@ -31,10 +28,7 @@ expression: diagnostics
     row: 20
     column: 32
   fix:
-    content:
-      - "    print(\"py3\")"
-      - "    for item in range(10):"
-      - "        print(f\"PY3-{item}\")"
+    content: "    print(\"py3\")\n    for item in range(10):\n        print(f\"PY3-{item}\")"
     location:
       row: 13
       column: 0
@@ -51,8 +45,7 @@ expression: diagnostics
     row: 24
     column: 50
   fix:
-    content:
-      - "print(\"PY3!\")"
+    content: "print(\"PY3!\")"
     location:
       row: 23
       column: 0

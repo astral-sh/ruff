@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_return/mod.rs
+source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,8 +11,7 @@ expression: diagnostics
     row: 4
     column: 15
   fix:
-    content:
-      - return
+    content: return
     location:
       row: 4
       column: 4

@@ -11,27 +11,7 @@ expression: diagnostics
     row: 24
     column: 0
   fix:
-    content:
-      - import foo
-      - import lib1
-      - import lib2
-      - import lib3
-      - import lib3.lib4
-      - import lib3.lib4.lib5
-      - import lib4
-      - import lib5
-      - import lib6
-      - import z
-      - from foo import bar
-      - from foo.lib1.bar import baz
-      - from lib1 import foo
-      - from lib1.lib2 import foo
-      - from lib2 import foo
-      - from lib3.lib4 import foo
-      - from lib3.lib4.lib5 import foo
-      - "from lib4 import lib1, lib2"
-      - "from lib5 import lib1, lib2"
-      - ""
+    content: "import foo\nimport lib1\nimport lib2\nimport lib3\nimport lib3.lib4\nimport lib3.lib4.lib5\nimport lib4\nimport lib5\nimport lib6\nimport z\nfrom foo import bar\nfrom foo.lib1.bar import baz\nfrom lib1 import foo\nfrom lib1.lib2 import foo\nfrom lib2 import foo\nfrom lib3.lib4 import foo\nfrom lib3.lib4.lib5 import foo\nfrom lib4 import lib1, lib2\nfrom lib5 import lib1, lib2\n"
     location:
       row: 1
       column: 0

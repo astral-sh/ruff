@@ -13,8 +13,7 @@ expression: diagnostics
     row: 9
     column: 20
   fix:
-    content:
-      - "var = a_dict.get(key, \"default1\")"
+    content: "var = a_dict.get(key, \"default1\")"
     location:
       row: 6
       column: 0
@@ -33,8 +32,7 @@ expression: diagnostics
     row: 15
     column: 21
   fix:
-    content:
-      - "var = a_dict.get(key, \"default2\")"
+    content: "var = a_dict.get(key, \"default2\")"
     location:
       row: 12
       column: 0
@@ -53,8 +51,7 @@ expression: diagnostics
     row: 21
     column: 21
   fix:
-    content:
-      - "var = a_dict.get(key, val1 + val2)"
+    content: "var = a_dict.get(key, val1 + val2)"
     location:
       row: 18
       column: 0
@@ -73,8 +70,7 @@ expression: diagnostics
     row: 27
     column: 19
   fix:
-    content:
-      - "var = a_dict.get(keys[idx], \"default\")"
+    content: "var = a_dict.get(keys[idx], \"default\")"
     location:
       row: 24
       column: 0
@@ -93,8 +89,7 @@ expression: diagnostics
     row: 33
     column: 19
   fix:
-    content:
-      - "var = dicts[idx].get(key, \"default\")"
+    content: "var = dicts[idx].get(key, \"default\")"
     location:
       row: 30
       column: 0
@@ -113,8 +108,7 @@ expression: diagnostics
     row: 39
     column: 25
   fix:
-    content:
-      - "vars[idx] = a_dict.get(key, \"default\")"
+    content: "vars[idx] = a_dict.get(key, \"default\")"
     location:
       row: 36
       column: 0

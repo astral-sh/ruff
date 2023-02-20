@@ -6,11 +6,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::CallDatetimeWithoutTzinfo, Path::new("DTZ001.py"); "DTZ001")]
     #[test_case(Rule::CallDatetimeToday, Path::new("DTZ002.py"); "DTZ002")]

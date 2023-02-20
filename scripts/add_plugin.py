@@ -36,11 +36,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
+    use crate::settings;
 
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());

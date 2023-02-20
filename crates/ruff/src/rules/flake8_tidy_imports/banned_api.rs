@@ -120,10 +120,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use rustc_hash::FxHashMap;
 
     use super::ApiBan;
-    use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;

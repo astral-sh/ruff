@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,20 +11,7 @@ expression: diagnostics
     row: 12
     column: 0
   fix:
-    content:
-      - import abc
-      - import io
-      - ""
-      - "# Old MacDonald had a farm,"
-      - "# EIEIO"
-      - "# And on his farm he had a cow,"
-      - "# EIEIO"
-      - "# With a moo-moo here and a moo-moo there"
-      - "# Here a moo, there a moo, everywhere moo-moo"
-      - "# Old MacDonald had a farm,"
-      - "# EIEIO"
-      - from errno import EIO
-      - ""
+    content: "import abc\nimport io\n\n# Old MacDonald had a farm,\n# EIEIO\n# And on his farm he had a cow,\n# EIEIO\n# With a moo-moo here and a moo-moo there\n# Here a moo, there a moo, everywhere moo-moo\n# Old MacDonald had a farm,\n# EIEIO\nfrom errno import EIO\n"
     location:
       row: 1
       column: 0

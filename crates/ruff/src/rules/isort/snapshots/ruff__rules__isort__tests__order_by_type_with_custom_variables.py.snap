@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,11 +11,7 @@ expression: diagnostics
     row: 3
     column: 0
   fix:
-    content:
-      - "from subprocess import CONSTANT, Klass, Variable, exe, utils, var_ABC"
-      - ""
-      - "from sklearn.svm import CONST, VAR, Class, MyVar, abc"
-      - ""
+    content: "from subprocess import CONSTANT, Klass, Variable, exe, utils, var_ABC\n\nfrom sklearn.svm import CONST, VAR, Class, MyVar, abc\n"
     location:
       row: 1
       column: 0

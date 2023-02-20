@@ -8,10 +8,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use regex::Regex;
     use test_case::test_case;
 
-    use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::rules::pylint;
     use crate::settings::Settings;
