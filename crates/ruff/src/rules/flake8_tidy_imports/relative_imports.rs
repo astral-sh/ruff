@@ -92,7 +92,7 @@ fn fix_banned_relative_import(
     module_path: Option<&Vec<String>>,
     stylist: &Stylist,
 ) -> Option<Fix> {
-    // Only fix is the module path is known.
+    // Only fix if the module path is known.
     if let Some(mut parts) = module_path.cloned() {
         // Remove relative level from module path.
         for _ in 0..*level? {

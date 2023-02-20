@@ -150,15 +150,13 @@ pub fn typing_only_runtime_import(
         && binding.runtime_usage.is_none()
         && binding.synthetic_usage.is_none()
     {
-        // Extract the module base and level from the full name.
-        // Ex) `foo.bar.baz` -> `foo`, `0`
+        // Extract the module level from the full name.
         // Ex) `.foo.bar.baz` -> `foo`, `1`
-        let module_base = full_name.split('.').next().unwrap();
         let level = full_name.chars().take_while(|c| *c == '.').count();
 
         // Categorize the import.
         match categorize(
-            module_base,
+            full_name,
             Some(&level),
             &settings.src,
             package,

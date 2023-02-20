@@ -38,7 +38,7 @@ enum Reason<'a> {
 
 #[allow(clippy::too_many_arguments)]
 pub fn categorize(
-    module_base: &str,
+    module_name: &str,
     level: Option<&usize>,
     src: &[PathBuf],
     package: Option<&Path>,
@@ -48,9 +48,20 @@ pub fn categorize(
     extra_standard_library: &BTreeSet<String>,
     target_version: PythonVersion,
 ) -> ImportType {
+    let module_base = module_name.split('.').next().unwrap();
     let (import_type, reason) = {
         if level.map_or(false, |level| *level > 0) {
             (ImportType::LocalFolder, Reason::NonZeroLevel)
+        } else if module_base == "__future__" {
+            (ImportType::Future, Reason::Future)
+        } else if known_first_party.contains(module_name) {
+            (ImportType::FirstParty, Reason::KnownFirstParty)
+        } else if known_third_party.contains(module_name) {
+            (ImportType::ThirdParty, Reason::KnownThirdParty)
+        } else if known_local_folder.contains(module_name) {
+            (ImportType::LocalFolder, Reason::KnownLocalFolder)
+        } else if extra_standard_library.contains(module_name) {
+            (ImportType::StandardLibrary, Reason::ExtraStandardLibrary)
         } else if known_first_party.contains(module_base) {
             (ImportType::FirstParty, Reason::KnownFirstParty)
         } else if known_third_party.contains(module_base) {
@@ -59,8 +70,6 @@ pub fn categorize(
             (ImportType::LocalFolder, Reason::KnownLocalFolder)
         } else if extra_standard_library.contains(module_base) {
             (ImportType::StandardLibrary, Reason::ExtraStandardLibrary)
-        } else if module_base == "__future__" {
-            (ImportType::Future, Reason::Future)
         } else if KNOWN_STANDARD_LIBRARY
             .get(&target_version.as_tuple())
             .unwrap()
@@ -77,7 +86,7 @@ pub fn categorize(
     };
     debug!(
         "Categorized '{}' as {:?} ({:?})",
-        module_base, import_type, reason
+        module_name, import_type, reason
     );
     import_type
 }
@@ -117,7 +126,7 @@ pub fn categorize_imports<'a>(
     // Categorize `StmtKind::Import`.
     for (alias, comments) in block.import {
         let import_type = categorize(
-            &alias.module_base(),
+            &alias.module_name(),
             None,
             src,
             package,
@@ -136,7 +145,7 @@ pub fn categorize_imports<'a>(
     // Categorize `StmtKind::ImportFrom` (without re-export).
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
-            &import_from.module_base(),
+            &import_from.module_name(),
             import_from.level,
             src,
             package,
@@ -155,7 +164,7 @@ pub fn categorize_imports<'a>(
     // Categorize `StmtKind::ImportFrom` (with re-export).
     for ((import_from, alias), comments) in block.import_from_as {
         let classification = categorize(
-            &import_from.module_base(),
+            &import_from.module_name(),
             import_from.level,
             src,
             package,
@@ -174,7 +183,7 @@ pub fn categorize_imports<'a>(
     // Categorize `StmtKind::ImportFrom` (with star).
     for (import_from, comments) in block.import_from_star {
         let classification = categorize(
-            &import_from.module_base(),
+            &import_from.module_name(),
             import_from.level,
             src,
             package,

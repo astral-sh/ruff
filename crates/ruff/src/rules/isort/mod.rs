@@ -400,6 +400,47 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
+    fn separate_modules(path: &Path) -> Result<()> {
+        let snapshot = format!("1_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_first_party: BTreeSet::from(["foo.bar".to_string(), "baz".to_string()]),
+                    known_third_party: BTreeSet::from([
+                        "foo".to_string(),
+                        "__future__".to_string(),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
+    fn separate_modules_first_party(path: &Path) -> Result<()> {
+        let snapshot = format!("2_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_first_party: BTreeSet::from(["foo".to_string()]),
+                    known_third_party: BTreeSet::from(["foo.bar".to_string()]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
     // Test currently disabled as line endings are automatically converted to
     // platform-appropriate ones in CI/CD #[test_case(Path::new("
     // line_ending_crlf.py"))] #[test_case(Path::new("line_ending_lf.py"))]
