@@ -322,7 +322,7 @@ fn push_codes<I: Display>(str: &mut String, codes: impl Iterator<Item = I>) {
         if !first {
             str.push_str(", ");
         }
-        let _ = write!(str, "{}", code);
+        let _ = write!(str, "{code}");
         first = false;
     }
 }
