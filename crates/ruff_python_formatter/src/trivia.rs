@@ -118,6 +118,16 @@ impl Trivia {
             },
         }
     }
+
+    pub fn eol_comment_range(&self) -> Option<Range> {
+        if !matches!(self.relationship, Relationship::Trailing) {
+            return None;
+        }
+        match self.kind {
+            TriviaKind::EndOfLineComment(range) => Some(range),
+            _ => None,
+        }
+    }
 }
 
 pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {

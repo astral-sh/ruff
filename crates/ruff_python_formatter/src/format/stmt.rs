@@ -22,17 +22,11 @@ fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatRe
 
     // Format any end-of-line comments.
     let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
+    for range in stmt
+        .trivia
+        .iter()
+        .filter_map(|trivia| trivia.eol_comment_range())
+    {
         if std::mem::take(&mut first) {
             write!(f, [line_suffix(&text("  "))])?;
         }
@@ -208,17 +202,11 @@ fn format_func_def(
 
     // Format any end-of-line comments.
     let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
+    for range in stmt
+        .trivia
+        .iter()
+        .filter_map(|trivia| trivia.eol_comment_range())
+    {
         if std::mem::take(&mut first) {
             write!(f, [line_suffix(&text("  "))])?;
         }
@@ -257,17 +245,11 @@ fn format_assign(
 
     // Format any end-of-line comments.
     let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
+    for range in stmt
+        .trivia
+        .iter()
+        .filter_map(|trivia| trivia.eol_comment_range())
+    {
         if std::mem::take(&mut first) {
             write!(f, [line_suffix(&text("  "))])?;
         }
@@ -545,17 +527,11 @@ fn format_import_from(
 
     // Format any end-of-line comments.
     let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
+    for range in stmt
+        .trivia
+        .iter()
+        .filter_map(|trivia| trivia.eol_comment_range())
+    {
         if std::mem::take(&mut first) {
             write!(f, [line_suffix(&text("  "))])?;
         }
@@ -594,17 +570,11 @@ fn format_expr(
 
     // Format any end-of-line comments.
     let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
+    for range in stmt
+        .trivia
+        .iter()
+        .filter_map(|trivia| trivia.eol_comment_range())
+    {
         if std::mem::take(&mut first) {
             write!(f, [line_suffix(&text("  "))])?;
         }
