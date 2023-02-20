@@ -18,8 +18,6 @@
 //!     method()
 //! ```
 
-use std::iter;
-
 use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
@@ -75,7 +73,7 @@ impl Violation for UnusedLoopControlVariable {
         if matches!(certainty, Certainty::Certain) && rename.is_some() {
             Some(|UnusedLoopControlVariable { name, rename, .. }| {
                 let rename = rename.as_ref().unwrap();
-                format!("Rename unused `{name}` to `_{rename}`")
+                format!("Rename unused `{name}` to `{rename}`")
             })
         } else {
             None
@@ -174,27 +172,19 @@ pub fn unused_loop_control_variable(
             if matches!(certainty, Certainty::Certain) && checker.patch(diagnostic.kind.rule()) {
                 // Find the `BindingKind::LoopVar` corresponding to the name.
                 let scope = checker.current_scope();
-                if let Some(binding) = iter::once(scope.bindings.get(name))
-                    .flatten()
-                    .chain(
-                        iter::once(scope.rebounds.get(name))
-                            .flatten()
-                            .into_iter()
-                            .flatten(),
-                    )
+                let binding = scope
+                    .bindings
+                    .get(name)
+                    .into_iter()
+                    .chain(scope.rebounds.get(name).into_iter().flatten())
                     .find_map(|index| {
                         let binding = &checker.bindings[*index];
-                        if let Some(source) = &binding.source {
-                            if source == &RefEquality(stmt) {
-                                Some(binding)
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    })
-                {
+                        binding
+                            .source
+                            .as_ref()
+                            .and_then(|source| (source == &RefEquality(stmt)).then_some(binding))
+                    });
+                if let Some(binding) = binding {
                     if matches!(binding.kind, BindingKind::LoopVar) {
                         if !binding.used() {
                             diagnostic.amend(Fix::replacement(

@@ -3,8 +3,10 @@ use rustpython_parser::lexer::{LexResult, Tok};
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use crate::fix::Fix;
+use crate::registry::{Diagnostic, Rule};
+use crate::settings::{flags, Settings};
+use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 define_violation!(
     pub struct MultipleStatementsOnOneLineColon;
@@ -29,14 +31,22 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 define_violation!(
     pub struct UselessSemicolon;
 );
-impl Violation for UselessSemicolon {
+impl AlwaysAutofixableViolation for UselessSemicolon {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Statement ends with an unnecessary semicolon")
     }
+
+    fn autofix_title(&self) -> String {
+        format!("Remove unnecessary semicolon")
+    }
 }
 
-pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
+pub fn compound_statements(
+    lxr: &[LexResult],
+    settings: &Settings,
+    autofix: flags::Autofix,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     // Track the last seen instance of a variety of tokens.
@@ -92,7 +102,13 @@ pub fn compound_statements(lxr: &[LexResult]) -> Vec<Diagnostic> {
         match tok {
             Tok::Newline => {
                 if let Some((start, end)) = semi {
-                    diagnostics.push(Diagnostic::new(UselessSemicolon, Range::new(start, end)));
+                    let mut diagnostic = Diagnostic::new(UselessSemicolon, Range::new(start, end));
+                    if matches!(autofix, flags::Autofix::Enabled)
+                        && settings.rules.should_fix(&Rule::UselessSemicolon)
+                    {
+                        diagnostic.amend(Fix::deletion(start, end));
+                    };
+                    diagnostics.push(diagnostic);
                 }
 
                 // Reset.

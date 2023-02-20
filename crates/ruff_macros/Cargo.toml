@@ -2,7 +2,8 @@
 name = "ruff_macros"
 version = "0.0.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
+rust-version = { workspace = true }
 
 [lib]
 proc-macro = true

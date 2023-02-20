@@ -117,7 +117,7 @@ pub fn check_tokens(
     // E701, E702, E703
     if enforce_compound_statements {
         diagnostics.extend(
-            pycodestyle::rules::compound_statements(tokens)
+            pycodestyle::rules::compound_statements(tokens, settings, autofix)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );

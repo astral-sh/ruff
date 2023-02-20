@@ -304,13 +304,14 @@ pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
                     ops.push(LocatedCmpop::new(start, end, Cmpop::In));
                 }
                 Tok::Is => {
-                    if let Some((_, _, end)) =
+                    let op = if let Some((_, _, end)) =
                         tok_iter.next_if(|(_, tok, _)| matches!(tok, Tok::Not))
                     {
-                        ops.push(LocatedCmpop::new(start, end, Cmpop::IsNot));
+                        LocatedCmpop::new(start, end, Cmpop::IsNot)
                     } else {
-                        ops.push(LocatedCmpop::new(start, end, Cmpop::Is));
-                    }
+                        LocatedCmpop::new(start, end, Cmpop::Is)
+                    };
+                    ops.push(op);
                 }
                 Tok::NotEqual => {
                     ops.push(LocatedCmpop::new(start, end, Cmpop::NotEq));

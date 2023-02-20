@@ -639,7 +639,7 @@ fn print_fixed<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) ->
     );
 
     let s = if total == 1 { "" } else { "s" };
-    let label = format!("Fixed {total} error{s}:", total = total, s = s);
+    let label = format!("Fixed {total} error{s}:");
     writeln!(stdout, "{}", label.bold().green())?;
 
     for (filename, table) in fixed
