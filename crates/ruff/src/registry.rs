@@ -182,6 +182,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::EmptyMethodWithoutAbstractDecorator,
     rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
+    rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
     // flake8-comprehensions

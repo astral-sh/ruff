@@ -3708,6 +3708,9 @@ where
                         self.settings.flake8_bandit.check_typed_exception,
                     );
                 }
+                if self.settings.rules.enabled(&Rule::ExceptWithEmptyTuple) {
+                    flake8_bugbear::rules::except_with_empty_tuple(self, excepthandler);
+                }
                 if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
