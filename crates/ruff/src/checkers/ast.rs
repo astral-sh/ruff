@@ -239,51 +239,51 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         let call_path = collect_call_path(value);
-        if let Some(head) = call_path.first() {
-            if let Some(binding) = self.find_binding(head) {
-                match &binding.kind {
-                    BindingKind::Importation(.., name)
-                    | BindingKind::SubmoduleImportation(name, ..) => {
-                        return if name.starts_with('.') {
-                            if let Some(module) = &self.module_path {
-                                let mut source_path = from_relative_import(module, name);
-                                source_path.extend(call_path.into_iter().skip(1));
-                                Some(source_path)
-                            } else {
-                                None
-                            }
-                        } else {
-                            let mut source_path: CallPath = name.split('.').collect();
-                            source_path.extend(call_path.into_iter().skip(1));
-                            Some(source_path)
-                        };
+        let Some(head) = call_path.first() else {
+            return None;
+        };
+        let Some(binding) = self.find_binding(head) else {
+            return None;
+        };
+        match &binding.kind {
+            BindingKind::Importation(.., name) | BindingKind::SubmoduleImportation(name, ..) => {
+                if name.starts_with('.') {
+                    if let Some(module) = &self.module_path {
+                        let mut source_path = from_relative_import(module, name);
+                        source_path.extend(call_path.into_iter().skip(1));
+                        Some(source_path)
+                    } else {
+                        None
                     }
-                    BindingKind::FromImportation(.., name) => {
-                        return if name.starts_with('.') {
-                            if let Some(module) = &self.module_path {
-                                let mut source_path = from_relative_import(module, name);
-                                source_path.extend(call_path.into_iter().skip(1));
-                                Some(source_path)
-                            } else {
-                                None
-                            }
-                        } else {
-                            let mut source_path: CallPath = name.split('.').collect();
-                            source_path.extend(call_path.into_iter().skip(1));
-                            Some(source_path)
-                        };
-                    }
-                    BindingKind::Builtin => {
-                        let mut source_path: CallPath = smallvec![];
-                        source_path.push("");
-                        source_path.extend(call_path);
-                        return Some(source_path);
-                    }
-                    _ => {}
+                } else {
+                    let mut source_path: CallPath = name.split('.').collect();
+                    source_path.extend(call_path.into_iter().skip(1));
+                    Some(source_path)
                 }
             }
+            BindingKind::FromImportation(.., name) => {
+                if name.starts_with('.') {
+                    if let Some(module) = &self.module_path {
+                        let mut source_path = from_relative_import(module, name);
+                        source_path.extend(call_path.into_iter().skip(1));
+                        Some(source_path)
+                    } else {
+                        None
+                    }
+                } else {
+                    let mut source_path: CallPath = name.split('.').collect();
+                    source_path.extend(call_path.into_iter().skip(1));
+                    Some(source_path)
+                }
+            }
+            BindingKind::Builtin => {
+                let mut source_path: CallPath = smallvec![];
+                source_path.push("");
+                source_path.extend(call_path);
+                Some(source_path)
+            }
+            _ => None,
         }
-        None
     }
 
     /// Return `true` if a `Rule` is disabled by a `noqa` directive.
@@ -4169,146 +4169,147 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        if let ExprKind::Name { id, .. } = &expr.node {
-            let scope_id = self.current_scope().id;
+        let ExprKind::Name { id, .. } = &expr.node else {
+            return;
+        };
+        let scope_id = self.current_scope().id;
 
-            let mut first_iter = true;
-            let mut in_generator = false;
-            let mut import_starred = false;
+        let mut first_iter = true;
+        let mut in_generator = false;
+        let mut import_starred = false;
 
-            for scope_index in self.scope_stack.iter().rev() {
-                let scope = &self.scopes[*scope_index];
+        for scope_index in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[*scope_index];
 
-                if matches!(scope.kind, ScopeKind::Class(_)) {
-                    if id == "__class__" {
-                        return;
-                    } else if !first_iter && !in_generator {
-                        continue;
-                    }
-                }
-
-                if let Some(index) = scope.bindings.get(&id.as_str()) {
-                    // Mark the binding as used.
-                    let context = self.execution_context();
-                    self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
-
-                    if matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        && !self.in_deferred_string_type_definition
-                        && !self.in_deferred_type_definition
-                    {
-                        continue;
-                    }
-
-                    // If the name of the sub-importation is the same as an alias of another
-                    // importation and the alias is used, that sub-importation should be
-                    // marked as used too.
-                    //
-                    // This handles code like:
-                    //   import pyarrow as pa
-                    //   import pyarrow.csv
-                    //   print(pa.csv.read_csv("test.csv"))
-                    match &self.bindings[*index].kind {
-                        BindingKind::Importation(name, full_name)
-                        | BindingKind::SubmoduleImportation(name, full_name) => {
-                            let has_alias = full_name
-                                .split('.')
-                                .last()
-                                .map(|segment| &segment != name)
-                                .unwrap_or_default();
-                            if has_alias {
-                                // Mark the sub-importation as used.
-                                if let Some(index) = scope.bindings.get(full_name) {
-                                    self.bindings[*index].mark_used(
-                                        scope_id,
-                                        Range::from_located(expr),
-                                        context,
-                                    );
-                                }
-                            }
-                        }
-                        BindingKind::FromImportation(name, full_name) => {
-                            let has_alias = full_name
-                                .split('.')
-                                .last()
-                                .map(|segment| &segment != name)
-                                .unwrap_or_default();
-                            if has_alias {
-                                // Mark the sub-importation as used.
-                                if let Some(index) = scope.bindings.get(full_name.as_str()) {
-                                    self.bindings[*index].mark_used(
-                                        scope_id,
-                                        Range::from_located(expr),
-                                        context,
-                                    );
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-
+            if matches!(scope.kind, ScopeKind::Class(_)) {
+                if id == "__class__" {
                     return;
+                } else if !first_iter && !in_generator {
+                    continue;
                 }
-
-                first_iter = false;
-                in_generator = matches!(scope.kind, ScopeKind::Generator);
-                import_starred = import_starred || scope.import_starred;
             }
 
-            if import_starred {
-                if self.settings.rules.enabled(&Rule::ImportStarUsage) {
-                    let mut from_list = vec![];
-                    for scope_index in self.scope_stack.iter().rev() {
-                        let scope = &self.scopes[*scope_index];
-                        for binding in scope.bindings.values().map(|index| &self.bindings[*index]) {
-                            if let BindingKind::StarImportation(level, module) = &binding.kind {
-                                from_list.push(helpers::format_import_from(
-                                    level.as_ref(),
-                                    module.as_deref(),
-                                ));
+            if let Some(index) = scope.bindings.get(&id.as_str()) {
+                // Mark the binding as used.
+                let context = self.execution_context();
+                self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
+
+                if matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                    && !self.in_deferred_string_type_definition
+                    && !self.in_deferred_type_definition
+                {
+                    continue;
+                }
+
+                // If the name of the sub-importation is the same as an alias of another
+                // importation and the alias is used, that sub-importation should be
+                // marked as used too.
+                //
+                // This handles code like:
+                //   import pyarrow as pa
+                //   import pyarrow.csv
+                //   print(pa.csv.read_csv("test.csv"))
+                match &self.bindings[*index].kind {
+                    BindingKind::Importation(name, full_name)
+                    | BindingKind::SubmoduleImportation(name, full_name) => {
+                        let has_alias = full_name
+                            .split('.')
+                            .last()
+                            .map(|segment| &segment != name)
+                            .unwrap_or_default();
+                        if has_alias {
+                            // Mark the sub-importation as used.
+                            if let Some(index) = scope.bindings.get(full_name) {
+                                self.bindings[*index].mark_used(
+                                    scope_id,
+                                    Range::from_located(expr),
+                                    context,
+                                );
                             }
                         }
                     }
-                    from_list.sort();
-
-                    self.diagnostics.push(Diagnostic::new(
-                        pyflakes::rules::ImportStarUsage {
-                            name: id.to_string(),
-                            sources: from_list,
-                        },
-                        Range::from_located(expr),
-                    ));
+                    BindingKind::FromImportation(name, full_name) => {
+                        let has_alias = full_name
+                            .split('.')
+                            .last()
+                            .map(|segment| &segment != name)
+                            .unwrap_or_default();
+                        if has_alias {
+                            // Mark the sub-importation as used.
+                            if let Some(index) = scope.bindings.get(full_name.as_str()) {
+                                self.bindings[*index].mark_used(
+                                    scope_id,
+                                    Range::from_located(expr),
+                                    context,
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
                 }
+
                 return;
             }
 
-            if self.settings.rules.enabled(&Rule::UndefinedName) {
-                // Allow __path__.
-                if self.path.ends_with("__init__.py") && id == "__path__" {
-                    return;
-                }
+            first_iter = false;
+            in_generator = matches!(scope.kind, ScopeKind::Generator);
+            import_starred = import_starred || scope.import_starred;
+        }
 
-                // Allow "__module__" and "__qualname__" in class scopes.
-                if (id == "__module__" || id == "__qualname__")
-                    && matches!(self.current_scope().kind, ScopeKind::Class(..))
-                {
-                    return;
-                }
-
-                // Avoid flagging if NameError is handled.
-                if let Some(handler_names) = self.except_handlers.last() {
-                    if handler_names
-                        .iter()
-                        .any(|call_path| call_path.as_slice() == ["NameError"])
-                    {
-                        return;
+        if import_starred {
+            if self.settings.rules.enabled(&Rule::ImportStarUsage) {
+                let mut from_list = vec![];
+                for scope_index in self.scope_stack.iter().rev() {
+                    let scope = &self.scopes[*scope_index];
+                    for binding in scope.bindings.values().map(|index| &self.bindings[*index]) {
+                        if let BindingKind::StarImportation(level, module) = &binding.kind {
+                            from_list.push(helpers::format_import_from(
+                                level.as_ref(),
+                                module.as_deref(),
+                            ));
+                        }
                     }
                 }
+                from_list.sort();
 
                 self.diagnostics.push(Diagnostic::new(
-                    pyflakes::rules::UndefinedName { name: id.clone() },
+                    pyflakes::rules::ImportStarUsage {
+                        name: id.to_string(),
+                        sources: from_list,
+                    },
                     Range::from_located(expr),
                 ));
             }
+            return;
+        }
+
+        if self.settings.rules.enabled(&Rule::UndefinedName) {
+            // Allow __path__.
+            if self.path.ends_with("__init__.py") && id == "__path__" {
+                return;
+            }
+
+            // Allow "__module__" and "__qualname__" in class scopes.
+            if (id == "__module__" || id == "__qualname__")
+                && matches!(self.current_scope().kind, ScopeKind::Class(..))
+            {
+                return;
+            }
+
+            // Avoid flagging if NameError is handled.
+            if let Some(handler_names) = self.except_handlers.last() {
+                if handler_names
+                    .iter()
+                    .any(|call_path| call_path.as_slice() == ["NameError"])
+                {
+                    return;
+                }
+            }
+
+            self.diagnostics.push(Diagnostic::new(
+                pyflakes::rules::UndefinedName { name: id.clone() },
+                Range::from_located(expr),
+            ));
         }
     }
 
@@ -4506,26 +4507,29 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        if let ExprKind::Name { id, .. } = &expr.node {
-            if operations::on_conditional_branch(
-                &mut self.parents.iter().rev().map(std::convert::Into::into),
-            ) {
-                return;
-            }
-
-            let scope =
-                &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-            if scope.bindings.remove(&id.as_str()).is_none()
-                && self.settings.rules.enabled(&Rule::UndefinedName)
-            {
-                self.diagnostics.push(Diagnostic::new(
-                    pyflakes::rules::UndefinedName {
-                        name: id.to_string(),
-                    },
-                    Range::from_located(expr),
-                ));
-            }
+        let ExprKind::Name { id, .. } = &expr.node else {
+            return;
+        };
+        if operations::on_conditional_branch(
+            &mut self.parents.iter().rev().map(std::convert::Into::into),
+        ) {
+            return;
         }
+
+        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
+        if scope.bindings.remove(&id.as_str()).is_some() {
+            return;
+        }
+        if !self.settings.rules.enabled(&Rule::UndefinedName) {
+            return;
+        }
+
+        self.diagnostics.push(Diagnostic::new(
+            pyflakes::rules::UndefinedName {
+                name: id.to_string(),
+            },
+            Range::from_located(expr),
+        ));
     }
 
     fn visit_docstring<'b>(&mut self, python_ast: &'b Suite) -> bool

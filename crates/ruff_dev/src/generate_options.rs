@@ -4,7 +4,7 @@ use ruff::settings::options::Options;
 use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionField};
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
-    output.push_str(&format!("#### [`{0}`](#{0})\n", name));
+    output.push_str(&format!("#### [`{name}`](#{name})\n"));
     output.push('\n');
     output.push_str(field.doc);
     output.push_str("\n\n");
@@ -40,7 +40,7 @@ pub fn generate() -> String {
     // Generate all the sub-groups.
     for (group_name, entry) in &sorted_options {
         let OptionEntry::Group(fields) = entry else { continue; };
-        output.push_str(&format!("### `{}`\n", group_name));
+        output.push_str(&format!("### `{group_name}`\n"));
         output.push('\n');
         for (name, entry) in fields.iter().sorted_by_key(|(name, _)| name) {
             let OptionEntry::Field(field) = entry else { continue; };

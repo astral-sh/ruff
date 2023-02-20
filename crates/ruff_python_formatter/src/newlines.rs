@@ -78,16 +78,10 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
             let required_newlines = match self.trailer {
                 Trailer::FunctionDef | Trailer::ClassDef => self.depth.max_newlines(),
                 Trailer::Docstring if matches!(self.scope, Scope::Class) => 1,
-                Trailer::Import => {
-                    if matches!(
-                        stmt.node,
-                        StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
-                    ) {
-                        0
-                    } else {
-                        1
-                    }
-                }
+                Trailer::Import => usize::from(!matches!(
+                    stmt.node,
+                    StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
+                )),
                 _ => 0,
             };
             let present_newlines = stmt
