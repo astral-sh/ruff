@@ -107,4 +107,16 @@ expression: diagnostics
       row: 11
       column: 28
   parent: ~
+- kind:
+    LambdaAssignment:
+      name: f
+      fixable: false
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 23
+  fix: ~
+  parent: ~
 
