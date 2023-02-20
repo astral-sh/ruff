@@ -4,10 +4,9 @@ expression: diagnostics
 ---
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: For
+      inner_kind: For
   location:
     row: 3
     column: 8
@@ -18,10 +17,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: With
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: With
+      inner_kind: For
   location:
     row: 8
     column: 8
@@ -32,10 +30,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: With
+      name: i
+      outer_kind: For
+      inner_kind: With
   location:
     row: 13
     column: 17
@@ -46,10 +43,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: With
-      inner_name: i
-      inner_keyword: With
+      name: i
+      outer_kind: With
+      inner_kind: With
   location:
     row: 18
     column: 17
@@ -60,10 +56,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: For
+      inner_kind: For
   location:
     row: 34
     column: 12
@@ -74,10 +69,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: For
+      inner_kind: For
   location:
     row: 40
     column: 12
@@ -88,10 +82,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: j
-      outer_keyword: For
-      inner_name: j
-      inner_keyword: For
+      name: j
+      outer_kind: For
+      inner_kind: For
   location:
     row: 41
     column: 16
@@ -102,10 +95,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: Assignment
+      name: i
+      outer_kind: For
+      inner_kind: Assignment
   location:
     row: 46
     column: 4
@@ -116,10 +108,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: Assignment
+      name: i
+      outer_kind: For
+      inner_kind: Assignment
   location:
     row: 50
     column: 4
@@ -130,10 +121,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: Assignment
+      name: i
+      outer_kind: For
+      inner_kind: Assignment
   location:
     row: 54
     column: 4
@@ -144,10 +134,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: For
+      inner_kind: For
   location:
     row: 58
     column: 8
@@ -158,10 +147,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: For
+      inner_kind: For
   location:
     row: 63
     column: 14
@@ -172,10 +160,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: For
+      inner_kind: For
   location:
     row: 68
     column: 8
@@ -186,10 +173,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: For
+      inner_kind: For
   location:
     row: 73
     column: 8
@@ -200,10 +186,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: For
+      inner_kind: For
   location:
     row: 78
     column: 8
@@ -214,10 +199,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: j
-      outer_keyword: For
-      inner_name: j
-      inner_keyword: For
+      name: j
+      outer_kind: For
+      inner_kind: For
   location:
     row: 78
     column: 11
@@ -228,10 +212,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: j
-      outer_keyword: For
-      inner_name: j
-      inner_keyword: For
+      name: j
+      outer_kind: For
+      inner_kind: For
   location:
     row: 95
     column: 8
@@ -242,10 +225,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: Assignment
+      name: i
+      outer_kind: For
+      inner_kind: Assignment
   location:
     row: 112
     column: 12
@@ -256,10 +238,9 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      outer_name: i
-      outer_keyword: For
-      inner_name: i
-      inner_keyword: For
+      name: i
+      outer_kind: For
+      inner_kind: For
   location:
     row: 118
     column: 16
