@@ -1,22 +1,3 @@
-//! Checks for `++n`.
-//!
-//! ## Why is this bad?
-//!
-//! Python does not support the unary prefix increment. Writing `++n` is
-//! equivalent to `+(+(n))`, which equals `n`.
-//!
-//! ## Example
-//!
-//! ```python
-//! ++n;
-//! ```
-//!
-//! Use instead:
-//!
-//! ```python
-//! n += 1
-//! ```
-
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Excepthandler;
 
