@@ -58,25 +58,19 @@ where
                 if !self.start_of_line {
                     next = Some(Ok((*start, soft_to_name(tok), *end)));
                 } else {
-                    let mut par_count = 0;
-                    let mut sqb_count = 0;
-                    let mut brace_count = 0;
+                    let mut nesting = 0;
                     let mut first = true;
                     let mut seen_colon = false;
                     while let Some(Ok((_, tok, _))) = self.underlying.peek() {
                         match tok {
                             Tok::Newline => break,
-                            Tok::Colon if par_count == 0 && sqb_count == 0 && brace_count == 0 => {
+                            Tok::Colon if nesting == 0 => {
                                 if !first {
                                     seen_colon = true;
                                 }
                             }
-                            Tok::Lpar => par_count += 1,
-                            Tok::Rpar => par_count -= 1,
-                            Tok::Lsqb => sqb_count += 1,
-                            Tok::Rsqb => sqb_count -= 1,
-                            Tok::Lbrace => brace_count += 1,
-                            Tok::Rbrace => brace_count -= 1,
+                            Tok::Lpar | Tok::Lsqb | Tok::Lbrace => nesting += 1,
+                            Tok::Rpar | Tok::Rsqb | Tok::Rbrace => nesting -= 1,
                             _ => {}
                         }
                         first = false;
