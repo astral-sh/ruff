@@ -56,17 +56,7 @@ where
             //    type hints.)
             if matches!(tok, Tok::Match | Tok::Case) {
                 if !self.start_of_line {
-                    next = Some(Ok((
-                        *start,
-                        Tok::Name {
-                            name: if matches!(tok, Tok::Match) {
-                                "match".to_string()
-                            } else {
-                                "case".to_string()
-                            },
-                        },
-                        *end,
-                    )));
+                    next = Some(Ok((*start, soft_to_name(tok), *end)));
                 } else {
                     let mut par_count = 0;
                     let mut sqb_count = 0;
@@ -92,17 +82,7 @@ where
                         first = false;
                     }
                     if !seen_colon {
-                        next = Some(Ok((
-                            *start,
-                            Tok::Name {
-                                name: if matches!(tok, Tok::Match) {
-                                    "match".to_string()
-                                } else {
-                                    "case".to_string()
-                                },
-                            },
-                            *end,
-                        )));
+                        next = Some(Ok((*start, soft_to_name(tok), *end)));
                     }
                 }
             }
@@ -122,5 +102,17 @@ where
         });
 
         next
+    }
+}
+
+#[inline]
+fn soft_to_name(tok: &Tok) -> Tok {
+    let name = match tok {
+        Tok::Match => "match",
+        Tok::Case => "case",
+        _ => unreachable!("other tokens never reach here"),
+    };
+    Tok::Name {
+        name: name.to_owned(),
     }
 }
