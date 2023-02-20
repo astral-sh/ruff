@@ -70,6 +70,7 @@ mod tests {
     #[test_case(Path::new("simple_cases/beginning_backslash.py"); "beginning_backslash")]
     #[test_case(Path::new("simple_cases/import_spacing.py"); "import_spacing")]
     #[test_case(Path::new("simple_cases/power_op_spacing.py"); "power_op_spacing")]
+    #[test_case(Path::new("simple_cases/slices.py"); "slices")]
     fn passing(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.display());
         let content = std::fs::read_to_string(test_resource_path(

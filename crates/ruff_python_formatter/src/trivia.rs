@@ -31,6 +31,7 @@ pub enum TriviaTokenKind {
     OwnLineComment,
     EndOfLineComment,
     MagicTrailingComma,
+    MagicTrailingColon,
     EmptyLine,
     Parentheses,
 }
@@ -66,6 +67,7 @@ pub enum TriviaKind {
     /// ```
     EndOfLineComment(Range),
     MagicTrailingComma,
+    MagicTrailingColon,
     EmptyLine,
     Parentheses,
 }
@@ -98,6 +100,10 @@ impl Trivia {
         match token.kind {
             TriviaTokenKind::MagicTrailingComma => Self {
                 kind: TriviaKind::MagicTrailingComma,
+                relationship,
+            },
+            TriviaTokenKind::MagicTrailingColon => Self {
+                kind: TriviaKind::MagicTrailingColon,
                 relationship,
             },
             TriviaTokenKind::EmptyLine => Self {
@@ -162,6 +168,12 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
                         start: *prev_start,
                         end: *prev_end,
                         kind: TriviaTokenKind::MagicTrailingComma,
+                    });
+                } else if prev_tok == &Tok::Colon {
+                    tokens.push(TriviaToken {
+                        start: *prev_start,
+                        end: *prev_end,
+                        kind: TriviaTokenKind::MagicTrailingColon,
                     });
                 }
             }
@@ -844,7 +856,7 @@ pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaI
                     unreachable!("Attach token to the ast: {:?}", token);
                 }
             }
-            TriviaTokenKind::MagicTrailingComma => {
+            TriviaTokenKind::MagicTrailingComma | TriviaTokenKind::MagicTrailingColon => {
                 if let Some(enclosing_node) = enclosing_node {
                     add_comment(
                         Trivia::from_token(&token, Relationship::Trailing),

@@ -218,6 +218,17 @@ fn format_slice(
             write!(f, [space()])?;
         }
         write!(f, [step.format()])?;
+    } else {
+        let magic_trailing_colon = expr
+            .trivia
+            .iter()
+            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingColon));
+        if magic_trailing_colon {
+            if !is_simple && upper.is_some() {
+                write!(f, [space()])?;
+            }
+            write!(f, [text(":")])?;
+        }
     }
 
     Ok(())
