@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violation::{AlwaysAutofixableViolation, AutofixKind, Availability, Violation};
+use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::helpers::is_falsy_constant;
 use super::unittest_assert::UnittestAssert;
@@ -94,18 +94,23 @@ impl Violation for AssertAlwaysFalse {
 define_violation!(
     pub struct UnittestAssertion {
         pub assertion: String,
+        pub fixable: bool,
     }
 );
-impl AlwaysAutofixableViolation for UnittestAssertion {
+impl Violation for UnittestAssertion {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnittestAssertion { assertion } = self;
+        let UnittestAssertion { assertion, .. } = self;
         format!("Use a regular `assert` instead of unittest-style `{assertion}`")
     }
 
-    fn autofix_title(&self) -> String {
-        let UnittestAssertion { assertion } = self;
-        format!("Replace `{assertion}(...)` with `assert ...`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable
+            .then_some(|UnittestAssertion { assertion, .. }| {
+                format!("Replace `{assertion}(...)` with `assert ...`")
+            })
     }
 }
 
@@ -181,13 +186,18 @@ pub fn unittest_assertion(
     match &func.node {
         ExprKind::Attribute { attr, .. } => {
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
+                // We're converting an expression to a statement, so avoid applying the fix if
+                // the assertion is part of a larger expression.
+                let fixable = checker.current_expr_parent().is_none()
+                    && matches!(checker.current_stmt().node, StmtKind::Expr { .. });
                 let mut diagnostic = Diagnostic::new(
                     UnittestAssertion {
                         assertion: unittest_assert.to_string(),
+                        fixable,
                     },
                     Range::from_located(func),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         diagnostic.amend(Fix::replacement(
                             unparse_stmt(&stmt, checker.stylist),
