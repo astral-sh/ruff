@@ -123,6 +123,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // pylint
         (Pylint, "E0100") => Rule::YieldInInit,
+        (Pylint, "E0101") => Rule::ReturnInInit,
         (Pylint, "E0604") => Rule::InvalidAllObject,
         (Pylint, "E0605") => Rule::InvalidAllFormat,
         (Pylint, "E1307") => Rule::BadStringFormatType,

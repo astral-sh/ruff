@@ -2,7 +2,8 @@
 name = "ruff_text_size"
 version = "0.0.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 serde = { version = "1.0", optional = true, default_features = false }

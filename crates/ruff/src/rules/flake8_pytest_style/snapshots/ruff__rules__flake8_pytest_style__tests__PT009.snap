@@ -5,6 +5,7 @@ expression: diagnostics
 - kind:
     UnittestAssertion:
       assertion: assertTrue
+      fixable: true
   location:
     row: 11
     column: 8
@@ -24,6 +25,7 @@ expression: diagnostics
 - kind:
     UnittestAssertion:
       assertion: assertTrue
+      fixable: true
   location:
     row: 12
     column: 8
@@ -43,6 +45,7 @@ expression: diagnostics
 - kind:
     UnittestAssertion:
       assertion: assertTrue
+      fixable: true
   location:
     row: 13
     column: 8
@@ -62,6 +65,7 @@ expression: diagnostics
 - kind:
     UnittestAssertion:
       assertion: assertTrue
+      fixable: true
   location:
     row: 14
     column: 8
@@ -81,6 +85,7 @@ expression: diagnostics
 - kind:
     UnittestAssertion:
       assertion: assertTrue
+      fixable: true
   location:
     row: 15
     column: 8
@@ -100,6 +105,7 @@ expression: diagnostics
 - kind:
     UnittestAssertion:
       assertion: assertTrue
+      fixable: true
   location:
     row: 16
     column: 8
@@ -111,6 +117,7 @@ expression: diagnostics
 - kind:
     UnittestAssertion:
       assertion: assertTrue
+      fixable: true
   location:
     row: 17
     column: 8
@@ -122,6 +129,7 @@ expression: diagnostics
 - kind:
     UnittestAssertion:
       assertion: assertTrue
+      fixable: true
   location:
     row: 18
     column: 8
@@ -133,373 +141,429 @@ expression: diagnostics
 - kind:
     UnittestAssertion:
       assertion: assertTrue
+      fixable: true
   location:
     row: 19
     column: 8
   end_location:
     row: 19
     column: 23
+  fix: ~
+  parent: ~
+- kind:
+    UnittestAssertion:
+      assertion: assertIsNotNone
+      fixable: false
+  location:
+    row: 21
+    column: 12
+  end_location:
+    row: 21
+    column: 32
+  fix: ~
+  parent: ~
+- kind:
+    UnittestAssertion:
+      assertion: assertIsNone
+      fixable: false
+  location:
+    row: 23
+    column: 17
+  end_location:
+    row: 23
+    column: 34
+  fix: ~
+  parent: ~
+- kind:
+    UnittestAssertion:
+      assertion: assertEqual
+      fixable: false
+  location:
+    row: 25
+    column: 15
+  end_location:
+    row: 25
+    column: 31
   fix: ~
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertFalse
+      fixable: true
   location:
-    row: 22
+    row: 28
     column: 8
   end_location:
-    row: 22
+    row: 28
     column: 24
   fix:
     content:
       - assert not True
     location:
-      row: 22
+      row: 28
       column: 8
     end_location:
-      row: 22
+      row: 28
       column: 30
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertEqual
+      fixable: true
   location:
-    row: 25
+    row: 31
     column: 8
   end_location:
-    row: 25
+    row: 31
     column: 24
   fix:
     content:
       - assert 1 == 2
     location:
-      row: 25
+      row: 31
       column: 8
     end_location:
-      row: 25
+      row: 31
       column: 30
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertNotEqual
+      fixable: true
   location:
-    row: 28
+    row: 34
     column: 8
   end_location:
-    row: 28
+    row: 34
     column: 27
   fix:
     content:
       - assert 1 != 1
     location:
-      row: 28
+      row: 34
       column: 8
     end_location:
-      row: 28
+      row: 34
       column: 33
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertGreater
+      fixable: true
   location:
-    row: 31
+    row: 37
     column: 8
   end_location:
-    row: 31
+    row: 37
     column: 26
   fix:
     content:
       - assert 1 > 2
     location:
-      row: 31
+      row: 37
       column: 8
     end_location:
-      row: 31
+      row: 37
       column: 32
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertGreaterEqual
+      fixable: true
   location:
-    row: 34
+    row: 40
     column: 8
   end_location:
-    row: 34
+    row: 40
     column: 31
   fix:
     content:
       - assert 1 >= 2
     location:
-      row: 34
+      row: 40
       column: 8
     end_location:
-      row: 34
+      row: 40
       column: 37
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertLess
+      fixable: true
   location:
-    row: 37
+    row: 43
     column: 8
   end_location:
-    row: 37
+    row: 43
     column: 23
   fix:
     content:
       - assert 2 < 1
     location:
-      row: 37
+      row: 43
       column: 8
     end_location:
-      row: 37
+      row: 43
       column: 29
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertLessEqual
+      fixable: true
   location:
-    row: 40
+    row: 46
     column: 8
   end_location:
-    row: 40
+    row: 46
     column: 28
   fix:
     content:
       - assert 1 <= 2
     location:
-      row: 40
+      row: 46
       column: 8
     end_location:
-      row: 40
+      row: 46
       column: 34
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertIn
+      fixable: true
   location:
-    row: 43
+    row: 49
     column: 8
   end_location:
-    row: 43
+    row: 49
     column: 21
   fix:
     content:
       - "assert 1 in [2, 3]"
     location:
-      row: 43
+      row: 49
       column: 8
     end_location:
-      row: 43
+      row: 49
       column: 32
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertNotIn
+      fixable: true
   location:
-    row: 46
+    row: 52
     column: 8
   end_location:
-    row: 46
+    row: 52
     column: 24
   fix:
     content:
       - "assert 2 not in [2, 3]"
     location:
-      row: 46
+      row: 52
       column: 8
     end_location:
-      row: 46
+      row: 52
       column: 35
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertIsNone
+      fixable: true
   location:
-    row: 49
+    row: 55
     column: 8
   end_location:
-    row: 49
+    row: 55
     column: 25
   fix:
     content:
       - assert 0 is None
     location:
-      row: 49
+      row: 55
       column: 8
     end_location:
-      row: 49
+      row: 55
       column: 28
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertIsNotNone
+      fixable: true
   location:
-    row: 52
+    row: 58
     column: 8
   end_location:
-    row: 52
+    row: 58
     column: 28
   fix:
     content:
       - assert 0 is not None
     location:
-      row: 52
+      row: 58
       column: 8
     end_location:
-      row: 52
+      row: 58
       column: 31
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertIs
+      fixable: true
   location:
-    row: 55
+    row: 61
     column: 8
   end_location:
-    row: 55
+    row: 61
     column: 21
   fix:
     content:
       - "assert [] is []"
     location:
-      row: 55
+      row: 61
       column: 8
     end_location:
-      row: 55
+      row: 61
       column: 29
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertIsNot
+      fixable: true
   location:
-    row: 58
+    row: 64
     column: 8
   end_location:
-    row: 58
+    row: 64
     column: 24
   fix:
     content:
       - assert 1 is not 1
     location:
-      row: 58
+      row: 64
       column: 8
     end_location:
-      row: 58
+      row: 64
       column: 30
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertIsInstance
+      fixable: true
   location:
-    row: 61
+    row: 67
     column: 8
   end_location:
-    row: 61
+    row: 67
     column: 29
   fix:
     content:
       - "assert isinstance(1, str)"
     location:
-      row: 61
+      row: 67
       column: 8
     end_location:
-      row: 61
+      row: 67
       column: 37
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertNotIsInstance
+      fixable: true
   location:
-    row: 64
+    row: 70
     column: 8
   end_location:
-    row: 64
+    row: 70
     column: 32
   fix:
     content:
       - "assert not isinstance(1, int)"
     location:
-      row: 64
+      row: 70
       column: 8
     end_location:
-      row: 64
+      row: 70
       column: 40
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertRegex
+      fixable: true
   location:
-    row: 67
+    row: 73
     column: 8
   end_location:
-    row: 67
+    row: 73
     column: 24
   fix:
     content:
       - "assert re.search(\"def\", \"abc\")"
     location:
-      row: 67
+      row: 73
       column: 8
     end_location:
-      row: 67
+      row: 73
       column: 39
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertNotRegex
+      fixable: true
   location:
-    row: 70
+    row: 76
     column: 8
   end_location:
-    row: 70
+    row: 76
     column: 27
   fix:
     content:
       - "assert not re.search(\"abc\", \"abc\")"
     location:
-      row: 70
+      row: 76
       column: 8
     end_location:
-      row: 70
+      row: 76
       column: 42
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertRegexpMatches
+      fixable: true
   location:
-    row: 73
+    row: 79
     column: 8
   end_location:
-    row: 73
+    row: 79
     column: 32
   fix:
     content:
       - "assert re.search(\"def\", \"abc\")"
     location:
-      row: 73
+      row: 79
       column: 8
     end_location:
-      row: 73
+      row: 79
       column: 47
   parent: ~
 - kind:
     UnittestAssertion:
       assertion: assertNotRegex
+      fixable: true
   location:
-    row: 76
+    row: 82
     column: 8
   end_location:
-    row: 76
+    row: 82
     column: 27
   fix:
     content:
       - "assert not re.search(\"abc\", \"abc\")"
     location:
-      row: 76
+      row: 82
       column: 8
     end_location:
-      row: 76
+      row: 82
       column: 42
   parent: ~
 

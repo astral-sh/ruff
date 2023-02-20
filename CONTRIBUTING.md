@@ -2,16 +2,16 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
-- [The Basics](#the-basics)
-  - [Prerequisites](#prerequisites)
-  - [Development](#development)
-  - [Project Structure](#project-structure)
-  - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
-    - [Rule naming convention](#rule-naming-convention)
-  - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
-- [MkDocs](#mkdocs)
-- [Release Process](#release-process)
-- [Benchmarks](#benchmarks)
+* [The Basics](#the-basics)
+  * [Prerequisites](#prerequisites)
+  * [Development](#development)
+  * [Project Structure](#project-structure)
+  * [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
+    * [Rule naming convention](#rule-naming-convention)
+  * [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
+* [MkDocs](#mkdocs)
+* [Release Process](#release-process)
+* [Benchmarks](#benchmarks)
 
 ## The Basics
 
@@ -52,7 +52,7 @@ cargo install cargo-insta
 After cloning the repository, run Ruff locally with:
 
 ```shell
-cargo run check /path/to/file.py --no-cache
+cargo run -p ruff_cli -- check /path/to/file.py --no-cache
 ```
 
 Prior to opening a pull request, ensure that your code has been auto-formatted,
@@ -94,12 +94,12 @@ The vast majority of the code, including all lint rules, lives in the `ruff` cra
 
 At time of writing, the repository includes the following crates:
 
-- `crates/ruff`: library crate containing all lint rules and the core logic for running them.
-- `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
-- `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g., `cargo dev generate-all`).
-- `crates/ruff_macros`: library crate containing macros used by Ruff.
-- `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of standard library modules by versionb).
-- `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
+* `crates/ruff`: library crate containing all lint rules and the core logic for running them.
+* `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
+* `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g., `cargo dev generate-all`).
+* `crates/ruff_macros`: library crate containing macros used by Ruff.
+* `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of standard library modules by versionb).
+* `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
 
 ### Example: Adding a new lint rule
 
@@ -135,7 +135,7 @@ contain a variety of violations and non-violations designed to evaluate and demo
 of your lint rule.
 
 Run `cargo dev generate-all` to generate the code for your new fixture. Then run Ruff
-locally with (e.g.) `cargo run check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
+locally with (e.g.) `cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
 `test_case` macro in the relevant `crates/ruff/src/[linter]/mod.rs` file. Then, run `cargo test --all`.
@@ -146,7 +146,7 @@ Finally, regenerate the documentation and generated code with `cargo dev generat
 
 #### Rule naming convention
 
-The rule name should make sense when read as "allow *rule-name*" or "allow *rule-name* items".
+The rule name should make sense when read as "allow _rule-name_" or "allow _rule-name_ items".
 
 This implies that rule names:
 
@@ -186,14 +186,19 @@ Finally, regenerate the documentation and generated code with `cargo dev generat
 To preview any changes to the documentation locally:
 
 1. Install MkDocs and Material for MkDocs with:
+
    ```shell
    pip install -r docs/requirements.txt
    ```
+
 2. Generate the MkDocs site with:
+
    ```shell
    python scripts/generate_mkdocs.py
    ```
+
 3. Run the development server with:
+
    ```shell
    mkdocs serve
    ```

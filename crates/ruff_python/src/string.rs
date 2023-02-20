@@ -3,8 +3,6 @@ use regex::Regex;
 
 pub static STRING_QUOTE_PREFIX_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"^(?i)[urb]*['"](?P<raw>.*)['"]$"#).unwrap());
-pub static LOWER_OR_UNDERSCORE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^[a-z][a-z0-9_]*$").unwrap());
 
 pub fn is_lower(s: &str) -> bool {
     let mut cased = false;
@@ -30,11 +28,6 @@ pub fn is_upper(s: &str) -> bool {
     cased
 }
 
-// Module names should be lowercase, and may contain underscore
-pub fn is_lower_with_underscore(s: &str) -> bool {
-    LOWER_OR_UNDERSCORE.is_match(s)
-}
-
 /// Remove prefixes (u, r, b) and quotes around a string. This expects the given
 /// string to be a valid Python string representation, it doesn't do any
 /// validation.
@@ -50,7 +43,7 @@ pub fn strip_quotes_and_prefixes(s: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use crate::string::{is_lower, is_lower_with_underscore, is_upper, strip_quotes_and_prefixes};
+    use crate::string::{is_lower, is_upper, strip_quotes_and_prefixes};
 
     #[test]
     fn test_is_lower() {
@@ -61,19 +54,6 @@ mod tests {
         assert!(!is_lower("ABC"));
         assert!(!is_lower(""));
         assert!(!is_lower("_"));
-    }
-
-    #[test]
-    fn test_is_lower_underscore() {
-        assert!(is_lower_with_underscore("a"));
-        assert!(is_lower_with_underscore("abc"));
-        assert!(is_lower_with_underscore("abc0"));
-        assert!(is_lower_with_underscore("abc_"));
-        assert!(is_lower_with_underscore("a_b_c"));
-        assert!(!is_lower_with_underscore("a-b-c"));
-        assert!(!is_lower_with_underscore("a_B_c"));
-        assert!(!is_lower_with_underscore("0abc"));
-        assert!(!is_lower_with_underscore("_abc"));
     }
 
     #[test]
