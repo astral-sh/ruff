@@ -1,6 +1,4 @@
-# These SHOULD change
-
-
+# Errors
 def main_function():
     try:
         process()
@@ -52,9 +50,7 @@ def func_comma():
         logger.exception("log message", ex)
 
 
-# These should NOT change
-
-
+# OK
 def main_function():
     try:
         process()

@@ -1,0 +1,95 @@
+---
+source: crates/ruff/src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 8
+    column: 44
+  end_location:
+    row: 8
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 19
+    column: 52
+  end_location:
+    row: 19
+    column: 55
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 21
+    column: 43
+  end_location:
+    row: 21
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 21
+    column: 49
+  end_location:
+    row: 21
+    column: 52
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 23
+    column: 43
+  end_location:
+    row: 23
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 24
+    column: 43
+  end_location:
+    row: 24
+    column: 46
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 36
+    column: 40
+  end_location:
+    row: 36
+    column: 42
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 43
+    column: 47
+  end_location:
+    row: 43
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 50
+    column: 40
+  end_location:
+    row: 50
+    column: 42
+  fix: ~
+  parent: ~
+
