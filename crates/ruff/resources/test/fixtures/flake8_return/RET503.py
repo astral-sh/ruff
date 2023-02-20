@@ -77,7 +77,7 @@ def x(y):
 
 # last line in while loop
 def x(y):
-    while True:
+    while i > 0:
         if y > 0:
             return 1
         y += 1
@@ -259,3 +259,10 @@ def nested(values):
 
     for value in values:
         print(value)
+
+
+def while_true():
+    while True:
+        if y > 0:
+            return 1
+        y += 1
