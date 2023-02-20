@@ -14,11 +14,11 @@
 
 use crate::lexer::{LexResult, Tok};
 pub use crate::mode::Mode;
+use crate::soft_keywords::SoftKeywordTransformer;
 use crate::{ast, error::ParseError, lexer, python};
 use ast::Location;
 use itertools::Itertools;
 use std::iter;
-use crate::soft_keywords::soft_keywords;
 
 /// Parse a full Python program usually consisting of multiple lines.
 ///  
@@ -190,7 +190,7 @@ pub fn parse_tokens(
         .chain(lxr)
         .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
     python::TopParser::new()
-        .parse(soft_keywords(tokenizer, mode).into_iter())
+        .parse(SoftKeywordTransformer::new(tokenizer, mode).into_iter())
         .map_err(|e| crate::error::parse_error_from_lalrpop(e, source_path))
 }
 
