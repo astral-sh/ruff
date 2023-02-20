@@ -2872,6 +2872,13 @@ where
                 {
                     flake8_logging_format::rules::logging_call(self, func, args, keywords);
                 }
+
+                // pylint logging checker
+                if self.settings.rules.enabled(&Rule::LoggingTooFewArgs)
+                    || self.settings.rules.enabled(&Rule::LoggingTooFewArgs)
+                {
+                    pylint::rules::logging_call(self, func, args, keywords);
+                }
             }
             ExprKind::Dict { keys, values } => {
                 if self

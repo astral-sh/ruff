@@ -7,6 +7,7 @@ pub use consider_using_sys_exit::{consider_using_sys_exit, ConsiderUsingSysExit}
 pub use global_variable_not_assigned::GlobalVariableNotAssigned;
 pub use invalid_all_format::{invalid_all_format, InvalidAllFormat};
 pub use invalid_all_object::{invalid_all_object, InvalidAllObject};
+pub use logging::{logging_call, LoggingTooFewArgs, LoggingTooManyArgs};
 pub use magic_value_comparison::{magic_value_comparison, MagicValueComparison};
 pub use merge_isinstance::{merge_isinstance, ConsiderMergingIsinstance};
 pub use nonlocal_without_binding::NonlocalWithoutBinding;
@@ -36,6 +37,7 @@ mod consider_using_sys_exit;
 mod global_variable_not_assigned;
 mod invalid_all_format;
 mod invalid_all_object;
+mod logging;
 mod magic_value_comparison;
 mod merge_isinstance;
 mod nonlocal_without_binding;

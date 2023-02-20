@@ -10,7 +10,7 @@ use crate::rules::flake8_logging_format::violations::{
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
 
-enum LoggingLevel {
+pub enum LoggingLevel {
     Debug,
     Critical,
     Error,
@@ -21,7 +21,7 @@ enum LoggingLevel {
 }
 
 impl LoggingLevel {
-    fn from_str(level: &str) -> Option<Self> {
+    pub fn from_str(level: &str) -> Option<Self> {
         match level {
             "debug" => Some(LoggingLevel::Debug),
             "critical" => Some(LoggingLevel::Critical),

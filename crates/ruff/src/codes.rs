@@ -126,6 +126,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "E0101") => Rule::ReturnInInit,
         (Pylint, "E0604") => Rule::InvalidAllObject,
         (Pylint, "E0605") => Rule::InvalidAllFormat,
+        (Pylint, "E1205") => Rule::LoggingTooManyArgs,
+        (Pylint, "E1206") => Rule::LoggingTooFewArgs,
         (Pylint, "E1307") => Rule::BadStringFormatType,
         (Pylint, "E2502") => Rule::BidirectionalUnicode,
         (Pylint, "E1310") => Rule::BadStrStripCall,

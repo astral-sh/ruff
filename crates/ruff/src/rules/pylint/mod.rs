@@ -17,6 +17,8 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
+    #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_E1205.py"); "PLE1205")]
+    #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_E1206.py"); "PLE1206")]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"); "PLE0101")]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
