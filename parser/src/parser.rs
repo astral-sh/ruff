@@ -393,6 +393,18 @@ with (0 as a, 1 as b,): pass
     }
 
     #[test]
+    fn test_star_index() {
+        let source = "\
+array_slice = array[0, *idxs, -1]
+array[0, *idxs, -1] = array_slice
+array[*idxs_to_select, *idxs_to_select]
+array[3:5, *idxs_to_select]
+";
+        let parse_ast = parse_program(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
     fn test_generator_expression_argument() {
         let source = r#"' '.join(
     sql
