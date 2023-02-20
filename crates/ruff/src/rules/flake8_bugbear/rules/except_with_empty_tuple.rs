@@ -25,6 +25,8 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
+use rustpython_parser::ast::{ExcepthandlerKind, ExprKind};
+
 define_violation!(
     pub struct ExceptWithEmptyTuple;
 );
@@ -37,8 +39,17 @@ impl Violation for ExceptWithEmptyTuple {
 
 /// B029
 pub fn except_with_empty_tuple(checker: &mut Checker, excepthandler: &Excepthandler) {
-    checker.diagnostics.push(Diagnostic::new(
-        ExceptWithEmptyTuple,
-        Range::from_located(excepthandler),
-    ));
+    let ExcepthandlerKind::ExceptHandler { type_, .. } = &excepthandler.node;
+    if type_.is_none() {
+        return;
+    }
+    let ExprKind::Tuple { elts, .. } = &type_.as_ref().unwrap().node else {
+        return;
+    };
+    if elts.is_empty() {
+        checker.diagnostics.push(Diagnostic::new(
+            ExceptWithEmptyTuple,
+            Range::from_located(excepthandler),
+        ));
+    }
 }
