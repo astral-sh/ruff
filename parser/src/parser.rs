@@ -406,6 +406,37 @@ with (0 as a, 1 as b,): pass
     }
 
     #[test]
+    fn test_try() {
+        let parse_ast = parse_program(
+            r#"try:
+    raise ValueError(1)
+except TypeError as e:
+    print(f'caught {type(e)}')
+except OSError as e:
+    print(f'caught {type(e)}')"#,
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_try_star() {
+        let parse_ast = parse_program(
+            r#"try:
+    raise ExceptionGroup("eg",
+        [ValueError(1), TypeError(2), OSError(3), OSError(4)])
+except* TypeError as e:
+    print(f'caught {type(e)} with nested {e.exceptions}')
+except* OSError as e:
+    print(f'caught {type(e)} with nested {e.exceptions}')"#,
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
     fn test_dict_unpacking() {
         let parse_ast = parse_expression(r#"{"a": "b", **c, "d": "e"}"#, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
