@@ -25,12 +25,8 @@ impl Violation for LambdaAssignment {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let LambdaAssignment { fixable, .. } = self;
-        if *fixable {
-            Some(|v| format!("Rewrite `{}` as a `def`", v.name))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|v| format!("Rewrite `{}` as a `def`", v.name))
     }
 }
 
