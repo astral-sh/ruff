@@ -17,6 +17,12 @@ class Test(unittest.TestCase):
         self.assertTrue(**{"expr": expr, "msg": msg})  # Error, unfixable
         self.assertTrue(msg=msg, expr=expr, unexpected_arg=False)  # Error, unfixable
         self.assertTrue(msg=msg)  # Error, unfixable
+        (
+            self.assertIsNotNone(value)  # Error, unfixable
+            if expect_condition
+            else self.assertIsNone(value)  # Error, unfixable
+        )
+        return self.assertEqual(True,  False)  # Error, unfixable
 
     def test_assert_false(self):
         self.assertFalse(True)  # Error
