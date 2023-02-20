@@ -41,6 +41,7 @@ mod tests {
     #[test_case(Rule::StarArgUnpackingAfterKeywordArg, Path::new("B026.py"); "B026")]
     #[test_case(Rule::EmptyMethodWithoutAbstractDecorator, Path::new("B027.py"); "B027")]
     #[test_case(Rule::EmptyMethodWithoutAbstractDecorator, Path::new("B027.pyi"); "B027_pyi")]
+    #[test_case(Rule::ExceptWithEmptyTuple, Path::new("B029.py"); "B029")]
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"); "B904")]
     #[test_case(Rule::ZipWithoutExplicitStrict, Path::new("B905.py"); "B905")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
