@@ -175,6 +175,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bugbear, "022") => Rule::UselessContextlibSuppress,
         (Flake8Bugbear, "023") => Rule::FunctionUsesLoopVariable,
         (Flake8Bugbear, "024") => Rule::AbstractBaseClassWithoutAbstractMethod,
+        (Flake8Bugbear, "028") => Rule::ExceptWithEmptyTuple,
         (Flake8Bugbear, "025") => Rule::DuplicateTryBlockException,
         (Flake8Bugbear, "026") => Rule::StarArgUnpackingAfterKeywordArg,
         (Flake8Bugbear, "027") => Rule::EmptyMethodWithoutAbstractDecorator,
