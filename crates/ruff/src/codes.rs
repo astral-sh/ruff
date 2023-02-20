@@ -545,6 +545,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Tryceratops, "300") => Rule::TryConsiderElse,
         (Tryceratops, "301") => Rule::RaiseWithinTry,
         (Tryceratops, "400") => Rule::ErrorInsteadOfException,
+        (Tryceratops, "401") => Rule::VerboseLogMessage,
 
         // flake8-use-pathlib
         (Flake8UsePathlib, "100") => Rule::PathlibAbspath,

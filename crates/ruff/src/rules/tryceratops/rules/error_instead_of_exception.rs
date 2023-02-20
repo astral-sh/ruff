@@ -1,12 +1,11 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
-use crate::ast::helpers::is_logger_candidate;
 use crate::ast::types::Range;
-use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 use crate::violation::Violation;
 
 define_violation!(
@@ -16,26 +15,6 @@ impl Violation for ErrorInsteadOfException {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `logging.exception` instead of `logging.error`")
-    }
-}
-
-#[derive(Default)]
-/// Collect `logging`-like calls from an AST.
-struct LoggerCandidateVisitor<'a> {
-    calls: Vec<(&'a Expr, &'a Expr)>,
-}
-
-impl<'a, 'b> Visitor<'b> for LoggerCandidateVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_expr(&mut self, expr: &'b Expr) {
-        if let ExprKind::Call { func, .. } = &expr.node {
-            if is_logger_candidate(func) {
-                self.calls.push((expr, func));
-            }
-        }
-        visitor::walk_expr(self, expr);
     }
 }
 
