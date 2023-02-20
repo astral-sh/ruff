@@ -1,8 +1,14 @@
 """
 Should emit:
-B029 - on lines 7
+B029 - on lines 8 and 13
 """
+
 try:
-    x = 1
-except():
-    print("error")
+    pass
+except ():
+    pass
+
+try:
+    pass
+except () as e:
+    pass
