@@ -720,6 +720,7 @@ Ruff is used in a number of major open-source projects, including:
 * [Dagger](https://github.com/dagger/dagger)
 * [Sphinx](https://github.com/sphinx-doc/sphinx)
 * [Hatch](https://github.com/pypa/hatch)
+* [PDM](https://github.com/pdm-project/pdm)
 * [Jupyter](https://github.com/jupyter-server/jupyter_server)
 * [Great Expectations](https://github.com/great-expectations/great_expectations)
 * [ONNX](https://github.com/onnx/onnx)
