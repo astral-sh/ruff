@@ -34,4 +34,3 @@ ham[lower:upper], ham[lower:upper:], ham[lower::step]
 # ham[lower+offset : upper+offset]
 ham[: upper_fn(x) : step_fn(x)], ham[:: step_fn(x)]
 ham[lower + offset : upper + offset]
-
