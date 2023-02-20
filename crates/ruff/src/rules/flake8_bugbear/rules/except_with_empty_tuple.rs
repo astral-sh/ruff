@@ -18,7 +18,7 @@
 //! ```
 
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::Excepthandler;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -36,18 +36,9 @@ impl Violation for ExceptWithEmptyTuple {
 }
 
 /// B029
-pub fn except_with_empty_tuple(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand: &Expr) {
-    if !matches!(op, Unaryop::UAdd) {
-        return;
-    }
-    let ExprKind::UnaryOp { op, .. } = &operand.node else {
-            return;
-        };
-    if !matches!(op, Unaryop::UAdd) {
-        return;
-    }
+pub fn except_with_empty_tuple(checker: &mut Checker, excepthandler: &Excepthandler) {
     checker.diagnostics.push(Diagnostic::new(
         ExceptWithEmptyTuple,
-        Range::from_located(expr),
+        Range::from_located(excepthandler),
     ));
 }
