@@ -48,7 +48,10 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
         // Remove any runs of empty lines greater than two in a row.
         let mut count = 0;
         stmt.trivia.retain(|c| {
-            if matches!(c.kind, TriviaKind::EmptyLine) {
+            if matches!(
+                (c.kind, c.relationship),
+                (TriviaKind::EmptyLine, Relationship::Leading)
+            ) {
                 count += 1;
                 count <= self.depth.max_newlines()
             } else {
@@ -64,7 +67,10 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                 if seen_non_empty {
                     true
                 } else {
-                    if matches!(c.kind, TriviaKind::EmptyLine) {
+                    if matches!(
+                        (c.kind, c.relationship),
+                        (TriviaKind::EmptyLine, Relationship::Leading)
+                    ) {
                         false
                     } else {
                         seen_non_empty = true;
@@ -87,7 +93,12 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
             let present_newlines = stmt
                 .trivia
                 .iter()
-                .take_while(|c| matches!(c.kind, TriviaKind::EmptyLine))
+                .take_while(|c| {
+                    matches!(
+                        (c.kind, c.relationship),
+                        (TriviaKind::EmptyLine, Relationship::Leading)
+                    )
+                })
                 .count();
             if present_newlines < required_newlines {
                 for _ in 0..(required_newlines - present_newlines) {
@@ -113,7 +124,12 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                     - stmt
                         .trivia
                         .iter()
-                        .take_while(|c| matches!(c.kind, TriviaKind::EmptyLine))
+                        .take_while(|c| {
+                            matches!(
+                                (c.kind, c.relationship),
+                                (TriviaKind::EmptyLine, Relationship::Leading)
+                            )
+                        })
                         .count();
                 for _ in 0..num_to_insert {
                     stmt.trivia.insert(

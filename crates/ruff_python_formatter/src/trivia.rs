@@ -128,7 +128,7 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
     let mut parens = vec![];
     for (start, tok, end) in lxr.iter().flatten() {
         // Add empty lines.
-        if let Some((prev, ..)) = prev_non_newline_tok {
+        if let Some((.., prev)) = prev_non_newline_tok {
             for row in prev.row() + 1..start.row() {
                 tokens.push(TriviaToken {
                     start: Location::new(row, 0),
@@ -189,7 +189,7 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
         prev_tok = Some((start, tok, end));
 
         // Track the most recent non-whitespace token.
-        if !matches!(tok, Tok::Newline | Tok::NonLogicalNewline,) {
+        if !matches!(tok, Tok::Newline | Tok::NonLogicalNewline) {
             prev_non_newline_tok = Some((start, tok, end));
         }
 

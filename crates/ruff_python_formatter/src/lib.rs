@@ -102,6 +102,9 @@ mod tests {
     #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
     // Lots of deviations, _mostly_ related to string normalization and wrapping.
     #[test_case(Path::new("simple_cases/expression.py"); "expression")]
+    // Passing apart from a trailing end-of-line comment within an if statement, which is being
+    // inappropriately associated with the if statement rather than the line it's on.
+    #[test_case(Path::new("simple_cases/comments.py"); "comments")]
     #[test_case(Path::new("simple_cases/function.py"); "function")]
     #[test_case(Path::new("simple_cases/function2.py"); "function2")]
     #[test_case(Path::new("simple_cases/function_trailing_comma.py"); "function_trailing_comma")]
