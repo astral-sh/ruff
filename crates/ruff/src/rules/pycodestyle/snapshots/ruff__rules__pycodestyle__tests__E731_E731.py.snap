@@ -3,7 +3,9 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LambdaAssignment: f
+    LambdaAssignment:
+      name: f
+      fixable: true
   location:
     row: 2
     column: 0
@@ -22,7 +24,9 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    LambdaAssignment: f
+    LambdaAssignment:
+      name: f
+      fixable: true
   location:
     row: 4
     column: 0
@@ -41,7 +45,9 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    LambdaAssignment: this
+    LambdaAssignment:
+      name: this
+      fixable: true
   location:
     row: 7
     column: 4
@@ -60,7 +66,9 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    LambdaAssignment: f
+    LambdaAssignment:
+      name: f
+      fixable: true
   location:
     row: 9
     column: 0
@@ -79,7 +87,9 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    LambdaAssignment: f
+    LambdaAssignment:
+      name: f
+      fixable: true
   location:
     row: 11
     column: 0

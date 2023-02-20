@@ -8,20 +8,29 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::violation::{AutofixKind, Availability, Violation};
 
 define_violation!(
-    pub struct LambdaAssignment(pub String);
+    pub struct LambdaAssignment {
+        pub name: String,
+        pub fixable: bool,
+    }
 );
-impl AlwaysAutofixableViolation for LambdaAssignment {
+impl Violation for LambdaAssignment {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not assign a `lambda` expression, use a `def`")
     }
 
-    fn autofix_title(&self) -> String {
-        let LambdaAssignment(name) = self;
-        format!("Rewrite `{name}` as a `def`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        let LambdaAssignment { fixable, .. } = self;
+        if *fixable {
+            Some(|v| format!("Rewrite `{}` as a `def`", v.name))
+        } else {
+            None
+        }
     }
 }
 
@@ -29,8 +38,13 @@ impl AlwaysAutofixableViolation for LambdaAssignment {
 pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stmt: &Stmt) {
     if let ExprKind::Name { id, .. } = &target.node {
         if let ExprKind::Lambda { args, body } = &value.node {
-            let mut diagnostic =
-                Diagnostic::new(LambdaAssignment(id.to_string()), Range::from_located(stmt));
+            let mut diagnostic = Diagnostic::new(
+                LambdaAssignment {
+                    name: id.to_string(),
+                    fixable: true,
+                },
+                Range::from_located(stmt),
+            );
             if checker.patch(diagnostic.kind.rule()) {
                 if !match_leading_content(stmt, checker.locator)
                     && !match_trailing_content(stmt, checker.locator)
