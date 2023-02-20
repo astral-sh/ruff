@@ -5,7 +5,7 @@ def main_function():
         handle()
         finish()
     except Exception as ex:
-        logger.exception(f"Found an error: {ex}")
+        logger.exception(f"Found an error: {ex}")  # TRY401
 
 
 def main_function():
@@ -16,12 +16,15 @@ def main_function():
     except ValueError as bad:
         if True is False:
             for i in range(10):
-                logger.exception(f"Found an error: {bad} {good}")
+                logger.exception(f"Found an error: {bad} {good}")  # TRY401
     except IndexError as bad:
-        logger.exception(f"Foud an error: {bad} {bad}")
+        logger.exception(f"Found an error: {bad} {bad}")  # TRY401
     except Exception as bad:
-        logger.exception(f"Foud an error: {bad}")
-        logger.exception(f"Foud an error: {bad}")
+        logger.exception(f"Found an error: {bad}")  # TRY401
+        logger.exception(f"Found an error: {bad}")  # TRY401
+
+        if True:
+            logger.exception(f"Found an error: {bad}")  # TRY401
 
 
 import logging
@@ -33,21 +36,21 @@ def func_fstr():
     try:
         ...
     except Exception as ex:
-        logger.exception(f"log message {ex}")
+        logger.exception(f"Logging an error: {ex}")  # TRY401
 
 
 def func_concat():
     try:
         ...
     except Exception as ex:
-        logger.exception("log message: " + str(ex))
+        logger.exception("Logging an error: " + str(ex))  # TRY401
 
 
 def func_comma():
     try:
         ...
     except Exception as ex:
-        logger.exception("log message", ex)
+        logger.exception("Logging an error:", ex)  # TRY401
 
 
 # OK
@@ -56,5 +59,6 @@ def main_function():
         process()
         handle()
         finish()
-    except Exception as ex:  # noqa: F841
+    except Exception as ex:
         logger.exception(f"Found an error: {er}")
+        logger.exception(f"Found an error: {ex.field}")

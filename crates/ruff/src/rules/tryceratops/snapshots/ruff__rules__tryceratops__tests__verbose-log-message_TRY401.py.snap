@@ -26,70 +26,80 @@ expression: diagnostics
     VerboseLogMessage: ~
   location:
     row: 21
-    column: 43
+    column: 44
   end_location:
     row: 21
-    column: 46
-  fix: ~
-  parent: ~
-- kind:
-    VerboseLogMessage: ~
-  location:
-    row: 21
-    column: 49
-  end_location:
-    row: 21
-    column: 52
-  fix: ~
-  parent: ~
-- kind:
-    VerboseLogMessage: ~
-  location:
-    row: 23
-    column: 43
-  end_location:
-    row: 23
-    column: 46
-  fix: ~
-  parent: ~
-- kind:
-    VerboseLogMessage: ~
-  location:
-    row: 24
-    column: 43
-  end_location:
-    row: 24
-    column: 46
-  fix: ~
-  parent: ~
-- kind:
-    VerboseLogMessage: ~
-  location:
-    row: 36
-    column: 40
-  end_location:
-    row: 36
-    column: 42
-  fix: ~
-  parent: ~
-- kind:
-    VerboseLogMessage: ~
-  location:
-    row: 43
     column: 47
-  end_location:
-    row: 43
-    column: 49
   fix: ~
   parent: ~
 - kind:
     VerboseLogMessage: ~
   location:
-    row: 50
-    column: 40
+    row: 21
+    column: 50
   end_location:
-    row: 50
-    column: 42
+    row: 21
+    column: 53
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 23
+    column: 44
+  end_location:
+    row: 23
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 24
+    column: 44
+  end_location:
+    row: 24
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 27
+    column: 48
+  end_location:
+    row: 27
+    column: 51
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 39
+    column: 46
+  end_location:
+    row: 39
+    column: 48
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 46
+    column: 52
+  end_location:
+    row: 46
+    column: 54
+  fix: ~
+  parent: ~
+- kind:
+    VerboseLogMessage: ~
+  location:
+    row: 53
+    column: 46
+  end_location:
+    row: 53
+    column: 48
   fix: ~
   parent: ~
 
