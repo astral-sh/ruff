@@ -11,7 +11,6 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
@@ -32,7 +31,6 @@ mod tests {
     #[test_case(Rule::UnnecessarySubscriptReversal, Path::new("C415.py"); "C415")]
     #[test_case(Rule::UnnecessaryComprehension, Path::new("C416.py"); "C416")]
     #[test_case(Rule::UnnecessaryMap, Path::new("C417.py"); "C417")]
-
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
