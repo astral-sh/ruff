@@ -1,20 +1,20 @@
 use log::error;
+use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_macros::{define_violation, derive_message_formats};
-use std::collections::{BTreeMap, HashMap};
 
 use crate::ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use crate::ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
-    has_comments_in, unparse_constant, unparse_expr, unparse_stmt,
+    has_comments_in, unparse_expr, unparse_stmt,
 };
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_simplify::rules::fix_if;
-use crate::violation::{AlwaysAutofixableViolation, AutofixKind, Availability, Violation};
+use crate::violation::{AutofixKind, Availability, Violation};
 
 fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
     expr1.eq(expr2)
@@ -105,14 +105,10 @@ define_violation!(
     /// ```
     pub struct ManualDictLookup;
 );
-impl AlwaysAutofixableViolation for ManualDictLookup {
+impl Violation for ManualDictLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a dictionary instead of consecutive `if` statements")
-    }
-
-    fn autofix_title(&self) -> String {
-        format!("Replace if statement with a dictionary")
     }
 }
 
@@ -604,71 +600,6 @@ pub fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stm
     }
 }
 
-fn should_proceed_main(test: &Expr, body: &[Stmt], orelse: &[Stmt]) -> bool {
-    if let ExprKind::Compare {
-        left,
-        ops,
-        comparators,
-    } = &test.node
-    {
-        matches!(
-            (
-                &left.node,
-                ops.as_slice(),
-                comparators.as_slice(),
-                body,
-                orelse
-            ),
-            (
-                ExprKind::Name { .. },
-                [Cmpop::Eq],
-                [Expr {
-                    node: ExprKind::Constant { .. },
-                    ..
-                }],
-                [Stmt {
-                    node: StmtKind::Return { .. },
-                    ..
-                }],
-                [Stmt {
-                    node: StmtKind::If { .. },
-                    ..
-                }]
-            )
-        )
-    } else {
-        false
-    }
-}
-
-fn should_proceed_child(stmt: &Stmt, var_id: &str) -> bool {
-    if let StmtKind::If { test, body, orelse } = &stmt.node {
-        if let ExprKind::Compare {
-            left,
-            ops,
-            comparators,
-        } = &test.node
-        {
-            if let ExprKind::Name { id, .. } = &left.node {
-                if id == var_id && ops.len() == 1 && ops[0] == Cmpop::Eq {
-                    if comparators.len() == 1 {
-                        if let ExprKind::Constant { .. } = &comparators[0].node {
-                            if body.len() == 1 {
-                                if let StmtKind::Return { .. } = &body[0].node {
-                                    if orelse.len() <= 1 {
-                                        return true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    false
-}
-
 /// SIM116
 pub fn manual_dict_lookup(
     checker: &mut Checker,
@@ -677,108 +608,112 @@ pub fn manual_dict_lookup(
     body: &[Stmt],
     orelse: &[Stmt],
 ) {
-    if !should_proceed_main(test, body, orelse) {
-        return;
-    }
-
+    // Throughout this rule:
+    // * Each if-statement's test must consist of a constant equality check with the same variable.
+    // * Each if-statement's body must consist of a single `return`.
+    // * Each if-statement's orelse must be either another if-statement or empty.
+    // * The final if-statement's orelse must be empty, or a single `return`.
     let ExprKind::Compare {
-        left, comparators, ..
+        left,
+        ops,
+        comparators,
     } = &test.node else {
-        unreachable!("Expected ExprKind::Compare");
-    };
-
-    let ExprKind::Name { id, .. } = &left.node else {
         return;
     };
-
-    let mut key_value_pairs: BTreeMap<String, &str> = BTreeMap::new();
-    if let ExprKind::Constant {
-        value: constant, ..
-    } = &comparators[0].node
-    {
-        if let StmtKind::Return { value } = &body[0].node {
-            let key = unparse_constant(constant, checker.stylist);
-            let value = match value {
-                Some(value) => checker.locator.slice(&Range::from_located(value)),
-                None => return,
-            };
-            key_value_pairs.insert(key, value);
-        }
+    let ExprKind::Name { id: target, .. } = &left.node else {
+        return;
+    };
+    if body.len() != 1 {
+        return;
     }
+    if orelse.len() != 1 {
+        return;
+    }
+    if !(ops.len() == 1 && ops[0] == Cmpop::Eq) {
+        return;
+    }
+    if comparators.len() != 1 {
+        return;
+    }
+    let ExprKind::Constant { value: constant, .. } = &comparators[0].node else {
+        return;
+    };
+    let StmtKind::Return { value, .. } = &body[0].node else {
+        return;
+    };
+    if value
+        .as_ref()
+        .map_or(false, |value| contains_effect(checker, value))
+    {
+        return;
+    }
+
+    let mut constants: FxHashSet<ComparableConstant> = FxHashSet::default();
+    constants.insert(constant.into());
 
     let mut child: Option<&Stmt> = orelse.get(0);
-    let mut else_value: Option<&str> = None;
     while let Some(current) = child.take() {
-        if !should_proceed_child(current, &id) {
+        let StmtKind::If { test, body, orelse } = &current.node else {
+            return;
+        };
+        if body.len() != 1 {
             return;
         }
-        if let StmtKind::If { test, body, orelse } = &current.node {
-            if let StmtKind::Return { value: Some(value) } = &body[0].node {
-                if matches!(value.node, ExprKind::Call { .. }) {
-                    return;
-                }
-                if let ExprKind::Compare { comparators, .. } = &test.node {
-                    if let ExprKind::Constant {
-                        value: constant, ..
-                    } = &comparators[0].node
-                    {
-                        let key = unparse_constant(constant, checker.stylist);
-                        let value = checker.locator.slice(&Range::from_located(clean_value));
-                        key_value_pairs.insert(key, value);
-                    }
-                }
-            } else {
-                return;
-            }
+        if orelse.len() > 1 {
+            return;
+        }
+        let ExprKind::Compare {
+            left,
+            ops,
+            comparators,
+        } = &test.node else {
+            return;
+        };
+        let ExprKind::Name { id, .. } = &left.node else {
+            return;
+        };
+        if !(id == target && ops.len() == 1 && ops[0] == Cmpop::Eq) {
+            return;
+        }
+        if comparators.len() != 1 {
+            return;
+        }
+        let ExprKind::Constant { value: constant, .. } = &comparators[0].node else {
+            return;
+        };
+        let StmtKind::Return { value, .. } = &body[0].node else {
+            return;
+        };
+        if value
+            .as_ref()
+            .map_or(false, |value| contains_effect(checker, value))
+        {
+            return;
+        };
 
-            if orelse.len() == 1 {
-                match &orelse[0].node {
-                    StmtKind::If { .. } => {
-                        child = orelse.get(0);
-                    }
-                    StmtKind::Return { value } => {
-                        let value = match value {
-                            Some(item) => checker.locator.slice(&Range::from_located(item)),
-                            None => "None",
-                        };
-                        else_value = Some(value);
-                        child = None;
-                    }
-                    _ => return,
+        constants.insert(constant.into());
+        if let Some(orelse) = orelse.first() {
+            match &orelse.node {
+                StmtKind::If { .. } => {
+                    child = Some(orelse);
                 }
-            } else {
-                child = None;
+                StmtKind::Return { .. } => {
+                    child = None;
+                }
+                _ => return,
             }
         } else {
-            return;
+            child = None;
         }
     }
 
-    if key_value_pairs.len() < 3 {
+    if constants.len() < 3 {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(ManualDictLookup, Range::from_located(stmt));
-    if checker.patch(diagnostic.kind.rule()) {
-        let dict_vals = key_value_pairs
-            .iter()
-            .map(|(k, v)| format!("{}: {}", k, v))
-            .collect::<Vec<String>>();
-
-        let mut new_str = format!("return {{ {} }}", dict_vals.join(", "));
-        new_str.push_str(&format!(".get({variable}"));
-        if let Some(else_val) = &else_value {
-            new_str.push_str(&format!(", {}", else_val));
-        }
-        new_str.push(')');
-
-        diagnostic.amend(Fix::replacement(
-            new_str,
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ));
-    }
-    checker.diagnostics.push(diagnostic);
+    checker
+        .diagnostics
+        .push(Diagnostic::new(ManualDictLookup, Range::from_located(stmt)));
 }
 
 /// SIM401

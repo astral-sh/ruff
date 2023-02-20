@@ -276,7 +276,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "112") => Rule::UseCapitalEnvironmentVariables,
         (Flake8Simplify, "114") => Rule::IfWithSameArms,
         (Flake8Simplify, "115") => Rule::OpenFileWithContextHandler,
-        (Flake8Simplify, "116") => Rule::IfToDict,
+        (Flake8Simplify, "116") => Rule::ManualDictLookup,
         (Flake8Simplify, "117") => Rule::MultipleWithStatements,
         (Flake8Simplify, "118") => Rule::KeyInDict,
         (Flake8Simplify, "201") => Rule::NegateEqualOp,

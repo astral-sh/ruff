@@ -1565,7 +1565,7 @@ where
                 if self.settings.rules.enabled(&Rule::NeedlessBool) {
                     flake8_simplify::rules::return_bool_condition_directly(self, stmt);
                 }
-                if self.settings.rules.enabled(&Rule::IfToDict) {
+                if self.settings.rules.enabled(&Rule::ManualDictLookup) {
                     flake8_simplify::rules::manual_dict_lookup(self, stmt, test, body, orelse);
                 }
                 if self.settings.rules.enabled(&Rule::UseTernaryOperator) {

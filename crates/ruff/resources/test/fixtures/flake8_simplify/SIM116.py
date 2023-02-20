@@ -1,6 +1,7 @@
 # Errors
 a = "hello"
 
+# SIM116
 if a == "foo":
     return "bar"
 elif a == "bar":
@@ -10,6 +11,7 @@ elif a == "boo":
 else:
     return 42
 
+# SIM116
 if a == 1:
     return (1, 2, 3)
 elif a == 2:
@@ -19,6 +21,7 @@ elif a == 3:
 else:
     return (10, 11, 12)
 
+# SIM116
 if a == 1:
     return (1, 2, 3)
 elif a == 2:
@@ -26,6 +29,7 @@ elif a == 2:
 elif a == 3:
     return (7, 8, 9)
 
+# SIM116
 if a == "hello 'sir'":
     return (1, 2, 3)
 elif a == 'goodbye "mam"':
@@ -35,6 +39,7 @@ elif a == """Fairwell 'mister'""":
 else:
     return (10, 11, 12)
 
+# SIM116
 if a == b"one":
     return 1
 elif a == b"two":
@@ -42,6 +47,7 @@ elif a == b"two":
 elif a == b"three":
     return 3
 
+# SIM116
 if a == "hello 'sir'":
     return ("hello'", 'hi"', 3)
 elif a == 'goodbye "mam"':
@@ -61,7 +67,7 @@ elif a == "boo":
 else:
     return 42
 
-
+# OK
 if a == b"one":
     return 1
 elif b == b"two":
