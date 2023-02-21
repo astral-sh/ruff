@@ -1847,7 +1847,12 @@ where
                     .rules
                     .enabled(&Rule::UnintentionalTypeAnnotation)
                 {
-                    flake8_bugbear::rules::unintentional_type_annotation(self, target, value, stmt);
+                    flake8_bugbear::rules::unintentional_type_annotation(
+                        self,
+                        target,
+                        value.as_deref(),
+                        stmt,
+                    );
                 }
             }
             StmtKind::Delete { .. } => {}

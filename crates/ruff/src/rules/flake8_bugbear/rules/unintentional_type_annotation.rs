@@ -1,3 +1,5 @@
+use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
@@ -5,16 +7,30 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-use rustpython_parser::ast::{Expr, ExprKind, Located, Stmt};
-
 define_violation!(
+    /// ## What it does
+    /// Checks for the unintentional use of type annotations.
+    ///
+    /// ## Why is this bad?
+    /// The use of a colon (`:`) in lieu of an assignment (`=`) can be syntactically valid, but
+    /// is almost certainly a mistake when used in a subscript or attribute assignment.
+    ///
+    /// ## Example
+    /// ```python
+    /// a["b"]: 1
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// a["b"] = 1
+    /// ```
     pub struct UnintentionalTypeAnnotation;
 );
 impl Violation for UnintentionalTypeAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "Possible unintentional type annotation (using :). Did you mean to assign (using =)?"
+            "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
         )
     }
 }
@@ -23,46 +39,31 @@ impl Violation for UnintentionalTypeAnnotation {
 pub fn unintentional_type_annotation(
     checker: &mut Checker,
     target: &Expr,
-    value: &Option<Box<Located<ExprKind>>>,
+    value: Option<&Expr>,
     stmt: &Stmt,
 ) {
-    if !value.is_none() {
+    if value.is_some() {
         return;
     }
-
-    let is_target_subscript = matches!(&target.node, ExprKind::Subscript { .. });
-
-    let is_target_attribute = matches!(&target.node, ExprKind::Attribute { .. });
-
-    if is_target_subscript || is_target_attribute {
-        let target_value = match &target.node {
-            ExprKind::Subscript { value, .. } => value,
-            ExprKind::Attribute { value, .. } => value,
-            _ => return,
-        };
-
-        let is_value_name = matches!(&target_value.node, ExprKind::Name { .. });
-
-        let mut err = false;
-        if is_value_name {
-            if is_target_subscript {
-                err = true;
-            } else {
-                let value_id = match &target_value.node {
-                    ExprKind::Name { id, .. } => id,
-                    _ => return,
-                };
-
-                if value_id != "self" {
-                    err = true;
+    match &target.node {
+        ExprKind::Subscript { value, .. } => {
+            if matches!(&value.node, ExprKind::Name { .. }) {
+                checker.diagnostics.push(Diagnostic::new(
+                    UnintentionalTypeAnnotation,
+                    Range::from_located(stmt),
+                ));
+            }
+        }
+        ExprKind::Attribute { value, .. } => {
+            if let ExprKind::Name { id, .. } = &value.node {
+                if id != "self" {
+                    checker.diagnostics.push(Diagnostic::new(
+                        UnintentionalTypeAnnotation,
+                        Range::from_located(stmt),
+                    ));
                 }
             }
         }
-        if err {
-            checker.diagnostics.push(Diagnostic::new(
-                UnintentionalTypeAnnotation,
-                Range::from_located(stmt),
-            ));
-        }
-    }
+        _ => {}
+    };
 }
