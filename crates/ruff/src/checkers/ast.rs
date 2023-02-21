@@ -2875,7 +2875,7 @@ where
 
                 // pylint logging checker
                 if self.settings.rules.enabled(&Rule::LoggingTooFewArgs)
-                    || self.settings.rules.enabled(&Rule::LoggingTooFewArgs)
+                    || self.settings.rules.enabled(&Rule::LoggingTooManyArgs)
                 {
                     pylint::rules::logging_call(self, func, args, keywords);
                 }

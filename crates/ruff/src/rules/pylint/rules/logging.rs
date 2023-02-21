@@ -60,7 +60,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
 
                         let message_args = call_args.args.len() - 1;
 
-                        if checker.settings.rules.enabled(&Rule::LoggingTooFewArgs)
+                        if checker.settings.rules.enabled(&Rule::LoggingTooManyArgs)
                             && summary.num_positional < message_args
                         {
                             checker.diagnostics.push(Diagnostic::new(
@@ -69,7 +69,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                             ));
                         }
 
-                        if checker.settings.rules.enabled(&Rule::LoggingTooManyArgs)
+                        if checker.settings.rules.enabled(&Rule::LoggingTooFewArgs)
                             && summary.num_positional > message_args
                         {
                             checker.diagnostics.push(Diagnostic::new(
