@@ -1,0 +1,861 @@
+---
+source: compiler/parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 7,
+                column: 57,
+            },
+        ),
+        custom: (),
+        node: TryStar {
+            body: [
+                Located {
+                    location: Location {
+                        row: 2,
+                        column: 4,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 3,
+                            column: 62,
+                        },
+                    ),
+                    custom: (),
+                    node: Raise {
+                        exc: Some(
+                            Located {
+                                location: Location {
+                                    row: 2,
+                                    column: 10,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 3,
+                                        column: 62,
+                                    },
+                                ),
+                                custom: (),
+                                node: Call {
+                                    func: Located {
+                                        location: Location {
+                                            row: 2,
+                                            column: 10,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 2,
+                                                column: 24,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Name {
+                                            id: "ExceptionGroup",
+                                            ctx: Load,
+                                        },
+                                    },
+                                    args: [
+                                        Located {
+                                            location: Location {
+                                                row: 2,
+                                                column: 25,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 2,
+                                                    column: 29,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Constant {
+                                                value: Str(
+                                                    "eg",
+                                                ),
+                                                kind: None,
+                                            },
+                                        },
+                                        Located {
+                                            location: Location {
+                                                row: 3,
+                                                column: 8,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 3,
+                                                    column: 61,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: List {
+                                                elts: [
+                                                    Located {
+                                                        location: Location {
+                                                            row: 3,
+                                                            column: 9,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 3,
+                                                                column: 22,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Call {
+                                                            func: Located {
+                                                                location: Location {
+                                                                    row: 3,
+                                                                    column: 9,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 3,
+                                                                        column: 19,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: Name {
+                                                                    id: "ValueError",
+                                                                    ctx: Load,
+                                                                },
+                                                            },
+                                                            args: [
+                                                                Located {
+                                                                    location: Location {
+                                                                        row: 3,
+                                                                        column: 20,
+                                                                    },
+                                                                    end_location: Some(
+                                                                        Location {
+                                                                            row: 3,
+                                                                            column: 21,
+                                                                        },
+                                                                    ),
+                                                                    custom: (),
+                                                                    node: Constant {
+                                                                        value: Int(
+                                                                            1,
+                                                                        ),
+                                                                        kind: None,
+                                                                    },
+                                                                },
+                                                            ],
+                                                            keywords: [],
+                                                        },
+                                                    },
+                                                    Located {
+                                                        location: Location {
+                                                            row: 3,
+                                                            column: 24,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 3,
+                                                                column: 36,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Call {
+                                                            func: Located {
+                                                                location: Location {
+                                                                    row: 3,
+                                                                    column: 24,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 3,
+                                                                        column: 33,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: Name {
+                                                                    id: "TypeError",
+                                                                    ctx: Load,
+                                                                },
+                                                            },
+                                                            args: [
+                                                                Located {
+                                                                    location: Location {
+                                                                        row: 3,
+                                                                        column: 34,
+                                                                    },
+                                                                    end_location: Some(
+                                                                        Location {
+                                                                            row: 3,
+                                                                            column: 35,
+                                                                        },
+                                                                    ),
+                                                                    custom: (),
+                                                                    node: Constant {
+                                                                        value: Int(
+                                                                            2,
+                                                                        ),
+                                                                        kind: None,
+                                                                    },
+                                                                },
+                                                            ],
+                                                            keywords: [],
+                                                        },
+                                                    },
+                                                    Located {
+                                                        location: Location {
+                                                            row: 3,
+                                                            column: 38,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 3,
+                                                                column: 48,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Call {
+                                                            func: Located {
+                                                                location: Location {
+                                                                    row: 3,
+                                                                    column: 38,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 3,
+                                                                        column: 45,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: Name {
+                                                                    id: "OSError",
+                                                                    ctx: Load,
+                                                                },
+                                                            },
+                                                            args: [
+                                                                Located {
+                                                                    location: Location {
+                                                                        row: 3,
+                                                                        column: 46,
+                                                                    },
+                                                                    end_location: Some(
+                                                                        Location {
+                                                                            row: 3,
+                                                                            column: 47,
+                                                                        },
+                                                                    ),
+                                                                    custom: (),
+                                                                    node: Constant {
+                                                                        value: Int(
+                                                                            3,
+                                                                        ),
+                                                                        kind: None,
+                                                                    },
+                                                                },
+                                                            ],
+                                                            keywords: [],
+                                                        },
+                                                    },
+                                                    Located {
+                                                        location: Location {
+                                                            row: 3,
+                                                            column: 50,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 3,
+                                                                column: 60,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Call {
+                                                            func: Located {
+                                                                location: Location {
+                                                                    row: 3,
+                                                                    column: 50,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 3,
+                                                                        column: 57,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: Name {
+                                                                    id: "OSError",
+                                                                    ctx: Load,
+                                                                },
+                                                            },
+                                                            args: [
+                                                                Located {
+                                                                    location: Location {
+                                                                        row: 3,
+                                                                        column: 58,
+                                                                    },
+                                                                    end_location: Some(
+                                                                        Location {
+                                                                            row: 3,
+                                                                            column: 59,
+                                                                        },
+                                                                    ),
+                                                                    custom: (),
+                                                                    node: Constant {
+                                                                        value: Int(
+                                                                            4,
+                                                                        ),
+                                                                        kind: None,
+                                                                    },
+                                                                },
+                                                            ],
+                                                            keywords: [],
+                                                        },
+                                                    },
+                                                ],
+                                                ctx: Load,
+                                            },
+                                        },
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                        ),
+                        cause: None,
+                    },
+                },
+            ],
+            handlers: [
+                Located {
+                    location: Location {
+                        row: 4,
+                        column: 0,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 5,
+                            column: 57,
+                        },
+                    ),
+                    custom: (),
+                    node: ExceptHandler {
+                        type_: Some(
+                            Located {
+                                location: Location {
+                                    row: 4,
+                                    column: 8,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 4,
+                                        column: 17,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "TypeError",
+                                    ctx: Load,
+                                },
+                            },
+                        ),
+                        name: Some(
+                            "e",
+                        ),
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 5,
+                                    column: 4,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 5,
+                                        column: 57,
+                                    },
+                                ),
+                                custom: (),
+                                node: Expr {
+                                    value: Located {
+                                        location: Location {
+                                            row: 5,
+                                            column: 4,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 5,
+                                                column: 57,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Call {
+                                            func: Located {
+                                                location: Location {
+                                                    row: 5,
+                                                    column: 4,
+                                                },
+                                                end_location: Some(
+                                                    Location {
+                                                        row: 5,
+                                                        column: 9,
+                                                    },
+                                                ),
+                                                custom: (),
+                                                node: Name {
+                                                    id: "print",
+                                                    ctx: Load,
+                                                },
+                                            },
+                                            args: [
+                                                Located {
+                                                    location: Location {
+                                                        row: 5,
+                                                        column: 10,
+                                                    },
+                                                    end_location: Some(
+                                                        Location {
+                                                            row: 5,
+                                                            column: 56,
+                                                        },
+                                                    ),
+                                                    custom: (),
+                                                    node: JoinedStr {
+                                                        values: [
+                                                            Located {
+                                                                location: Location {
+                                                                    row: 5,
+                                                                    column: 10,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 5,
+                                                                        column: 56,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: Constant {
+                                                                    value: Str(
+                                                                        "caught ",
+                                                                    ),
+                                                                    kind: None,
+                                                                },
+                                                            },
+                                                            Located {
+                                                                location: Location {
+                                                                    row: 5,
+                                                                    column: 10,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 5,
+                                                                        column: 56,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: FormattedValue {
+                                                                    value: Located {
+                                                                        location: Location {
+                                                                            row: 5,
+                                                                            column: 20,
+                                                                        },
+                                                                        end_location: Some(
+                                                                            Location {
+                                                                                row: 5,
+                                                                                column: 27,
+                                                                            },
+                                                                        ),
+                                                                        custom: (),
+                                                                        node: Call {
+                                                                            func: Located {
+                                                                                location: Location {
+                                                                                    row: 5,
+                                                                                    column: 20,
+                                                                                },
+                                                                                end_location: Some(
+                                                                                    Location {
+                                                                                        row: 5,
+                                                                                        column: 24,
+                                                                                    },
+                                                                                ),
+                                                                                custom: (),
+                                                                                node: Name {
+                                                                                    id: "type",
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            },
+                                                                            args: [
+                                                                                Located {
+                                                                                    location: Location {
+                                                                                        row: 5,
+                                                                                        column: 25,
+                                                                                    },
+                                                                                    end_location: Some(
+                                                                                        Location {
+                                                                                            row: 5,
+                                                                                            column: 26,
+                                                                                        },
+                                                                                    ),
+                                                                                    custom: (),
+                                                                                    node: Name {
+                                                                                        id: "e",
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                },
+                                                                            ],
+                                                                            keywords: [],
+                                                                        },
+                                                                    },
+                                                                    conversion: 0,
+                                                                    format_spec: None,
+                                                                },
+                                                            },
+                                                            Located {
+                                                                location: Location {
+                                                                    row: 5,
+                                                                    column: 10,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 5,
+                                                                        column: 56,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: Constant {
+                                                                    value: Str(
+                                                                        " with nested ",
+                                                                    ),
+                                                                    kind: None,
+                                                                },
+                                                            },
+                                                            Located {
+                                                                location: Location {
+                                                                    row: 5,
+                                                                    column: 10,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 5,
+                                                                        column: 56,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: FormattedValue {
+                                                                    value: Located {
+                                                                        location: Location {
+                                                                            row: 5,
+                                                                            column: 42,
+                                                                        },
+                                                                        end_location: Some(
+                                                                            Location {
+                                                                                row: 5,
+                                                                                column: 54,
+                                                                            },
+                                                                        ),
+                                                                        custom: (),
+                                                                        node: Attribute {
+                                                                            value: Located {
+                                                                                location: Location {
+                                                                                    row: 5,
+                                                                                    column: 42,
+                                                                                },
+                                                                                end_location: Some(
+                                                                                    Location {
+                                                                                        row: 5,
+                                                                                        column: 43,
+                                                                                    },
+                                                                                ),
+                                                                                custom: (),
+                                                                                node: Name {
+                                                                                    id: "e",
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            },
+                                                                            attr: "exceptions",
+                                                                            ctx: Load,
+                                                                        },
+                                                                    },
+                                                                    conversion: 0,
+                                                                    format_spec: None,
+                                                                },
+                                                            },
+                                                        ],
+                                                    },
+                                                },
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+                Located {
+                    location: Location {
+                        row: 6,
+                        column: 0,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 7,
+                            column: 57,
+                        },
+                    ),
+                    custom: (),
+                    node: ExceptHandler {
+                        type_: Some(
+                            Located {
+                                location: Location {
+                                    row: 6,
+                                    column: 8,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 6,
+                                        column: 15,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "OSError",
+                                    ctx: Load,
+                                },
+                            },
+                        ),
+                        name: Some(
+                            "e",
+                        ),
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 7,
+                                    column: 4,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 7,
+                                        column: 57,
+                                    },
+                                ),
+                                custom: (),
+                                node: Expr {
+                                    value: Located {
+                                        location: Location {
+                                            row: 7,
+                                            column: 4,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 7,
+                                                column: 57,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Call {
+                                            func: Located {
+                                                location: Location {
+                                                    row: 7,
+                                                    column: 4,
+                                                },
+                                                end_location: Some(
+                                                    Location {
+                                                        row: 7,
+                                                        column: 9,
+                                                    },
+                                                ),
+                                                custom: (),
+                                                node: Name {
+                                                    id: "print",
+                                                    ctx: Load,
+                                                },
+                                            },
+                                            args: [
+                                                Located {
+                                                    location: Location {
+                                                        row: 7,
+                                                        column: 10,
+                                                    },
+                                                    end_location: Some(
+                                                        Location {
+                                                            row: 7,
+                                                            column: 56,
+                                                        },
+                                                    ),
+                                                    custom: (),
+                                                    node: JoinedStr {
+                                                        values: [
+                                                            Located {
+                                                                location: Location {
+                                                                    row: 7,
+                                                                    column: 10,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 7,
+                                                                        column: 56,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: Constant {
+                                                                    value: Str(
+                                                                        "caught ",
+                                                                    ),
+                                                                    kind: None,
+                                                                },
+                                                            },
+                                                            Located {
+                                                                location: Location {
+                                                                    row: 7,
+                                                                    column: 10,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 7,
+                                                                        column: 56,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: FormattedValue {
+                                                                    value: Located {
+                                                                        location: Location {
+                                                                            row: 7,
+                                                                            column: 20,
+                                                                        },
+                                                                        end_location: Some(
+                                                                            Location {
+                                                                                row: 7,
+                                                                                column: 27,
+                                                                            },
+                                                                        ),
+                                                                        custom: (),
+                                                                        node: Call {
+                                                                            func: Located {
+                                                                                location: Location {
+                                                                                    row: 7,
+                                                                                    column: 20,
+                                                                                },
+                                                                                end_location: Some(
+                                                                                    Location {
+                                                                                        row: 7,
+                                                                                        column: 24,
+                                                                                    },
+                                                                                ),
+                                                                                custom: (),
+                                                                                node: Name {
+                                                                                    id: "type",
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            },
+                                                                            args: [
+                                                                                Located {
+                                                                                    location: Location {
+                                                                                        row: 7,
+                                                                                        column: 25,
+                                                                                    },
+                                                                                    end_location: Some(
+                                                                                        Location {
+                                                                                            row: 7,
+                                                                                            column: 26,
+                                                                                        },
+                                                                                    ),
+                                                                                    custom: (),
+                                                                                    node: Name {
+                                                                                        id: "e",
+                                                                                        ctx: Load,
+                                                                                    },
+                                                                                },
+                                                                            ],
+                                                                            keywords: [],
+                                                                        },
+                                                                    },
+                                                                    conversion: 0,
+                                                                    format_spec: None,
+                                                                },
+                                                            },
+                                                            Located {
+                                                                location: Location {
+                                                                    row: 7,
+                                                                    column: 10,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 7,
+                                                                        column: 56,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: Constant {
+                                                                    value: Str(
+                                                                        " with nested ",
+                                                                    ),
+                                                                    kind: None,
+                                                                },
+                                                            },
+                                                            Located {
+                                                                location: Location {
+                                                                    row: 7,
+                                                                    column: 10,
+                                                                },
+                                                                end_location: Some(
+                                                                    Location {
+                                                                        row: 7,
+                                                                        column: 56,
+                                                                    },
+                                                                ),
+                                                                custom: (),
+                                                                node: FormattedValue {
+                                                                    value: Located {
+                                                                        location: Location {
+                                                                            row: 7,
+                                                                            column: 42,
+                                                                        },
+                                                                        end_location: Some(
+                                                                            Location {
+                                                                                row: 7,
+                                                                                column: 54,
+                                                                            },
+                                                                        ),
+                                                                        custom: (),
+                                                                        node: Attribute {
+                                                                            value: Located {
+                                                                                location: Location {
+                                                                                    row: 7,
+                                                                                    column: 42,
+                                                                                },
+                                                                                end_location: Some(
+                                                                                    Location {
+                                                                                        row: 7,
+                                                                                        column: 43,
+                                                                                    },
+                                                                                ),
+                                                                                custom: (),
+                                                                                node: Name {
+                                                                                    id: "e",
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            },
+                                                                            attr: "exceptions",
+                                                                            ctx: Load,
+                                                                        },
+                                                                    },
+                                                                    conversion: 0,
+                                                                    format_spec: None,
+                                                                },
+                                                            },
+                                                        ],
+                                                    },
+                                                },
+                                            ],
+                                            keywords: [],
+                                        },
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            ],
+            orelse: [],
+            finalbody: [],
+        },
+    },
+]

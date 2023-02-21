@@ -451,6 +451,27 @@ TryStatement: ast::Stmt = {
             },
         }
     },
+    <location:@L> "try" ":" <body:Suite> <handlers:ExceptStarClause+> <else_suite:("else" ":" Suite)?> <finally:("finally" ":" Suite)?> <end_location:@R> => {
+        let orelse = else_suite.map(|s| s.2).unwrap_or_default();
+        let finalbody = finally.map(|s| s.2).unwrap_or_default();
+        let end_location = finalbody
+            .last()
+            .or_else(|| orelse.last())
+            .map(|last| last.end_location)
+            .or_else(|| handlers.last().map(|last| last.end_location))
+            .unwrap();
+        ast::Stmt {
+            custom: (),
+            location,
+            end_location,
+            node: ast::StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            },
+        }
+    },
     <location:@L> "try" ":" <body:Suite> <finally:("finally" ":" Suite)> => {
         let handlers = vec![];
         let orelse = vec![];
@@ -469,6 +490,34 @@ TryStatement: ast::Stmt = {
         }
     },
 };
+
+ExceptStarClause: ast::Excepthandler = {
+    <location:@L> "except" "*" <typ:Test<"all">> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end_location.unwrap();
+        ast::Excepthandler::new(
+            location,
+            end_location,
+            ast::ExcepthandlerKind::ExceptHandler {
+                type_: Some(Box::new(typ)),
+                name: None,
+                body,
+            },
+        )
+    },
+    <location:@L> "except" "*" <x:(Test<"all"> "as" Identifier)> ":" <body:Suite> => {
+        let end_location = body.last().unwrap().end_location.unwrap();
+        ast::Excepthandler::new(
+            location,
+            end_location,
+            ast::ExcepthandlerKind::ExceptHandler {
+                type_: Some(Box::new(x.0)),
+                name: Some(x.2),
+                body,
+            },
+        )
+    },
+};
+
 
 ExceptClause: ast::Excepthandler = {
     <location:@L> "except" <typ:Test<"all">?> ":" <body:Suite> => {

@@ -139,6 +139,12 @@ pub enum StmtKind<U = ()> {
         orelse: Vec<Stmt<U>>,
         finalbody: Vec<Stmt<U>>,
     },
+    TryStar {
+        body: Vec<Stmt<U>>,
+        handlers: Vec<Excepthandler<U>>,
+        orelse: Vec<Stmt<U>>,
+        finalbody: Vec<Stmt<U>>,
+    },
     Assert {
         test: Box<Expr<U>>,
         msg: Option<Box<Expr<U>>>,
@@ -721,6 +727,17 @@ pub mod fold {
                 orelse,
                 finalbody,
             } => Ok(StmtKind::Try {
+                body: Foldable::fold(body, folder)?,
+                handlers: Foldable::fold(handlers, folder)?,
+                orelse: Foldable::fold(orelse, folder)?,
+                finalbody: Foldable::fold(finalbody, folder)?,
+            }),
+            StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => Ok(StmtKind::TryStar {
                 body: Foldable::fold(body, folder)?,
                 handlers: Foldable::fold(handlers, folder)?,
                 orelse: Foldable::fold(orelse, folder)?,
