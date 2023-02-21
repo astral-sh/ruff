@@ -62,3 +62,11 @@ except Exception as e:
         raise RuntimeError("boom!")
     else:
         raise RuntimeError("bang!")
+
+
+try:
+    ...
+except Exception as e:
+    match 0:
+        case 0:
+            raise RuntimeError("boom!")

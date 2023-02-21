@@ -226,6 +226,12 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                 handlers,
                 orelse,
                 finalbody,
+            }
+            | StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
             } => {
                 self.depth = Depth::Nested;
                 self.trailer = Trailer::CompoundStatement;

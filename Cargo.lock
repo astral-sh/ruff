@@ -2146,7 +2146,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=61b48f108982d865524f86624a9d5bc2ae3bccef#61b48f108982d865524f86624a9d5bc2ae3bccef"
+source = "git+https://github.com/RustPython/RustPython.git?rev=ddf497623ae56d21aa4166ff1c0725a7db67e955#ddf497623ae56d21aa4166ff1c0725a7db67e955"
 dependencies = [
  "num-bigint",
  "rustpython-compiler-core",
@@ -2155,7 +2155,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=61b48f108982d865524f86624a9d5bc2ae3bccef#61b48f108982d865524f86624a9d5bc2ae3bccef"
+source = "git+https://github.com/RustPython/RustPython.git?rev=ddf497623ae56d21aa4166ff1c0725a7db67e955#ddf497623ae56d21aa4166ff1c0725a7db67e955"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2180,7 +2180,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=61b48f108982d865524f86624a9d5bc2ae3bccef#61b48f108982d865524f86624a9d5bc2ae3bccef"
+source = "git+https://github.com/RustPython/RustPython.git?rev=ddf497623ae56d21aa4166ff1c0725a7db67e955#ddf497623ae56d21aa4166ff1c0725a7db67e955"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2197,7 +2197,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=61b48f108982d865524f86624a9d5bc2ae3bccef#61b48f108982d865524f86624a9d5bc2ae3bccef"
+source = "git+https://github.com/RustPython/RustPython.git?rev=ddf497623ae56d21aa4166ff1c0725a7db67e955#ddf497623ae56d21aa4166ff1c0725a7db67e955"
 dependencies = [
  "ahash",
  "anyhow",

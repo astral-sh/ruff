@@ -411,6 +411,12 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 handlers,
                 orelse,
                 finalbody,
+            }
+            | StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
             } => {
                 for stmt in body {
                     result.push(Node::Stmt(stmt));

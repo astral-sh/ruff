@@ -1,7 +1,7 @@
 """
- Test that shadowing a global with a class attribute does not produce a
- warning.
- """
+Test that shadowing a global with a class attribute does not produce a
+warning.
+"""
 
 import fu
 

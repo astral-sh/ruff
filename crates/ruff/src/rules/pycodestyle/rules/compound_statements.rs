@@ -52,6 +52,7 @@ pub fn compound_statements(
     // Track the last seen instance of a variety of tokens.
     let mut colon = None;
     let mut semi = None;
+    let mut case = None;
     let mut class = None;
     let mut elif = None;
     let mut else_ = None;
@@ -59,6 +60,7 @@ pub fn compound_statements(
     let mut finally = None;
     let mut for_ = None;
     let mut if_ = None;
+    let mut match_ = None;
     let mut try_ = None;
     let mut while_ = None;
     let mut with = None;
@@ -114,6 +116,7 @@ pub fn compound_statements(
                 // Reset.
                 colon = None;
                 semi = None;
+                case = None;
                 class = None;
                 elif = None;
                 else_ = None;
@@ -121,18 +124,21 @@ pub fn compound_statements(
                 finally = None;
                 for_ = None;
                 if_ = None;
+                match_ = None;
                 try_ = None;
                 while_ = None;
                 with = None;
             }
             Tok::Colon => {
-                if class.is_some()
+                if case.is_some()
+                    || class.is_some()
                     || elif.is_some()
                     || else_.is_some()
                     || except.is_some()
                     || finally.is_some()
                     || for_.is_some()
                     || if_.is_some()
+                    || match_.is_some()
                     || try_.is_some()
                     || while_.is_some()
                     || with.is_some()
@@ -168,6 +174,7 @@ pub fn compound_statements(
 
                     // Reset.
                     colon = None;
+                    case = None;
                     class = None;
                     elif = None;
                     else_ = None;
@@ -175,6 +182,7 @@ pub fn compound_statements(
                     finally = None;
                     for_ = None;
                     if_ = None;
+                    match_ = None;
                     try_ = None;
                     while_ = None;
                     with = None;
@@ -186,6 +194,7 @@ pub fn compound_statements(
             Tok::Lambda => {
                 // Reset.
                 colon = None;
+                case = None;
                 class = None;
                 elif = None;
                 else_ = None;
@@ -193,9 +202,13 @@ pub fn compound_statements(
                 finally = None;
                 for_ = None;
                 if_ = None;
+                match_ = None;
                 try_ = None;
                 while_ = None;
                 with = None;
+            }
+            Tok::Case => {
+                case = Some((start, end));
             }
             Tok::If => {
                 if_ = Some((start, end));
@@ -226,6 +239,9 @@ pub fn compound_statements(
             }
             Tok::With => {
                 with = Some((start, end));
+            }
+            Tok::Match => {
+                match_ = Some((start, end));
             }
             _ => {}
         };

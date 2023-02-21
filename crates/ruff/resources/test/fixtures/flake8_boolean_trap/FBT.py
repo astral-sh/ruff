@@ -68,3 +68,11 @@ class Registry:
     # FBT001: Boolean positional arg in function definition
     def __setitem__(self, switch: Switch, value: bool) -> None:
         self._switches[switch.value] = value
+
+    @foo.setter
+    def foo(self, value: bool) -> None:
+        pass
+
+    # FBT001: Boolean positional arg in function definition
+    def foo(self, value: bool) -> None:
+        pass

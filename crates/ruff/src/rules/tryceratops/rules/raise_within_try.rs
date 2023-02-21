@@ -29,7 +29,7 @@ where
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         match stmt.node {
             StmtKind::Raise { .. } => self.raises.push(stmt),
-            StmtKind::Try { .. } => (),
+            StmtKind::Try { .. } | StmtKind::TryStar { .. } => (),
             _ => visitor::walk_stmt(self, stmt),
         }
     }

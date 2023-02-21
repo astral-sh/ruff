@@ -29,6 +29,13 @@ fn loop_exits_early(body: &[Stmt]) -> bool {
             orelse,
             finalbody,
             ..
+        }
+        | StmtKind::TryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
         } => {
             loop_exits_early(body)
                 || loop_exits_early(orelse)

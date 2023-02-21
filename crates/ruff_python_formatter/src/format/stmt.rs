@@ -476,6 +476,28 @@ fn format_try(
     Ok(())
 }
 
+fn format_try_star(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    body: &[Stmt],
+    handlers: &[Excepthandler],
+    orelse: &[Stmt],
+    finalbody: &[Stmt],
+) -> FormatResult<()> {
+    write!(f, [text("try:"), block_indent(&block(body))])?;
+    for handler in handlers {
+        // TODO(charlie): Include `except*`.
+        write!(f, [handler.format()])?;
+    }
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    if !finalbody.is_empty() {
+        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
+    }
+    Ok(())
+}
+
 fn format_assert(
     f: &mut Formatter<ASTFormatContext<'_>>,
     stmt: &Stmt,
@@ -832,6 +854,12 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 orelse,
                 finalbody,
             } => format_try(f, self.item, body, handlers, orelse, finalbody),
+            StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => format_try_star(f, self.item, body, handlers, orelse, finalbody),
             StmtKind::Assert { test, msg } => {
                 format_assert(f, self.item, test, msg.as_ref().map(|expr| &**expr))
             }

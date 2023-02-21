@@ -71,7 +71,7 @@ def f():
     def connect():
         return None, None
 
-    with (connect() as (connection, cursor)):
+    with connect() as (connection, cursor):
         cursor.execute("SELECT * FROM users")
 
 
@@ -94,3 +94,28 @@ def f():
         (exponential := (exponential * base_multiplier) % 3): i + 1 for i in range(2)
     }
     return hash_map
+
+
+def f(x: int):
+    msg1 = "Hello, world!"
+    msg2 = "Hello, world!"
+    msg3 = "Hello, world!"
+    match x:
+        case 1:
+            print(msg1)
+        case 2:
+            print(msg2)
+
+
+def f(x: int):
+    import enum
+
+    Foo = enum.Enum("Foo", "A B")
+    Bar = enum.Enum("Bar", "A B")
+    Baz = enum.Enum("Baz", "A B")
+
+    match x:
+        case (Foo.A):
+            print("A")
+        case [Bar.A, *_]:
+            print("A")
