@@ -329,7 +329,7 @@ last_call()
      k: v
 -    for k, v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 +    for k,
-+    v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
++    v, in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
  }
  Python3 > Python2 > COBOL
  Life is Life
@@ -363,7 +363,7 @@ last_call()
  ....__class__
  list[str]
  dict[str, int]
-@@ -138,15 +141,15 @@
+@@ -138,33 +141,33 @@
  very_long_variable_name_filters: t.List[
      t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
  ]
@@ -376,19 +376,44 @@ last_call()
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 +xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
 +    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
-+)
-+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
-+    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))
  )
 -xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)  # type: ignore
++xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
++    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))
++)
  slice[0]
  slice[0:1]
  slice[0:1:2]
-@@ -174,15 +177,15 @@
+-slice[:]
++slice[::]
+ slice[:-1]
+-slice[1:]
++slice[1::]
+ slice[::-1]
+ slice[d :: d + 1]
+ slice[:c, c - 1]
+ numpy[:, 0:1]
+ numpy[:, :-1]
+-numpy[0, :]
++numpy[0, ::]
+ numpy[:, i]
+ numpy[0, :2]
+ numpy[:N, 0]
+ numpy[:2, :4]
+ numpy[2:4, 1:5]
+-numpy[4:, 2:]
++numpy[4:, 2::]
+ numpy[:, (0, 1, 2, 5)]
+ numpy[0, [0]]
+ numpy[:, [i]]
+@@ -172,17 +175,17 @@
+ numpy[-(c + 1) :, d]
+ numpy[:, l[-2]]
  numpy[:, ::-1]
- numpy[np.newaxis, :]
+-numpy[np.newaxis, :]
++numpy[np.newaxis, ::]
  (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
 -{"2.7": dead, "3.7": long_live or die_hard}
 -{"2.7", "3.6", "3.7", "3.8", "3.9", "4.0" if gilectomy else "3.10"}
@@ -467,13 +492,11 @@ last_call()
  assert parens is TooMany
  for (x,) in (1,), (2,), (3,):
      ...
-@@ -271,8 +270,8 @@
-     addr_type,
+@@ -272,7 +271,7 @@
      addr_proto,
      addr_canonname,
--    addr_sockaddr,
+     addr_sockaddr,
 -) in socket.getaddrinfo("google.com", "http"):
-+    addr_sockaddr
 +) in socket.getaddrinfo('google.com', 'http'):
      pass
  a = (
@@ -629,7 +652,7 @@ str or None if (1 if True else 2) else str or bytes or None
 {
     k: v
     for k,
-    v in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
+    v, in this_is_a_very_long_variable_which_will_cause_a_trailing_comma_which_breaks_the_comprehension
 }
 Python3 > Python2 > COBOL
 Life is Life
@@ -679,21 +702,21 @@ xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
 slice[0]
 slice[0:1]
 slice[0:1:2]
-slice[:]
+slice[::]
 slice[:-1]
-slice[1:]
+slice[1::]
 slice[::-1]
 slice[d :: d + 1]
 slice[:c, c - 1]
 numpy[:, 0:1]
 numpy[:, :-1]
-numpy[0, :]
+numpy[0, ::]
 numpy[:, i]
 numpy[0, :2]
 numpy[:N, 0]
 numpy[:2, :4]
 numpy[2:4, 1:5]
-numpy[4:, 2:]
+numpy[4:, 2::]
 numpy[:, (0, 1, 2, 5)]
 numpy[0, [0]]
 numpy[:, [i]]
@@ -701,7 +724,7 @@ numpy[1 : c + 1, c]
 numpy[-(c + 1) :, d]
 numpy[:, l[-2]]
 numpy[:, ::-1]
-numpy[np.newaxis, :]
+numpy[np.newaxis, ::]
 (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
 {'2.7': dead, '3.7': long_live or die_hard}
 {'2.7', '3.6', '3.7', '3.8', '3.9', '4.0' if gilectomy else '3.10'}
@@ -796,7 +819,7 @@ for (
     addr_type,
     addr_proto,
     addr_canonname,
-    addr_sockaddr
+    addr_sockaddr,
 ) in socket.getaddrinfo('google.com', 'http'):
     pass
 a = (

@@ -54,7 +54,7 @@ def test_calculate_fades():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,39 +3,41 @@
+@@ -3,39 +3,42 @@
  TmSt = 1
  TmEx = 2
  
@@ -63,9 +63,9 @@ def test_calculate_fades():
  
  # Test data:
  #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
- 
--@pytest.mark.parametrize('test', [
 -
+-@pytest.mark.parametrize('test', [
+ 
 -    # Test don't manage the volume
 +@pytest.mark.parametrize(
 +    'test',
@@ -79,12 +79,12 @@ def test_calculate_fades():
  def test_fader(test):
      pass
  
+-def check_fader(test):
+ 
++def check_fader(test):
+     pass
+ 
 +
- def check_fader(test):
-+    pass
- 
--    pass
- 
  def verify_fader(test):
 -  # misaligned comment
 +    # misaligned comment
@@ -95,6 +95,7 @@ def test_calculate_fades():
      """Hey, ho."""
      assert test.passed()
  
++
  def test_calculate_fades():
      calcs = [
 -        # one is zero/none
@@ -147,6 +148,7 @@ def verify_fader(test):
 def verify_fader(test):
     """Hey, ho."""
     assert test.passed()
+
 
 def test_calculate_fades():
     calcs = [

@@ -77,9 +77,14 @@ mod tests {
             "*fmtonoff.py",
             "*fmtskip8.py",
             "*function2.py",
+            "*one_element_subscript.py",
             "*remove_except_parens.py",
             "*remove_parens.py",
-            "*string_prefixes.py"
+            "*remove_newline_after_code_block_open.py",
+            "*slices.py",
+            "*string_prefixes.py",
+            "*tricky_unicode_symbols.py",
+            "*tupleassign.py"
         ])
     ]
     #[test]

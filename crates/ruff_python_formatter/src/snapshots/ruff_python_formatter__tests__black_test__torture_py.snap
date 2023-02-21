@@ -97,24 +97,17 @@ assert (
          name,
          description,
          self.default,
-@@ -39,8 +40,9 @@
-         self.auto_generated,
+@@ -40,7 +41,8 @@
          self.parameters,
          self.meta_data,
--        self.schedule,
+         self.schedule,
 -    ) == (
-+        self.schedule
 +    )
 +    == (
          name,
          description,
          othr.default,
-@@ -48,12 +50,17 @@
-         othr.auto_generated,
-         othr.parameters,
-         othr.meta_data,
--        othr.schedule,
-+        othr.schedule
+@@ -52,8 +54,13 @@
      )
  
  
@@ -182,7 +175,7 @@ def test(self, othr):
         self.auto_generated,
         self.parameters,
         self.meta_data,
-        self.schedule
+        self.schedule,
     )
     == (
         name,
@@ -192,7 +185,7 @@ def test(self, othr):
         othr.auto_generated,
         othr.parameters,
         othr.meta_data,
-        othr.schedule
+        othr.schedule,
     )
 
 
