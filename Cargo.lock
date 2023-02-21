@@ -2012,6 +2012,7 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
+ "shellexpand",
  "similar",
  "strum",
  "textwrap",
