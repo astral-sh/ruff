@@ -41,7 +41,7 @@ pub fn unintentional_type_annotation(
             _ => return,
         };
 
-        let is_value_name = matches!(&target.node, ExprKind::Name { .. });
+        let is_value_name = matches!(&target_value.node, ExprKind::Name { .. });
 
         let mut err = false;
         if is_value_name {
