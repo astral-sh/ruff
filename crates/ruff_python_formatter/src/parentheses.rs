@@ -81,6 +81,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer {
             StmtKind::Match { .. } => {}
             StmtKind::Raise { .. } => {}
             StmtKind::Try { .. } => {}
+            StmtKind::TryStar { .. } => {}
             StmtKind::Assert { test, msg } => {
                 use_inferred_parens(test);
                 if let Some(msg) = msg {

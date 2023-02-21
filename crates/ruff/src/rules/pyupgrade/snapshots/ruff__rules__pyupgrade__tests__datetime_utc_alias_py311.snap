@@ -1,5 +1,5 @@
 ---
-source: src/rules/pyupgrade/mod.rs
+source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -34,8 +34,7 @@ expression: diagnostics
     row: 10
     column: 27
   fix:
-    content:
-      - datetime.UTC
+    content: datetime.UTC
     location:
       row: 10
       column: 6

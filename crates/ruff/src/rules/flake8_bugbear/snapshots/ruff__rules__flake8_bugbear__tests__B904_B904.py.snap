@@ -52,4 +52,14 @@ expression: diagnostics
     column: 35
   fix: ~
   parent: ~
+- kind:
+    RaiseWithoutFromInsideExcept: ~
+  location:
+    row: 72
+    column: 12
+  end_location:
+    row: 72
+    column: 39
+  fix: ~
+  parent: ~
 

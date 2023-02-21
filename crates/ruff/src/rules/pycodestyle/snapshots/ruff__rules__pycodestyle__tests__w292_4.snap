@@ -1,5 +1,5 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,9 +11,7 @@ expression: diagnostics
     row: 1
     column: 1
   fix:
-    content:
-      - ""
-      - ""
+    content: "<LineEnding>"
     location:
       row: 1
       column: 1

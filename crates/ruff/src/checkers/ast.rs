@@ -1568,6 +1568,9 @@ where
                 if self.settings.rules.enabled(&Rule::NeedlessBool) {
                     flake8_simplify::rules::return_bool_condition_directly(self, stmt);
                 }
+                if self.settings.rules.enabled(&Rule::ManualDictLookup) {
+                    flake8_simplify::rules::manual_dict_lookup(self, stmt, test, body, orelse);
+                }
                 if self.settings.rules.enabled(&Rule::UseTernaryOperator) {
                     flake8_simplify::rules::use_ternary_operator(
                         self,
@@ -1700,6 +1703,13 @@ where
                 }
             }
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,
@@ -1988,6 +1998,12 @@ where
                 self.visit_body(body);
             }
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,
@@ -3707,6 +3723,9 @@ where
                         body,
                         self.settings.flake8_bandit.check_typed_exception,
                     );
+                }
+                if self.settings.rules.enabled(&Rule::ExceptWithEmptyTuple) {
+                    flake8_bugbear::rules::except_with_empty_tuple(self, excepthandler);
                 }
                 if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);

@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_quotes/mod.rs
+source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,10 +12,7 @@ expression: diagnostics
     row: 3
     column: 3
   fix:
-    content:
-      - "\"\"\""
-      - Single quotes multiline module docstring
-      - "\"\"\""
+    content: "\"\"\"\nSingle quotes multiline module docstring\n\"\"\""
     location:
       row: 1
       column: 0
@@ -33,10 +30,7 @@ expression: diagnostics
     row: 16
     column: 7
   fix:
-    content:
-      - "\"\"\""
-      - "    Single quotes multiline class docstring"
-      - "    \"\"\""
+    content: "\"\"\"\n    Single quotes multiline class docstring\n    \"\"\""
     location:
       row: 14
       column: 4
@@ -54,10 +48,7 @@ expression: diagnostics
     row: 28
     column: 11
   fix:
-    content:
-      - "\"\"\""
-      - "        Single quotes multiline function docstring"
-      - "        \"\"\""
+    content: "\"\"\"\n        Single quotes multiline function docstring\n        \"\"\""
     location:
       row: 26
       column: 8

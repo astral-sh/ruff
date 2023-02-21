@@ -50,6 +50,10 @@ const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "pop",
     "setattr",
     "setdefault",
+    "str",
+    "bytes",
+    "int",
+    "float",
 ];
 
 const FUNC_DEF_NAME_ALLOWLIST: &[&str] = &["__setitem__"];

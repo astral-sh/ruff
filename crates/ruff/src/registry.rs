@@ -183,6 +183,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::EmptyMethodWithoutAbstractDecorator,
     rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
+    rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
     // flake8-comprehensions
@@ -254,6 +255,7 @@ ruff_macros::register_rules!(
     rules::flake8_2020::rules::SysVersionCmpStr10,
     rules::flake8_2020::rules::SysVersionSlice1Referenced,
     // flake8-simplify
+    rules::flake8_simplify::rules::ManualDictLookup,
     rules::flake8_simplify::rules::DuplicateIsinstanceCall,
     rules::flake8_simplify::rules::CollapsibleIf,
     rules::flake8_simplify::rules::NeedlessBool,

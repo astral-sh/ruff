@@ -168,14 +168,7 @@ If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel fr
 
 ## What versions of Python does Ruff support?
 
-Ruff can lint code for any Python version from 3.7 onwards. However, Ruff lacks support for a few
-language features that were introduced in Python 3.10 and later. Specifically, Ruff does not
-support:
-
-* "Structural Pattern Matching" ([PEP 622](https://peps.python.org/pep-0622/)), introduced in Python 3.10.
-* "Exception Groups and except* ([PEP 654](https://www.python.org/dev/peps/pep-0654/)), introduced in Python 3.11.
-
-Support for these features is planned.
+Ruff can lint code for any Python version from 3.7 onwards, including Python 3.10 and 3.11.
 
 Ruff does not support Python 2. Ruff _may_ run on pre-Python 3.7 code, although such versions
 are not officially supported (e.g., Ruff does _not_ respect type comments).

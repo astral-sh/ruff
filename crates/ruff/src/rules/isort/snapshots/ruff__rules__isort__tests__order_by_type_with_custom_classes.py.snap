@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,13 +11,7 @@ expression: diagnostics
     row: 5
     column: 0
   fix:
-    content:
-      - "from subprocess import N_CLASS, PIPE, STDOUT, Popen"
-      - ""
-      - "from module import BASIC, CLASS, CONSTANT, Apple, Class, function"
-      - "from sklearn.svm import CONST, SVC, Klass, func"
-      - "from torch.nn import A_CONSTANT, SELU, AClass"
-      - ""
+    content: "from subprocess import N_CLASS, PIPE, STDOUT, Popen\n\nfrom module import BASIC, CLASS, CONSTANT, Apple, Class, function\nfrom sklearn.svm import CONST, SVC, Klass, func\nfrom torch.nn import A_CONSTANT, SELU, AClass\n"
     location:
       row: 1
       column: 0

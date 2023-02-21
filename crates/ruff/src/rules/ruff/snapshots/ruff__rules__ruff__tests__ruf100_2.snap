@@ -1,5 +1,5 @@
 ---
-source: src/rules/ruff/mod.rs
+source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -16,8 +16,7 @@ expression: diagnostics
     row: 1
     column: 30
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 1
       column: 16

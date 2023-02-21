@@ -9,11 +9,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::UnusedFunctionArgument, Path::new("ARG.py"); "ARG001")]
     #[test_case(Rule::UnusedMethodArgument, Path::new("ARG.py"); "ARG002")]

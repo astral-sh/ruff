@@ -8,12 +8,13 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
+    use crate::settings;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::InvalidClassName, Path::new("N801.py"); "N801")]
     #[test_case(Rule::InvalidFunctionName, Path::new("N802.py"); "N802")]

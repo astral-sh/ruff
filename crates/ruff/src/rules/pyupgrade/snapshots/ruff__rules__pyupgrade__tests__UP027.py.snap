@@ -11,8 +11,7 @@ expression: diagnostics
     row: 2
     column: 38
   fix:
-    content:
-      - (fn(x) for x in items)
+    content: (fn(x) for x in items)
     location:
       row: 2
       column: 16
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 4
     column: 37
   fix:
-    content:
-      - (fn(x) for x in items)
+    content: (fn(x) for x in items)
     location:
       row: 4
       column: 15
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 6
     column: 47
   fix:
-    content:
-      - (fn(x) for x in items)
+    content: (fn(x) for x in items)
     location:
       row: 6
       column: 25
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 8
     column: 51
   fix:
-    content:
-      - "([i for i in fn(x)] for x in items)"
+    content: "([i for i in fn(x)] for x in items)"
     location:
       row: 8
       column: 16
@@ -83,11 +79,7 @@ expression: diagnostics
     row: 13
     column: 1
   fix:
-    content:
-      - (
-      - "    fn(x)"
-      - "    for x in items"
-      - )
+    content: "(\n    fn(x)\n    for x in items\n)"
     location:
       row: 10
       column: 16

@@ -13,9 +13,7 @@ expression: diagnostics
     row: 2
     column: 19
   fix:
-    content:
-      - "def f(x):"
-      - "    return 2 * x"
+    content: "def f(x):\n    return 2 * x"
     location:
       row: 2
       column: 0
@@ -34,9 +32,7 @@ expression: diagnostics
     row: 4
     column: 19
   fix:
-    content:
-      - "def f(x):"
-      - "    return 2 * x"
+    content: "def f(x):\n    return 2 * x"
     location:
       row: 4
       column: 0
@@ -55,9 +51,7 @@ expression: diagnostics
     row: 7
     column: 29
   fix:
-    content:
-      - "def this(y, z):"
-      - "        return 2 * x"
+    content: "def this(y, z):\n        return 2 * x"
     location:
       row: 7
       column: 4
@@ -76,9 +70,7 @@ expression: diagnostics
     row: 9
     column: 21
   fix:
-    content:
-      - "def f():"
-      - "    return (yield 1)"
+    content: "def f():\n    return (yield 1)"
     location:
       row: 9
       column: 0
@@ -97,9 +89,7 @@ expression: diagnostics
     row: 11
     column: 28
   fix:
-    content:
-      - "def f():"
-      - "    return (yield from g())"
+    content: "def f():\n    return (yield from g())"
     location:
       row: 11
       column: 0

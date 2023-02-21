@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_quotes/mod.rs
+source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 2
     column: 56
   fix:
-    content:
-      - "'''function without params, single line docstring'''"
+    content: "'''function without params, single line docstring'''"
     location:
       row: 2
       column: 4
@@ -31,10 +30,7 @@ expression: diagnostics
     row: 10
     column: 7
   fix:
-    content:
-      - "'''"
-      - "        function without params, multiline docstring"
-      - "    '''"
+    content: "'''\n        function without params, multiline docstring\n    '''"
     location:
       row: 8
       column: 4
@@ -52,8 +48,7 @@ expression: diagnostics
     row: 27
     column: 27
   fix:
-    content:
-      - "'Single line docstring'"
+    content: "'Single line docstring'"
     location:
       row: 27
       column: 4

@@ -31,6 +31,7 @@ pub enum TriviaTokenKind {
     OwnLineComment,
     EndOfLineComment,
     MagicTrailingComma,
+    MagicTrailingColon,
     EmptyLine,
     Parentheses,
 }
@@ -66,6 +67,7 @@ pub enum TriviaKind {
     /// ```
     EndOfLineComment(Range),
     MagicTrailingComma,
+    MagicTrailingColon,
     EmptyLine,
     Parentheses,
 }
@@ -100,6 +102,10 @@ impl Trivia {
                 kind: TriviaKind::MagicTrailingComma,
                 relationship,
             },
+            TriviaTokenKind::MagicTrailingColon => Self {
+                kind: TriviaKind::MagicTrailingColon,
+                relationship,
+            },
             TriviaTokenKind::EmptyLine => Self {
                 kind: TriviaKind::EmptyLine,
                 relationship,
@@ -128,7 +134,7 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
     let mut parens = vec![];
     for (start, tok, end) in lxr.iter().flatten() {
         // Add empty lines.
-        if let Some((prev, ..)) = prev_non_newline_tok {
+        if let Some((.., prev)) = prev_non_newline_tok {
             for row in prev.row() + 1..start.row() {
                 tokens.push(TriviaToken {
                     start: Location::new(row, 0),
@@ -163,6 +169,12 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
                         end: *prev_end,
                         kind: TriviaTokenKind::MagicTrailingComma,
                     });
+                } else if prev_tok == &Tok::Colon {
+                    tokens.push(TriviaToken {
+                        start: *prev_start,
+                        end: *prev_end,
+                        kind: TriviaTokenKind::MagicTrailingColon,
+                    });
                 }
             }
         }
@@ -189,7 +201,7 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
         prev_tok = Some((start, tok, end));
 
         // Track the most recent non-whitespace token.
-        if !matches!(tok, Tok::Newline | Tok::NonLogicalNewline,) {
+        if !matches!(tok, Tok::Newline | Tok::NonLogicalNewline) {
             prev_non_newline_tok = Some((start, tok, end));
         }
 
@@ -395,6 +407,12 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             StmtKind::Break => {}
             StmtKind::Continue => {}
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,
@@ -844,7 +862,7 @@ pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaI
                     unreachable!("Attach token to the ast: {:?}", token);
                 }
             }
-            TriviaTokenKind::MagicTrailingComma => {
+            TriviaTokenKind::MagicTrailingComma | TriviaTokenKind::MagicTrailingColon => {
                 if let Some(enclosing_node) = enclosing_node {
                     add_comment(
                         Trivia::from_token(&token, Relationship::Trailing),

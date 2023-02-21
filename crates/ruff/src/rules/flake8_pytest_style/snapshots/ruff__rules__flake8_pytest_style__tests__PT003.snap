@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_pytest_style/mod.rs
+source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,8 +11,7 @@ expression: diagnostics
     row: 14
     column: 32
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 14
       column: 16
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 19
     column: 32
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 19
       column: 16
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 24
     column: 51
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 24
       column: 33
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 29
     column: 51
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 29
       column: 35
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 37
     column: 46
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 37
       column: 28
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 43
     column: 20
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 43
       column: 4
@@ -119,8 +113,7 @@ expression: diagnostics
     row: 52
     column: 20
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 51
       column: 21
@@ -137,8 +130,7 @@ expression: diagnostics
     row: 67
     column: 18
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 66
       column: 4

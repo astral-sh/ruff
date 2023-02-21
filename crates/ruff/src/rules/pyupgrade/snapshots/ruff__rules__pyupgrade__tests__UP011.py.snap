@@ -11,8 +11,7 @@ expression: diagnostics
     row: 5
     column: 22
   fix:
-    content:
-      - functools.lru_cache
+    content: functools.lru_cache
     location:
       row: 5
       column: 1
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 10
     column: 12
   fix:
-    content:
-      - lru_cache
+    content: lru_cache
     location:
       row: 10
       column: 1
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 16
     column: 22
   fix:
-    content:
-      - functools.lru_cache
+    content: functools.lru_cache
     location:
       row: 16
       column: 1
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 21
     column: 22
   fix:
-    content:
-      - functools.lru_cache
+    content: functools.lru_cache
     location:
       row: 21
       column: 1

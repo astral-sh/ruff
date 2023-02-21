@@ -1,5 +1,5 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,8 +11,7 @@ expression: diagnostics
     row: 288
     column: 33
   fix:
-    content:
-      - Whitespace at the end.
+    content: Whitespace at the end.
     location:
       row: 288
       column: 7
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 293
     column: 37
   fix:
-    content:
-      - Whitespace at everywhere.
+    content: Whitespace at everywhere.
     location:
       row: 293
       column: 7
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 302
     column: 7
   fix:
-    content:
-      - Whitespace at the beginning.
+    content: Whitespace at the beginning.
     location:
       row: 299
       column: 7

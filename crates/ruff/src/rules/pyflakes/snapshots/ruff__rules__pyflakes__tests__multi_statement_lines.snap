@@ -1,5 +1,5 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -14,8 +14,7 @@ expression: diagnostics
     row: 3
     column: 15
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 3
       column: 4
@@ -35,8 +34,7 @@ expression: diagnostics
     row: 4
     column: 15
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 4
       column: 4
@@ -56,8 +54,7 @@ expression: diagnostics
     row: 7
     column: 15
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 7
       column: 4
@@ -77,8 +74,7 @@ expression: diagnostics
     row: 11
     column: 15
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 11
       column: 4
@@ -98,8 +94,7 @@ expression: diagnostics
     row: 16
     column: 22
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 16
       column: 11
@@ -119,8 +114,7 @@ expression: diagnostics
     row: 21
     column: 20
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 21
       column: 9
@@ -140,8 +134,7 @@ expression: diagnostics
     row: 26
     column: 21
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 26
       column: 10
@@ -161,8 +154,7 @@ expression: diagnostics
     row: 30
     column: 22
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 30
       column: 11
@@ -182,8 +174,7 @@ expression: diagnostics
     row: 31
     column: 26
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 31
       column: 15
@@ -203,8 +194,7 @@ expression: diagnostics
     row: 35
     column: 20
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 35
       column: 8
@@ -224,8 +214,7 @@ expression: diagnostics
     row: 40
     column: 21
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 40
       column: 9
@@ -245,8 +234,7 @@ expression: diagnostics
     row: 46
     column: 12
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 46
       column: 0
@@ -266,8 +254,7 @@ expression: diagnostics
     row: 51
     column: 12
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 51
       column: 0

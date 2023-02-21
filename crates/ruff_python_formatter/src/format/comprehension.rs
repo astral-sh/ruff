@@ -22,6 +22,10 @@ impl Format<ASTFormatContext<'_>> for FormatComprehension<'_> {
         let comprehension = self.item;
 
         write!(f, [soft_line_break_or_space()])?;
+        if comprehension.is_async > 0 {
+            write!(f, [text("async")])?;
+            write!(f, [space()])?;
+        }
         write!(f, [text("for")])?;
         write!(f, [space()])?;
         // TODO(charlie): If this is an unparenthesized tuple, we need to avoid expanding it.

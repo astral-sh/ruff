@@ -57,6 +57,8 @@ dict.fromkeys(("world",), True)
 {}.deploy(True, False)
 getattr(someobj, attrname, False)
 mylist.index(True)
+int(True)
+str(int(False))
 
 
 class Registry:

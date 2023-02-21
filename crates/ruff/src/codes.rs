@@ -180,6 +180,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bugbear, "025") => Rule::DuplicateTryBlockException,
         (Flake8Bugbear, "026") => Rule::StarArgUnpackingAfterKeywordArg,
         (Flake8Bugbear, "027") => Rule::EmptyMethodWithoutAbstractDecorator,
+        (Flake8Bugbear, "029") => Rule::ExceptWithEmptyTuple,
         (Flake8Bugbear, "904") => Rule::RaiseWithoutFromInsideExcept,
         (Flake8Bugbear, "905") => Rule::ZipWithoutExplicitStrict,
 
@@ -277,6 +278,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "112") => Rule::UseCapitalEnvironmentVariables,
         (Flake8Simplify, "114") => Rule::IfWithSameArms,
         (Flake8Simplify, "115") => Rule::OpenFileWithContextHandler,
+        (Flake8Simplify, "116") => Rule::ManualDictLookup,
         (Flake8Simplify, "117") => Rule::MultipleWithStatements,
         (Flake8Simplify, "118") => Rule::KeyInDict,
         (Flake8Simplify, "201") => Rule::NegateEqualOp,

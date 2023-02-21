@@ -65,11 +65,19 @@ mod tests {
     use crate::fmt;
     use crate::test::test_resource_path;
 
+    #[test_case(Path::new("simple_cases/beginning_backslash.py"); "beginning_backslash")]
     #[test_case(Path::new("simple_cases/class_blank_parentheses.py"); "class_blank_parentheses")]
     #[test_case(Path::new("simple_cases/class_methods_new_line.py"); "class_methods_new_line")]
-    #[test_case(Path::new("simple_cases/beginning_backslash.py"); "beginning_backslash")]
     #[test_case(Path::new("simple_cases/import_spacing.py"); "import_spacing")]
+    #[test_case(Path::new("simple_cases/one_element_subscript.py"); "one_element_subscript")]
     #[test_case(Path::new("simple_cases/power_op_spacing.py"); "power_op_spacing")]
+    #[test_case(Path::new("simple_cases/remove_newline_after_code_block_open.py"); "remove_newline_after_code_block_open")]
+    #[test_case(Path::new("simple_cases/slices.py"); "slices")]
+    #[test_case(Path::new("simple_cases/tricky_unicode_symbols.py"); "tricky_unicode_symbols")]
+    // Passing except that `1, 2, 3,` should be `(1, 2, 3)`.
+    #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
+    // Passing except that `CliRunner().invoke(...)` arguments are improperly wrapped.
+    #[test_case(Path::new("simple_cases/function2.py"); "function2")]
     fn passing(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.display());
         let content = std::fs::read_to_string(test_resource_path(
@@ -98,12 +106,12 @@ mod tests {
     }
 
     #[ignore]
-    // Passing apart from one deviation in RHS tuple assignment.
-    #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
     // Lots of deviations, _mostly_ related to string normalization and wrapping.
     #[test_case(Path::new("simple_cases/expression.py"); "expression")]
+    // Passing apart from a trailing end-of-line comment within an if statement, which is being
+    // inappropriately associated with the if statement rather than the line it's on.
+    #[test_case(Path::new("simple_cases/comments.py"); "comments")]
     #[test_case(Path::new("simple_cases/function.py"); "function")]
-    #[test_case(Path::new("simple_cases/function2.py"); "function2")]
     #[test_case(Path::new("simple_cases/function_trailing_comma.py"); "function_trailing_comma")]
     #[test_case(Path::new("simple_cases/composition.py"); "composition")]
     fn failing(path: &Path) -> Result<()> {
