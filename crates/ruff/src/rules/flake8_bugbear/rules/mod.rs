@@ -41,6 +41,10 @@ pub use useless_contextlib_suppress::{useless_contextlib_suppress, UselessContex
 pub use useless_expression::{useless_expression, UselessExpression};
 pub use zip_without_explicit_strict::{zip_without_explicit_strict, ZipWithoutExplicitStrict};
 
+pub use unintentional_type_annotation::{
+    unintentional_type_annotation, UnintentionalTypeAnnotation,
+};
+
 mod abstract_base_class;
 mod assert_false;
 mod assert_raises_exception;
@@ -62,6 +66,7 @@ mod setattr_with_constant;
 mod star_arg_unpacking_after_keyword_arg;
 mod strip_with_multi_characters;
 mod unary_prefix_increment;
+mod unintentional_type_annotation;
 mod unreliable_callable_check;
 mod unused_loop_control_variable;
 mod useless_comparison;
