@@ -10,8 +10,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
-    ExprKind, KeywordData, Located, Location, Operator, Pattern, PatternKind, Stmt, StmtKind,
-    Suite,
+    ExprKind, KeywordData, Located, Location, MatchCase, Operator, Pattern, PatternKind, Stmt,
+    StmtKind, Suite,
 };
 use rustpython_parser::parser;
 use smallvec::smallvec;
@@ -29,7 +29,7 @@ use crate::ast::types::{
     RefEquality, Scope, ScopeKind,
 };
 use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
-use crate::ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
+use crate::ast::visitor::{walk_excepthandler, walk_match_case, walk_pattern, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::registry::{Diagnostic, Rule};
@@ -3839,6 +3839,14 @@ where
                 }
             }
         }
+    }
+
+    fn visit_match_case(&mut self, match_case: &'b MatchCase) {
+        self.push_scope(Scope::new(ScopeKind::Case));
+        walk_match_case(self, match_case);
+        self.deferred_assignments
+            .push((self.scope_stack.clone(), self.parents.clone()));
+        self.pop_scope();
     }
 
     fn visit_pattern(&mut self, pattern: &'b Pattern) {

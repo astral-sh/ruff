@@ -4,12 +4,34 @@ expression: diagnostics
 ---
 - kind:
     UndefinedName:
+      name: make
+  location:
+    row: 18
+    column: 18
+  end_location:
+    row: 18
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: model
+  location:
+    row: 18
+    column: 24
+  end_location:
+    row: 18
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
       name: captured
   location:
-    row: 22
+    row: 26
     column: 19
   end_location:
-    row: 22
+    row: 26
     column: 27
   fix: ~
   parent: ~

@@ -78,6 +78,7 @@ pub enum ScopeKind<'a> {
     Generator,
     Module,
     Lambda(Lambda<'a>),
+    Case,
 }
 
 #[derive(Debug)]

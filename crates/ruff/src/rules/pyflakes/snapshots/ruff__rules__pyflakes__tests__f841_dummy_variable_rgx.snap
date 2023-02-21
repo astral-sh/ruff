@@ -230,6 +230,17 @@ expression: diagnostics
     column: 13
   end_location:
     row: 122
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: y
+  location:
+    row: 124
+    column: 13
+  end_location:
+    row: 124
     column: 14
   fix: ~
   parent: ~
