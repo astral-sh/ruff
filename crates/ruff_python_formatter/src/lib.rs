@@ -65,12 +65,15 @@ mod tests {
     use crate::fmt;
     use crate::test::test_resource_path;
 
+    #[test_case(Path::new("simple_cases/beginning_backslash.py"); "beginning_backslash")]
     #[test_case(Path::new("simple_cases/class_blank_parentheses.py"); "class_blank_parentheses")]
     #[test_case(Path::new("simple_cases/class_methods_new_line.py"); "class_methods_new_line")]
-    #[test_case(Path::new("simple_cases/beginning_backslash.py"); "beginning_backslash")]
     #[test_case(Path::new("simple_cases/import_spacing.py"); "import_spacing")]
+    #[test_case(Path::new("simple_cases/one_element_subscript.py"); "one_element_subscript")]
     #[test_case(Path::new("simple_cases/power_op_spacing.py"); "power_op_spacing")]
+    #[test_case(Path::new("simple_cases/remove_newline_after_code_block_open.py"); "remove_newline_after_code_block_open")]
     #[test_case(Path::new("simple_cases/slices.py"); "slices")]
+    #[test_case(Path::new("simple_cases/tricky_unicode_symbols.py"); "tricky_unicode_symbols")]
     fn passing(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.display());
         let content = std::fs::read_to_string(test_resource_path(
