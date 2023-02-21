@@ -62,6 +62,8 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
 
         if matches!(self.trailer, Trailer::None) {
             // If this is the first statement in the block, remove any leading empty lines.
+            // TODO(charlie): If we have a function or class definition within a non-scoped block,
+            // like an if-statement, retain a line before and after.
             let mut seen_non_empty = false;
             stmt.trivia.retain(|c| {
                 if seen_non_empty {

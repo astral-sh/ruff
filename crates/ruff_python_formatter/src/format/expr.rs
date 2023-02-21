@@ -134,6 +134,8 @@ fn format_tuple(
                                 .trivia
                                 .iter()
                                 .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+                            let is_unbroken =
+                                expr.location.row() == expr.end_location.unwrap().row();
                             if magic_trailing_comma {
                                 write!(f, [expand_parent()])?;
                             }
@@ -143,7 +145,7 @@ fn format_tuple(
                                     write!(f, [text(",")])?;
                                     write!(f, [soft_line_break_or_space()])?;
                                 } else {
-                                    if magic_trailing_comma {
+                                    if magic_trailing_comma || is_unbroken {
                                         write!(f, [if_group_breaks(&text(","))])?;
                                     }
                                 }
@@ -156,6 +158,7 @@ fn format_tuple(
                         .trivia
                         .iter()
                         .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+                    let is_unbroken = expr.location.row() == expr.end_location.unwrap().row();
                     if magic_trailing_comma {
                         write!(f, [expand_parent()])?;
                     }
@@ -165,7 +168,7 @@ fn format_tuple(
                             write!(f, [text(",")])?;
                             write!(f, [soft_line_break_or_space()])?;
                         } else {
-                            if magic_trailing_comma {
+                            if magic_trailing_comma || is_unbroken {
                                 write!(f, [if_group_breaks(&text(","))])?;
                             }
                         }

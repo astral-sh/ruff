@@ -74,6 +74,8 @@ mod tests {
     #[test_case(Path::new("simple_cases/remove_newline_after_code_block_open.py"); "remove_newline_after_code_block_open")]
     #[test_case(Path::new("simple_cases/slices.py"); "slices")]
     #[test_case(Path::new("simple_cases/tricky_unicode_symbols.py"); "tricky_unicode_symbols")]
+    // Passing except that `1, 2, 3,` should be `(1, 2, 3)`.
+    #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
     fn passing(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.display());
         let content = std::fs::read_to_string(test_resource_path(
@@ -102,8 +104,6 @@ mod tests {
     }
 
     #[ignore]
-    // Passing apart from one deviation in RHS tuple assignment.
-    #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
     // Lots of deviations, _mostly_ related to string normalization and wrapping.
     #[test_case(Path::new("simple_cases/expression.py"); "expression")]
     // Passing apart from a trailing end-of-line comment within an if statement, which is being
