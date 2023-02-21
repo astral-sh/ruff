@@ -76,15 +76,6 @@ mod tests {
             "*docstring.py",
             "*fmtonoff.py",
             "*fmtskip8.py",
-            "*function2.py",
-            "*one_element_subscript.py",
-            "*remove_except_parens.py",
-            "*remove_parens.py",
-            "*remove_newline_after_code_block_open.py",
-            "*slices.py",
-            "*string_prefixes.py",
-            "*tricky_unicode_symbols.py",
-            "*tupleassign.py"
         ])
     ]
     #[test]
@@ -94,7 +85,8 @@ mod tests {
         let formatted = fmt(&content)?;
 
         let expected_path = input_path.with_extension("py.expect");
-        let expected_output = fs::read_to_string(&expected_path)?;
+        let expected_output = fs::read_to_string(&expected_path)
+            .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
 
         let printed = formatted.print()?;
         let formatted_code = printed.as_code();
