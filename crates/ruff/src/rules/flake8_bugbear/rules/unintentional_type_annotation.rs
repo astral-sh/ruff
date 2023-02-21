@@ -26,7 +26,7 @@ pub fn unintentional_type_annotation(
     value: &Option<Box<Located<ExprKind>>>,
     stmt: &Stmt,
 ) {
-    if let Some(value) = value {
+    if !value.is_none() {
         return;
     }
 
