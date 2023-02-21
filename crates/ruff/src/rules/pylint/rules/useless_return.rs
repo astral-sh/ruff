@@ -52,8 +52,9 @@ pub fn useless_return(checker: &mut Checker, stmt: &Stmt) {
         Some(node) => matches!(node.node, StmtKind::FunctionDef { .. }),
         None => false,
     };
-    let is_last_statement = checker.current_sibling_stmt().is_none() && belongs_to_function_scope;
-    if !is_last_statement {
+    let is_last_function_statement =
+        checker.current_sibling_stmt().is_none() && belongs_to_function_scope;
+    if !is_last_function_statement {
         return;
     }
 
@@ -64,7 +65,6 @@ pub fn useless_return(checker: &mut Checker, stmt: &Stmt) {
     if is_bare_return_or_none {
         let mut diagnostic = Diagnostic::new(UselessReturn, Range::from_located(stmt));
         if checker.patch(diagnostic.kind.rule()) {
-            // Fix::deletion(stmt.location, stmt.end_location.unwrap())
             match delete_stmt(
                 stmt,
                 None,
