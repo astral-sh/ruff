@@ -30,15 +30,9 @@ pub fn unintentional_type_annotation(
         return;
     }
 
-    let is_target_subscript = match &target.node {
-        ExprKind::Subscript { .. } => true,
-        _ => false,
-    };
+    let is_target_subscript = matches!(&target.node, ExprKind::Subscript { .. });
 
-    let is_target_attribute = match &target.node {
-        ExprKind::Attribute { .. } => true,
-        _ => false,
-    };
+    let is_target_attribute = matches!(&target.node, ExprKind::Attribute { .. });
 
     if is_target_subscript || is_target_attribute {
         let target_value = match &target.node {
@@ -47,10 +41,8 @@ pub fn unintentional_type_annotation(
             _ => return,
         };
 
-        let is_value_name = match &target_value.node {
-            ExprKind::Name { .. } => true,
-            _ => false,
-        };
+        let is_value_name = matches!(&target.node, ExprKind::Name { .. });
+
         let mut err = false;
         if is_value_name {
             if is_target_subscript {
