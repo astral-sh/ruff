@@ -129,7 +129,9 @@ pub fn lint_path(
         );
 
         // Purge the cache.
-        cache::del(path, package.as_ref(), settings, autofix.into());
+        if let Some(metadata) = metadata {
+            cache::del(path, package.as_ref(), &metadata, settings, autofix.into());
+        }
     } else {
         // Re-populate the cache.
         if let Some(metadata) = metadata {
