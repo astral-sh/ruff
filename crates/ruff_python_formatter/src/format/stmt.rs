@@ -322,7 +322,7 @@ fn format_for(
     target: &Expr,
     iter: &Expr,
     body: &[Stmt],
-    _orelse: &[Stmt],
+    orelse: &[Stmt],
     _type_comment: Option<&str>,
 ) -> FormatResult<()> {
     write!(
@@ -338,7 +338,11 @@ fn format_for(
             text(":"),
             block_indent(&block(body))
         ]
-    )
+    )?;
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    Ok(())
 }
 
 fn format_while(
