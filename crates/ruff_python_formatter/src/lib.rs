@@ -76,6 +76,8 @@ mod tests {
     #[test_case(Path::new("simple_cases/tricky_unicode_symbols.py"); "tricky_unicode_symbols")]
     // Passing except that `1, 2, 3,` should be `(1, 2, 3)`.
     #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
+    // Passing except that `CliRunner().invoke(...)` arguments are improperly wrapped.
+    #[test_case(Path::new("simple_cases/function2.py"); "function2")]
     fn passing(path: &Path) -> Result<()> {
         let snapshot = format!("{}", path.display());
         let content = std::fs::read_to_string(test_resource_path(
@@ -110,7 +112,6 @@ mod tests {
     // inappropriately associated with the if statement rather than the line it's on.
     #[test_case(Path::new("simple_cases/comments.py"); "comments")]
     #[test_case(Path::new("simple_cases/function.py"); "function")]
-    #[test_case(Path::new("simple_cases/function2.py"); "function2")]
     #[test_case(Path::new("simple_cases/function_trailing_comma.py"); "function_trailing_comma")]
     #[test_case(Path::new("simple_cases/composition.py"); "composition")]
     fn failing(path: &Path) -> Result<()> {
