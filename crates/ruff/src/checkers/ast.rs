@@ -706,7 +706,12 @@ where
                     .rules
                     .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
                 {
-                    flake8_boolean_trap::rules::check_positional_boolean_in_def(self, name, args);
+                    flake8_boolean_trap::rules::check_positional_boolean_in_def(
+                        self,
+                        name,
+                        decorator_list,
+                        args,
+                    );
                 }
 
                 if self
@@ -715,7 +720,10 @@ where
                     .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
                 {
                     flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
-                        self, name, args,
+                        self,
+                        name,
+                        decorator_list,
+                        args,
                     );
                 }
 
