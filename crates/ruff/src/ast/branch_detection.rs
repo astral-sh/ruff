@@ -59,6 +59,12 @@ fn alternatives<'a>(stmt: &'a RefEquality<'a, Stmt>) -> Vec<Vec<RefEquality<'a, 
             handlers,
             orelse,
             ..
+        }
+        | StmtKind::TryStar {
+            body,
+            handlers,
+            orelse,
+            ..
         } => vec![body.iter().chain(orelse.iter()).map(RefEquality).collect()]
             .into_iter()
             .chain(handlers.iter().map(|handler| {

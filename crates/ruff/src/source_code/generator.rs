@@ -483,7 +483,37 @@ impl<'a> Generator<'a> {
 
                 for handler in handlers {
                     statement!({
-                        self.unparse_excepthandler(handler);
+                        self.unparse_excepthandler(handler, false);
+                    });
+                }
+
+                if !orelse.is_empty() {
+                    statement!({
+                        self.p("else:");
+                    });
+                    self.body(orelse);
+                }
+                if !finalbody.is_empty() {
+                    statement!({
+                        self.p("finally:");
+                    });
+                    self.body(finalbody);
+                }
+            }
+            StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => {
+                statement!({
+                    self.p("try:");
+                });
+                self.body(body);
+
+                for handler in handlers {
+                    statement!({
+                        self.unparse_excepthandler(handler, true);
                     });
                 }
 
@@ -584,10 +614,13 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_excepthandler<U>(&mut self, ast: &Excepthandler<U>) {
+    fn unparse_excepthandler<U>(&mut self, ast: &Excepthandler<U>, star: bool) {
         match &ast.node {
             ExcepthandlerKind::ExceptHandler { type_, name, body } => {
                 self.p("except");
+                if star {
+                    self.p("*");
+                }
                 if let Some(type_) = type_ {
                     self.p(" ");
                     self.unparse_expr(type_, precedence::MAX);
@@ -1265,6 +1298,18 @@ mod tests {
             r#"@functools.lru_cache(maxsize=None)
 def f(x: int, y: int) -> int:
     return x + y"#
+        );
+        assert_round_trip!(
+            r#"try:
+    pass
+except Exception as e:
+    pass"#
+        );
+        assert_round_trip!(
+            r#"try:
+    pass
+except* Exception as e:
+    pass"#
         );
         assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
         assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);

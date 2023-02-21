@@ -232,6 +232,19 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_body(orelse);
             visitor.visit_body(finalbody);
         }
+        StmtKind::TryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+        } => {
+            visitor.visit_body(body);
+            for excepthandler in handlers {
+                visitor.visit_excepthandler(excepthandler);
+            }
+            visitor.visit_body(orelse);
+            visitor.visit_body(finalbody);
+        }
         StmtKind::Assert { test, msg } => {
             visitor.visit_expr(test);
             if let Some(expr) = msg {

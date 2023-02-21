@@ -44,7 +44,8 @@ impl<'a> Visitor<'a> for RaiseVisitor {
             StmtKind::ClassDef { .. }
             | StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }
-            | StmtKind::Try { .. } => {}
+            | StmtKind::Try { .. }
+            | StmtKind::TryStar { .. } => {}
             StmtKind::If { body, orelse, .. } => {
                 visitor::walk_body(self, body);
                 visitor::walk_body(self, orelse);

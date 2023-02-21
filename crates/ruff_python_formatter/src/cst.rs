@@ -249,6 +249,12 @@ pub enum StmtKind {
         orelse: Vec<Stmt>,
         finalbody: Vec<Stmt>,
     },
+    TryStar {
+        body: Vec<Stmt>,
+        handlers: Vec<Excepthandler>,
+        orelse: Vec<Stmt>,
+        finalbody: Vec<Stmt>,
+    },
     Assert {
         test: Box<Expr>,
         msg: Option<Box<Expr>>,
@@ -807,6 +813,23 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Try {
+                    body: body.into_iter().map(Into::into).collect(),
+                    handlers: handlers.into_iter().map(Into::into).collect(),
+                    orelse: orelse.into_iter().map(Into::into).collect(),
+                    finalbody: finalbody.into_iter().map(Into::into).collect(),
+                },
+                trivia: vec![],
+                parentheses: Parenthesize::Never,
+            },
+            rustpython_parser::ast::StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => Stmt {
+                location: stmt.location,
+                end_location: stmt.end_location,
+                node: StmtKind::TryStar {
                     body: body.into_iter().map(Into::into).collect(),
                     handlers: handlers.into_iter().map(Into::into).collect(),
                     orelse: orelse.into_iter().map(Into::into).collect(),

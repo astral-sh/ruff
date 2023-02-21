@@ -260,7 +260,10 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 implicit_return(checker, last_stmt);
             }
         }
-        StmtKind::Return { .. } | StmtKind::Raise { .. } | StmtKind::Try { .. } => {}
+        StmtKind::Return { .. }
+        | StmtKind::Raise { .. }
+        | StmtKind::Try { .. }
+        | StmtKind::TryStar { .. } => {}
         StmtKind::Expr { value, .. }
             if matches!(
                 &value.node,

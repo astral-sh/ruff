@@ -54,6 +54,12 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 handlers,
                 orelse,
                 finalbody,
+            }
+            | StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
             } => {
                 count += 1;
                 count += num_statements(body);

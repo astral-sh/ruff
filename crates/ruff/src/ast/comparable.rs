@@ -654,6 +654,12 @@ pub enum ComparableStmt<'a> {
         orelse: Vec<ComparableStmt<'a>>,
         finalbody: Vec<ComparableStmt<'a>>,
     },
+    TryStar {
+        body: Vec<ComparableStmt<'a>>,
+        handlers: Vec<ComparableExcepthandler<'a>>,
+        orelse: Vec<ComparableStmt<'a>>,
+        finalbody: Vec<ComparableStmt<'a>>,
+    },
     Assert {
         test: ComparableExpr<'a>,
         msg: Option<ComparableExpr<'a>>,
@@ -822,6 +828,17 @@ impl<'a> From<&'a Stmt> for ComparableStmt<'a> {
                 orelse,
                 finalbody,
             } => Self::Try {
+                body: body.iter().map(Into::into).collect(),
+                handlers: handlers.iter().map(Into::into).collect(),
+                orelse: orelse.iter().map(Into::into).collect(),
+                finalbody: finalbody.iter().map(Into::into).collect(),
+            },
+            StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => Self::TryStar {
                 body: body.iter().map(Into::into).collect(),
                 handlers: handlers.iter().map(Into::into).collect(),
                 orelse: orelse.iter().map(Into::into).collect(),

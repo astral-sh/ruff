@@ -116,7 +116,8 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
                 | StmtKind::For { .. }
                 | StmtKind::AsyncFor { .. }
                 | StmtKind::While { .. }
-                | StmtKind::Try { .. } => {
+                | StmtKind::Try { .. }
+                | StmtKind::TryStar { .. } => {
                     is_too_complex = true;
                 }
                 _ => {}
