@@ -1,0 +1,1674 @@
+---
+source: compiler/parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Located {
+        location: Location {
+            row: 2,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 2,
+                column: 15,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 2,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 2,
+                        column: 15,
+                    },
+                ),
+                custom: (),
+                node: Tuple {
+                    elts: [
+                        Located {
+                            location: Location {
+                                row: 2,
+                                column: 0,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 2,
+                                    column: 12,
+                                },
+                            ),
+                            custom: (),
+                            node: BinOp {
+                                left: Located {
+                                    location: Location {
+                                        row: 2,
+                                        column: 0,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 2,
+                                            column: 8,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: BinOp {
+                                        left: Located {
+                                            location: Location {
+                                                row: 2,
+                                                column: 0,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 2,
+                                                    column: 5,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Name {
+                                                id: "match",
+                                                ctx: Load,
+                                            },
+                                        },
+                                        op: Mult,
+                                        right: Located {
+                                            location: Location {
+                                                row: 2,
+                                                column: 7,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 2,
+                                                    column: 8,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Name {
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        },
+                                    },
+                                },
+                                op: Add,
+                                right: Located {
+                                    location: Location {
+                                        row: 2,
+                                        column: 11,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 2,
+                                            column: 12,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Name {
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                },
+                            },
+                        },
+                        Located {
+                            location: Location {
+                                row: 2,
+                                column: 14,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 2,
+                                    column: 15,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "c",
+                                ctx: Load,
+                            },
+                        },
+                    ],
+                    ctx: Load,
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 3,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 3,
+                column: 17,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 3,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 3,
+                        column: 17,
+                    },
+                ),
+                custom: (),
+                node: Tuple {
+                    elts: [
+                        Located {
+                            location: Location {
+                                row: 3,
+                                column: 0,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 3,
+                                    column: 14,
+                                },
+                            ),
+                            custom: (),
+                            node: BinOp {
+                                left: Located {
+                                    location: Location {
+                                        row: 3,
+                                        column: 0,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 3,
+                                            column: 5,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Name {
+                                        id: "match",
+                                        ctx: Load,
+                                    },
+                                },
+                                op: Mult,
+                                right: Located {
+                                    location: Location {
+                                        row: 3,
+                                        column: 8,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 3,
+                                            column: 13,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: BinOp {
+                                        left: Located {
+                                            location: Location {
+                                                row: 3,
+                                                column: 8,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 3,
+                                                    column: 9,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Name {
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        },
+                                        op: Add,
+                                        right: Located {
+                                            location: Location {
+                                                row: 3,
+                                                column: 12,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 3,
+                                                    column: 13,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Name {
+                                                id: "b",
+                                                ctx: Load,
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        Located {
+                            location: Location {
+                                row: 3,
+                                column: 16,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 3,
+                                    column: 17,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "c",
+                                ctx: Load,
+                            },
+                        },
+                    ],
+                    ctx: Load,
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 4,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 4,
+                column: 17,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 4,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 4,
+                        column: 17,
+                    },
+                ),
+                custom: (),
+                node: Call {
+                    func: Located {
+                        location: Location {
+                            row: 4,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 4,
+                                column: 5,
+                            },
+                        ),
+                        custom: (),
+                        node: Name {
+                            id: "match",
+                            ctx: Load,
+                        },
+                    },
+                    args: [
+                        Located {
+                            location: Location {
+                                row: 4,
+                                column: 7,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 4,
+                                    column: 13,
+                                },
+                            ),
+                            custom: (),
+                            node: Starred {
+                                value: Located {
+                                    location: Location {
+                                        row: 4,
+                                        column: 8,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 4,
+                                            column: 13,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: BinOp {
+                                        left: Located {
+                                            location: Location {
+                                                row: 4,
+                                                column: 8,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 4,
+                                                    column: 9,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Name {
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        },
+                                        op: Add,
+                                        right: Located {
+                                            location: Location {
+                                                row: 4,
+                                                column: 12,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 4,
+                                                    column: 13,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Name {
+                                                id: "b",
+                                                ctx: Load,
+                                            },
+                                        },
+                                    },
+                                },
+                                ctx: Load,
+                            },
+                        },
+                        Located {
+                            location: Location {
+                                row: 4,
+                                column: 15,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 4,
+                                    column: 16,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "c",
+                                ctx: Load,
+                            },
+                        },
+                    ],
+                    keywords: [],
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 5,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 5,
+                column: 16,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 5,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 5,
+                        column: 16,
+                    },
+                ),
+                custom: (),
+                node: BinOp {
+                    left: Located {
+                        location: Location {
+                            row: 5,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 5,
+                                column: 12,
+                            },
+                        ),
+                        custom: (),
+                        node: BinOp {
+                            left: Located {
+                                location: Location {
+                                    row: 5,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 5,
+                                        column: 5,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            },
+                            op: Sub,
+                            right: Located {
+                                location: Location {
+                                    row: 5,
+                                    column: 7,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 5,
+                                        column: 12,
+                                    },
+                                ),
+                                custom: (),
+                                node: BinOp {
+                                    left: Located {
+                                        location: Location {
+                                            row: 5,
+                                            column: 7,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 5,
+                                                column: 8,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Name {
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    },
+                                    op: Mult,
+                                    right: Located {
+                                        location: Location {
+                                            row: 5,
+                                            column: 11,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 5,
+                                                column: 12,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Name {
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    op: Add,
+                    right: Located {
+                        location: Location {
+                            row: 5,
+                            column: 15,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 5,
+                                column: 16,
+                            },
+                        ),
+                        custom: (),
+                        node: Name {
+                            id: "c",
+                            ctx: Load,
+                        },
+                    },
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 6,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 6,
+                column: 18,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 6,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 6,
+                        column: 18,
+                    },
+                ),
+                custom: (),
+                node: BinOp {
+                    left: Located {
+                        location: Location {
+                            row: 6,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 6,
+                                column: 14,
+                            },
+                        ),
+                        custom: (),
+                        node: BinOp {
+                            left: Located {
+                                location: Location {
+                                    row: 6,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 6,
+                                        column: 5,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            },
+                            op: Sub,
+                            right: Located {
+                                location: Location {
+                                    row: 6,
+                                    column: 8,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 6,
+                                        column: 13,
+                                    },
+                                ),
+                                custom: (),
+                                node: BinOp {
+                                    left: Located {
+                                        location: Location {
+                                            row: 6,
+                                            column: 8,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 6,
+                                                column: 9,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Name {
+                                            id: "a",
+                                            ctx: Load,
+                                        },
+                                    },
+                                    op: Mult,
+                                    right: Located {
+                                        location: Location {
+                                            row: 6,
+                                            column: 12,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 6,
+                                                column: 13,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Name {
+                                            id: "b",
+                                            ctx: Load,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    op: Add,
+                    right: Located {
+                        location: Location {
+                            row: 6,
+                            column: 17,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 6,
+                                column: 18,
+                            },
+                        ),
+                        custom: (),
+                        node: Name {
+                            id: "c",
+                            ctx: Load,
+                        },
+                    },
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 7,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 7,
+                column: 18,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 7,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 7,
+                        column: 18,
+                    },
+                ),
+                custom: (),
+                node: BinOp {
+                    left: Located {
+                        location: Location {
+                            row: 7,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 7,
+                                column: 14,
+                            },
+                        ),
+                        custom: (),
+                        node: BinOp {
+                            left: Located {
+                                location: Location {
+                                    row: 7,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 7,
+                                        column: 10,
+                                    },
+                                ),
+                                custom: (),
+                                node: Call {
+                                    func: Located {
+                                        location: Location {
+                                            row: 7,
+                                            column: 0,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 7,
+                                                column: 5,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Name {
+                                            id: "match",
+                                            ctx: Load,
+                                        },
+                                    },
+                                    args: [
+                                        Located {
+                                            location: Location {
+                                                row: 7,
+                                                column: 7,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 7,
+                                                    column: 9,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: UnaryOp {
+                                                op: USub,
+                                                operand: Located {
+                                                    location: Location {
+                                                        row: 7,
+                                                        column: 8,
+                                                    },
+                                                    end_location: Some(
+                                                        Location {
+                                                            row: 7,
+                                                            column: 9,
+                                                        },
+                                                    ),
+                                                    custom: (),
+                                                    node: Name {
+                                                        id: "a",
+                                                        ctx: Load,
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    ],
+                                    keywords: [],
+                                },
+                            },
+                            op: Mult,
+                            right: Located {
+                                location: Location {
+                                    row: 7,
+                                    column: 13,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 7,
+                                        column: 14,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "b",
+                                    ctx: Load,
+                                },
+                            },
+                        },
+                    },
+                    op: Add,
+                    right: Located {
+                        location: Location {
+                            row: 7,
+                            column: 17,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 7,
+                                column: 18,
+                            },
+                        ),
+                        custom: (),
+                        node: Name {
+                            id: "c",
+                            ctx: Load,
+                        },
+                    },
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 8,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 8,
+                column: 10,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 8,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 8,
+                        column: 10,
+                    },
+                ),
+                custom: (),
+                node: Attribute {
+                    value: Located {
+                        location: Location {
+                            row: 8,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 8,
+                                column: 8,
+                            },
+                        ),
+                        custom: (),
+                        node: Call {
+                            func: Located {
+                                location: Location {
+                                    row: 8,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 8,
+                                        column: 5,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            },
+                            args: [],
+                            keywords: [],
+                        },
+                    },
+                    attr: "a",
+                    ctx: Load,
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 9,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 9,
+                column: 12,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 9,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 9,
+                        column: 12,
+                    },
+                ),
+                custom: (),
+                node: Attribute {
+                    value: Located {
+                        location: Location {
+                            row: 9,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 9,
+                                column: 10,
+                            },
+                        ),
+                        custom: (),
+                        node: Call {
+                            func: Located {
+                                location: Location {
+                                    row: 9,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 9,
+                                        column: 5,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            },
+                            args: [
+                                Located {
+                                    location: Location {
+                                        row: 9,
+                                        column: 7,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 9,
+                                            column: 9,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Tuple {
+                                        elts: [],
+                                        ctx: Load,
+                                    },
+                                },
+                            ],
+                            keywords: [],
+                        },
+                    },
+                    attr: "a",
+                    ctx: Load,
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 10,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 10,
+                column: 13,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 10,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 10,
+                        column: 13,
+                    },
+                ),
+                custom: (),
+                node: Attribute {
+                    value: Located {
+                        location: Location {
+                            row: 10,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 10,
+                                column: 11,
+                            },
+                        ),
+                        custom: (),
+                        node: Call {
+                            func: Located {
+                                location: Location {
+                                    row: 10,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 10,
+                                        column: 5,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            },
+                            args: [
+                                Located {
+                                    location: Location {
+                                        row: 10,
+                                        column: 7,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 10,
+                                            column: 9,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Tuple {
+                                        elts: [],
+                                        ctx: Load,
+                                    },
+                                },
+                            ],
+                            keywords: [],
+                        },
+                    },
+                    attr: "a",
+                    ctx: Load,
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 11,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 11,
+                column: 11,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 11,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 11,
+                        column: 11,
+                    },
+                ),
+                custom: (),
+                node: Attribute {
+                    value: Located {
+                        location: Location {
+                            row: 11,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 11,
+                                column: 9,
+                            },
+                        ),
+                        custom: (),
+                        node: Subscript {
+                            value: Located {
+                                location: Location {
+                                    row: 11,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 11,
+                                        column: 5,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            },
+                            slice: Located {
+                                location: Location {
+                                    row: 11,
+                                    column: 7,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 11,
+                                        column: 8,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "a",
+                                    ctx: Load,
+                                },
+                            },
+                            ctx: Load,
+                        },
+                    },
+                    attr: "b",
+                    ctx: Load,
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 12,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 12,
+                column: 12,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 12,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 12,
+                        column: 12,
+                    },
+                ),
+                custom: (),
+                node: Attribute {
+                    value: Located {
+                        location: Location {
+                            row: 12,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 12,
+                                column: 10,
+                            },
+                        ),
+                        custom: (),
+                        node: Subscript {
+                            value: Located {
+                                location: Location {
+                                    row: 12,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 12,
+                                        column: 5,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            },
+                            slice: Located {
+                                location: Location {
+                                    row: 12,
+                                    column: 7,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 12,
+                                        column: 9,
+                                    },
+                                ),
+                                custom: (),
+                                node: Tuple {
+                                    elts: [
+                                        Located {
+                                            location: Location {
+                                                row: 12,
+                                                column: 7,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 12,
+                                                    column: 8,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Name {
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        },
+                                    ],
+                                    ctx: Load,
+                                },
+                            },
+                            ctx: Load,
+                        },
+                    },
+                    attr: "b",
+                    ctx: Load,
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 13,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 13,
+                column: 14,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 13,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 13,
+                        column: 14,
+                    },
+                ),
+                custom: (),
+                node: Attribute {
+                    value: Located {
+                        location: Location {
+                            row: 13,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 13,
+                                column: 12,
+                            },
+                        ),
+                        custom: (),
+                        node: Subscript {
+                            value: Located {
+                                location: Location {
+                                    row: 13,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 13,
+                                        column: 5,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            },
+                            slice: Located {
+                                location: Location {
+                                    row: 13,
+                                    column: 7,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 13,
+                                        column: 11,
+                                    },
+                                ),
+                                custom: (),
+                                node: Tuple {
+                                    elts: [
+                                        Located {
+                                            location: Location {
+                                                row: 13,
+                                                column: 8,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 13,
+                                                    column: 9,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Name {
+                                                id: "a",
+                                                ctx: Load,
+                                            },
+                                        },
+                                    ],
+                                    ctx: Load,
+                                },
+                            },
+                            ctx: Load,
+                        },
+                    },
+                    attr: "b",
+                    ctx: Load,
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 14,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 15,
+                column: 6,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 14,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 15,
+                        column: 6,
+                    },
+                ),
+                custom: (),
+                node: Subscript {
+                    value: Located {
+                        location: Location {
+                            row: 14,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 14,
+                                column: 7,
+                            },
+                        ),
+                        custom: (),
+                        node: Call {
+                            func: Located {
+                                location: Location {
+                                    row: 14,
+                                    column: 0,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 14,
+                                        column: 5,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "match",
+                                    ctx: Load,
+                                },
+                            },
+                            args: [],
+                            keywords: [],
+                        },
+                    },
+                    slice: Located {
+                        location: Location {
+                            row: 14,
+                            column: 8,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 15,
+                                column: 5,
+                            },
+                        ),
+                        custom: (),
+                        node: Slice {
+                            lower: Some(
+                                Located {
+                                    location: Location {
+                                        row: 14,
+                                        column: 8,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 14,
+                                            column: 9,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Name {
+                                        id: "a",
+                                        ctx: Load,
+                                    },
+                                },
+                            ),
+                            upper: Some(
+                                Located {
+                                    location: Location {
+                                        row: 15,
+                                        column: 4,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 15,
+                                            column: 5,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Name {
+                                        id: "b",
+                                        ctx: Load,
+                                    },
+                                },
+                            ),
+                            step: None,
+                        },
+                    },
+                    ctx: Load,
+                },
+            },
+        },
+    },
+    Located {
+        location: Location {
+            row: 16,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 16,
+                column: 19,
+            },
+        ),
+        custom: (),
+        node: If {
+            test: Located {
+                location: Location {
+                    row: 16,
+                    column: 3,
+                },
+                end_location: Some(
+                    Location {
+                        row: 16,
+                        column: 13,
+                    },
+                ),
+                custom: (),
+                node: NamedExpr {
+                    target: Located {
+                        location: Location {
+                            row: 16,
+                            column: 3,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 16,
+                                column: 8,
+                            },
+                        ),
+                        custom: (),
+                        node: Name {
+                            id: "match",
+                            ctx: Store,
+                        },
+                    },
+                    value: Located {
+                        location: Location {
+                            row: 16,
+                            column: 12,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 16,
+                                column: 13,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant {
+                            value: Int(
+                                1,
+                            ),
+                            kind: None,
+                        },
+                    },
+                },
+            },
+            body: [
+                Located {
+                    location: Location {
+                        row: 16,
+                        column: 15,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 16,
+                            column: 19,
+                        },
+                    ),
+                    custom: (),
+                    node: Pass,
+                },
+            ],
+            orelse: [],
+        },
+    },
+    Located {
+        location: Location {
+            row: 17,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 21,
+                column: 0,
+            },
+        ),
+        custom: (),
+        node: Match {
+            subject: Located {
+                location: Location {
+                    row: 17,
+                    column: 6,
+                },
+                end_location: Some(
+                    Location {
+                        row: 17,
+                        column: 11,
+                    },
+                ),
+                custom: (),
+                node: Name {
+                    id: "match",
+                    ctx: Load,
+                },
+            },
+            cases: [
+                MatchCase {
+                    pattern: Located {
+                        location: Location {
+                            row: 18,
+                            column: 9,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 18,
+                                column: 10,
+                            },
+                        ),
+                        custom: (),
+                        node: MatchValue {
+                            value: Located {
+                                location: Location {
+                                    row: 18,
+                                    column: 9,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 18,
+                                        column: 10,
+                                    },
+                                ),
+                                custom: (),
+                                node: Constant {
+                                    value: Int(
+                                        1,
+                                    ),
+                                    kind: None,
+                                },
+                            },
+                        },
+                    },
+                    guard: None,
+                    body: [
+                        Located {
+                            location: Location {
+                                row: 18,
+                                column: 12,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 18,
+                                    column: 16,
+                                },
+                            ),
+                            custom: (),
+                            node: Pass,
+                        },
+                    ],
+                },
+                MatchCase {
+                    pattern: Located {
+                        location: Location {
+                            row: 19,
+                            column: 9,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 19,
+                                column: 10,
+                            },
+                        ),
+                        custom: (),
+                        node: MatchValue {
+                            value: Located {
+                                location: Location {
+                                    row: 19,
+                                    column: 9,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 19,
+                                        column: 10,
+                                    },
+                                ),
+                                custom: (),
+                                node: Constant {
+                                    value: Int(
+                                        2,
+                                    ),
+                                    kind: None,
+                                },
+                            },
+                        },
+                    },
+                    guard: None,
+                    body: [
+                        Located {
+                            location: Location {
+                                row: 20,
+                                column: 8,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 20,
+                                    column: 12,
+                                },
+                            ),
+                            custom: (),
+                            node: Pass,
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+]

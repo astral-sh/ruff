@@ -131,4 +131,5 @@ mod string;
 #[rustfmt::skip]
 mod python;
 mod context;
+mod soft_keywords;
 pub mod token;
