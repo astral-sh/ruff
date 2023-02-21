@@ -87,6 +87,12 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 handlers,
                 orelse,
                 finalbody,
+            }
+            | StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
             } => {
                 complexity += 1;
                 complexity += get_complexity_number(body);

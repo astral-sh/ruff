@@ -226,6 +226,12 @@ where
                 handlers,
                 orelse,
                 finalbody,
+            }
+            | StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
             } => {
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);

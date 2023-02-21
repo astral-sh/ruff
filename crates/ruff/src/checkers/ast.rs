@@ -1705,6 +1705,13 @@ where
                 orelse,
                 finalbody,
                 ..
+            }
+            | StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
             } => {
                 if self.settings.rules.enabled(&Rule::DefaultExceptNotLast) {
                     if let Some(diagnostic) =
@@ -1988,6 +1995,12 @@ where
                 self.visit_body(body);
             }
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,

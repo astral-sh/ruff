@@ -391,6 +391,12 @@ where
             handlers,
             orelse,
             finalbody,
+        }
+        | StmtKind::TryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
         } => {
             any_over_body(body, func)
                 || handlers.iter().any(|handler| {

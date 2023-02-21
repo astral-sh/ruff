@@ -46,6 +46,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
             }
             StmtKind::If { body, .. }
             | StmtKind::Try { body, .. }
+            | StmtKind::TryStar { body, .. }
             | StmtKind::With { body, .. }
             | StmtKind::AsyncWith { body, .. } => {
                 walk_stmt(checker, body, f);

@@ -56,6 +56,12 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                     handlers,
                     orelse,
                     finalbody,
+                }
+                | StmtKind::TryStar {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
                 } => {
                     1 + num_branches(body)
                         + (if orelse.is_empty() {

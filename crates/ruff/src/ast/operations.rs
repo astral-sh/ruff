@@ -198,7 +198,10 @@ pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool 
     parents.any(|parent| {
         matches!(
             parent.node,
-            StmtKind::Try { .. } | StmtKind::If { .. } | StmtKind::With { .. }
+            StmtKind::Try { .. }
+                | StmtKind::TryStar { .. }
+                | StmtKind::If { .. }
+                | StmtKind::With { .. }
         )
     })
 }

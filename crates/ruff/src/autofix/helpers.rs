@@ -53,6 +53,12 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
             handlers,
             orelse,
             finalbody,
+        }
+        | StmtKind::TryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
         } => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))

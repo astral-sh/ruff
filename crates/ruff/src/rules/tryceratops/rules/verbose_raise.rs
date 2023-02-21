@@ -32,6 +32,9 @@ where
             StmtKind::Raise { exc, cause } => self.raises.push((exc.as_deref(), cause.as_deref())),
             StmtKind::Try {
                 body, finalbody, ..
+            }
+            | StmtKind::TryStar {
+                body, finalbody, ..
             } => {
                 for stmt in body.iter().chain(finalbody.iter()) {
                     visitor::walk_stmt(self, stmt);
