@@ -50,6 +50,7 @@ regex = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1" }
 strum = { version = "0.24.1" }
 textwrap = { version = "0.16.0" }
