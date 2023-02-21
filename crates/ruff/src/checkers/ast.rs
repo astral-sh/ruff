@@ -1832,11 +1832,7 @@ where
                     .rules
                     .enabled(&Rule::UnintentionalTypeAnnotation)
                 {
-                    if let Some(value) = value {
-                        flake8_bugbear::rules::unintentional_type_annotation(
-                            self, target, value, stmt,
-                        );
-                    }
+                    flake8_bugbear::rules::unintentional_type_annotation(self, target, value, stmt);
                 }
             }
             StmtKind::Delete { .. } => {}
