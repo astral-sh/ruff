@@ -117,3 +117,39 @@ for i in []:
         for i in []:  # no error
             for i in []:  # error
                 pass
+
+# For -> use in assignment target without actual assignment; subscript
+for i in []:
+    a[i] = 2  # no error
+    i[a] = 2  # no error
+
+# For -> use in assignment target without actual assignment; attribute
+for i in []:
+    a.i = 2  # no error
+    i.a = 2  # no error
+
+# For target with subscript -> assignment
+for a[0] in []:
+    a[0] = 2  # error
+    a[1] = 2  # no error
+
+# For target with subscript -> assignment
+for a['i'] in []:
+    a['i'] = 2  # error
+    a['j'] = 2  # no error
+
+# For target with attribute -> assignment
+for a.i in []:
+    a.i = 2  # error
+    a.j = 2  # no error
+
+# For target with double nested attribute -> assignment
+for a.i.j in []:
+    a.i.j = 2  # error
+    a.j.i = 2  # no error
+
+# For target with attribute -> assignment with different spacing
+for a.i in []:
+    a. i = 2  # error
+for a. i in []:
+    a.i = 2  # error

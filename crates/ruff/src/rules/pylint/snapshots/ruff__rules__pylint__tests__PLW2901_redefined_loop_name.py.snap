@@ -249,4 +249,82 @@ expression: diagnostics
     column: 17
   fix: ~
   parent: ~
+- kind:
+    RedefinedLoopName:
+      name: "a[0]"
+      outer_kind: For
+      inner_kind: Assignment
+  location:
+    row: 133
+    column: 4
+  end_location:
+    row: 133
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    RedefinedLoopName:
+      name: "a['i']"
+      outer_kind: For
+      inner_kind: Assignment
+  location:
+    row: 138
+    column: 4
+  end_location:
+    row: 138
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    RedefinedLoopName:
+      name: a.i
+      outer_kind: For
+      inner_kind: Assignment
+  location:
+    row: 143
+    column: 4
+  end_location:
+    row: 143
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    RedefinedLoopName:
+      name: a.i.j
+      outer_kind: For
+      inner_kind: Assignment
+  location:
+    row: 148
+    column: 4
+  end_location:
+    row: 148
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    RedefinedLoopName:
+      name: a.i
+      outer_kind: For
+      inner_kind: Assignment
+  location:
+    row: 153
+    column: 4
+  end_location:
+    row: 153
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    RedefinedLoopName:
+      name: a. i
+      outer_kind: For
+      inner_kind: Assignment
+  location:
+    row: 155
+    column: 4
+  end_location:
+    row: 155
+    column: 7
+  fix: ~
+  parent: ~
 

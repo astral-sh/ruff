@@ -1,16 +1,15 @@
-use crate::ast::helpers::find_names;
+use crate::ast::comparable::ComparableExpr;
 use crate::ast::types::{Node, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::source_code::Locator;
+use crate::settings::hashable::HashableRegex;
 use crate::violation::Violation;
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Expr, Stmt, StmtKind, Withitem};
+use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind, Withitem};
 use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::iter::zip;
+use std::{fmt, iter};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
 pub enum BindingKind {
@@ -80,47 +79,71 @@ impl Violation for RedefinedLoopName {
             inner_kind,
         } = self;
         format!(
-            "Outer {outer_kind} variable `{name}` overwritten by {inner_kind} target with same name"
+            "Outer {outer_kind} variable `{name}` overwritten by \
+            inner {inner_kind} target with same name"
         )
     }
 }
 
-struct InnerForWithAssignNamesVisitor<'a> {
-    locator: &'a Locator<'a>,
-    name_ranges: Vec<(Range, BindingKind)>,
+struct ExprWithBindingKind<'a> {
+    expr: &'a Expr,
+    binding_kind: BindingKind,
 }
 
-impl<'a, 'b> Visitor<'b> for InnerForWithAssignNamesVisitor<'_>
+struct InnerForWithAssignTargetsVisitor<'a> {
+    dummy_variable_rgx: &'a HashableRegex,
+    assignment_targets: Vec<ExprWithBindingKind<'a>>,
+}
+
+impl<'a, 'b> Visitor<'b> for InnerForWithAssignTargetsVisitor<'a>
 where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        // Collect target names.
+        // Collect target expressions.
         match &stmt.node {
             // For and async for.
             StmtKind::For { target, .. } | StmtKind::AsyncFor { target, .. } => {
-                self.name_ranges.extend(name_ranges_from_expr(
-                    target,
-                    self.locator,
-                    BindingKind::For,
-                ));
+                self.assignment_targets.extend(
+                    assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
+                        ExprWithBindingKind {
+                            expr,
+                            binding_kind: BindingKind::For,
+                        }
+                    }),
+                );
             }
             // With.
             StmtKind::With { items, .. } => {
-                self.name_ranges
-                    .extend(name_ranges_from_with_items(items, self.locator));
+                self.assignment_targets.extend(
+                    assignment_targets_from_with_items(items, self.dummy_variable_rgx).map(
+                        |expr| ExprWithBindingKind {
+                            expr,
+                            binding_kind: BindingKind::With,
+                        },
+                    ),
+                );
             }
             // Assignment, augmented assignment, and annotated assignment.
             StmtKind::Assign { targets, .. } => {
-                self.name_ranges
-                    .extend(name_ranges_from_assign_targets(targets, self.locator));
+                self.assignment_targets.extend(
+                    assignment_targets_from_assign_targets(targets, self.dummy_variable_rgx).map(
+                        |expr| ExprWithBindingKind {
+                            expr,
+                            binding_kind: BindingKind::Assignment,
+                        },
+                    ),
+                );
             }
             StmtKind::AugAssign { target, .. } | StmtKind::AnnAssign { target, .. } => {
-                self.name_ranges.extend(name_ranges_from_expr(
-                    target,
-                    self.locator,
-                    BindingKind::Assignment,
-                ));
+                self.assignment_targets.extend(
+                    assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
+                        ExprWithBindingKind {
+                            expr,
+                            binding_kind: BindingKind::Assignment,
+                        }
+                    }),
+                );
             }
             _ => {}
         }
@@ -137,58 +160,103 @@ where
     }
 }
 
-fn name_ranges_from_expr<'a, U>(
-    target: &'a Expr<U>,
-    locator: &'a Locator,
-    kind: BindingKind,
-) -> impl Iterator<Item = (Range, BindingKind)> + 'a {
-    find_names(target, locator).map(move |item| (item, kind))
+fn assignment_targets_from_expr<'a, U>(
+    expr: &'a Expr<U>,
+    dummy_variable_rgx: &'a HashableRegex,
+) -> Box<dyn Iterator<Item = &'a Expr<U>> + 'a> {
+    // The Box is necessary to ensure the match arms have the same return type - we can't use
+    // a cast to "impl Iterator", since at the time of writing that is only allowed for
+    // return types and argument types.
+    match &expr.node {
+        ExprKind::Attribute {
+            ctx: ExprContext::Store,
+            ..
+        } => Box::new(iter::once(expr)),
+        ExprKind::Subscript {
+            ctx: ExprContext::Store,
+            ..
+        } => Box::new(iter::once(expr)),
+        ExprKind::Starred {
+            ctx: ExprContext::Store,
+            value,
+            ..
+        } => Box::new(iter::once(&**value)),
+        ExprKind::Name {
+            ctx: ExprContext::Store,
+            id,
+            ..
+        } => {
+            // Ignore dummy variables.
+            if dummy_variable_rgx.is_match(id) {
+                Box::new(iter::empty())
+            } else {
+                Box::new(iter::once(expr))
+            }
+        }
+        ExprKind::List {
+            ctx: ExprContext::Store,
+            elts,
+            ..
+        } => Box::new(
+            elts.iter()
+                .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),
+        ),
+        ExprKind::Tuple {
+            ctx: ExprContext::Store,
+            elts,
+            ..
+        } => Box::new(
+            elts.iter()
+                .flat_map(|elt| assignment_targets_from_expr(elt, dummy_variable_rgx)),
+        ),
+        _ => Box::new(iter::empty()),
+    }
 }
 
-fn name_ranges_from_with_items<'a, U>(
+fn assignment_targets_from_with_items<'a, U>(
     items: &'a [Withitem<U>],
-    locator: &'a Locator,
-) -> impl Iterator<Item = (Range, BindingKind)> + 'a {
+    dummy_variable_rgx: &'a HashableRegex,
+) -> impl Iterator<Item = &'a Expr<U>> + 'a {
     items
         .iter()
         .filter_map(|item| {
             item.optional_vars
                 .as_ref()
-                .map(|expr| find_names(&**expr, locator))
+                .map(|expr| assignment_targets_from_expr(&**expr, dummy_variable_rgx))
         })
         .flatten()
-        .map(|item| (item, BindingKind::With))
 }
 
-fn name_ranges_from_assign_targets<'a, U>(
+fn assignment_targets_from_assign_targets<'a, U>(
     targets: &'a [Expr<U>],
-    locator: &'a Locator,
-) -> impl Iterator<Item = (Range, BindingKind)> + 'a {
+    dummy_variable_rgx: &'a HashableRegex,
+) -> impl Iterator<Item = &'a Expr<U>> + 'a {
     targets
         .iter()
-        .flat_map(|target| find_names(target, locator))
-        .map(|item| (item, BindingKind::Assignment))
+        .flat_map(|target| assignment_targets_from_expr(target, dummy_variable_rgx))
 }
 
 /// PLW2901
-pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>)
-where
-    'b: 'a,
-{
-    let (outer_name_ranges, inner_name_ranges) = match node {
+pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>) {
+    let (outer_assignment_targets, inner_assignment_targets) = match node {
         Node::Stmt(stmt) => match &stmt.node {
             // With.
             StmtKind::With { items, body, .. } => {
-                let name_ranges: Vec<(Range, BindingKind)> =
-                    name_ranges_from_with_items(items, checker.locator).collect();
-                let mut visitor = InnerForWithAssignNamesVisitor {
-                    locator: checker.locator,
-                    name_ranges: vec![],
+                let outer_assignment_targets: Vec<ExprWithBindingKind<'a>> =
+                    assignment_targets_from_with_items(items, &checker.settings.dummy_variable_rgx)
+                        .map(|expr| ExprWithBindingKind {
+                            expr,
+                            binding_kind: BindingKind::With,
+                        })
+                        .collect();
+                let mut visitor = InnerForWithAssignTargetsVisitor {
+                    dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                    assignment_targets: vec![],
                 };
                 for stmt in body {
                     visitor.visit_stmt(stmt);
                 }
-                (name_ranges, visitor.name_ranges)
+                (outer_assignment_targets, visitor.assignment_targets)
             }
             // For and async for.
             StmtKind::For {
@@ -205,16 +273,21 @@ where
                 orelse: _,
                 ..
             } => {
-                let name_ranges: Vec<(Range, BindingKind)> =
-                    name_ranges_from_expr(target, checker.locator, BindingKind::For).collect();
-                let mut visitor = InnerForWithAssignNamesVisitor {
-                    locator: checker.locator,
-                    name_ranges: vec![],
+                let outer_assignment_targets: Vec<ExprWithBindingKind<'a>> =
+                    assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
+                        .map(|expr| ExprWithBindingKind {
+                            expr,
+                            binding_kind: BindingKind::For,
+                        })
+                        .collect();
+                let mut visitor = InnerForWithAssignTargetsVisitor {
+                    dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
+                    assignment_targets: vec![],
                 };
                 for stmt in body {
                     visitor.visit_stmt(stmt);
                 }
-                (name_ranges, visitor.name_ranges)
+                (outer_assignment_targets, visitor.assignment_targets)
             }
             _ => panic!(
                 "redefined_loop_name called on Statement that is not a With, For, or AsyncFor"
@@ -223,26 +296,28 @@ where
         Node::Expr(_) => panic!("redefined_loop_name called on Node that is not a Statement"),
     };
 
-    let inner_names: Vec<&str> = inner_name_ranges
-        .iter()
-        .map(|range| checker.locator.slice(&range.0))
-        .collect();
-
-    for outer_range in &outer_name_ranges {
-        let outer_name = checker.locator.slice(&outer_range.0);
-        // Ignore dummy variables.
-        if checker.settings.dummy_variable_rgx.is_match(outer_name) {
-            continue;
-        }
-        for (inner_range, inner_name) in zip(inner_name_ranges.iter(), inner_names.iter()) {
-            if inner_name.eq(&outer_name) {
+    for outer_assignment_target in &outer_assignment_targets {
+        let mut outer_name = None;
+        for inner_assignment_target in &inner_assignment_targets {
+            // Compare the targets structurally.
+            if ComparableExpr::from(outer_assignment_target.expr)
+                .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
+            {
+                // Compute the textual name of the outer target lazily.
+                if outer_name.is_none() {
+                    outer_name = Some(
+                        checker
+                            .locator
+                            .slice(&Range::from_located(outer_assignment_target.expr)),
+                    );
+                }
                 checker.diagnostics.push(Diagnostic::new(
                     RedefinedLoopName {
-                        name: (*outer_name).to_string(),
-                        outer_kind: outer_range.1,
-                        inner_kind: inner_range.1,
+                        name: (*outer_name.unwrap()).to_string(),
+                        outer_kind: outer_assignment_target.binding_kind,
+                        inner_kind: inner_assignment_target.binding_kind,
                     },
-                    inner_range.0,
+                    Range::from_located(inner_assignment_target.expr),
                 ));
             }
         }
