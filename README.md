@@ -27,6 +27,7 @@ An extremely fast Python linter, written in Rust.
 * ⚡️  10-100x faster than existing linters
 * 🐍  Installable via `pip`
 * 🛠️  `pyproject.toml` support
+* 🤝  Python 3.11 compatibility
 * 📦  Built-in caching, to avoid re-analyzing unchanged files
 * 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
 * 📏  Over [400 built-in rules](https://beta.ruff.rs/docs/rules/) (and growing)
