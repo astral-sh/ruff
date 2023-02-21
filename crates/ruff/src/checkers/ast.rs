@@ -1827,6 +1827,17 @@ where
                         pycodestyle::rules::lambda_assignment(self, target, value, stmt);
                     }
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnintentionalTypeAnnotation)
+                {
+                    if let Some(value) = value {
+                        flake8_bugbear::rules::unintentional_type_annotation(
+                            self, target, value, stmt,
+                        );
+                    }
+                }
             }
             StmtKind::Delete { .. } => {}
             StmtKind::Expr { value, .. } => {
