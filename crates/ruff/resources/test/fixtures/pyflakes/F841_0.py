@@ -119,3 +119,5 @@ def f(x: int):
             print("A")
         case [Bar.A, *_]:
             print("A")
+        case y:
+            pass

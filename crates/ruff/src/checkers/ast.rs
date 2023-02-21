@@ -10,7 +10,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
-    ExprKind, KeywordData, Located, Location, Operator, Stmt, StmtKind, Suite,
+    ExprKind, KeywordData, Located, Location, Operator, Pattern, PatternKind, Stmt, StmtKind,
+    Suite,
 };
 use rustpython_parser::parser;
 use smallvec::smallvec;
@@ -28,7 +29,7 @@ use crate::ast::types::{
     RefEquality, Scope, ScopeKind,
 };
 use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
-use crate::ast::visitor::{walk_excepthandler, Visitor};
+use crate::ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::registry::{Diagnostic, Rule};
@@ -3838,6 +3839,28 @@ where
                 }
             }
         }
+    }
+
+    fn visit_pattern(&mut self, pattern: &'b Pattern) {
+        if let PatternKind::MatchAs {
+            name: Some(name), ..
+        } = &pattern.node
+        {
+            self.add_binding(
+                name,
+                Binding {
+                    kind: BindingKind::Assignment,
+                    runtime_usage: None,
+                    synthetic_usage: None,
+                    typing_usage: None,
+                    range: Range::from_located(pattern),
+                    source: Some(self.current_stmt().clone()),
+                    context: self.execution_context(),
+                },
+            );
+        }
+
+        walk_pattern(self, pattern);
     }
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
