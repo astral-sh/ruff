@@ -358,7 +358,12 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Lambda { args, body } = &expr.node else {
         unreachable!("Expected ExprKind::Lambda");
     };
-    if args.args.is_empty() {
+    if args.args.is_empty()
+        && args.kwonlyargs.is_empty()
+        && args.posonlyargs.is_empty()
+        && args.vararg.is_none()
+        && args.kwarg.is_none()
+    {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(PreferListBuiltin, Range::from_located(expr));
