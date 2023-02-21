@@ -205,7 +205,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
             visitor.visit_body(body);
         }
         StmtKind::Match { subject, cases } => {
-            // TODO(charlie): Handle `cases`.
             visitor.visit_expr(subject);
             for match_case in cases {
                 visitor.visit_match_case(match_case);

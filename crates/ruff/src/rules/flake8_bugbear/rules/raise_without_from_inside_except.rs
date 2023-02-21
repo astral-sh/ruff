@@ -57,11 +57,17 @@ impl<'a> Visitor<'a> for RaiseVisitor {
             | StmtKind::AsyncFor { body, .. } => {
                 visitor::walk_body(self, body);
             }
+            StmtKind::Match { cases, .. } => {
+                for case in cases {
+                    visitor::walk_body(self, &case.body);
+                }
+            }
             _ => {}
         }
     }
 }
 
+/// B904
 pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
     let mut visitor = RaiseVisitor {
         diagnostics: vec![],

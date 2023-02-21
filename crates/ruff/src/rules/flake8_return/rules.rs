@@ -255,6 +255,13 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 checker.diagnostics.push(diagnostic);
             }
         }
+        StmtKind::Match { cases, .. } => {
+            for case in cases {
+                if let Some(last_stmt) = case.body.last() {
+                    implicit_return(checker, last_stmt);
+                }
+            }
+        }
         StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => {
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);

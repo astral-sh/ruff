@@ -82,6 +82,12 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += 1;
                 }
             }
+            StmtKind::Match { cases, .. } => {
+                complexity += 1;
+                for case in cases {
+                    complexity += get_complexity_number(&case.body);
+                }
+            }
             StmtKind::Try {
                 body,
                 handlers,

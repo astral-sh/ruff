@@ -150,4 +150,40 @@ expression: diagnostics
       row: 85
       column: 31
   parent: ~
+- kind:
+    UnusedVariable:
+      name: msg3
+  location:
+    row: 102
+    column: 4
+  end_location:
+    row: 102
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 102
+      column: 0
+    end_location:
+      row: 103
+      column: 0
+  parent: ~
+- kind:
+    UnusedVariable:
+      name: Baz
+  location:
+    row: 115
+    column: 4
+  end_location:
+    row: 115
+    column: 7
+  fix:
+    content: ""
+    location:
+      row: 115
+      column: 4
+    end_location:
+      row: 115
+      column: 10
+  parent: ~
 

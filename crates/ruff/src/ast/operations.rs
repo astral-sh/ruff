@@ -181,7 +181,10 @@ pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, &Stmt> {
 /// Check if a node is parent of a conditional branch.
 pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {
-        if matches!(parent.node, StmtKind::If { .. } | StmtKind::While { .. }) {
+        if matches!(
+            parent.node,
+            StmtKind::If { .. } | StmtKind::While { .. } | StmtKind::Match { .. }
+        ) {
             return true;
         }
         if let StmtKind::Expr { value } = &parent.node {

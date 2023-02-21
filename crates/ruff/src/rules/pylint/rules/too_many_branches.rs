@@ -28,7 +28,6 @@ fn num_branches(stmts: &[Stmt]) -> usize {
     stmts
         .iter()
         .map(|stmt| {
-            // TODO(charlie): Account for pattern match statement.
             match &stmt.node {
                 StmtKind::If { body, orelse, .. } => {
                     1 + num_branches(body)
@@ -40,6 +39,12 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                             0
                         })
                         + num_branches(orelse)
+                }
+                StmtKind::Match { cases, .. } => {
+                    1 + cases
+                        .iter()
+                        .map(|case| num_branches(&case.body))
+                        .sum::<usize>()
                 }
                 StmtKind::For { body, orelse, .. }
                 | StmtKind::AsyncFor { body, orelse, .. }

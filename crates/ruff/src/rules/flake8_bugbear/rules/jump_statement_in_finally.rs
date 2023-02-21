@@ -51,6 +51,11 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
             | StmtKind::AsyncWith { body, .. } => {
                 walk_stmt(checker, body, f);
             }
+            StmtKind::Match { cases, .. } => {
+                for case in cases {
+                    walk_stmt(checker, &case.body, f);
+                }
+            }
             _ => {}
         }
     }
