@@ -3,31 +3,57 @@
 
 use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind, Suite};
 use rustpython_parser::lexer::{LexResult, Tok};
+use std::iter::FusedIterator;
 
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub fn doc_lines_from_tokens(lxr: &[LexResult]) -> Vec<usize> {
-    let mut doc_lines: Vec<usize> = Vec::default();
-    let mut prev: Option<usize> = None;
-    for (start, tok, end) in lxr.iter().flatten() {
-        if matches!(tok, Tok::Indent | Tok::Dedent | Tok::Newline) {
-            continue;
-        }
-        if matches!(tok, Tok::Comment(..)) {
-            if let Some(prev) = prev {
-                if start.row() > prev {
-                    doc_lines.push(start.row());
-                }
-            } else {
-                doc_lines.push(start.row());
-            }
-        }
-        prev = Some(end.row());
-    }
-    doc_lines
+pub fn doc_lines_from_tokens(lxr: &[LexResult]) -> DocLines {
+    DocLines::new(lxr)
 }
+
+pub struct DocLines<'a> {
+    inner: std::iter::Flatten<core::slice::Iter<'a, LexResult>>,
+    prev: Option<usize>,
+}
+
+impl<'a> DocLines<'a> {
+    fn new(lxr: &'a [LexResult]) -> Self {
+        Self {
+            inner: lxr.iter().flatten(),
+            prev: None,
+        }
+    }
+}
+
+impl Iterator for DocLines<'_> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (start, tok, end) = self.inner.next()?;
+
+            match tok {
+                Tok::Indent | Tok::Dedent | Tok::Newline => continue,
+                Tok::Comment(..) => {
+                    if let Some(prev) = self.prev {
+                        if start.row() > prev {
+                            break Some(start.row());
+                        }
+                    } else {
+                        break Some(start.row());
+                    }
+                }
+                _ => {}
+            }
+
+            self.prev = Some(end.row());
+        }
+    }
+}
+
+impl FusedIterator for DocLines<'_> {}
 
 #[derive(Default)]
 struct StringLinesVisitor {
