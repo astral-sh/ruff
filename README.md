@@ -184,6 +184,8 @@ Or, to enable autofix:
       args: [--fix, --exit-non-zero-on-fix]
 ```
 
+Note that Ruff's pre-commit hook should run before Black, isort, and other formatting tools.
+
 <!-- End section: Installation and Usage -->
 
 ## Configuration
