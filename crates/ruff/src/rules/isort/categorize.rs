@@ -6,12 +6,13 @@ use log::debug;
 use ruff_python::sys::KNOWN_STANDARD_LIBRARY;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
 use super::types::{ImportBlock, Importable};
 use crate::settings::types::PythonVersion;
 
 #[derive(
-    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash,
+    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash, EnumIter,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ImportType {
