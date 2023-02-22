@@ -1,13 +1,10 @@
+use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
 use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
-
-use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

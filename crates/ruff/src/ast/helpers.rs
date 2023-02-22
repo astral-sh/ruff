@@ -9,10 +9,7 @@ use rustpython_parser::ast::{
     Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
     Located, Location, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
 };
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::StringKind;
-use rustpython_parser::Tok;
+use rustpython_parser::{lexer, Mode, StringKind, Tok};
 use smallvec::{smallvec, SmallVec};
 
 use crate::ast::types::{Binding, BindingKind, CallPath, Range};

@@ -1,11 +1,8 @@
 use anyhow::{bail, Result};
 use libcst_native::{Call, Codegen, CodegenState, Dict, DictElement, Expression};
-use rustpython_parser::ast::{Excepthandler, Expr};
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
-
 use ruff_python::string::strip_quotes_and_prefixes;
+use rustpython_parser::ast::{Excepthandler, Expr};
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::cst::matchers::{match_expr, match_module};

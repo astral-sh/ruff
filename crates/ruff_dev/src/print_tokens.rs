@@ -5,8 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
+use rustpython_parser::{lexer, Mode};
 
 #[derive(clap::Args)]
 pub struct Args {

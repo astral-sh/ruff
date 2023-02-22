@@ -46,7 +46,8 @@ pub struct TriviaToken {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TriviaKind {
-    /// A Comment that is separated by at least one line break from the preceding token.
+    /// A Comment that is separated by at least one line break from the
+    /// preceding token.
     ///
     /// # Examples
     ///

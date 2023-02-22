@@ -1,9 +1,7 @@
 use std::borrow::Cow;
 
 use rustpython_parser::ast::Location;
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::source_code::Locator;

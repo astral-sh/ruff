@@ -50,9 +50,8 @@ impl From<&[LexResult]> for Indexer {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::Mode;
+    use rustpython_parser::{lexer, Mode};
 
     use crate::source_code::Indexer;
 

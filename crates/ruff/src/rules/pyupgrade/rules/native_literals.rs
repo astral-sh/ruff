@@ -2,9 +2,7 @@ use std::fmt;
 
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;

@@ -4,9 +4,7 @@ use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
 use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, StmtKind};
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers;
 use crate::ast::helpers::to_absolute;

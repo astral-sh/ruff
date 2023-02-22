@@ -1,13 +1,10 @@
 use rustpython_parser::ast::{Location, Stmt};
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
+use super::types::TrailingComma;
 use crate::ast::helpers::is_docstring_stmt;
 use crate::ast::types::Range;
 use crate::source_code::Locator;
-
-use super::types::TrailingComma;
 
 /// Return `true` if a `StmtKind::ImportFrom` statement ends with a magic
 /// trailing comma.
@@ -129,9 +126,8 @@ mod tests {
     use rustpython_parser as parser;
     use rustpython_parser::ast::Location;
 
-    use crate::source_code::Locator;
-
     use super::find_splice_location;
+    use crate::source_code::Locator;
 
     fn splice_contents(contents: &str) -> Result<Location> {
         let program = parser::parse_program(contents, "<filename>")?;

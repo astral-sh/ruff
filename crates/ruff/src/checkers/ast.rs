@@ -6,6 +6,8 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
+use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python::typing::TYPING_EXTENSIONS;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser as parser;
@@ -15,9 +17,6 @@ use rustpython_parser::ast::{
     Suite,
 };
 use smallvec::smallvec;
-
-use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python::typing::TYPING_EXTENSIONS;
 
 use crate::ast::helpers::{
     binding_range, collect_call_path, extract_handler_names, from_relative_import, to_module_path,
@@ -2060,8 +2059,8 @@ where
                 value,
                 ..
             } => {
-                // If we're in a class or module scope, then the annotation needs to be available
-                // at runtime.
+                // If we're in a class or module scope, then the annotation needs to be
+                // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 if !self.annotations_future_enabled
                     && matches!(

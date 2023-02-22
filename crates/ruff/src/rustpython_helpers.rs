@@ -1,9 +1,7 @@
 use rustpython_parser as parser;
 use rustpython_parser::ast::{Mod, Suite};
-use rustpython_parser::lexer;
 use rustpython_parser::lexer::LexResult;
-use rustpython_parser::Mode;
-use rustpython_parser::ParseError;
+use rustpython_parser::{lexer, Mode, ParseError};
 
 /// Collect tokens up to and including the first error.
 pub fn tokenize(contents: &str) -> Vec<LexResult> {

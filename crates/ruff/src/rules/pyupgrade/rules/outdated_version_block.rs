@@ -2,12 +2,9 @@ use std::cmp::Ordering;
 
 use log::error;
 use num_bigint::{BigInt, Sign};
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
-
 use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::{Range, RefEquality};
 use crate::ast::whitespace::indentation;

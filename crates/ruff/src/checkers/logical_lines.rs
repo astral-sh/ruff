@@ -152,9 +152,8 @@ pub fn check_logical_lines(
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::Mode;
+    use rustpython_parser::{lexer, Mode};
 
     use crate::checkers::logical_lines::iter_logical_lines;
     use crate::source_code::Locator;

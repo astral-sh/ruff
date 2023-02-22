@@ -1,8 +1,6 @@
 use anyhow::{bail, Result};
 use rustpython_parser::ast::Stmt;
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;

@@ -1,9 +1,7 @@
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, StmtKind};
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers::any_over_expr;
 use crate::ast::types::{BindingKind, Scope};

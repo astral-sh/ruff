@@ -4,9 +4,7 @@ use anyhow::{anyhow, Result};
 use log::error;
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
-use rustpython_parser::lexer;
-use rustpython_parser::Mode;
-use rustpython_parser::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;

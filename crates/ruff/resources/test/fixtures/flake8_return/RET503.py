@@ -289,3 +289,7 @@ def x(y):
             return 1
         case 1:
             print()  # error
+
+
+def foo(baz: str) -> str:
+    return baz

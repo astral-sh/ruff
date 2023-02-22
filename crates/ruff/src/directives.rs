@@ -151,9 +151,8 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
 #[cfg(test)]
 mod tests {
     use nohash_hasher::{IntMap, IntSet};
-    use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::Mode;
+    use rustpython_parser::{lexer, Mode};
 
     use crate::directives::{extract_isort_directives, extract_noqa_line_for};
 
