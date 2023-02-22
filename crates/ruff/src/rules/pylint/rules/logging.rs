@@ -11,22 +11,76 @@ use crate::rules::pyflakes::cformat::CFormatSummary;
 use crate::violation::Violation;
 
 define_violation!(
+    /// ## What it does
+    /// Checks for too few positional arguments for a `logging` format string.
+    ///
+    /// ## Why is this bad?
+    /// A `TypeError` will be raised if the statement is run.
+    ///
+    /// ## Example
+    /// ```python
+    /// import logging
+    ///
+    /// try:
+    ///     function()
+    /// except Exception as e:
+    ///     logging.error('%s error occurred: %s', e)  # [logging-too-few-args]
+    ///     raise
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// import logging
+    ///
+    /// try:
+    ///     function()
+    /// except Exception as e:
+    ///     logging.error('%s error occurred: %s', type(e), e)
+    ///     raise
+    /// ```
     pub struct LoggingTooFewArgs;
 );
 impl Violation for LoggingTooFewArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Not enough arguments for logging format string")
+        format!("Not enough arguments for `logging` format string")
     }
 }
 
 define_violation!(
+    /// ## What it does
+    /// Checks for too many positional arguments for a `logging` format string.
+    ///
+    /// ## Why is this bad?
+    /// A `TypeError` will be raised if the statement is run.
+    ///
+    /// ## Example
+    /// ```python
+    /// import logging
+    ///
+    /// try:
+    ///     function()
+    /// except Exception as e:
+    ///     logging.error('Error occurred: %s', type(e), e)  # [logging-too-many-args]
+    ///     raise
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// import logging
+    ///
+    /// try:
+    ///     function()
+    /// except Exception as e:
+    ///     logging.error('%s error occurred: %s', type(e), e)
+    ///     raise
+    /// ```
     pub struct LoggingTooManyArgs;
 );
 impl Violation for LoggingTooManyArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Too many arguments for logging format string")
+        format!("Too many arguments for `logging` format string")
     }
 }
 
@@ -37,7 +91,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     }
 
     if let ExprKind::Attribute { attr, .. } = &func.node {
-        if let Some(_logging_level) = LoggingLevel::from_str(attr.as_str()) {
+        if LoggingLevel::from_str(attr.as_str()).is_some() {
             let call_args = SimpleCallArgs::new(args, keywords);
 
             // E1205 - E1206
