@@ -3,10 +3,10 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::helpers::{is_logger_candidate, SimpleCallArgs};
+use crate::ast::logging::LoggingLevel;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, Rule};
-use crate::rules::flake8_logging_format::rules::LoggingLevel;
 use crate::rules::pyflakes::cformat::CFormatSummary;
 use crate::violation::Violation;
 
