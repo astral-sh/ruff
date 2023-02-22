@@ -3,7 +3,7 @@ members = ["crates/*"]
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.65.0"
+rust-version = "1.67.0"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.66" }
