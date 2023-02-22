@@ -152,6 +152,7 @@ mod tests {
     use nohash_hasher::{IntMap, IntSet};
     use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
+    use rustpython_parser::mode::Mode;
 
     use crate::directives::{extract_isort_directives, extract_noqa_line_for};
 
@@ -161,6 +162,7 @@ mod tests {
             "x = 1
 y = 2
 z = x + 1",
+            Mode::Module,
         )
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
@@ -170,6 +172,7 @@ z = x + 1",
 x = 1
 y = 2
 z = x + 1",
+            Mode::Module,
         )
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
@@ -179,6 +182,7 @@ z = x + 1",
 y = 2
 z = x + 1
         ",
+            Mode::Module,
         )
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
@@ -189,6 +193,7 @@ z = x + 1
 y = 2
 z = x + 1
         ",
+            Mode::Module,
         )
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
@@ -200,6 +205,7 @@ ghi
 '''
 y = 2
 z = x + 1",
+            Mode::Module,
         )
         .collect();
         assert_eq!(
@@ -214,6 +220,7 @@ def
 ghi
 '''
 z = 2",
+            Mode::Module,
         )
         .collect();
         assert_eq!(
@@ -227,6 +234,7 @@ y = '''abc
 def
 ghi
 '''",
+            Mode::Module,
         )
         .collect();
         assert_eq!(
@@ -237,6 +245,7 @@ ghi
         let lxr: Vec<LexResult> = lexer::make_tokenizer(
             r#"x = \
     1"#,
+            Mode::Module,
         )
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::from_iter([(1, 2)]));
@@ -245,6 +254,7 @@ ghi
             r#"from foo import \
     bar as baz, \
     qux as quux"#,
+            Mode::Module,
         )
         .collect();
         assert_eq!(
@@ -262,6 +272,7 @@ x = \
     1
 y = \
     2"#,
+            Mode::Module,
         )
         .collect();
         assert_eq!(
@@ -275,7 +286,7 @@ y = \
         let contents = "x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).exclusions, IntSet::default());
 
         let contents = "# isort: off
@@ -283,7 +294,7 @@ x = 1
 y = 2
 # isort: on
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
         assert_eq!(
             extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([2, 3, 4])
@@ -296,7 +307,7 @@ y = 2
 # isort: on
 z = x + 1
 # isort: on";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
         assert_eq!(
             extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([2, 3, 4, 5])
@@ -306,7 +317,7 @@ z = x + 1
 x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
         assert_eq!(
             extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([2, 3, 4])
@@ -316,7 +327,7 @@ z = x + 1";
 x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).exclusions, IntSet::default());
 
         let contents = "# isort: off
@@ -325,7 +336,7 @@ x = 1
 y = 2
 # isort: skip_file
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).exclusions, IntSet::default());
     }
 
@@ -334,20 +345,20 @@ z = x + 1";
         let contents = "x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).splits, Vec::<usize>::new());
 
         let contents = "x = 1
 y = 2
 # isort: split
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).splits, vec![3]);
 
         let contents = "x = 1
 y = 2  # isort: split
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).splits, vec![2]);
     }
 }
