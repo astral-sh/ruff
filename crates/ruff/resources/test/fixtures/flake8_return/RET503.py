@@ -3,6 +3,8 @@ import os
 import posix
 from posix import abort
 import sys as std_sys
+import typing
+import typing_extensions
 import _thread
 import _winapi
 
@@ -209,6 +211,18 @@ def noreturn_sys_exit():
     if x > 0:
         return 1
     std_sys.exit(0)
+
+
+def noreturn_typing_assert_never():
+    if x > 0:
+        return 1
+    typing.assert_never(0)
+
+
+def noreturn_typing_extensions_assert_never():
+    if x > 0:
+        return 1
+    typing_extensions.assert_never(0)
 
 
 def noreturn__thread_exit():
