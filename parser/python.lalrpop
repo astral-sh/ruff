@@ -359,7 +359,15 @@ CompoundStatement: ast::Stmt = {
 };
 
 MatchStatement: ast::Stmt = {
-    <location:@L> "match" <subject:TestOrStarNamedExpr> ":" "\n" Indent <cases:MatchCase+> Dedent <end_location:@R> => {
+    <location:@L> "match" <subject:TestOrStarNamedExpr> ":" "\n" Indent <cases:MatchCase+> Dedent => {
+       let end_location = cases
+            .last()
+            .unwrap()
+            .body
+            .last()
+            .unwrap()
+            .end_location
+            .unwrap();
         ast::Stmt {
             location,
             end_location: Some(end_location),
@@ -370,7 +378,15 @@ MatchStatement: ast::Stmt = {
             }
         }
     },
-    <location:@L> "match" <subject:TestOrStarNamedExpr> "," ":" "\n" Indent <cases:MatchCase+> Dedent <end_location:@R> => {
+    <location:@L> "match" <subject:TestOrStarNamedExpr> "," ":" "\n" Indent <cases:MatchCase+> Dedent => {
+       let end_location = cases
+            .last()
+            .unwrap()
+            .body
+            .last()
+            .unwrap()
+            .end_location
+            .unwrap();
         ast::Stmt {
             location,
             end_location: Some(end_location),
@@ -381,7 +397,15 @@ MatchStatement: ast::Stmt = {
             }
         }
     },
-    <location:@L> "match" <subject:TestOrStarNamedExpr> "," <subjects:OneOrMore<TestOrStarNamedExpr>> ","? ":" "\n" Indent <cases:MatchCase+> Dedent <end_location:@R> => {
+    <location:@L> "match" <subject:TestOrStarNamedExpr> "," <subjects:OneOrMore<TestOrStarNamedExpr>> ","? ":" "\n" Indent <cases:MatchCase+> Dedent => {
+        let end_location = cases
+            .last()
+            .unwrap()
+            .body
+            .last()
+            .unwrap()
+            .end_location
+            .unwrap();
         let mut subjects = subjects;
         subjects.insert(0, subject);
         ast::Stmt {
