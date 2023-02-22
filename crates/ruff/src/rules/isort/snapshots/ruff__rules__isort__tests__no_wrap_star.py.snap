@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,9 +11,7 @@ expression: diagnostics
     row: 2
     column: 0
   fix:
-    content:
-      - "from .subscription import *  # type: ignore  # some very long comment explaining why this needs a type ignore"
-      - ""
+    content: "from .subscription import *  # type: ignore  # some very long comment explaining why this needs a type ignore\n"
     location:
       row: 1
       column: 0

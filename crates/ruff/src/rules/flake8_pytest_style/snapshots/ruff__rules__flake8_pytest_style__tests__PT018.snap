@@ -6,192 +6,190 @@ expression: diagnostics
     CompositeAssertion:
       fixable: true
   location:
-    row: 13
+    row: 14
     column: 4
   end_location:
-    row: 13
+    row: 14
     column: 39
   fix:
-    content:
-      - assert something
-      - assert something_else
+    content: "    assert something\n    assert something_else\n"
     location:
-      row: 13
-      column: 4
+      row: 14
+      column: 0
     end_location:
-      row: 13
-      column: 39
+      row: 15
+      column: 0
   parent: ~
 - kind:
     CompositeAssertion:
       fixable: true
   location:
-    row: 14
+    row: 15
     column: 4
   end_location:
-    row: 14
+    row: 15
     column: 59
   fix:
-    content:
-      - assert something
-      - assert something_else
-      - assert something_third
+    content: "    assert something and something_else\n    assert something_third\n"
     location:
-      row: 14
-      column: 4
+      row: 15
+      column: 0
     end_location:
-      row: 14
-      column: 59
+      row: 16
+      column: 0
   parent: ~
 - kind:
     CompositeAssertion:
       fixable: true
   location:
-    row: 15
+    row: 16
     column: 4
   end_location:
-    row: 15
+    row: 16
     column: 43
   fix:
-    content:
-      - assert something
-      - assert not something_else
+    content: "    assert something\n    assert not something_else\n"
     location:
-      row: 15
-      column: 4
+      row: 16
+      column: 0
     end_location:
-      row: 15
-      column: 43
+      row: 17
+      column: 0
   parent: ~
 - kind:
     CompositeAssertion:
       fixable: true
   location:
-    row: 16
+    row: 17
     column: 4
   end_location:
-    row: 16
+    row: 17
     column: 60
   fix:
-    content:
-      - assert something
-      - assert something_else or something_third
+    content: "    assert something\n    assert (something_else or something_third)\n"
     location:
-      row: 16
-      column: 4
+      row: 17
+      column: 0
     end_location:
-      row: 16
-      column: 60
+      row: 18
+      column: 0
   parent: ~
 - kind:
     CompositeAssertion:
       fixable: true
   location:
-    row: 17
+    row: 18
     column: 4
   end_location:
-    row: 17
+    row: 18
     column: 43
   fix:
-    content:
-      - assert not something
-      - assert something_else
+    content: "    assert not something\n    assert something_else\n"
     location:
-      row: 17
-      column: 4
+      row: 18
+      column: 0
     end_location:
-      row: 17
-      column: 43
+      row: 19
+      column: 0
   parent: ~
 - kind:
     CompositeAssertion:
       fixable: true
   location:
-    row: 18
+    row: 19
     column: 4
   end_location:
-    row: 18
+    row: 19
     column: 44
   fix:
-    content:
-      - assert not something
-      - assert not something_else
+    content: "    assert not something\n    assert not something_else\n"
     location:
-      row: 18
-      column: 4
+      row: 19
+      column: 0
     end_location:
-      row: 18
-      column: 44
+      row: 20
+      column: 0
   parent: ~
 - kind:
     CompositeAssertion:
       fixable: true
   location:
-    row: 19
+    row: 20
     column: 4
   end_location:
-    row: 19
+    row: 20
     column: 63
   fix:
-    content:
-      - assert not something
-      - assert not something_else
-      - assert not something_third
+    content: "    assert not something or something_else\n    assert not something_third\n"
     location:
-      row: 19
-      column: 4
+      row: 20
+      column: 0
     end_location:
-      row: 19
-      column: 63
+      row: 21
+      column: 0
   parent: ~
 - kind:
     CompositeAssertion:
       fixable: true
   location:
-    row: 22
+    row: 21
     column: 4
   end_location:
-    row: 22
+    row: 23
+    column: 7
+  fix:
+    content: "    assert something\n    assert something_else == \"\"\"error\n    message\n    \"\"\"\n"
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 24
+      column: 0
+  parent: ~
+- kind:
+    CompositeAssertion:
+      fixable: true
+  location:
+    row: 26
+    column: 4
+  end_location:
+    row: 26
     column: 34
   fix:
-    content:
-      - assert not a
-      - assert b or c
+    content: "    assert not a\n    assert (b or c)\n"
     location:
-      row: 22
-      column: 4
+      row: 26
+      column: 0
     end_location:
-      row: 22
-      column: 34
+      row: 27
+      column: 0
   parent: ~
 - kind:
     CompositeAssertion:
       fixable: true
   location:
-    row: 23
+    row: 27
     column: 4
   end_location:
-    row: 23
+    row: 27
     column: 35
   fix:
-    content:
-      - assert not a
-      - assert b and c
+    content: "    assert not a\n    assert (b and c)\n"
     location:
-      row: 23
-      column: 4
+      row: 27
+      column: 0
     end_location:
-      row: 23
-      column: 35
+      row: 28
+      column: 0
   parent: ~
 - kind:
     CompositeAssertion:
       fixable: false
   location:
-    row: 26
+    row: 30
     column: 4
   end_location:
-    row: 26
+    row: 30
     column: 56
   fix: ~
   parent: ~
@@ -199,10 +197,10 @@ expression: diagnostics
     CompositeAssertion:
       fixable: false
   location:
-    row: 27
+    row: 31
     column: 4
   end_location:
-    row: 27
+    row: 31
     column: 80
   fix: ~
   parent: ~
@@ -210,11 +208,22 @@ expression: diagnostics
     CompositeAssertion:
       fixable: false
   location:
-    row: 29
+    row: 33
     column: 4
   end_location:
-    row: 29
+    row: 33
     column: 64
+  fix: ~
+  parent: ~
+- kind:
+    CompositeAssertion:
+      fixable: true
+  location:
+    row: 35
+    column: 4
+  end_location:
+    row: 41
+    column: 5
   fix: ~
   parent: ~
 

@@ -11,8 +11,7 @@ expression: diagnostics
     row: 8
     column: 12
   fix:
-    content:
-      - raise AssertionError()
+    content: raise AssertionError()
     location:
       row: 8
       column: 0
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 10
     column: 12
   fix:
-    content:
-      - "raise AssertionError(\"message\")"
+    content: "raise AssertionError(\"message\")"
     location:
       row: 10
       column: 0

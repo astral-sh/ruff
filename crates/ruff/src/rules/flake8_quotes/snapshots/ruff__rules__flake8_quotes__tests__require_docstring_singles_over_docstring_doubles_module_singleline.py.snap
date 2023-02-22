@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_quotes/mod.rs
+source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 1
     column: 49
   fix:
-    content:
-      - "''' Double quotes singleline module docstring '''"
+    content: "''' Double quotes singleline module docstring '''"
     location:
       row: 1
       column: 0

@@ -29,12 +29,9 @@ If you're looking for a place to start, we recommend implementing a new lint rul
 pattern-match against the examples in the existing codebase. Many lint rules are inspired by
 existing Python plugins, which can be used as a reference implementation.
 
-As a concrete example: consider taking on one of the rules from the [`tryceratops`](https://github.com/charliermarsh/ruff/issues/2056)
-plugin, and looking to the originating [Python source](https://github.com/guilatrova/tryceratops)
+As a concrete example: consider taking on one of the rules from the [`flake8-pyi`](https://github.com/charliermarsh/ruff/issues/848)
+plugin, and looking to the originating [Python source](https://github.com/PyCQA/flake8-pyi)
 for guidance.
-
-Alternatively, we've started work on the [`flake8-pyi`](https://github.com/charliermarsh/ruff/issues/848)
-plugin (see the [Python source](https://github.com/PyCQA/flake8-pyi)) -- another good place to start.
 
 ### Prerequisites
 

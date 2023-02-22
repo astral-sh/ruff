@@ -11,9 +11,7 @@ expression: diagnostics
     row: 19
     column: 16
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 19
       column: 16
@@ -30,9 +28,7 @@ expression: diagnostics
     row: 25
     column: 15
   fix:
-    content:
-      - ""
-      - "        return None"
+    content: "\n        return None"
     location:
       row: 25
       column: 15
@@ -49,9 +45,7 @@ expression: diagnostics
     row: 34
     column: 11
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 34
       column: 11
@@ -68,9 +62,7 @@ expression: diagnostics
     row: 41
     column: 20
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 41
       column: 20
@@ -87,9 +79,7 @@ expression: diagnostics
     row: 50
     column: 15
   fix:
-    content:
-      - ""
-      - "        return None"
+    content: "\n        return None"
     location:
       row: 50
       column: 15
@@ -106,9 +96,7 @@ expression: diagnostics
     row: 57
     column: 22
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 57
       column: 22
@@ -125,9 +113,7 @@ expression: diagnostics
     row: 64
     column: 21
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 64
       column: 21
@@ -144,9 +130,7 @@ expression: diagnostics
     row: 83
     column: 14
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 83
       column: 14
@@ -163,9 +147,7 @@ expression: diagnostics
     row: 114
     column: 16
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 114
       column: 16
@@ -182,9 +164,7 @@ expression: diagnostics
     row: 124
     column: 19
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 124
       column: 19
@@ -201,9 +181,7 @@ expression: diagnostics
     row: 131
     column: 16
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 131
       column: 16
@@ -220,9 +198,7 @@ expression: diagnostics
     row: 141
     column: 19
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 141
       column: 19
@@ -239,14 +215,29 @@ expression: diagnostics
     row: 261
     column: 20
   fix:
-    content:
-      - ""
-      - "    return None"
+    content: "\n    return None"
     location:
       row: 261
       column: 20
     end_location:
       row: 261
       column: 20
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 277
+    column: 12
+  end_location:
+    row: 277
+    column: 19
+  fix:
+    content: "\n            return None"
+    location:
+      row: 277
+      column: 19
+    end_location:
+      row: 277
+      column: 19
   parent: ~
 

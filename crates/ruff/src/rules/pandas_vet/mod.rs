@@ -8,6 +8,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;
@@ -17,7 +18,7 @@ mod tests {
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, directives, rustpython_helpers, settings};
+    use crate::{directives, rustpython_helpers, settings};
 
     fn rule_code(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);

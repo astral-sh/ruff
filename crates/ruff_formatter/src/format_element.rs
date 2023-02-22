@@ -385,4 +385,4 @@ static_assert!(std::mem::size_of::<crate::format_element::Tag>() == 16usize);
 
 #[cfg(not(debug_assertions))]
 #[cfg(target_pointer_width = "64")]
-static_assert!(std::mem::size_of::<crate::FormatElement>() == 24usize);
+static_assert!(std::mem::size_of::<crate::FormatElement>() == 32usize);

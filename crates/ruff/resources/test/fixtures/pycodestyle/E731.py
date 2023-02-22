@@ -9,6 +9,9 @@ while False:
 f = lambda: (yield 1)
 #: E731
 f = lambda: (yield from g())
+#: E731
+class F:
+    f = lambda x: 2 * x
 
 f = object()
 f.method = lambda: "Method"

@@ -148,6 +148,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R0913") => Rule::TooManyArguments,
         (Pylint, "R0912") => Rule::TooManyBranches,
         (Pylint, "R0915") => Rule::TooManyStatements,
+        (Pylint, "W2901") => Rule::RedefinedLoopName,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
@@ -181,6 +182,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bugbear, "025") => Rule::DuplicateTryBlockException,
         (Flake8Bugbear, "026") => Rule::StarArgUnpackingAfterKeywordArg,
         (Flake8Bugbear, "027") => Rule::EmptyMethodWithoutAbstractDecorator,
+        (Flake8Bugbear, "029") => Rule::ExceptWithEmptyTuple,
+        (Flake8Bugbear, "032") => Rule::UnintentionalTypeAnnotation,
         (Flake8Bugbear, "904") => Rule::RaiseWithoutFromInsideExcept,
         (Flake8Bugbear, "905") => Rule::ZipWithoutExplicitStrict,
 
@@ -278,6 +281,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "112") => Rule::UseCapitalEnvironmentVariables,
         (Flake8Simplify, "114") => Rule::IfWithSameArms,
         (Flake8Simplify, "115") => Rule::OpenFileWithContextHandler,
+        (Flake8Simplify, "116") => Rule::ManualDictLookup,
         (Flake8Simplify, "117") => Rule::MultipleWithStatements,
         (Flake8Simplify, "118") => Rule::KeyInDict,
         (Flake8Simplify, "201") => Rule::NegateEqualOp,
@@ -547,6 +551,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Tryceratops, "300") => Rule::TryConsiderElse,
         (Tryceratops, "301") => Rule::RaiseWithinTry,
         (Tryceratops, "400") => Rule::ErrorInsteadOfException,
+        (Tryceratops, "401") => Rule::VerboseLogMessage,
 
         // flake8-use-pathlib
         (Flake8UsePathlib, "100") => Rule::PathlibAbspath,

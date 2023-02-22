@@ -11,8 +11,7 @@ expression: diagnostics
     row: 5
     column: 20
   fix:
-    content:
-      - "f\"{a} {b}\""
+    content: "f\"{a} {b}\""
     location:
       row: 5
       column: 0
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 7
     column: 22
   fix:
-    content:
-      - "f\"{b} {a}\""
+    content: "f\"{b} {a}\""
     location:
       row: 7
       column: 0
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 9
     column: 19
   fix:
-    content:
-      - "f\"{z.y}\""
+    content: "f\"{z.y}\""
     location:
       row: 9
       column: 0
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 11
     column: 24
   fix:
-    content:
-      - "f\"{a.x} {b.y}\""
+    content: "f\"{a.x} {b.y}\""
     location:
       row: 11
       column: 0
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 13
     column: 24
   fix:
-    content:
-      - "f\"{a.b} {c.d}\""
+    content: "f\"{a.b} {c.d}\""
     location:
       row: 13
       column: 0
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 15
     column: 16
   fix:
-    content:
-      - "f\"{a()}\""
+    content: "f\"{a()}\""
     location:
       row: 15
       column: 0
@@ -119,8 +113,7 @@ expression: diagnostics
     row: 17
     column: 18
   fix:
-    content:
-      - "f\"{a.b()}\""
+    content: "f\"{a.b()}\""
     location:
       row: 17
       column: 0
@@ -137,8 +130,7 @@ expression: diagnostics
     row: 19
     column: 22
   fix:
-    content:
-      - "f\"{a.b().c()}\""
+    content: "f\"{a.b().c()}\""
     location:
       row: 19
       column: 0
@@ -155,8 +147,7 @@ expression: diagnostics
     row: 21
     column: 24
   fix:
-    content:
-      - "f\"hello {name}!\""
+    content: "f\"hello {name}!\""
     location:
       row: 21
       column: 0
@@ -173,8 +164,7 @@ expression: diagnostics
     row: 23
     column: 27
   fix:
-    content:
-      - "f\"{a}{b}{c}\""
+    content: "f\"{a}{b}{c}\""
     location:
       row: 23
       column: 0
@@ -191,8 +181,7 @@ expression: diagnostics
     row: 25
     column: 16
   fix:
-    content:
-      - "f\"{0x0}\""
+    content: "f\"{0x0}\""
     location:
       row: 25
       column: 0
@@ -209,8 +198,7 @@ expression: diagnostics
     row: 27
     column: 20
   fix:
-    content:
-      - "f\"{a} {b}\""
+    content: "f\"{a} {b}\""
     location:
       row: 27
       column: 0
@@ -227,8 +215,7 @@ expression: diagnostics
     row: 29
     column: 24
   fix:
-    content:
-      - "f\"\"\"{a} {b}\"\"\""
+    content: "f\"\"\"{a} {b}\"\"\""
     location:
       row: 29
       column: 0
@@ -245,8 +232,7 @@ expression: diagnostics
     row: 31
     column: 17
   fix:
-    content:
-      - "f\"foo{1}\""
+    content: "f\"foo{1}\""
     location:
       row: 31
       column: 0
@@ -263,8 +249,7 @@ expression: diagnostics
     row: 33
     column: 18
   fix:
-    content:
-      - "fr\"foo{1}\""
+    content: "fr\"foo{1}\""
     location:
       row: 33
       column: 0
@@ -281,8 +266,7 @@ expression: diagnostics
     row: 35
     column: 21
   fix:
-    content:
-      - "f\"{1}\""
+    content: "f\"{1}\""
     location:
       row: 35
       column: 4
@@ -299,8 +283,7 @@ expression: diagnostics
     row: 37
     column: 25
   fix:
-    content:
-      - "f\"foo {x} \""
+    content: "f\"foo {x} \""
     location:
       row: 37
       column: 6
@@ -317,8 +300,7 @@ expression: diagnostics
     row: 39
     column: 20
   fix:
-    content:
-      - "f\"{a[b]}\""
+    content: "f\"{a[b]}\""
     location:
       row: 39
       column: 0
@@ -335,8 +317,7 @@ expression: diagnostics
     row: 41
     column: 22
   fix:
-    content:
-      - "f\"{a.a[b]}\""
+    content: "f\"{a.a[b]}\""
     location:
       row: 41
       column: 0
@@ -353,8 +334,7 @@ expression: diagnostics
     row: 43
     column: 29
   fix:
-    content:
-      - "f\"{escaped}{{}}{y}\""
+    content: "f\"{escaped}{{}}{y}\""
     location:
       row: 43
       column: 0
@@ -371,8 +351,7 @@ expression: diagnostics
     row: 45
     column: 14
   fix:
-    content:
-      - "f\"{a}\""
+    content: "f\"{a}\""
     location:
       row: 45
       column: 0
@@ -389,8 +368,7 @@ expression: diagnostics
     row: 47
     column: 24
   fix:
-    content:
-      - "f'({a}={{0!e}})'"
+    content: "f'({a}={{0!e}})'"
     location:
       row: 47
       column: 0

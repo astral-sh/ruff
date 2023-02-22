@@ -105,3 +105,25 @@ while True:
         pass
     finally:
         break  # warning
+
+
+while True:
+    try:
+        pass
+    finally:
+        match *0, 1, *2:
+            case 0,:
+                y = 0
+            case 0, *x:
+                break  # warning
+
+
+while True:
+    try:
+        pass
+    finally:
+        match *0, 1, *2:
+            case 0,:
+                y = 0
+            case 0, *x:
+                pass  # no warning

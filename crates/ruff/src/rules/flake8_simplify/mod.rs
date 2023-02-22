@@ -6,11 +6,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::DuplicateIsinstanceCall, Path::new("SIM101.py"); "SIM101")]
     #[test_case(Rule::CollapsibleIf, Path::new("SIM102.py"); "SIM102")]
@@ -37,6 +38,7 @@ mod tests {
     #[test_case(Rule::AndFalse, Path::new("SIM223.py"); "SIM223")]
     #[test_case(Rule::YodaConditions, Path::new("SIM300.py"); "SIM300")]
     #[test_case(Rule::DictGetWithDefault, Path::new("SIM401.py"); "SIM401")]
+    #[test_case(Rule::ManualDictLookup, Path::new("SIM116.py"); "SIM116")]
     #[test_case(Rule::IfWithSameArms, Path::new("SIM114.py"); "SIM114")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

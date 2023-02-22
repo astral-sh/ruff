@@ -4,9 +4,9 @@ pub use ast_bool_op::{
 };
 pub use ast_expr::{use_capital_environment_variables, UseCapitalEnvironmentVariables};
 pub use ast_if::{
-    if_with_same_arms, nested_if_statements, return_bool_condition_directly,
+    if_with_same_arms, manual_dict_lookup, nested_if_statements, return_bool_condition_directly,
     use_dict_get_with_default, use_ternary_operator, CollapsibleIf, DictGetWithDefault,
-    IfWithSameArms, NeedlessBool, UseTernaryOperator,
+    IfWithSameArms, ManualDictLookup, NeedlessBool, UseTernaryOperator,
 };
 pub use ast_ifexp::{
     explicit_false_true_in_ifexpr, explicit_true_false_in_ifexpr, twisted_arms_in_ifexpr,

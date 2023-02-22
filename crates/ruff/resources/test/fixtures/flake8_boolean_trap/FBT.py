@@ -57,6 +57,8 @@ dict.fromkeys(("world",), True)
 {}.deploy(True, False)
 getattr(someobj, attrname, False)
 mylist.index(True)
+int(True)
+str(int(False))
 
 
 class Registry:
@@ -66,3 +68,11 @@ class Registry:
     # FBT001: Boolean positional arg in function definition
     def __setitem__(self, switch: Switch, value: bool) -> None:
         self._switches[switch.value] = value
+
+    @foo.setter
+    def foo(self, value: bool) -> None:
+        pass
+
+    # FBT001: Boolean positional arg in function definition
+    def foo(self, value: bool) -> None:
+        pass

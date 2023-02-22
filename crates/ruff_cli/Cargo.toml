@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.248"
+version = "0.0.251"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -50,6 +50,7 @@ regex = { workspace = true }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1" }
 strum = { version = "0.24.1" }
 textwrap = { version = "0.16.0" }

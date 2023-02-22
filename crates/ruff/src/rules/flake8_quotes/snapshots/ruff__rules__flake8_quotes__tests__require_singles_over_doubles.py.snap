@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_quotes/mod.rs
+source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 1
     column: 45
   fix:
-    content:
-      - "'double quote string'"
+    content: "'double quote string'"
     location:
       row: 1
       column: 24
@@ -31,8 +30,7 @@ expression: diagnostics
     row: 2
     column: 46
   fix:
-    content:
-      - "u'double quote string'"
+    content: "u'double quote string'"
     location:
       row: 2
       column: 24
@@ -50,8 +48,7 @@ expression: diagnostics
     row: 3
     column: 46
   fix:
-    content:
-      - "f'double quote string'"
+    content: "f'double quote string'"
     location:
       row: 3
       column: 24

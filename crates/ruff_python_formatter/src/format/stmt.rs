@@ -6,7 +6,9 @@ use ruff_text_size::TextSize;
 
 use crate::builders::literal;
 use crate::context::ASTFormatContext;
-use crate::cst::{Alias, Arguments, Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem};
+use crate::cst::{
+    Alias, Arguments, Excepthandler, Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem,
+};
 use crate::format::builders::{block, join_names};
 use crate::format::helpers::is_self_closing;
 use crate::shared_traits::AsFormat;
@@ -320,7 +322,7 @@ fn format_for(
     target: &Expr,
     iter: &Expr,
     body: &[Stmt],
-    _orelse: &[Stmt],
+    orelse: &[Stmt],
     _type_comment: Option<&str>,
 ) -> FormatResult<()> {
     write!(
@@ -336,7 +338,11 @@ fn format_for(
             text(":"),
             block_indent(&block(body))
         ]
-    )
+    )?;
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    Ok(())
 }
 
 fn format_while(
@@ -419,11 +425,75 @@ fn format_raise(
 
 fn format_return(
     f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
     value: Option<&Expr>,
 ) -> FormatResult<()> {
     write!(f, [text("return")])?;
     if let Some(value) = value {
         write!(f, [space(), value.format()])?;
+    }
+
+    // Format any end-of-line comments.
+    let mut first = true;
+    for range in stmt.trivia.iter().filter_map(|trivia| {
+        if matches!(trivia.relationship, Relationship::Trailing) {
+            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
+                Some(range)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }) {
+        if std::mem::take(&mut first) {
+            write!(f, [line_suffix(&text("  "))])?;
+        }
+        write!(f, [line_suffix(&literal(range))])?;
+    }
+
+    Ok(())
+}
+
+fn format_try(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    body: &[Stmt],
+    handlers: &[Excepthandler],
+    orelse: &[Stmt],
+    finalbody: &[Stmt],
+) -> FormatResult<()> {
+    write!(f, [text("try:"), block_indent(&block(body))])?;
+    for handler in handlers {
+        write!(f, [handler.format()])?;
+    }
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    if !finalbody.is_empty() {
+        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
+    }
+    Ok(())
+}
+
+fn format_try_star(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    body: &[Stmt],
+    handlers: &[Excepthandler],
+    orelse: &[Stmt],
+    finalbody: &[Stmt],
+) -> FormatResult<()> {
+    write!(f, [text("try:"), block_indent(&block(body))])?;
+    for handler in handlers {
+        // TODO(charlie): Include `except*`.
+        write!(f, [handler.format()])?;
+    }
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    if !finalbody.is_empty() {
+        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
     }
     Ok(())
 }
@@ -720,7 +790,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 body,
                 decorator_list,
             } => format_class_def(f, name, bases, keywords, body, decorator_list),
-            StmtKind::Return { value } => format_return(f, value.as_ref()),
+            StmtKind::Return { value } => format_return(f, self.item, value.as_ref()),
             StmtKind::Delete { targets } => format_delete(f, targets),
             StmtKind::Assign { targets, value, .. } => format_assign(f, self.item, targets, value),
             // StmtKind::AugAssign { .. } => {}
@@ -778,7 +848,18 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
             StmtKind::Raise { exc, cause } => {
                 format_raise(f, self.item, exc.as_deref(), cause.as_deref())
             }
-            // StmtKind::Try { .. } => {}
+            StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => format_try(f, self.item, body, handlers, orelse, finalbody),
+            StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => format_try_star(f, self.item, body, handlers, orelse, finalbody),
             StmtKind::Assert { test, msg } => {
                 format_assert(f, self.item, test, msg.as_ref().map(|expr| &**expr))
             }

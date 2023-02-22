@@ -1,5 +1,5 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -13,8 +13,7 @@ expression: diagnostics
     row: 2
     column: 14
   fix:
-    content:
-      - res is True
+    content: res is True
     location:
       row: 2
       column: 3
@@ -33,8 +32,7 @@ expression: diagnostics
     row: 5
     column: 15
   fix:
-    content:
-      - res is not False
+    content: res is not False
     location:
       row: 5
       column: 3
@@ -53,8 +51,7 @@ expression: diagnostics
     row: 8
     column: 7
   fix:
-    content:
-      - True is not res
+    content: True is not res
     location:
       row: 8
       column: 3
@@ -73,8 +70,7 @@ expression: diagnostics
     row: 11
     column: 8
   fix:
-    content:
-      - False is res
+    content: False is res
     location:
       row: 11
       column: 3
@@ -93,8 +89,7 @@ expression: diagnostics
     row: 14
     column: 17
   fix:
-    content:
-      - "res[1] is True"
+    content: "res[1] is True"
     location:
       row: 14
       column: 3
@@ -113,8 +108,7 @@ expression: diagnostics
     row: 17
     column: 18
   fix:
-    content:
-      - "res[1] is not False"
+    content: "res[1] is not False"
     location:
       row: 17
       column: 3
@@ -133,8 +127,7 @@ expression: diagnostics
     row: 20
     column: 23
   fix:
-    content:
-      - cond is True
+    content: cond is True
     location:
       row: 20
       column: 11
@@ -153,8 +146,7 @@ expression: diagnostics
     row: 20
     column: 48
   fix:
-    content:
-      - cond is False
+    content: cond is False
     location:
       row: 20
       column: 35
@@ -173,8 +165,7 @@ expression: diagnostics
     row: 22
     column: 8
   fix:
-    content:
-      - True is TrueElement
+    content: True is TrueElement
     location:
       row: 22
       column: 3
@@ -193,8 +184,7 @@ expression: diagnostics
     row: 25
     column: 14
   fix:
-    content:
-      - res is True is not False
+    content: res is True is not False
     location:
       row: 25
       column: 3
@@ -213,8 +203,7 @@ expression: diagnostics
     row: 25
     column: 23
   fix:
-    content:
-      - res is True is not False
+    content: res is True is not False
     location:
       row: 25
       column: 3

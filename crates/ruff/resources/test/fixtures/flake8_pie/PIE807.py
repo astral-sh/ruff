@@ -18,3 +18,10 @@ class Foo:
 
 class FooTable(BaseTable):
     bar = fields.ListField(list)
+
+
+lambda *args, **kwargs: []
+
+lambda *args: []
+
+lambda **kwargs: []

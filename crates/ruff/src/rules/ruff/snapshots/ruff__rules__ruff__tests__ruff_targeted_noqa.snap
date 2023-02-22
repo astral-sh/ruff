@@ -12,8 +12,7 @@ expression: diagnostics
     row: 8
     column: 5
   fix:
-    content:
-      - pass
+    content: pass
     location:
       row: 8
       column: 4

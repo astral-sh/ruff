@@ -7,11 +7,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::CommentedOutCode, Path::new("ERA001.py"); "ERA001")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

@@ -53,6 +53,12 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
             handlers,
             orelse,
             finalbody,
+        }
+        | StmtKind::TryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
         } => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
@@ -67,6 +73,19 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                     } else {
                         None
                     }
+                }
+            }) {
+                Ok(has_single_child(body, deleted))
+            } else {
+                bail!("Unable to find child in parent body")
+            }
+        }
+        StmtKind::Match { cases, .. } => {
+            if let Some(body) = cases.iter().find_map(|case| {
+                if case.body.iter().contains(child) {
+                    Some(&case.body)
+                } else {
+                    None
                 }
             }) {
                 Ok(has_single_child(body, deleted))

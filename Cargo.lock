@@ -753,7 +753,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.248"
+version = "0.0.251"
 dependencies = [
  "anyhow",
  "clap 4.1.6",
@@ -1927,7 +1927,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.248"
+version = "0.0.251"
 dependencies = [
  "anyhow",
  "bisection",
@@ -1983,7 +1983,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.248"
+version = "0.0.251"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2012,6 +2012,7 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
+ "shellexpand",
  "similar",
  "strum",
  "textwrap",
@@ -2146,7 +2147,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=61b48f108982d865524f86624a9d5bc2ae3bccef#61b48f108982d865524f86624a9d5bc2ae3bccef"
+source = "git+https://github.com/RustPython/RustPython.git?rev=ddf497623ae56d21aa4166ff1c0725a7db67e955#ddf497623ae56d21aa4166ff1c0725a7db67e955"
 dependencies = [
  "num-bigint",
  "rustpython-compiler-core",
@@ -2155,7 +2156,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=61b48f108982d865524f86624a9d5bc2ae3bccef#61b48f108982d865524f86624a9d5bc2ae3bccef"
+source = "git+https://github.com/RustPython/RustPython.git?rev=ddf497623ae56d21aa4166ff1c0725a7db67e955#ddf497623ae56d21aa4166ff1c0725a7db67e955"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2180,7 +2181,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=61b48f108982d865524f86624a9d5bc2ae3bccef#61b48f108982d865524f86624a9d5bc2ae3bccef"
+source = "git+https://github.com/RustPython/RustPython.git?rev=ddf497623ae56d21aa4166ff1c0725a7db67e955#ddf497623ae56d21aa4166ff1c0725a7db67e955"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2197,7 +2198,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=61b48f108982d865524f86624a9d5bc2ae3bccef#61b48f108982d865524f86624a9d5bc2ae3bccef"
+source = "git+https://github.com/RustPython/RustPython.git?rev=ddf497623ae56d21aa4166ff1c0725a7db67e955#ddf497623ae56d21aa4166ff1c0725a7db67e955"
 dependencies = [
  "ahash",
  "anyhow",

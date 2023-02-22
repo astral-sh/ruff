@@ -27,6 +27,7 @@ An extremely fast Python linter, written in Rust.
 * ⚡️  10-100x faster than existing linters
 * 🐍  Installable via `pip`
 * 🛠️  `pyproject.toml` support
+* 🤝  Python 3.11 compatibility
 * 📦  Built-in caching, to avoid re-analyzing unchanged files
 * 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
 * 📏  Over [400 built-in rules](https://beta.ruff.rs/docs/rules/) (and growing)
@@ -167,7 +168,7 @@ Ruff also works with [pre-commit](https://pre-commit.com):
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.248'
+  rev: 'v0.0.251'
   hooks:
     - id: ruff
 ```
@@ -177,7 +178,7 @@ Or, to enable autofix:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.248'
+  rev: 'v0.0.251'
   hooks:
     - id: ruff
       args: [--fix, --exit-non-zero-on-fix]
@@ -720,6 +721,7 @@ Ruff is used in a number of major open-source projects, including:
 * [Dagger](https://github.com/dagger/dagger)
 * [Sphinx](https://github.com/sphinx-doc/sphinx)
 * [Hatch](https://github.com/pypa/hatch)
+* [PDM](https://github.com/pdm-project/pdm)
 * [Jupyter](https://github.com/jupyter-server/jupyter_server)
 * [Great Expectations](https://github.com/great-expectations/great_expectations)
 * [ONNX](https://github.com/onnx/onnx)

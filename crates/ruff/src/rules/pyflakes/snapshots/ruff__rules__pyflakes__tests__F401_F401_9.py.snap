@@ -14,8 +14,7 @@ expression: diagnostics
     row: 4
     column: 24
   fix:
-    content:
-      - from foo import bar
+    content: from foo import bar
     location:
       row: 4
       column: 0
