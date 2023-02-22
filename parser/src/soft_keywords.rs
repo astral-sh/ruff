@@ -19,8 +19,8 @@ pub struct SoftKeywordTransformer<I>
 where
     I: Iterator<Item = LexResult>,
 {
-    pub underlying: MultiPeek<I>,
-    pub start_of_line: bool,
+    underlying: MultiPeek<I>,
+    start_of_line: bool,
 }
 
 impl<I> SoftKeywordTransformer<I>
@@ -84,14 +84,18 @@ where
 
         self.start_of_line = next.as_ref().map_or(false, |lex_result| {
             lex_result.as_ref().map_or(false, |(_, tok, _)| {
-                matches!(
-                    tok,
-                    Tok::StartModule
-                        | Tok::StartInteractive
-                        | Tok::Newline
-                        | Tok::Indent
-                        | Tok::Dedent
-                )
+                if matches!(tok, Tok::NonLogicalNewline | Tok::Comment { .. }) {
+                    self.start_of_line
+                } else {
+                    matches!(
+                        tok,
+                        Tok::StartModule
+                            | Tok::StartInteractive
+                            | Tok::Newline
+                            | Tok::Indent
+                            | Tok::Dedent
+                    )
+                }
             })
         });
 

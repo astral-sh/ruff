@@ -14,7 +14,6 @@
 
 use crate::lexer::{LexResult, Tok};
 pub use crate::mode::Mode;
-use crate::soft_keywords::SoftKeywordTransformer;
 use crate::{ast, error::ParseError, lexer, python};
 use ast::Location;
 use itertools::Itertools;
@@ -107,7 +106,8 @@ pub fn parse_expression_located(
 /// parsing:
 ///
 /// ```
-/// use rustpython_parser::parser::{parse, Mode};
+/// use rustpython_parser::mode::Mode;
+/// use rustpython_parser::parser::parse;
 ///
 /// let expr = parse("1 + 2", Mode::Expression, "<embedded>");
 /// assert!(expr.is_ok());
@@ -116,7 +116,8 @@ pub fn parse_expression_located(
 /// Alternatively, we can parse a full Python program consisting of multiple lines:
 ///
 /// ```
-/// use rustpython_parser::parser::{parse, Mode};
+/// use rustpython_parser::mode::Mode;
+/// use rustpython_parser::parser::parse;
 ///
 /// let source = r#"
 /// class Greeter:
@@ -139,8 +140,9 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
 /// # Example
 ///
 /// ```
-/// use rustpython_parser::parser::{parse_located, Mode};
 /// use rustpython_parser::ast::Location;
+/// use rustpython_parser::mode::Mode;
+/// use rustpython_parser::parser::parse_located;
 ///
 /// let source = r#"
 /// def fib(i):
@@ -160,7 +162,7 @@ pub fn parse_located(
     source_path: &str,
     location: Location,
 ) -> Result<ast::Mod, ParseError> {
-    let lxr = lexer::make_tokenizer_located(source, location);
+    let lxr = lexer::make_tokenizer_located(source, mode, location);
     parse_tokens(lxr, mode, source_path)
 }
 
@@ -174,10 +176,11 @@ pub fn parse_located(
 /// them using the [`lexer::make_tokenizer`] function:
 ///
 /// ```
-/// use rustpython_parser::parser::{parse_tokens, Mode};
 /// use rustpython_parser::lexer::make_tokenizer;
+/// use rustpython_parser::mode::Mode;
+/// use rustpython_parser::parser::parse_tokens;
 ///
-/// let expr = parse_tokens(make_tokenizer("1 + 2"), Mode::Expression, "<embedded>");
+/// let expr = parse_tokens(make_tokenizer("1 + 2", Mode::Expression), Mode::Expression, "<embedded>");
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_tokens(
@@ -190,7 +193,7 @@ pub fn parse_tokens(
         .chain(lxr)
         .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
     python::TopParser::new()
-        .parse(SoftKeywordTransformer::new(tokenizer, mode).into_iter())
+        .parse(tokenizer.into_iter())
         .map_err(|e| crate::error::parse_error_from_lalrpop(e, source_path))
 }
 

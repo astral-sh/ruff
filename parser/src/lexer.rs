@@ -13,10 +13,11 @@
 //!
 //! ```
 //! use rustpython_parser::lexer::{make_tokenizer, Tok};
+//! use rustpython_parser::mode::Mode;
 //! use rustpython_parser::token::StringKind;
 //!
 //! let source = "x = 'RustPython'";
-//! let tokens = make_tokenizer(source)
+//! let tokens = make_tokenizer(source, Mode::Module)
 //!     .map(|tok| tok.expect("Failed to lex"))
 //!     .collect::<Vec<_>>();
 //!
@@ -35,6 +36,8 @@
 pub use super::token::{StringKind, Tok};
 use crate::ast::Location;
 use crate::error::{LexicalError, LexicalErrorType};
+use crate::mode::Mode;
+use crate::soft_keywords::SoftKeywordTransformer;
 use num_bigint::BigInt;
 use num_traits::identities::Zero;
 use num_traits::Num;
@@ -197,27 +200,29 @@ pub type LexResult = Result<Spanned, LexicalError>;
 /// # Examples
 ///
 /// ```
+/// use rustpython_parser::mode::Mode;
 /// use rustpython_parser::lexer::{make_tokenizer};
 ///
 /// let source = "def hello(): return 'world'";
-/// let tokenizer = make_tokenizer(source);
+/// let tokenizer = make_tokenizer(source, Mode::Module);
 ///
 /// for token in tokenizer {
 ///    println!("{:?}", token);
 /// }
 /// ```
 #[inline]
-pub fn make_tokenizer(source: &str) -> impl Iterator<Item = LexResult> + '_ {
-    make_tokenizer_located(source, Location::default())
+pub fn make_tokenizer(source: &str, mode: Mode) -> impl Iterator<Item = LexResult> + '_ {
+    make_tokenizer_located(source, mode, Location::default())
 }
 
 /// Create a new tokenizer from a source string, starting at a given location.
 /// You probably want to use [`make_tokenizer`] instead.
 pub fn make_tokenizer_located(
     source: &str,
+    mode: Mode,
     start_location: Location,
 ) -> impl Iterator<Item = LexResult> + '_ {
-    Lexer::new(source.chars(), start_location)
+    SoftKeywordTransformer::new(Lexer::new(source.chars(), start_location), mode)
 }
 
 impl<T> Lexer<T>
@@ -1210,6 +1215,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::{make_tokenizer, StringKind, Tok};
+    use crate::mode::Mode;
     use num_bigint::BigInt;
 
     const WINDOWS_EOL: &str = "\r\n";
@@ -1217,7 +1223,7 @@ mod tests {
     const UNIX_EOL: &str = "\n";
 
     pub fn lex_source(source: &str) -> Vec<Tok> {
-        let lexer = make_tokenizer(source);
+        let lexer = make_tokenizer(source, Mode::Module);
         lexer.map(|x| x.unwrap().1).collect()
     }
 

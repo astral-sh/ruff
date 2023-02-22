@@ -66,27 +66,29 @@
 //! For example, to get a stream of tokens from a given string, one could do this:
 //!
 //! ```
+//! use rustpython_parser::mode::Mode;
 //! use rustpython_parser::lexer::make_tokenizer;
 //!
 //! let python_source = r#"
 //! def is_odd(i):
 //!     return bool(i & 1)
 //! "#;
-//! let mut tokens = make_tokenizer(python_source);
+//! let mut tokens = make_tokenizer(python_source, Mode::Module);
 //! assert!(tokens.all(|t| t.is_ok()));
 //! ```
 //!
 //! These tokens can be directly fed into the parser to generate an AST:
 //!
 //! ```
-//! use rustpython_parser::parser::{parse_tokens, Mode};
 //! use rustpython_parser::lexer::make_tokenizer;
+//! use rustpython_parser::mode::Mode;
+//! use rustpython_parser::parser::parse_tokens;
 //!
 //! let python_source = r#"
 //! def is_odd(i):
 //!    return bool(i & 1)
 //! "#;
-//! let tokens = make_tokenizer(python_source);
+//! let tokens = make_tokenizer(python_source, Mode::Module);
 //! let ast = parse_tokens(tokens, Mode::Module, "<embedded>");
 //!
 //! assert!(ast.is_ok());
@@ -131,5 +133,5 @@ mod string;
 #[rustfmt::skip]
 mod python;
 mod context;
-pub mod soft_keywords;
+mod soft_keywords;
 pub mod token;
