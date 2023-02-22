@@ -1538,8 +1538,8 @@ expression: parse_ast
         },
         end_location: Some(
             Location {
-                row: 21,
-                column: 0,
+                row: 20,
+                column: 12,
             },
         ),
         custom: (),

@@ -10,8 +10,8 @@ expression: parse_ast
         },
         end_location: Some(
             Location {
-                row: 7,
-                column: 0,
+                row: 6,
+                column: 19,
             },
         ),
         custom: (),
@@ -178,8 +178,8 @@ expression: parse_ast
         },
         end_location: Some(
             Location {
-                row: 12,
-                column: 0,
+                row: 11,
+                column: 20,
             },
         ),
         custom: (),
@@ -453,8 +453,8 @@ expression: parse_ast
         },
         end_location: Some(
             Location {
-                row: 15,
-                column: 0,
+                row: 14,
+                column: 13,
             },
         ),
         custom: (),
@@ -631,8 +631,8 @@ expression: parse_ast
         },
         end_location: Some(
             Location {
-                row: 18,
-                column: 0,
+                row: 17,
+                column: 13,
             },
         ),
         custom: (),
@@ -809,8 +809,8 @@ expression: parse_ast
         },
         end_location: Some(
             Location {
-                row: 21,
-                column: 0,
+                row: 20,
+                column: 13,
             },
         ),
         custom: (),
