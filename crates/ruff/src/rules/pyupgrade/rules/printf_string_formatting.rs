@@ -1,14 +1,16 @@
 use std::str::FromStr;
 
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::identifiers::is_identifier;
-use ruff_python::keyword::KWLIST;
 use rustpython_common::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
+use rustpython_parser::mode::Mode;
+
+use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::identifiers::is_identifier;
+use ruff_python::keyword::KWLIST;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
@@ -321,6 +323,7 @@ pub(crate) fn printf_string_formatting(
     let mut extension = None;
     for (start, tok, end) in lexer::make_tokenizer_located(
         checker.locator.slice(&Range::from_located(expr)),
+        Mode::Module,
         expr.location,
     )
     .flatten()

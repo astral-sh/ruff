@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
+use rustpython_parser::mode::Mode;
 
 use crate::ast::types::Range;
 use crate::source_code::Locator;
@@ -17,7 +18,7 @@ pub struct Comment<'a> {
 /// Collect all comments in an import block.
 pub fn collect_comments<'a>(range: &Range, locator: &'a Locator) -> Vec<Comment<'a>> {
     let contents = locator.slice(range);
-    lexer::make_tokenizer_located(contents, range.location)
+    lexer::make_tokenizer_located(contents, Mode::Module, range.location)
         .flatten()
         .filter_map(|(start, tok, end)| {
             if let Tok::Comment(value) = tok {

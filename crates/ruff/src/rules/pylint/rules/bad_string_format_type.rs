@@ -5,6 +5,7 @@ use rustpython_common::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CF
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Operator};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
+use rustpython_parser::mode::Mode;
 
 use ruff_macros::{define_violation, derive_message_formats};
 
@@ -247,7 +248,9 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) 
     // Grab each string segment (in case there's an implicit concatenation).
     let content = checker.locator.slice(&Range::from_located(expr));
     let mut strings: Vec<(Location, Location)> = vec![];
-    for (start, tok, end) in lexer::make_tokenizer_located(content, expr.location).flatten() {
+    for (start, tok, end) in
+        lexer::make_tokenizer_located(content, Mode::Module, expr.location).flatten()
+    {
         if matches!(tok, Tok::String { .. }) {
             strings.push((start, end));
         } else if matches!(tok, Tok::Percent) {

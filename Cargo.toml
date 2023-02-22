@@ -13,8 +13,8 @@ libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a87
 once_cell = { version = "1.16.0" }
 regex = { version = "1.6.0" }
 rustc-hash = { version = "1.1.0" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "ddf497623ae56d21aa4166ff1c0725a7db67e955" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "ddf497623ae56d21aa4166ff1c0725a7db67e955" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "6d5bbd913c7c46518f4ed8b1b378ffb0df72f505" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "6d5bbd913c7c46518f4ed8b1b378ffb0df72f505" }
 schemars = { version = "0.8.11" }
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }

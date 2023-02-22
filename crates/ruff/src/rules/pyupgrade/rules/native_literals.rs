@@ -4,6 +4,7 @@ use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::lexer;
 use rustpython_parser::lexer::Tok;
+use rustpython_parser::mode::Mode;
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
@@ -118,7 +119,7 @@ pub fn native_literals(
         // safely remove the outer call in this situation. We're following pyupgrade
         // here and skip.
         let arg_code = checker.locator.slice(&Range::from_located(arg));
-        if lexer::make_tokenizer(arg_code)
+        if lexer::make_tokenizer_located(arg_code, Mode::Module, arg.location)
             .flatten()
             .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
             .count()
