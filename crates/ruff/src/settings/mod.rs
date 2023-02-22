@@ -468,6 +468,7 @@ mod tests {
             Rule::NoNewLineAtEndOfFile,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::BlanklineContainsWhitespace,
         ]);
         assert_eq!(actual, expected);
 
@@ -480,7 +481,10 @@ mod tests {
 
         let actual = resolve_rules([RuleSelection {
             select: Some(vec![Pycodestyle::W.into()]),
-            ignore: vec![codes::Pycodestyle::W292.into()],
+            ignore: vec![
+                codes::Pycodestyle::W292.into(),
+                codes::Pycodestyle::W293.into(),
+            ],
             ..RuleSelection::default()
         }]);
         let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
@@ -517,6 +521,7 @@ mod tests {
             Rule::NoNewLineAtEndOfFile,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::BlanklineContainsWhitespace,
         ]);
         assert_eq!(actual, expected);
 
@@ -541,7 +546,7 @@ mod tests {
         let actual = resolve_rules([
             RuleSelection {
                 select: Some(vec![]),
-                ignore: vec![Pycodestyle::W292.into()],
+                ignore: vec![Pycodestyle::W292.into(), Pycodestyle::W293.into()],
                 ..RuleSelection::default()
             },
             RuleSelection {
@@ -555,7 +560,7 @@ mod tests {
         let actual = resolve_rules([
             RuleSelection {
                 select: Some(vec![]),
-                ignore: vec![Pycodestyle::W292.into()],
+                ignore: vec![Pycodestyle::W292.into(), Pycodestyle::W293.into()],
                 ..RuleSelection::default()
             },
             RuleSelection {

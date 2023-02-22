@@ -53,7 +53,6 @@ pub fn check_physical_lines(
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
     for (index, line) in contents.lines().enumerate() {
-        println!("Inside physical lines {:?} {:?}", index, line);
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
             .is_some()

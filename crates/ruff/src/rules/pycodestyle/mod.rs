@@ -37,6 +37,7 @@ mod tests {
     #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_1.py"))]
     #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_2.py"))]
     #[test_case(Rule::NoNewLineAtEndOfFile, Path::new("W292_3.py"))]
+    #[test_case(Rule::BlanklineContainsWhitespace, Path::new("W293.py"))]
     #[test_case(Rule::NoneComparison, Path::new("E711.py"))]
     #[test_case(Rule::NotInTest, Path::new("E713.py"))]
     #[test_case(Rule::NotIsTest, Path::new("E714.py"))]
