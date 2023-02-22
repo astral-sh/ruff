@@ -8,7 +8,8 @@ use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
 use crate::rules::pycodestyle::rules::{
-    doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
+    blankline_contains_whitespace, doc_line_too_long, line_too_long, mixed_spaces_and_tabs,
+    no_newline_at_end_of_file,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
@@ -41,6 +42,8 @@ pub fn check_physical_lines(
     let enforce_unnecessary_coding_comment = settings.rules.enabled(&Rule::UTF8EncodingDeclaration);
     let enforce_mixed_spaces_and_tabs = settings.rules.enabled(&Rule::MixedSpacesAndTabs);
     let enforce_bidirectional_unicode = settings.rules.enabled(&Rule::BidirectionalUnicode);
+    let enforce_blankline_contains_whitespace =
+        settings.rules.enabled(&Rule::BlanklineContainsWhitespace);
 
     let fix_unnecessary_coding_comment = matches!(autofix, flags::Autofix::Enabled)
         && settings.rules.should_fix(&Rule::UTF8EncodingDeclaration);
@@ -50,6 +53,7 @@ pub fn check_physical_lines(
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
     for (index, line) in contents.lines().enumerate() {
+        println!("Inside physical lines {:?} {:?}", index, line);
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
             .is_some()
@@ -138,6 +142,12 @@ pub fn check_physical_lines(
 
         if enforce_bidirectional_unicode {
             diagnostics.extend(pylint::rules::bidirectional_unicode(index, line));
+        }
+
+        if enforce_blankline_contains_whitespace {
+            if let Some(diagnostic) = blankline_contains_whitespace(index, line) {
+                diagnostics.push(diagnostic);
+            }
         }
     }
 
