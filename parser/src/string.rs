@@ -3,22 +3,19 @@
 // The lexer doesn't do any special handling of f-strings, it just treats them as
 // regular strings. Since the parser has no definition of f-string formats (Pending PEP 701)
 // we have to do the parsing here, manually.
-use itertools::Itertools;
-
-use self::FStringErrorType::*;
 use crate::{
     ast::{Constant, ConversionFlag, Expr, ExprKind, Location},
-    error::{FStringError, FStringErrorType, LexicalError, LexicalErrorType, ParseError},
-    parser::parse_expression_located,
-    token::StringKind,
+    lexer::{LexicalError, LexicalErrorType},
+    parser::{parse_expression_located, LalrpopError, ParseError, ParseErrorType},
+    token::{StringKind, Tok},
 };
-use std::{iter, str};
+use itertools::Itertools;
 
 // unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
 const MAX_UNICODE_NAME: usize = 88;
 
 struct StringParser<'a> {
-    chars: iter::Peekable<str::Chars<'a>>,
+    chars: std::iter::Peekable<std::str::Chars<'a>>,
     kind: StringKind,
     start: Location,
     end: Location,
@@ -178,6 +175,8 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_formatted_value(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
+        use FStringErrorType::*;
+
         let mut expression = String::new();
         let mut spec = None;
         let mut delims = Vec::new();
@@ -403,6 +402,8 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_fstring(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
+        use FStringErrorType::*;
+
         if nested >= 2 {
             return Err(FStringError::new(ExpressionNestedTooDeeply, self.get_pos()).into());
         }
@@ -651,6 +652,108 @@ pub(crate) fn parse_strings(
     ))
 }
 
+// TODO: consolidate these with ParseError
+/// An error that occurred during parsing of an f-string.
+#[derive(Debug, PartialEq)]
+struct FStringError {
+    /// The type of error that occurred.
+    pub error: FStringErrorType,
+    /// The location of the error.
+    pub location: Location,
+}
+
+impl FStringError {
+    /// Creates a new `FStringError` with the given error type and location.
+    pub fn new(error: FStringErrorType, location: Location) -> Self {
+        Self { error, location }
+    }
+}
+
+impl From<FStringError> for LexicalError {
+    fn from(err: FStringError) -> Self {
+        LexicalError {
+            error: LexicalErrorType::FStringError(err.error),
+            location: err.location,
+        }
+    }
+}
+
+/// Represents the different types of errors that can occur during parsing of an f-string.
+#[derive(Debug, PartialEq)]
+pub enum FStringErrorType {
+    /// Expected a right brace after an opened left brace.
+    UnclosedLbrace,
+    /// Expected a left brace after an ending right brace.
+    UnopenedRbrace,
+    /// Expected a right brace after a conversion flag.
+    ExpectedRbrace,
+    /// An error occurred while parsing an f-string expression.
+    InvalidExpression(Box<ParseErrorType>),
+    /// An invalid conversion flag was encountered.
+    InvalidConversionFlag,
+    /// An empty expression was encountered.
+    EmptyExpression,
+    /// An opening delimiter was not closed properly.
+    MismatchedDelimiter(char, char),
+    /// Too many nested expressions in an f-string.
+    ExpressionNestedTooDeeply,
+    /// The f-string expression cannot include the given character.
+    ExpressionCannotInclude(char),
+    /// A single right brace was encountered.
+    SingleRbrace,
+    /// A closing delimiter was not opened properly.
+    Unmatched(char),
+    // TODO: Test this case.
+    /// Unterminated string.
+    UnterminatedString,
+}
+
+impl std::fmt::Display for FStringErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use FStringErrorType::*;
+        match self {
+            UnclosedLbrace => write!(f, "expecting '}}'"),
+            UnopenedRbrace => write!(f, "Unopened '}}'"),
+            ExpectedRbrace => write!(f, "Expected '}}' after conversion flag."),
+            InvalidExpression(error) => {
+                write!(f, "{error}")
+            }
+            InvalidConversionFlag => write!(f, "invalid conversion character"),
+            EmptyExpression => write!(f, "empty expression not allowed"),
+            MismatchedDelimiter(first, second) => write!(
+                f,
+                "closing parenthesis '{second}' does not match opening parenthesis '{first}'"
+            ),
+            SingleRbrace => write!(f, "single '}}' is not allowed"),
+            Unmatched(delim) => write!(f, "unmatched '{delim}'"),
+            ExpressionNestedTooDeeply => {
+                write!(f, "expressions nested too deeply")
+            }
+            UnterminatedString => {
+                write!(f, "unterminated string")
+            }
+            ExpressionCannotInclude(c) => {
+                if *c == '\\' {
+                    write!(f, "f-string expression part cannot include a backslash")
+                } else {
+                    write!(f, "f-string expression part cannot include '{c}'s")
+                }
+            }
+        }
+    }
+}
+
+impl From<FStringError> for LalrpopError<Location, Tok, LexicalError> {
+    fn from(err: FStringError) -> Self {
+        lalrpop_util::ParseError::User {
+            error: LexicalError {
+                error: LexicalErrorType::FStringError(err.error),
+                location: err.location,
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -732,6 +835,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_fstring() {
+        use FStringErrorType::*;
         assert_eq!(parse_fstring_error("{5!a"), UnclosedLbrace);
         assert_eq!(parse_fstring_error("{5!a1}"), UnclosedLbrace);
         assert_eq!(parse_fstring_error("{5!"), UnclosedLbrace);

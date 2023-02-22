@@ -4,7 +4,7 @@
 //! governing what is and is not a valid token are defined in the Python reference
 //! guide section on [Lexical analysis].
 //!
-//! The primary function in this module is [`make_tokenizer`], which takes a string slice
+//! The primary function in this module is [`lex`], which takes a string slice
 //! and returns an iterator over the tokens in the source code. The tokens are currently returned
 //! as a `Result<Spanned, LexicalError>`, where [`Spanned`] is a tuple containing the
 //! start and end [`Location`] and a [`Tok`] denoting the token.
@@ -12,12 +12,10 @@
 //! # Example
 //!
 //! ```
-//! use rustpython_parser::lexer::{make_tokenizer, Tok};
-//! use rustpython_parser::mode::Mode;
-//! use rustpython_parser::token::StringKind;
+//! use rustpython_parser::{lexer::lex, Tok, Mode, StringKind};
 //!
 //! let source = "x = 'RustPython'";
-//! let tokens = make_tokenizer(source, Mode::Module)
+//! let tokens = lex(source, Mode::Module)
 //!     .map(|tok| tok.expect("Failed to lex"))
 //!     .collect::<Vec<_>>();
 //!
@@ -33,19 +31,17 @@
 //! ```
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
-pub use super::token::{StringKind, Tok};
-use crate::ast::Location;
-use crate::error::{LexicalError, LexicalErrorType};
-use crate::mode::Mode;
-use crate::soft_keywords::SoftKeywordTransformer;
+use crate::{
+    ast::Location,
+    mode::Mode,
+    soft_keywords::SoftKeywordTransformer,
+    string::FStringErrorType,
+    token::{StringKind, Tok},
+};
+use log::trace;
 use num_bigint::BigInt;
-use num_traits::identities::Zero;
-use num_traits::Num;
-use std::char;
-use std::cmp::Ordering;
-use std::ops::Index;
-use std::slice::SliceIndex;
-use std::str::FromStr;
+use num_traits::{Num, Zero};
+use std::{char, cmp::Ordering, ops::Index, slice::SliceIndex, str::FromStr};
 use unic_emoji_char::is_emoji_presentation;
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
@@ -195,29 +191,28 @@ pub type Spanned = (Location, Tok, Location);
 /// The result of lexing a token.
 pub type LexResult = Result<Spanned, LexicalError>;
 
-/// Create a new tokenizer from a source string.
+/// Create a new lexer from a source string.
 ///
 /// # Examples
 ///
 /// ```
-/// use rustpython_parser::mode::Mode;
-/// use rustpython_parser::lexer::{make_tokenizer};
+/// use rustpython_parser::{Mode, lexer::lex};
 ///
 /// let source = "def hello(): return 'world'";
-/// let tokenizer = make_tokenizer(source, Mode::Module);
+/// let lexer = lex(source, Mode::Module);
 ///
-/// for token in tokenizer {
+/// for token in lexer {
 ///    println!("{:?}", token);
 /// }
 /// ```
 #[inline]
-pub fn make_tokenizer(source: &str, mode: Mode) -> impl Iterator<Item = LexResult> + '_ {
-    make_tokenizer_located(source, mode, Location::default())
+pub fn lex(source: &str, mode: Mode) -> impl Iterator<Item = LexResult> + '_ {
+    lex_located(source, mode, Location::default())
 }
 
-/// Create a new tokenizer from a source string, starting at a given location.
-/// You probably want to use [`make_tokenizer`] instead.
-pub fn make_tokenizer_located(
+/// Create a new lexer from a source string, starting at a given location.
+/// You probably want to use [`lex`] instead.
+pub fn lex_located(
     source: &str,
     mode: Mode,
     start_location: Location,
@@ -230,7 +225,7 @@ where
     T: Iterator<Item = char>,
 {
     /// Create a new lexer from T and a starting location. You probably want to use
-    /// [`make_tokenizer`] instead.
+    /// [`lex`] instead.
     pub fn new(input: T, start: Location) -> Self {
         let mut lxr = Lexer {
             at_begin_of_line: true,
@@ -1212,10 +1207,115 @@ where
     }
 }
 
+/// Represents an error that occur during lexing and are
+/// returned by the `parse_*` functions in the iterator in the
+/// [lexer] implementation.
+///
+/// [lexer]: crate::lexer
+#[derive(Debug, PartialEq)]
+pub struct LexicalError {
+    /// The type of error that occurred.
+    pub error: LexicalErrorType,
+    /// The location of the error.
+    pub location: Location,
+}
+
+impl LexicalError {
+    /// Creates a new `LexicalError` with the given error type and location.
+    pub fn new(error: LexicalErrorType, location: Location) -> Self {
+        Self { error, location }
+    }
+}
+
+/// Represents the different types of errors that can occur during lexing.
+#[derive(Debug, PartialEq)]
+pub enum LexicalErrorType {
+    // TODO: Can probably be removed, the places it is used seem to be able
+    // to use the `UnicodeError` variant instead.
+    #[doc(hidden)]
+    StringError,
+    // TODO: Should take a start/end position to report.
+    /// Decoding of a unicode escape sequence in a string literal failed.
+    UnicodeError,
+    /// The nesting of brackets/braces/parentheses is not balanced.
+    NestingError,
+    /// The indentation is not consistent.
+    IndentationError,
+    /// Inconsistent use of tabs and spaces.
+    TabError,
+    /// Encountered a tab after a space.
+    TabsAfterSpaces,
+    /// A non-default argument follows a default argument.
+    DefaultArgumentError,
+    /// A duplicate argument was found in a function definition.
+    DuplicateArgumentError(String),
+    /// A positional argument follows a keyword argument.
+    PositionalArgumentError,
+    /// An iterable argument unpacking `*args` follows keyword argument unpacking `**kwargs`.
+    UnpackedArgumentError,
+    /// A keyword argument was repeated.
+    DuplicateKeywordArgumentError(String),
+    /// An unrecognized token was encountered.
+    UnrecognizedToken { tok: char },
+    /// An f-string error containing the [`FStringErrorType`].
+    FStringError(FStringErrorType),
+    /// An unexpected character was encountered after a line continuation.
+    LineContinuationError,
+    /// An unexpected end of file was encountered.
+    Eof,
+    /// An unexpected error occurred.
+    OtherError(String),
+}
+
+impl std::fmt::Display for LexicalErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            LexicalErrorType::StringError => write!(f, "Got unexpected string"),
+            LexicalErrorType::FStringError(error) => write!(f, "f-string: {error}"),
+            LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode"),
+            LexicalErrorType::NestingError => write!(f, "Got unexpected nesting"),
+            LexicalErrorType::IndentationError => {
+                write!(f, "unindent does not match any outer indentation level")
+            }
+            LexicalErrorType::TabError => {
+                write!(f, "inconsistent use of tabs and spaces in indentation")
+            }
+            LexicalErrorType::TabsAfterSpaces => {
+                write!(f, "Tabs not allowed as part of indentation after spaces")
+            }
+            LexicalErrorType::DefaultArgumentError => {
+                write!(f, "non-default argument follows default argument")
+            }
+            LexicalErrorType::DuplicateArgumentError(arg_name) => {
+                write!(f, "duplicate argument '{arg_name}' in function definition")
+            }
+            LexicalErrorType::DuplicateKeywordArgumentError(arg_name) => {
+                write!(f, "keyword argument repeated: {arg_name}")
+            }
+            LexicalErrorType::PositionalArgumentError => {
+                write!(f, "positional argument follows keyword argument")
+            }
+            LexicalErrorType::UnpackedArgumentError => {
+                write!(
+                    f,
+                    "iterable argument unpacking follows keyword argument unpacking"
+                )
+            }
+            LexicalErrorType::UnrecognizedToken { tok } => {
+                write!(f, "Got unexpected token {tok}")
+            }
+            LexicalErrorType::LineContinuationError => {
+                write!(f, "unexpected character after line continuation character")
+            }
+            LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
+            LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{make_tokenizer, StringKind, Tok};
-    use crate::mode::Mode;
+    use super::*;
     use num_bigint::BigInt;
 
     const WINDOWS_EOL: &str = "\r\n";
@@ -1223,7 +1323,7 @@ mod tests {
     const UNIX_EOL: &str = "\n";
 
     pub fn lex_source(source: &str) -> Vec<Tok> {
-        let lexer = make_tokenizer(source, Mode::Module);
+        let lexer = lex(source, Mode::Module);
         lexer.map(|x| x.unwrap().1).collect()
     }
 

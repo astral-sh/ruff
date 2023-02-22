@@ -96,7 +96,7 @@ impl Location {
 
 #[cfg(test)]
 mod tests {
-    use crate::Location;
+    use super::*;
 
     #[test]
     fn test_gt() {

@@ -1,7 +1,5 @@
+use crate::{lexer::LexResult, mode::Mode, token::Tok};
 use itertools::{Itertools, MultiPeek};
-
-use crate::lexer::{LexResult, Tok};
-pub use crate::mode::Mode;
 
 /// An [`Iterator`] that transforms a token stream to accommodate soft keywords (namely, `match`
 /// and `case`).
@@ -27,9 +25,9 @@ impl<I> SoftKeywordTransformer<I>
 where
     I: Iterator<Item = LexResult>,
 {
-    pub fn new(tokenizer: I, mode: Mode) -> Self {
+    pub fn new(lexer: I, mode: Mode) -> Self {
         Self {
-            underlying: tokenizer.multipeek(),
+            underlying: lexer.multipeek(),
             start_of_line: matches!(mode, Mode::Interactive | Mode::Module),
         }
     }

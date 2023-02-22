@@ -1,7 +1,9 @@
 // Contains functions that perform validation and parsing of arguments and parameters.
 // Checks apply both to functions and to lambdas.
-use crate::ast;
-use crate::error::{LexicalError, LexicalErrorType};
+use crate::{
+    ast,
+    lexer::{LexicalError, LexicalErrorType},
+};
 use rustc_hash::FxHashSet;
 
 pub(crate) struct ArgumentList {
@@ -149,8 +151,8 @@ fn is_starred(exp: &ast::Expr) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::error::{LexicalErrorType, ParseErrorType};
-    use crate::parser::parse_program;
+    use super::*;
+    use crate::parser::{parse_program, ParseErrorType};
 
     macro_rules! function_and_lambda {
         ($($name:ident: $code:expr,)*) => {
