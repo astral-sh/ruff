@@ -1,9 +1,7 @@
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, StmtKind};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::mode::Mode;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers::any_over_expr;
 use crate::ast::types::{BindingKind, Scope};
@@ -285,9 +283,7 @@ pub type LocatedCmpop<U = ()> = Located<Cmpop, U>;
 /// `CPython` doesn't either. This method iterates over the token stream and
 /// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
 pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
-    let mut tok_iter = lexer::make_tokenizer(contents, Mode::Module)
-        .flatten()
-        .peekable();
+    let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
     let mut ops: Vec<LocatedCmpop> = vec![];
     let mut count: usize = 0;
     loop {

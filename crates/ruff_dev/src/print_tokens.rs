@@ -5,8 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use rustpython_parser::lexer;
-use rustpython_parser::mode::Mode;
+use rustpython_parser::{lexer, Mode};
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -17,7 +16,7 @@ pub struct Args {
 
 pub fn main(args: &Args) -> Result<()> {
     let contents = fs::read_to_string(&args.file)?;
-    for (_, tok, _) in lexer::make_tokenizer(&contents, Mode::Module).flatten() {
+    for (_, tok, _) in lexer::lex(&contents, Mode::Module).flatten() {
         println!("{tok:#?}");
     }
     Ok(())

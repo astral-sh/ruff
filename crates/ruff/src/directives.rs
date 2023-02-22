@@ -3,7 +3,8 @@
 use bitflags::bitflags;
 use nohash_hasher::{IntMap, IntSet};
 use rustpython_parser::ast::Location;
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::registry::LintSource;
 use crate::settings::Settings;
@@ -150,15 +151,14 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
 #[cfg(test)]
 mod tests {
     use nohash_hasher::{IntMap, IntSet};
-    use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::mode::Mode;
+    use rustpython_parser::{lexer, Mode};
 
     use crate::directives::{extract_isort_directives, extract_noqa_line_for};
 
     #[test]
     fn noqa_extraction() {
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             "x = 1
 y = 2
 z = x + 1",
@@ -167,7 +167,7 @@ z = x + 1",
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
 
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             "
 x = 1
 y = 2
@@ -177,7 +177,7 @@ z = x + 1",
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
 
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             "x = 1
 y = 2
 z = x + 1
@@ -187,7 +187,7 @@ z = x + 1
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
 
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             "x = 1
 
 y = 2
@@ -198,7 +198,7 @@ z = x + 1
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::default());
 
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             "x = '''abc
 def
 ghi
@@ -213,7 +213,7 @@ z = x + 1",
             IntMap::from_iter([(1, 4), (2, 4), (3, 4)])
         );
 
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             "x = 1
 y = '''abc
 def
@@ -228,7 +228,7 @@ z = 2",
             IntMap::from_iter([(2, 5), (3, 5), (4, 5)])
         );
 
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             "x = 1
 y = '''abc
 def
@@ -242,7 +242,7 @@ ghi
             IntMap::from_iter([(2, 5), (3, 5), (4, 5)])
         );
 
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             r#"x = \
     1"#,
             Mode::Module,
@@ -250,7 +250,7 @@ ghi
         .collect();
         assert_eq!(extract_noqa_line_for(&lxr), IntMap::from_iter([(1, 2)]));
 
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             r#"from foo import \
     bar as baz, \
     qux as quux"#,
@@ -262,7 +262,7 @@ ghi
             IntMap::from_iter([(1, 3), (2, 3)])
         );
 
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(
+        let lxr: Vec<LexResult> = lexer::lex(
             r#"
 # Foo
 from foo import \
@@ -286,7 +286,7 @@ y = \
         let contents = "x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).exclusions, IntSet::default());
 
         let contents = "# isort: off
@@ -294,7 +294,7 @@ x = 1
 y = 2
 # isort: on
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         assert_eq!(
             extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([2, 3, 4])
@@ -307,7 +307,7 @@ y = 2
 # isort: on
 z = x + 1
 # isort: on";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         assert_eq!(
             extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([2, 3, 4, 5])
@@ -317,7 +317,7 @@ z = x + 1
 x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         assert_eq!(
             extract_isort_directives(&lxr).exclusions,
             IntSet::from_iter([2, 3, 4])
@@ -327,7 +327,7 @@ z = x + 1";
 x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).exclusions, IntSet::default());
 
         let contents = "# isort: off
@@ -336,7 +336,7 @@ x = 1
 y = 2
 # isort: skip_file
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).exclusions, IntSet::default());
     }
 
@@ -345,20 +345,20 @@ z = x + 1";
         let contents = "x = 1
 y = 2
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).splits, Vec::<usize>::new());
 
         let contents = "x = 1
 y = 2
 # isort: split
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).splits, vec![3]);
 
         let contents = "x = 1
 y = 2  # isort: split
 z = x + 1";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         assert_eq!(extract_isort_directives(&lxr).splits, vec![2]);
     }
 }

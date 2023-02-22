@@ -2,7 +2,8 @@
 //! are omitted from the AST (e.g., commented lines).
 
 use rustpython_parser::ast::Location;
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 pub struct Indexer {
     commented_lines: Vec<usize>,
@@ -49,16 +50,15 @@ impl From<&[LexResult]> for Indexer {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
-    use rustpython_parser::mode::Mode;
+    use rustpython_parser::{lexer, Mode};
 
     use crate::source_code::Indexer;
 
     #[test]
     fn continuation() {
         let contents = r#"x = 1"#;
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
         assert_eq!(indexer.continuation_lines(), Vec::<usize>::new().as_slice());
 
@@ -70,7 +70,7 @@ x = 1
 y = 2
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
         assert_eq!(indexer.continuation_lines(), Vec::<usize>::new().as_slice());
 
@@ -90,7 +90,7 @@ if True:
 )
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
         assert_eq!(indexer.continuation_lines(), [1, 5, 6, 11]);
 
@@ -110,7 +110,7 @@ x = 1; \
 import os
 "#
         .trim();
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents, Mode::Module).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
         assert_eq!(indexer.continuation_lines(), [9, 12]);
     }

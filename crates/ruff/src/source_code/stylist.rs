@@ -5,9 +5,7 @@ use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
 use rustpython_parser::ast::Location;
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::mode::Mode;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::rules::pydocstyle::helpers::leading_quote;
@@ -166,7 +164,7 @@ impl Deref for LineEnding {
 
 /// Detect the indentation style of the given tokens.
 fn detect_indentation(contents: &str, locator: &Locator) -> Option<Indentation> {
-    for (_start, tok, end) in lexer::make_tokenizer(contents, Mode::Module).flatten() {
+    for (_start, tok, end) in lexer::lex(contents, Mode::Module).flatten() {
         if let Tok::Indent { .. } = tok {
             let start = Location::new(end.row(), 0);
             let whitespace = locator.slice(&Range::new(start, end));
@@ -178,7 +176,7 @@ fn detect_indentation(contents: &str, locator: &Locator) -> Option<Indentation> 
 
 /// Detect the quotation style of the given tokens.
 fn detect_quote(contents: &str, locator: &Locator) -> Option<Quote> {
-    for (start, tok, end) in lexer::make_tokenizer(contents, Mode::Module).flatten() {
+    for (start, tok, end) in lexer::lex(contents, Mode::Module).flatten() {
         if let Tok::String { .. } = tok {
             let content = locator.slice(&Range::new(start, end));
             if let Some(pattern) = leading_quote(content) {

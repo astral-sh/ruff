@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::lexer::{LexResult, Spanned};
-use rustpython_parser::token::Tok;
+use rustpython_parser::Tok;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;

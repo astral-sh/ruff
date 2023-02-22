@@ -1,13 +1,10 @@
 use rustpython_parser::ast::{Location, Stmt};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::mode::Mode;
+use rustpython_parser::{lexer, Mode, Tok};
 
+use super::types::TrailingComma;
 use crate::ast::helpers::is_docstring_stmt;
 use crate::ast::types::Range;
 use crate::source_code::Locator;
-
-use super::types::TrailingComma;
 
 /// Return `true` if a `StmtKind::ImportFrom` statement ends with a magic
 /// trailing comma.
@@ -15,9 +12,7 @@ pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
     let contents = locator.slice(&Range::from_located(stmt));
     let mut count: usize = 0;
     let mut trailing_comma = TrailingComma::Absent;
-    for (_, tok, _) in
-        lexer::make_tokenizer_located(contents, Mode::Module, stmt.location).flatten()
-    {
+    for (_, tok, _) in lexer::lex_located(contents, Mode::Module, stmt.location).flatten() {
         if matches!(tok, Tok::Lpar) {
             count += 1;
         }
@@ -114,7 +109,7 @@ pub fn find_splice_location(body: &[Stmt], locator: &Locator) -> Location {
 
     // Find the first token that isn't a comment or whitespace.
     let contents = locator.skip(splice);
-    for (.., tok, end) in lexer::make_tokenizer_located(contents, Mode::Module, splice).flatten() {
+    for (.., tok, end) in lexer::lex_located(contents, Mode::Module, splice).flatten() {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
             splice = end;
         } else {
@@ -128,12 +123,11 @@ pub fn find_splice_location(body: &[Stmt], locator: &Locator) -> Location {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use rustpython_parser as parser;
     use rustpython_parser::ast::Location;
-    use rustpython_parser::parser;
-
-    use crate::source_code::Locator;
 
     use super::find_splice_location;
+    use crate::source_code::Locator;
 
     fn splice_contents(contents: &str) -> Result<Location> {
         let program = parser::parse_program(contents, "<filename>")?;

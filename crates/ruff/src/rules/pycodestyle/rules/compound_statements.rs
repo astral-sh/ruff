@@ -1,6 +1,6 @@
-use rustpython_parser::lexer::{LexResult, Tok};
-
 use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;

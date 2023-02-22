@@ -1,11 +1,8 @@
 use itertools::Itertools;
 use log::error;
-use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::mode::Mode;
-
 use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers::contains_effect;
 use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
@@ -21,8 +18,8 @@ define_violation!(
     /// Checks for the presence of unused variables in function scopes.
     ///
     /// ## Why is this bad?
-    /// A variable that is defined but not used is likely a mistake, and should be
-    /// removed to avoid confusion.
+    /// A variable that is defined but not used is likely a mistake, and should
+    /// be removed to avoid confusion.
     ///
     /// If a variable is intentionally defined-but-not-used, it should be
     /// prefixed with an underscore, or some other value that adheres to the
@@ -62,8 +59,8 @@ impl AlwaysAutofixableViolation for UnusedVariable {
     }
 }
 
-/// Return the start and end [`Location`] of the token after the next match of the predicate,
-/// skipping over any bracketed expressions.
+/// Return the start and end [`Location`] of the token after the next match of
+/// the predicate, skipping over any bracketed expressions.
 fn match_token_after<F, T>(located: &Located<T>, locator: &Locator, f: F) -> Range
 where
     F: Fn(Tok) -> bool,
@@ -76,7 +73,7 @@ where
     let mut brace_count = 0;
 
     for ((_, tok, _), (start, _, end)) in
-        lexer::make_tokenizer_located(contents, Mode::Module, located.location)
+        lexer::lex_located(contents, Mode::Module, located.location)
             .flatten()
             .tuple_windows()
     {
@@ -125,8 +122,8 @@ where
     unreachable!("No token after matched");
 }
 
-/// Return the start and end [`Location`] of the token matching the predicate, skipping over
-/// any bracketed expressions.
+/// Return the start and end [`Location`] of the token matching the predicate,
+/// skipping over any bracketed expressions.
 fn match_token<F, T>(located: &Located<T>, locator: &Locator, f: F) -> Range
 where
     F: Fn(Tok) -> bool,
@@ -138,8 +135,7 @@ where
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for (start, tok, end) in
-        lexer::make_tokenizer_located(contents, Mode::Module, located.location).flatten()
+    for (start, tok, end) in lexer::lex_located(contents, Mode::Module, located.location).flatten()
     {
         match tok {
             Tok::Lpar => {

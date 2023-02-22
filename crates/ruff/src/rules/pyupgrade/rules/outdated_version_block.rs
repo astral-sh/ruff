@@ -2,12 +2,9 @@ use std::cmp::Ordering;
 
 use log::error;
 use num_bigint::{BigInt, Sign};
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::mode::Mode;
-
 use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::{Range, RefEquality};
 use crate::ast::whitespace::indentation;
@@ -69,7 +66,7 @@ fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata>
     let mut else_ = None;
 
     for (start, tok, _) in
-        lexer::make_tokenizer_located(text, Mode::Module, Location::new(located.location.row(), 0))
+        lexer::lex_located(text, Mode::Module, Location::new(located.location.row(), 0))
             .flatten()
             .filter(|(_, tok, _)| {
                 !matches!(

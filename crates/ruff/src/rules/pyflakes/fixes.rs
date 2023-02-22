@@ -1,11 +1,8 @@
 use anyhow::{bail, Result};
 use libcst_native::{Call, Codegen, CodegenState, Dict, DictElement, Expression};
-use rustpython_parser::ast::{Excepthandler, Expr};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::mode::Mode;
-
 use ruff_python::string::strip_quotes_and_prefixes;
+use rustpython_parser::ast::{Excepthandler, Expr};
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::cst::matchers::{match_expr, match_module};
@@ -124,7 +121,7 @@ pub fn remove_exception_handler_assignment(
     // End of the token just before the `as` to the semicolon.
     let mut prev = None;
     for (start, tok, end) in
-        lexer::make_tokenizer_located(contents, Mode::Module, excepthandler.location).flatten()
+        lexer::lex_located(contents, Mode::Module, excepthandler.location).flatten()
     {
         if matches!(tok, Tok::As) {
             fix_start = prev;

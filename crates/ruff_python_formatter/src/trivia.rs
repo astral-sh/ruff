@@ -1,6 +1,7 @@
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::core::types::Range;
 use crate::cst::{Alias, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind};
@@ -45,7 +46,8 @@ pub struct TriviaToken {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TriviaKind {
-    /// A Comment that is separated by at least one line break from the preceding token.
+    /// A Comment that is separated by at least one line break from the
+    /// preceding token.
     ///
     /// # Examples
     ///
