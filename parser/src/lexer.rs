@@ -38,6 +38,7 @@ use crate::{
     string::FStringErrorType,
     token::{StringKind, Tok},
 };
+use log::trace;
 use num_bigint::BigInt;
 use num_traits::{Num, Zero};
 use std::{char, cmp::Ordering, ops::Index, slice::SliceIndex, str::FromStr};
