@@ -144,7 +144,14 @@ pub fn check_physical_lines(
         }
 
         if enforce_blankline_contains_whitespace {
-            if let Some(diagnostic) = blankline_contains_whitespace(index, line) {
+            if let Some(diagnostic) = blankline_contains_whitespace(
+                index,
+                line,
+                matches!(autofix, flags::Autofix::Enabled)
+                    && settings
+                        .rules
+                        .should_fix(&Rule::BlanklineContainsWhitespace),
+            ) {
                 diagnostics.push(diagnostic);
             }
         }
