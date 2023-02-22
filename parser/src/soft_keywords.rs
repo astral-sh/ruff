@@ -1,7 +1,5 @@
+use crate::{lexer::LexResult, mode::Mode, token::Tok};
 use itertools::{Itertools, MultiPeek};
-
-use crate::lexer::{LexResult, Tok};
-pub use crate::mode::Mode;
 
 /// An [`Iterator`] that transforms a token stream to accommodate soft keywords (namely, `match`
 /// and `case`).

@@ -12,9 +12,7 @@
 //! # Example
 //!
 //! ```
-//! use rustpython_parser::lexer::{lex, Tok};
-//! use rustpython_parser::mode::Mode;
-//! use rustpython_parser::token::StringKind;
+//! use rustpython_parser::{lexer::lex, Tok, Mode, StringKind};
 //!
 //! let source = "x = 'RustPython'";
 //! let tokens = lex(source, Mode::Module)
@@ -33,19 +31,16 @@
 //! ```
 //!
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
-pub use super::token::{StringKind, Tok};
-use crate::ast::Location;
-use crate::mode::Mode;
-use crate::soft_keywords::SoftKeywordTransformer;
-use crate::string::FStringErrorType;
+use crate::{
+    ast::Location,
+    mode::Mode,
+    soft_keywords::SoftKeywordTransformer,
+    string::FStringErrorType,
+    token::{StringKind, Tok},
+};
 use num_bigint::BigInt;
-use num_traits::identities::Zero;
-use num_traits::Num;
-use std::char;
-use std::cmp::Ordering;
-use std::ops::Index;
-use std::slice::SliceIndex;
-use std::str::FromStr;
+use num_traits::{Num, Zero};
+use std::{char, cmp::Ordering, ops::Index, slice::SliceIndex, str::FromStr};
 use unic_emoji_char::is_emoji_presentation;
 use unic_ucd_ident::{is_xid_continue, is_xid_start};
 
@@ -200,8 +195,7 @@ pub type LexResult = Result<Spanned, LexicalError>;
 /// # Examples
 ///
 /// ```
-/// use rustpython_parser::mode::Mode;
-/// use rustpython_parser::lexer::{lex};
+/// use rustpython_parser::{Mode, lexer::lex};
 ///
 /// let source = "def hello(): return 'world'";
 /// let lexer = lex(source, Mode::Module);
@@ -1320,8 +1314,7 @@ impl std::fmt::Display for LexicalErrorType {
 
 #[cfg(test)]
 mod tests {
-    use super::{lex, StringKind, Tok};
-    use crate::mode::Mode;
+    use super::*;
     use num_bigint::BigInt;
 
     const WINDOWS_EOL: &str = "\r\n";

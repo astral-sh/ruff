@@ -12,10 +12,13 @@
 //! [Abstract Syntax Tree]: https://en.wikipedia.org/wiki/Abstract_syntax_tree
 //! [`Mode`]: crate::mode
 
-use crate::lexer::{LexResult, LexicalError, LexicalErrorType, Tok};
-pub use crate::mode::Mode;
-use crate::{ast, lexer, python};
-use ast::Location;
+use crate::{
+    ast::{self, Location},
+    lexer::{self, LexResult, LexicalError, LexicalErrorType},
+    mode::Mode,
+    python,
+    token::Tok,
+};
 use itertools::Itertools;
 use std::iter;
 
@@ -31,7 +34,7 @@ pub(super) use lalrpop_util::ParseError as LalrpopError;
 /// For example, parsing a simple function definition and a call to that function:
 ///
 /// ```
-/// use rustpython_parser::parser;
+/// use rustpython_parser as parser;
 /// let source = r#"
 /// def foo():
 ///    return 42
@@ -59,7 +62,7 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 ///
 ///  ```
 /// extern crate num_bigint;
-/// use rustpython_parser::{parser, ast};
+/// use rustpython_parser as parser;
 /// let expr = parser::parse_expression("1 + 2", "<embedded>");
 ///
 /// assert!(expr.is_ok());
@@ -80,8 +83,7 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 /// somewhat silly, location:
 ///
 /// ```
-/// use rustpython_parser::parser::parse_expression_located;
-/// use rustpython_parser::ast::Location;
+/// use rustpython_parser::{ast::Location, parse_expression_located};
 ///
 /// let expr = parse_expression_located("1 + 2", "<embedded>", Location::new(5, 20));
 /// assert!(expr.is_ok());
@@ -108,8 +110,7 @@ pub fn parse_expression_located(
 /// parsing:
 ///
 /// ```
-/// use rustpython_parser::mode::Mode;
-/// use rustpython_parser::parser::parse;
+/// use rustpython_parser::{Mode, parse};
 ///
 /// let expr = parse("1 + 2", Mode::Expression, "<embedded>");
 /// assert!(expr.is_ok());
@@ -118,8 +119,7 @@ pub fn parse_expression_located(
 /// Alternatively, we can parse a full Python program consisting of multiple lines:
 ///
 /// ```
-/// use rustpython_parser::mode::Mode;
-/// use rustpython_parser::parser::parse;
+/// use rustpython_parser::{Mode, parse};
 ///
 /// let source = r#"
 /// class Greeter:
@@ -142,9 +142,7 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
 /// # Example
 ///
 /// ```
-/// use rustpython_parser::ast::Location;
-/// use rustpython_parser::mode::Mode;
-/// use rustpython_parser::parser::parse_located;
+/// use rustpython_parser::{ast::Location, Mode, parse_located};
 ///
 /// let source = r#"
 /// def fib(i):
@@ -178,9 +176,7 @@ pub fn parse_located(
 /// them using the [`lexer::lex`] function:
 ///
 /// ```
-/// use rustpython_parser::lexer::lex;
-/// use rustpython_parser::mode::Mode;
-/// use rustpython_parser::parser::parse_tokens;
+/// use rustpython_parser::{lexer::lex, Mode, parse_tokens};
 ///
 /// let expr = parse_tokens(lex("1 + 2", Mode::Expression), Mode::Expression, "<embedded>");
 /// assert!(expr.is_ok());
@@ -200,9 +196,7 @@ pub fn parse_tokens(
 }
 
 /// Represents represent errors that occur during parsing and are
-/// returned by the `parse_*` functions in the [parser] module.
-///
-/// [parser]: crate::parser
+/// returned by the `parse_*` functions.
 pub type ParseError = rustpython_compiler_core::BaseError<ParseErrorType>;
 
 /// Represents the different types of errors that can occur during parsing.

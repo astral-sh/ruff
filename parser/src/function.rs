@@ -1,7 +1,9 @@
 // Contains functions that perform validation and parsing of arguments and parameters.
 // Checks apply both to functions and to lambdas.
-use crate::ast;
-use crate::lexer::{LexicalError, LexicalErrorType};
+use crate::{
+    ast,
+    lexer::{LexicalError, LexicalErrorType},
+};
 use rustc_hash::FxHashSet;
 
 pub(crate) struct ArgumentList {

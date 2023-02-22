@@ -3,7 +3,6 @@
 // The lexer doesn't do any special handling of f-strings, it just treats them as
 // regular strings. Since the parser has no definition of f-string formats (Pending PEP 701)
 // we have to do the parsing here, manually.
-use self::FStringErrorType::*;
 use crate::{
     ast::{Constant, ConversionFlag, Expr, ExprKind, Location},
     lexer::{LexicalError, LexicalErrorType},
@@ -11,13 +10,12 @@ use crate::{
     token::{StringKind, Tok},
 };
 use itertools::Itertools;
-use std::{iter, str};
 
 // unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
 const MAX_UNICODE_NAME: usize = 88;
 
 struct StringParser<'a> {
-    chars: iter::Peekable<str::Chars<'a>>,
+    chars: std::iter::Peekable<std::str::Chars<'a>>,
     kind: StringKind,
     start: Location,
     end: Location,
@@ -177,6 +175,8 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_formatted_value(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
+        use FStringErrorType::*;
+
         let mut expression = String::new();
         let mut spec = None;
         let mut delims = Vec::new();
@@ -402,6 +402,8 @@ impl<'a> StringParser<'a> {
     }
 
     fn parse_fstring(&mut self, nested: u8) -> Result<Vec<Expr>, LexicalError> {
+        use FStringErrorType::*;
+
         if nested >= 2 {
             return Err(FStringError::new(ExpressionNestedTooDeeply, self.get_pos()).into());
         }
@@ -653,7 +655,7 @@ pub(crate) fn parse_strings(
 // TODO: consolidate these with ParseError
 /// An error that occurred during parsing of an f-string.
 #[derive(Debug, PartialEq)]
-pub struct FStringError {
+struct FStringError {
     /// The type of error that occurred.
     pub error: FStringErrorType,
     /// The location of the error.
@@ -708,28 +710,29 @@ pub enum FStringErrorType {
 
 impl std::fmt::Display for FStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        use FStringErrorType::*;
         match self {
-            FStringErrorType::UnclosedLbrace => write!(f, "expecting '}}'"),
-            FStringErrorType::UnopenedRbrace => write!(f, "Unopened '}}'"),
-            FStringErrorType::ExpectedRbrace => write!(f, "Expected '}}' after conversion flag."),
-            FStringErrorType::InvalidExpression(error) => {
+            UnclosedLbrace => write!(f, "expecting '}}'"),
+            UnopenedRbrace => write!(f, "Unopened '}}'"),
+            ExpectedRbrace => write!(f, "Expected '}}' after conversion flag."),
+            InvalidExpression(error) => {
                 write!(f, "{error}")
             }
-            FStringErrorType::InvalidConversionFlag => write!(f, "invalid conversion character"),
-            FStringErrorType::EmptyExpression => write!(f, "empty expression not allowed"),
-            FStringErrorType::MismatchedDelimiter(first, second) => write!(
+            InvalidConversionFlag => write!(f, "invalid conversion character"),
+            EmptyExpression => write!(f, "empty expression not allowed"),
+            MismatchedDelimiter(first, second) => write!(
                 f,
                 "closing parenthesis '{second}' does not match opening parenthesis '{first}'"
             ),
-            FStringErrorType::SingleRbrace => write!(f, "single '}}' is not allowed"),
-            FStringErrorType::Unmatched(delim) => write!(f, "unmatched '{delim}'"),
-            FStringErrorType::ExpressionNestedTooDeeply => {
+            SingleRbrace => write!(f, "single '}}' is not allowed"),
+            Unmatched(delim) => write!(f, "unmatched '{delim}'"),
+            ExpressionNestedTooDeeply => {
                 write!(f, "expressions nested too deeply")
             }
-            FStringErrorType::UnterminatedString => {
+            UnterminatedString => {
                 write!(f, "unterminated string")
             }
-            FStringErrorType::ExpressionCannotInclude(c) => {
+            ExpressionCannotInclude(c) => {
                 if *c == '\\' {
                     write!(f, "f-string expression part cannot include a backslash")
                 } else {
@@ -832,6 +835,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_fstring() {
+        use FStringErrorType::*;
         assert_eq!(parse_fstring_error("{5!a"), UnclosedLbrace);
         assert_eq!(parse_fstring_error("{5!a1}"), UnclosedLbrace);
         assert_eq!(parse_fstring_error("{5!"), UnclosedLbrace);
