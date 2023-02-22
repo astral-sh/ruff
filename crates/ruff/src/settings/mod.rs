@@ -465,7 +465,9 @@ mod tests {
         }]);
 
         let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
             Rule::NoNewLineAtEndOfFile,
+            Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
         ]);
@@ -483,7 +485,12 @@ mod tests {
             ignore: vec![codes::Pycodestyle::W292.into()],
             ..RuleSelection::default()
         }]);
-        let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
+        let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
+            Rule::BlankLineContainsWhitespace,
+            Rule::DocLineTooLong,
+            Rule::InvalidEscapeSequence,
+        ]);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([RuleSelection {
@@ -514,7 +521,9 @@ mod tests {
             },
         ]);
         let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
             Rule::NoNewLineAtEndOfFile,
+            Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
         ]);
@@ -549,7 +558,12 @@ mod tests {
                 ..RuleSelection::default()
             },
         ]);
-        let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
+        let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
+            Rule::BlankLineContainsWhitespace,
+            Rule::DocLineTooLong,
+            Rule::InvalidEscapeSequence,
+        ]);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([
@@ -564,7 +578,11 @@ mod tests {
                 ..RuleSelection::default()
             },
         ]);
-        let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
+        let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
+            Rule::BlankLineContainsWhitespace,
+            Rule::InvalidEscapeSequence,
+        ]);
         assert_eq!(actual, expected);
     }
 }

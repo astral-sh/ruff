@@ -77,7 +77,9 @@ ruff_macros::register_rules!(
     rules::pycodestyle::rules::IOError,
     rules::pycodestyle::rules::SyntaxError,
     // pycodestyle warnings
+    rules::pycodestyle::rules::TrailingWhitespace,
     rules::pycodestyle::rules::NoNewLineAtEndOfFile,
+    rules::pycodestyle::rules::BlankLineContainsWhitespace,
     rules::pycodestyle::rules::DocLineTooLong,
     rules::pycodestyle::rules::InvalidEscapeSequence,
     // pyflakes
@@ -782,7 +784,9 @@ impl Rule {
             | Rule::ShebangNewline
             | Rule::BidirectionalUnicode
             | Rule::ShebangPython
-            | Rule::ShebangWhitespace => &LintSource::PhysicalLines,
+            | Rule::ShebangWhitespace
+            | Rule::TrailingWhitespace
+            | Rule::BlankLineContainsWhitespace => &LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
