@@ -69,7 +69,7 @@ define_violation!(
     /// by way of a list comprehension is unnecessary and reduces performance due to the
     /// overhead of creating the list.
     ///
-    /// For example, compare the performance of `all` with a list comprension against that
+    /// For example, compare the performance of `all` with a list comprehension against that
     /// of a generator (~40x faster here):
     ///
     /// ```python
