@@ -522,11 +522,13 @@ pub fn fix_unnecessary_collection_call(
                 // Quote each argument.
                 for arg in &call.args {
                     let quoted = format!(
-                        "\"{}\"",
+                        "{}{}{}",
+                        stylist.quote(),
                         arg.keyword
                             .as_ref()
                             .expect("Expected dictionary argument to be kwarg")
-                            .value
+                            .value,
+                        stylist.quote(),
                     );
                     arena.push(quoted);
                 }
