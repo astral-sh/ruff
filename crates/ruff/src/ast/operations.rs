@@ -206,6 +206,7 @@ pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool 
                 | StmtKind::TryStar { .. }
                 | StmtKind::If { .. }
                 | StmtKind::With { .. }
+                | StmtKind::Match { .. }
         )
     })
 }
