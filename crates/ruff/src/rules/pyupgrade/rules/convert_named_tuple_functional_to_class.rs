@@ -1,9 +1,10 @@
 use anyhow::{bail, Result};
 use log::debug;
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
+
 use ruff_macros::{define_violation, derive_message_formats};
 use ruff_python::identifiers::is_identifier;
 use ruff_python::keyword::KWLIST;
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
@@ -11,23 +12,29 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::violation::{Availability, Violation};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct ConvertNamedTupleFunctionalToClass {
         pub name: String,
+        pub fixable: bool,
     }
 );
-impl AlwaysAutofixableViolation for ConvertNamedTupleFunctionalToClass {
+impl Violation for ConvertNamedTupleFunctionalToClass {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertNamedTupleFunctionalToClass { name } = self;
+        let ConvertNamedTupleFunctionalToClass { name, .. } = self;
         format!("Convert `{name}` from `NamedTuple` functional to class syntax")
     }
 
-    fn autofix_title(&self) -> String {
-        let ConvertNamedTupleFunctionalToClass { name } = self;
-        format!("Convert `{name}` to class syntax")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable
+            .then_some(|ConvertNamedTupleFunctionalToClass { name, .. }| {
+                format!("Convert `{name}` to class syntax")
+            })
     }
 }
 
@@ -172,28 +179,33 @@ pub fn convert_named_tuple_functional_to_class(
     {
         return;
     };
+
+    let properties = match match_defaults(keywords)
+        .and_then(|defaults| create_properties_from_args(args, defaults))
+    {
+        Ok(properties) => properties,
+        Err(err) => {
+            debug!("Skipping `NamedTuple` \"{typename}\": {err}");
+            return;
+        }
+    };
+    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+    let fixable = stmt.location.column() == 0;
     let mut diagnostic = Diagnostic::new(
         ConvertNamedTupleFunctionalToClass {
             name: typename.to_string(),
+            fixable,
         },
         Range::from_located(stmt),
     );
-    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-    if checker.patch(diagnostic.kind.rule()) && stmt.location.column() == 0 {
-        match match_defaults(keywords)
-            .and_then(|defaults| create_properties_from_args(args, defaults))
-        {
-            Ok(properties) => {
-                diagnostic.amend(convert_to_class(
-                    stmt,
-                    typename,
-                    properties,
-                    base_class,
-                    checker.stylist,
-                ));
-            }
-            Err(err) => debug!("Skipping ineligible `NamedTuple` \"{typename}\": {err}"),
-        };
+    if fixable && checker.patch(diagnostic.kind.rule()) {
+        diagnostic.amend(convert_to_class(
+            stmt,
+            typename,
+            properties,
+            base_class,
+            checker.stylist,
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }
