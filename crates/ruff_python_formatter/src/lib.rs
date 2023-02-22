@@ -103,7 +103,7 @@ mod tests {
 
             let snapshot_path = Path::new(&workspace_path)
                 .join("src/snapshots")
-                .join(&format!(
+                .join(format!(
                     "{module_path}__{}.snap",
                     snapshot_name.replace(&['/', '\\'][..], "__")
                 ));
