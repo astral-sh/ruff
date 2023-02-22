@@ -80,10 +80,7 @@ impl Violation for RedefinedLoopName {
             outer_kind,
             inner_kind,
         } = self;
-        format!(
-            "Outer {outer_kind} variable `{name}` overwritten by \
-            inner {inner_kind} target with same name"
-        )
+        format!("Outer {outer_kind} variable `{name}` overwritten by inner {inner_kind} target")
     }
 }
 
