@@ -147,7 +147,7 @@ pub fn function_is_too_complex(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::parser;
+    use rustpython_parser as parser;
 
     use super::get_complexity_number;
 

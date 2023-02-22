@@ -2,8 +2,8 @@ use itertools::Itertools;
 use log::error;
 use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::mode::Mode;
+use rustpython_parser::Mode;
+use rustpython_parser::Tok;
 
 use ruff_macros::{define_violation, derive_message_formats};
 
@@ -76,7 +76,7 @@ where
     let mut brace_count = 0;
 
     for ((_, tok, _), (start, _, end)) in
-        lexer::make_tokenizer_located(contents, Mode::Module, located.location)
+        lexer::lex_located(contents, Mode::Module, located.location)
             .flatten()
             .tuple_windows()
     {
@@ -138,8 +138,7 @@ where
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for (start, tok, end) in
-        lexer::make_tokenizer_located(contents, Mode::Module, located.location).flatten()
+    for (start, tok, end) in lexer::lex_located(contents, Mode::Module, located.location).flatten()
     {
         match tok {
             Tok::Lpar => {

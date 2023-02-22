@@ -5,8 +5,8 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::error;
 use rustc_hash::FxHashMap;
-use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
+use rustpython_parser::ParseError;
 
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;

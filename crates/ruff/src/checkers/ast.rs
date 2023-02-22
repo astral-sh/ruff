@@ -8,12 +8,12 @@ use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
+use rustpython_parser as parser;
 use rustpython_parser::ast::{
     Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
     ExprKind, KeywordData, Located, Location, Operator, Pattern, PatternKind, Stmt, StmtKind,
     Suite,
 };
-use rustpython_parser::parser;
 use smallvec::smallvec;
 
 use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};

@@ -4,8 +4,8 @@ use log::error;
 use num_bigint::{BigInt, Sign};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
 use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::mode::Mode;
+use rustpython_parser::Mode;
+use rustpython_parser::Tok;
 
 use ruff_macros::{define_violation, derive_message_formats};
 
@@ -69,7 +69,7 @@ fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata>
     let mut else_ = None;
 
     for (start, tok, _) in
-        lexer::make_tokenizer_located(text, Mode::Module, Location::new(located.location.row(), 0))
+        lexer::lex_located(text, Mode::Module, Location::new(located.location.row(), 0))
             .flatten()
             .filter(|(_, tok, _)| {
                 !matches!(

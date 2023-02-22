@@ -5,8 +5,8 @@ use libcst_native::{
 };
 use rustpython_parser::ast::{Expr, Keyword, Location};
 use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::mode::Mode;
+use rustpython_parser::Mode;
+use rustpython_parser::Tok;
 
 use crate::ast::types::Range;
 use crate::autofix::helpers::remove_argument;
@@ -111,7 +111,7 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
     // Find all Tok::Name tokens that are not preceded by Tok::As, and all
     // Tok::Comma tokens.
     let mut prev_tok = None;
-    for (start, tok, end) in lexer::make_tokenizer(contents, Mode::Module)
+    for (start, tok, end) in lexer::lex(contents, Mode::Module)
         .flatten()
         .skip_while(|(_, tok, _)| !matches!(tok, Tok::Import))
     {

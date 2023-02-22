@@ -2,7 +2,8 @@
 //! standalone comment or a constant string statement.
 
 use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind, Suite};
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 use std::iter::FusedIterator;
 
 use crate::ast::visitor;

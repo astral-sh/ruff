@@ -1,6 +1,7 @@
 //! Lint rules based on token traversal.
 
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};

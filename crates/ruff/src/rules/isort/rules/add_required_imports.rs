@@ -2,6 +2,7 @@ use std::fmt;
 
 use log::error;
 use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser as parser;
 use rustpython_parser::ast::{Location, StmtKind, Suite};
 
 use super::super::helpers;
@@ -210,18 +211,26 @@ pub fn add_required_imports(
         .required_imports
         .iter()
         .flat_map(|required_import| {
-            let Ok(body) = rustpython_parser::parser::parse_program(required_import, "<filename>") else {
+            let Ok(body) = parser::parse_program(required_import, "<filename>") else {
                 error!("Failed to parse required import: `{}`", required_import);
                 return vec![];
             };
             if body.is_empty() || body.len() > 1 {
-                error!("Expected require import to contain a single statement: `{}`", required_import);
+                error!(
+                    "Expected require import to contain a single statement: `{}`",
+                    required_import
+                );
                 return vec![];
             }
 
             match &body[0].node {
-                StmtKind::ImportFrom { module, names, level } => {
-                    names.iter().filter_map(|name| {
+                StmtKind::ImportFrom {
+                    module,
+                    names,
+                    level,
+                } => names
+                    .iter()
+                    .filter_map(|name| {
                         add_required_import(
                             &AnyImport::ImportFrom(ImportFrom {
                                 module: module.as_ref().map(String::as_str),
@@ -238,10 +247,11 @@ pub fn add_required_imports(
                             settings,
                             autofix,
                         )
-                    }).collect()
-                }
-                StmtKind::Import { names } => {
-                    names.iter().filter_map(|name| {
+                    })
+                    .collect(),
+                StmtKind::Import { names } => names
+                    .iter()
+                    .filter_map(|name| {
                         add_required_import(
                             &AnyImport::Import(Import {
                                 name: Alias {
@@ -256,10 +266,13 @@ pub fn add_required_imports(
                             settings,
                             autofix,
                         )
-                    }).collect()
-                }
+                    })
+                    .collect(),
                 _ => {
-                    error!("Expected required import to be in import-from style: `{}`", required_import);
+                    error!(
+                        "Expected required import to be in import-from style: `{}`",
+                        required_import
+                    );
                     vec![]
                 }
             }

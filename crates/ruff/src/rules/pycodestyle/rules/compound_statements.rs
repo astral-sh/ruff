@@ -1,4 +1,5 @@
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use ruff_macros::{define_violation, derive_message_formats};
 
