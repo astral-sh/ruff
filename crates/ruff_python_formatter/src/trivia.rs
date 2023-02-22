@@ -757,7 +757,7 @@ pub struct TriviaIndex {
     pub withitem: FxHashMap<usize, Vec<Trivia>>,
 }
 
-fn add_comment<'a>(comment: Trivia, node: &Node<'a>, trivia: &mut TriviaIndex) {
+fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
     match node {
         Node::Mod(_) => {}
         Node::Stmt(node) => {

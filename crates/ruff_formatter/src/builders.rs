@@ -333,7 +333,7 @@ impl std::fmt::Debug for StaticTextSlice {
 }
 
 fn debug_assert_no_newlines(text: &str) {
-    debug_assert!(!text.contains('\r'), "The content '{}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings.", text);
+    debug_assert!(!text.contains('\r'), "The content '{text}' contains an unsupported '\\r' line terminator character but text must only use line feeds '\\n' as line separator. Use '\\n' instead of '\\r' and '\\r\\n' to insert a line break in strings.");
 }
 
 /// Pushes some content to the end of the current line
