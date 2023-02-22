@@ -497,7 +497,7 @@ match match:
     }
 
     #[test]
-    fn test_match_complex() {
+    fn test_patma() {
         let source = r#"# Cases sampled from Lib/test/test_patma.py
 
 # case test_patma_098
@@ -664,6 +664,36 @@ match w := x,:
         z = 0
 "#;
         let parse_ast = parse_program(source, "<test>").unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
+
+    #[test]
+    fn test_match() {
+        let parse_ast = parse_program(
+            r#"
+match {"test": 1}:
+    case {
+        **rest,
+    }:
+        print(rest)
+match {"label": "test"}:
+    case {
+        "label": str() | None as label,
+    }:
+        print(label)
+match x:
+    case [0, 1,]:
+        y = 0
+match x:
+    case (0, 1,):
+        y = 0
+match x:
+    case (0,):
+        y = 0
+"#,
+            "<test>",
+        )
+        .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 }

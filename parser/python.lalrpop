@@ -801,7 +801,7 @@ MappingPattern: ast::PatternKind = {
             rest: None,
         };
     },
-    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> "}" <end_location:@R> => {
+    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","? "}" <end_location:@R> => {
         let (keys, patterns) = e
             .into_iter()
             .unzip();
@@ -811,14 +811,14 @@ MappingPattern: ast::PatternKind = {
             rest: None,
         };
     },
-    <location:@L> "{" "**" <rest:Identifier> "}" <end_location:@R> => {
+    <location:@L> "{" "**" <rest:Identifier> ","? "}" <end_location:@R> => {
         return ast::PatternKind::MatchMapping {
             keys: vec![],
             patterns: vec![],
             rest: Some(rest),
         };
     },
-    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","  "**" <rest:Identifier> "}" <end_location:@R> => {
+    <location:@L> "{" <e:OneOrMore<MatchMappingEntry>> ","  "**" <rest:Identifier> ","? "}" <end_location:@R> => {
         let (keys, patterns) = e
             .into_iter()
             .unzip();
