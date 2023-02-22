@@ -73,6 +73,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // pycodestyle warnings
         (Pycodestyle, "W292") => Rule::NoNewLineAtEndOfFile,
+        (Pycodestyle, "W293") => Rule::BlankLineContainsWhitespace,
         (Pycodestyle, "W505") => Rule::DocLineTooLong,
         (Pycodestyle, "W605") => Rule::InvalidEscapeSequence,
 

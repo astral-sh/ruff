@@ -80,6 +80,7 @@ ruff_macros::register_rules!(
     rules::pycodestyle::rules::NoNewLineAtEndOfFile,
     rules::pycodestyle::rules::DocLineTooLong,
     rules::pycodestyle::rules::InvalidEscapeSequence,
+    rules::pycodestyle::rules::BlanklineContainsWhitespace,
     // pyflakes
     rules::pyflakes::rules::UnusedImport,
     rules::pyflakes::rules::ImportShadowedByLoopVar,

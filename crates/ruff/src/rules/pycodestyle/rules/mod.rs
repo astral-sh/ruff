@@ -42,10 +42,15 @@ pub use whitespace_before_comment::{
     NoSpaceAfterInlineComment, TooFewSpacesBeforeInlineComment,
 };
 
+pub use blankline_contains_whitespace::{
+    blankline_contains_whitespace, BlanklineContainsWhitespace,
+};
+
 mod ambiguous_class_name;
 mod ambiguous_function_name;
 mod ambiguous_variable_name;
 mod bare_except;
+mod blankline_contains_whitespace;
 mod compound_statements;
 mod doc_line_too_long;
 mod errors;
