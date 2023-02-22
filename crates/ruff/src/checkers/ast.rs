@@ -342,7 +342,7 @@ where
         match &stmt.node {
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
-                let ranges = helpers::find_names(stmt, self.locator);
+                let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     // Add the binding to the current scope.
                     let context = self.execution_context();
@@ -372,7 +372,7 @@ where
             }
             StmtKind::Nonlocal { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
-                let ranges = helpers::find_names(stmt, self.locator);
+                let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     let context = self.execution_context();
                     let scope = &mut self.scopes[scope_index];
@@ -1651,6 +1651,9 @@ where
                         self.current_stmt_parent().map(Into::into),
                     );
                 }
+                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
+                }
             }
             StmtKind::While { body, orelse, .. } => {
                 if self.settings.rules.enabled(&Rule::FunctionUsesLoopVariable) {
@@ -1694,6 +1697,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
+                }
+                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
                 if matches!(stmt.node, StmtKind::For { .. }) {
                     if self.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
