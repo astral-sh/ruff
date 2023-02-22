@@ -10,7 +10,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser::ast::{
     Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
-    ExprKind, KeywordData, Located, Location, Operator, Stmt, StmtKind, Suite,
+    ExprKind, KeywordData, Located, Location, Operator, Pattern, PatternKind, Stmt, StmtKind,
+    Suite,
 };
 use rustpython_parser::parser;
 use smallvec::smallvec;
@@ -28,7 +29,7 @@ use crate::ast::types::{
     RefEquality, Scope, ScopeKind,
 };
 use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
-use crate::ast::visitor::{walk_excepthandler, Visitor};
+use crate::ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::registry::{Diagnostic, Rule};
@@ -341,7 +342,7 @@ where
         match &stmt.node {
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
-                let ranges = helpers::find_names(stmt, self.locator);
+                let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     // Add the binding to the current scope.
                     let context = self.execution_context();
@@ -371,7 +372,7 @@ where
             }
             StmtKind::Nonlocal { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
-                let ranges = helpers::find_names(stmt, self.locator);
+                let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     let context = self.execution_context();
                     let scope = &mut self.scopes[scope_index];
@@ -706,7 +707,12 @@ where
                     .rules
                     .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
                 {
-                    flake8_boolean_trap::rules::check_positional_boolean_in_def(self, name, args);
+                    flake8_boolean_trap::rules::check_positional_boolean_in_def(
+                        self,
+                        name,
+                        decorator_list,
+                        args,
+                    );
                 }
 
                 if self
@@ -715,7 +721,10 @@ where
                     .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
                 {
                     flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
-                        self, name, args,
+                        self,
+                        name,
+                        decorator_list,
+                        args,
                     );
                 }
 
@@ -1645,6 +1654,9 @@ where
                         self.current_stmt_parent().map(Into::into),
                     );
                 }
+                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
+                }
             }
             StmtKind::While { body, orelse, .. } => {
                 if self.settings.rules.enabled(&Rule::FunctionUsesLoopVariable) {
@@ -1688,6 +1700,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
+                }
+                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
                 if matches!(stmt.node, StmtKind::For { .. }) {
                     if self.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
@@ -1836,6 +1851,18 @@ where
                     if let Some(value) = value {
                         pycodestyle::rules::lambda_assignment(self, target, value, stmt);
                     }
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnintentionalTypeAnnotation)
+                {
+                    flake8_bugbear::rules::unintentional_type_annotation(
+                        self,
+                        target,
+                        value.as_deref(),
+                        stmt,
+                    );
                 }
             }
             StmtKind::Delete { .. } => {}
@@ -2894,6 +2921,13 @@ where
                 {
                     flake8_logging_format::rules::logging_call(self, func, args, keywords);
                 }
+
+                // pylint logging checker
+                if self.settings.rules.enabled(&Rule::LoggingTooFewArgs)
+                    || self.settings.rules.enabled(&Rule::LoggingTooManyArgs)
+                {
+                    pylint::rules::logging_call(self, func, args, keywords);
+                }
             }
             ExprKind::Dict { keys, values } => {
                 if self
@@ -3821,6 +3855,28 @@ where
                 }
             }
         }
+    }
+
+    fn visit_pattern(&mut self, pattern: &'b Pattern) {
+        if let PatternKind::MatchAs {
+            name: Some(name), ..
+        } = &pattern.node
+        {
+            self.add_binding(
+                name,
+                Binding {
+                    kind: BindingKind::Assignment,
+                    runtime_usage: None,
+                    synthetic_usage: None,
+                    typing_usage: None,
+                    range: Range::from_located(pattern),
+                    source: Some(self.current_stmt().clone()),
+                    context: self.execution_context(),
+                },
+            );
+        }
+
+        walk_pattern(self, pattern);
     }
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {

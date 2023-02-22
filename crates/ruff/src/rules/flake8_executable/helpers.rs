@@ -1,3 +1,8 @@
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::PermissionsExt;
+#[cfg(target_family = "unix")]
+use std::path::Path;
+
 use once_cell::sync::Lazy;
 use regex::Regex;
 
@@ -30,6 +35,17 @@ pub fn extract_shebang(line: &str) -> ShebangDirective {
             None => ShebangDirective::None,
         },
         None => ShebangDirective::None,
+    }
+}
+
+#[cfg(target_family = "unix")]
+pub fn is_executable(filepath: &Path) -> bool {
+    {
+        let Ok(metadata) = filepath.metadata() else {
+            return false;
+        };
+        let permissions = metadata.permissions();
+        permissions.mode() & 0o111 != 0
     }
 }
 

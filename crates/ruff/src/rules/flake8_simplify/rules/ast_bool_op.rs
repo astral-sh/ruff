@@ -35,6 +35,7 @@ define_violation!(
     /// ```python
     /// if isinstance(obj, (int, float)):
     ///     pass
+    /// ```
     ///
     /// ## References
     /// * [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)

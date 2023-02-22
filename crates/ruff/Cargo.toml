@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.249"
+version = "0.0.251"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -57,7 +57,6 @@ titlecase = { version = "2.2.1" }
 toml = { workspace = true }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
-# For (future) wasm-pack support
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2.7", features = ["js"] }
 console_error_panic_hook = { version = "0.1.7" }
@@ -65,9 +64,6 @@ console_log = { version = "0.2.0" }
 serde-wasm-bindgen = { version = "0.4" }
 js-sys = { version = "0.3.60" }
 wasm-bindgen = { version = "0.2.83" }
-
-[target.'cfg(not(target_family = "wasm"))'.dependencies]
-is_executable = "1.0.1"
 
 [dev-dependencies]
 insta = { version = "1.19.0", features = ["yaml", "redactions"] }

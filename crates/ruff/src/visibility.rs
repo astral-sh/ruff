@@ -185,11 +185,8 @@ fn method_visibility(stmt: &Stmt) -> Visibility {
             // Is this a setter or deleter?
             if decorator_list.iter().any(|expr| {
                 let call_path = collect_call_path(expr);
-                if call_path.len() > 1 {
-                    call_path[0] == name
-                } else {
-                    false
-                }
+                call_path.as_slice() == [name, "setter"]
+                    || call_path.as_slice() == [name, "deleter"]
             }) {
                 return Visibility::Private;
             }

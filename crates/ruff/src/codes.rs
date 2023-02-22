@@ -126,6 +126,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "E0101") => Rule::ReturnInInit,
         (Pylint, "E0604") => Rule::InvalidAllObject,
         (Pylint, "E0605") => Rule::InvalidAllFormat,
+        (Pylint, "E1205") => Rule::LoggingTooManyArgs,
+        (Pylint, "E1206") => Rule::LoggingTooFewArgs,
         (Pylint, "E1307") => Rule::BadStringFormatType,
         (Pylint, "E2502") => Rule::BidirectionalUnicode,
         (Pylint, "E1310") => Rule::BadStrStripCall,
@@ -147,6 +149,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R0912") => Rule::TooManyBranches,
         (Pylint, "R0915") => Rule::TooManyStatements,
         (Pylint, "R1711") => Rule::UselessReturn,
+        (Pylint, "W2901") => Rule::RedefinedLoopName,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
@@ -181,6 +184,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bugbear, "026") => Rule::StarArgUnpackingAfterKeywordArg,
         (Flake8Bugbear, "027") => Rule::EmptyMethodWithoutAbstractDecorator,
         (Flake8Bugbear, "029") => Rule::ExceptWithEmptyTuple,
+        (Flake8Bugbear, "032") => Rule::UnintentionalTypeAnnotation,
         (Flake8Bugbear, "904") => Rule::RaiseWithoutFromInsideExcept,
         (Flake8Bugbear, "905") => Rule::ZipWithoutExplicitStrict,
 

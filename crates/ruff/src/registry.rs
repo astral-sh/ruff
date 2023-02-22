@@ -150,6 +150,9 @@ ruff_macros::register_rules!(
     rules::pylint::rules::TooManyArguments,
     rules::pylint::rules::TooManyBranches,
     rules::pylint::rules::TooManyStatements,
+    rules::pylint::rules::RedefinedLoopName,
+    rules::pylint::rules::LoggingTooFewArgs,
+    rules::pylint::rules::LoggingTooManyArgs,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -184,6 +187,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
     rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
+    rules::flake8_bugbear::rules::UnintentionalTypeAnnotation,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
     // flake8-comprehensions

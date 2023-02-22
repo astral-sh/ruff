@@ -1,6 +1,7 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location, Operator};
 
 use crate::ast::helpers::{find_keyword, is_logger_candidate, SimpleCallArgs};
+use crate::ast::logging::LoggingLevel;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -9,31 +10,6 @@ use crate::rules::flake8_logging_format::violations::{
     LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
 };
-
-enum LoggingLevel {
-    Debug,
-    Critical,
-    Error,
-    Exception,
-    Info,
-    Warn,
-    Warning,
-}
-
-impl LoggingLevel {
-    fn from_str(level: &str) -> Option<Self> {
-        match level {
-            "debug" => Some(LoggingLevel::Debug),
-            "critical" => Some(LoggingLevel::Critical),
-            "error" => Some(LoggingLevel::Error),
-            "exception" => Some(LoggingLevel::Exception),
-            "info" => Some(LoggingLevel::Info),
-            "warn" => Some(LoggingLevel::Warn),
-            "warning" => Some(LoggingLevel::Warning),
-            _ => None,
-        }
-    }
-}
 
 const RESERVED_ATTRS: &[&str; 22] = &[
     "args",

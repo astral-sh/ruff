@@ -753,7 +753,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.249"
+version = "0.0.251"
 dependencies = [
  "anyhow",
  "clap 4.1.6",
@@ -1033,15 +1033,6 @@ dependencies = [
  "io-lifetimes",
  "rustix",
  "windows-sys 0.45.0",
-]
-
-[[package]]
-name = "is_executable"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa9acdc6d67b75e626ad644734e8bc6df893d9cd2a834129065d3dd6158ea9c8"
-dependencies = [
- "winapi",
 ]
 
 [[package]]
@@ -1927,7 +1918,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.249"
+version = "0.0.251"
 dependencies = [
  "anyhow",
  "bisection",
@@ -1947,7 +1938,6 @@ dependencies = [
  "ignore",
  "imperative",
  "insta",
- "is_executable",
  "itertools",
  "js-sys",
  "libcst",
@@ -1983,7 +1973,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.249"
+version = "0.0.251"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2012,6 +2002,7 @@ dependencies = [
  "rustc-hash",
  "serde",
  "serde_json",
+ "shellexpand",
  "similar",
  "strum",
  "textwrap",

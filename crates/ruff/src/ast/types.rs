@@ -29,7 +29,7 @@ impl Range {
         }
     }
 
-    pub fn from_located<T>(located: &Located<T>) -> Self {
+    pub fn from_located<T, U>(located: &Located<T, U>) -> Self {
         Range::new(located.location, located.end_location.unwrap())
     }
 
