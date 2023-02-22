@@ -15,7 +15,6 @@ mod print_ast;
 mod print_cst;
 mod print_tokens;
 mod round_trip;
-mod utils;
 
 const ROOT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../");
 

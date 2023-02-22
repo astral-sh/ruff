@@ -21,7 +21,7 @@ implements all of the `F` rules (which originate from Pyflakes), along with a su
 Ruff also re-implements some of the most popular Flake8 plugins and related code quality tools
 natively, including:
 
-* [autoflake](https://pypi.org/project/autoflake/) ([#1647](https://github.com/charliermarsh/ruff/issues/1647))
+* [autoflake](https://pypi.org/project/autoflake/)
 * [eradicate](https://pypi.org/project/eradicate/)
 * [flake8-2020](https://pypi.org/project/flake8-2020/)
 * [flake8-annotations](https://pypi.org/project/flake8-annotations/)
@@ -51,7 +51,7 @@ natively, including:
 * [flake8-raise](https://pypi.org/project/flake8-raise/)
 * [flake8-return](https://pypi.org/project/flake8-return/)
 * [flake8-self](https://pypi.org/project/flake8-self/)
-* [flake8-simplify](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
+* [flake8-simplify](https://pypi.org/project/flake8-simplify/)
 * [flake8-super](https://pypi.org/project/flake8-super/)
 * [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 * [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
@@ -62,7 +62,7 @@ natively, including:
 * [pep8-naming](https://pypi.org/project/pep8-naming/)
 * [pydocstyle](https://pypi.org/project/pydocstyle/)
 * [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980))
-* [pyupgrade](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827))
+* [pyupgrade](https://pypi.org/project/pyupgrade/)
 * [yesqa](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different rule codes and prefixes than would be found in the
@@ -149,7 +149,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 * [flake8-raise](https://pypi.org/project/flake8-raise/)
 * [flake8-return](https://pypi.org/project/flake8-return/)
 * [flake8-self](https://pypi.org/project/flake8-self/)
-* [flake8-simplify](https://pypi.org/project/flake8-simplify/) ([#998](https://github.com/charliermarsh/ruff/issues/998))
+* [flake8-simplify](https://pypi.org/project/flake8-simplify/)
 * [flake8-super](https://pypi.org/project/flake8-super/)
 * [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
 * [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
@@ -160,11 +160,11 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 * [pydocstyle](https://pypi.org/project/pydocstyle/)
 
 Ruff can also replace [isort](https://pypi.org/project/isort/),
-[yesqa](https://github.com/asottile/yesqa), [eradicate](https://pypi.org/project/eradicate/),
-[pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980)), and a subset of the rules
-implemented in [pyupgrade](https://pypi.org/project/pyupgrade/) ([#827](https://github.com/charliermarsh/ruff/issues/827)).
+[yesqa](https://github.com/asottile/yesqa), [eradicate](https://pypi.org/project/eradicate/), and
+most of the rules implemented in [pyupgrade](https://pypi.org/project/pyupgrade/).
 
-If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an Issue.
+If you're looking to use Ruff, but rely on an unsupported Flake8 plugin, feel free to file an
+[issue](https://github.com/charliermarsh/ruff/issues/new).
 
 ## What versions of Python does Ruff support?
 
@@ -309,7 +309,7 @@ On Windows, Ruff expects that file to be located at `C:\Users\Alice\AppData\Roam
 
 For more, see the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html) crate.
 
-## Ruff tried to fix something, but it broke my code. What should I do?
+## Ruff tried to fix something — but it broke my code?
 
 Ruff's autofix is a best-effort mechanism. Given the dynamic nature of Python, it's difficult to
 have _complete_ certainty when making changes to code, even for the seemingly trivial fixes.

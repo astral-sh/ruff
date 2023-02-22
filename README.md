@@ -99,7 +99,7 @@ For more, see the [documentation](https://beta.ruff.rs/docs/).
 
 1. [Getting Started](#getting-started)
 2. [Configuration](#configuration)
-3. [Supported Rules](#supported-rules)
+3. [Rules](#rules)
 4. [Contributing](#contributing)
 5. [Support](#support)
 6. [Acknowledgements](#acknowledgements)
@@ -143,18 +143,19 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```
 
 Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
-with other editors as an [LSP](https://github.com/charliermarsh/ruff-lsp).
+with other editors through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
 
 ### Configuration
 
 Ruff can be configured via a `pyproject.toml` file, a `ruff.toml` file, or through the command line
-(see: [_Configuration_](https://beta.ruff.rs/docs/configuration/)).
+(see: [_Configuration_](https://beta.ruff.rs/docs/configuration/), or
+[_Settings_](https://beta.ruff.rs/docs/settings/) for a complete list of all configuration options).
 
 If left unspecified, the default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
-# Enable Pyflakes `E` and `F` codes by default.
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
 select = ["E", "F"]
 ignore = []
 
@@ -201,147 +202,32 @@ target-version = "py310"
 max-complexity = 10
 ```
 
-For a complete enumeration of the available configuration options, see
-[_Settings_](https://beta.ruff.rs/docs/settings/).
-
-Some configuration settings can be provided via the command-line, such as those related to
+Some configuration options can be provided via the command-line, such as those related to
 rule enablement and disablement, file discovery, logging level, and more:
 
 ```shell
 ruff check path/to/code/ --select F401 --select F403 --quiet
 ```
 
-See `ruff help` for more on Ruff's top-level commands:
+See `ruff help` for more on Ruff's top-level commands, or `ruff help check` for more on the
+linting command.
 
-<!-- Begin auto-generated command help. -->
-
-```text
-Ruff: An extremely fast Python linter.
-
-Usage: ruff [OPTIONS] <COMMAND>
-
-Commands:
-  check   Run Ruff on the given files or directories (default)
-  rule    Explain a rule
-  config  List or describe the available configuration options
-  linter  List all supported upstream linters
-  clean   Clear any caches in the current directory and any subdirectories
-  help    Print this message or the help of the given subcommand(s)
-
-Options:
-  -h, --help     Print help
-  -V, --version  Print version
-
-Log levels:
-  -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
-
-For help with a specific command, see: `ruff help <command>`.
-```
-
-<!-- End auto-generated command help. -->
-
-Or `ruff help check` for more on the linting command:
-
-<!-- Begin auto-generated subcommand help. -->
-
-```text
-Run Ruff on the given files or directories (default)
-
-Usage: ruff check [OPTIONS] [FILES]...
-
-Arguments:
-  [FILES]...  List of files or directories to check
-
-Options:
-      --fix
-          Attempt to automatically fix lint violations
-      --show-source
-          Show violations with source code
-      --show-fixes
-          Show an enumeration of all autofixed lint violations
-      --diff
-          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
-  -w, --watch
-          Run in watch mode by re-running whenever files change
-      --fix-only
-          Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
-      --format <FORMAT>
-          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
-      --target-version <TARGET_VERSION>
-          The minimum Python version that should be supported
-      --config <CONFIG>
-          Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
-      --statistics
-          Show counts for every rule with at least one violation
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
-      --show-files
-          See the files Ruff will be run against with the current settings
-      --show-settings
-          See the settings Ruff will use to lint a given Python file
-  -h, --help
-          Print help
-
-Rule selection:
-      --select <RULE_CODE>
-          Comma-separated list of rule codes to enable (or ALL, to enable all rules)
-      --ignore <RULE_CODE>
-          Comma-separated list of rule codes to disable
-      --extend-select <RULE_CODE>
-          Like --select, but adds additional rule codes on top of the selected ones
-      --per-file-ignores <PER_FILE_IGNORES>
-          List of mappings from file pattern to code to exclude
-      --fixable <RULE_CODE>
-          List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
-      --unfixable <RULE_CODE>
-          List of rule codes to treat as ineligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
-
-File selection:
-      --exclude <FILE_PATTERN>         List of paths, used to omit files and/or directories from analysis
-      --extend-exclude <FILE_PATTERN>  Like --exclude, but adds additional files and directories on top of those already excluded
-      --respect-gitignore              Respect file exclusions via `.gitignore` and other standard ignore files
-      --force-exclude                  Enforce exclusions, even for paths passed to Ruff directly on the command-line
-
-Miscellaneous:
-  -n, --no-cache
-          Disable cache reads
-      --isolated
-          Ignore all configuration files
-      --cache-dir <CACHE_DIR>
-          Path to the cache directory [env: RUFF_CACHE_DIR=]
-      --stdin-filename <STDIN_FILENAME>
-          The name of the file when passing it through stdin
-  -e, --exit-zero
-          Exit with status code "0", even upon detecting lint violations
-      --exit-non-zero-on-fix
-          Exit with a non-zero status code if any files were modified via autofix, even if no lint violations remain
-
-Log levels:
-  -v, --verbose  Enable verbose logging
-  -q, --quiet    Print lint violations, but nothing else
-  -s, --silent   Disable all logging (but still exit with status code "1" upon detecting lint violations)
-```
-
-<!-- End auto-generated subcommand help. -->
-
-## Supported Rules
+## Rules
 
 <!-- Begin section: Rules -->
 
-Ruff supports over 400 lint rules, many of which are inspired by popular tools like Flake8, isort,
-pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
+**Ruff supports over 400 lint rules**, many of which are inspired by popular tools like Flake8,
+isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
 By default, Ruff enables Flake8's `E` and `F` rules. Ruff supports all rules from the `F` category,
 and a [subset](https://beta.ruff.rs/docs/rules/#error-e) of the `E` category, omitting those
-stylistic rules made obsolete by the use of an autoformatter, like [Black](https://github.com/psf/black).
+stylistic rules made obsolete by the use of an autoformatter, like
+[Black](https://github.com/psf/black).
 
 <!-- End section: Rules -->
 
-For a complete enumeration, see the [list of rules](https://beta.ruff.rs/docs/rules/) in the
-Ruff documentation.
+For a complete enumeration of the supported rules, see [_Rules_](https://beta.ruff.rs/docs/rules/).
 
 ## Contributing
 
