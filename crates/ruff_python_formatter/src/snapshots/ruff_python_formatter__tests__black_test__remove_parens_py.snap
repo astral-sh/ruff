@@ -108,11 +108,13 @@ def example8():
  
  
  def example4():
-@@ -83,4 +75,3 @@
+@@ -82,4 +74,4 @@
+ 
  
  def example8():
-     return None
--
+-    return None
+\ No newline at end of file
++    return None
 
 ```
 
@@ -287,8 +289,6 @@ def example7():
 
 def example8():
     return None
-
-
 ```
 
 

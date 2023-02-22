@@ -36,7 +36,7 @@ y = 100(no)
 ```diff
 --- Black
 +++ Ruff
-@@ -1,23 +1,22 @@
+@@ -1,22 +1,22 @@
 -x = (123456789).bit_count()
 +x = 123456789.bit_count()
  x = (123456).__abs__()
@@ -75,7 +75,7 @@ y = 100(no)
  
  y = 100[no]
 -y = 100(no)
--
+\ No newline at end of file
 +y = 100((no))
 \ No newline at end of file
 
@@ -133,8 +133,6 @@ if (10).real:
 
 y = 100[no]
 y = 100(no)
-
-
 ```
 
 

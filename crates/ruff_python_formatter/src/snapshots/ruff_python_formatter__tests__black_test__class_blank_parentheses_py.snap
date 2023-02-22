@@ -37,11 +37,13 @@ class NormalClass (
 ```diff
 --- Black
 +++ Ruff
-@@ -28,4 +28,3 @@
+@@ -27,4 +27,4 @@
+ class NormalClass:
      def func_for_testing(self, first, second):
          sum = first + second
-         return sum
--
+-        return sum
+\ No newline at end of file
++        return sum
 
 ```
 
@@ -114,8 +116,6 @@ class NormalClass:
     def func_for_testing(self, first, second):
         sum = first + second
         return sum
-
-
 ```
 
 

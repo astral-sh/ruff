@@ -18,12 +18,12 @@ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasu
 ```diff
 --- Black
 +++ Ruff
-@@ -1,5 +1,4 @@
+@@ -1,4 +1,4 @@
  a = "this is some code"
 -b =     5  # fmt:skip
 -c = 9  # fmt: skip
 -d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
--
+\ No newline at end of file
 +b = 5  #fmt:skip
 +c = 9  #fmt: skip
 +d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  #fmt:skip
@@ -47,8 +47,6 @@ a = "this is some code"
 b =     5  # fmt:skip
 c = 9  # fmt: skip
 d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
-
-
 ```
 
 

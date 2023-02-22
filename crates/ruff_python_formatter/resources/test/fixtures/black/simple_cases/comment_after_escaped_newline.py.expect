@@ -4,4 +4,3 @@ def bob():  # pylint: disable=W9016
 
 def bobtwo():  # some comment here
     pass
-

@@ -244,7 +244,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      c = call(
          0.0123,
          0.0456,
-@@ -96,24 +94,37 @@
+@@ -96,23 +94,37 @@
          0.0123,
          0.0456,
          0.0789,
@@ -288,9 +288,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +    ],
  )
  
--aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
--
-+aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
+ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
 \ No newline at end of file
 
 ```
@@ -551,8 +549,6 @@ call_to_some_function_asdf(
 )
 
 aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-
-
 ```
 
 

@@ -42,7 +42,7 @@ for (((((k, v))))) in d.items():
      if hasattr(module, "_verify_python3_env"):
          module._verify_python3_env = lambda: None
  
-@@ -17,12 +17,9 @@
+@@ -17,11 +17,9 @@
  for (
      k,
      v,
@@ -54,8 +54,9 @@ for (((((k, v))))) in d.items():
  
  # Test deeply nested brackets
  for k, v in d.items():
-     print(k, v)
--
+-    print(k, v)
+\ No newline at end of file
++    print(k, v)
 
 ```
 
@@ -120,8 +121,6 @@ for (
 # Test deeply nested brackets
 for k, v in d.items():
     print(k, v)
-
-
 ```
 
 

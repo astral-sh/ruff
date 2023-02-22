@@ -60,4 +60,3 @@ with  give_me_context(  unformatted,  args  ):  # fmt: skip
 async def test_async_with():
     async  with  give_me_async_context(  unformatted,  args  ):  # fmt: skip
         print("Do something")
-

@@ -176,14 +176,6 @@ some_module.some_function(
  )
  
  # Inner trailing comma causes outer to explode
-@@ -111,5 +110,4 @@
-     argument4,
-     argument5,
-     argument6,
--)
--
-+)
-\ No newline at end of file
 
 ```
 
@@ -422,8 +414,6 @@ some_module.some_function(
     argument5,
     argument6,
 )
-
-
 ```
 
 

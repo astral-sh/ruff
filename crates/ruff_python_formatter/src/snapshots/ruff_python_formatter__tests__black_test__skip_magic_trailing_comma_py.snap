@@ -61,7 +61,7 @@ func(
 ```diff
 --- Black
 +++ Ruff
-@@ -3,24 +3,61 @@
+@@ -3,23 +3,61 @@
  b = tuple[int,]
  
  # But commas in multiple element subscripts should be removed.
@@ -99,8 +99,6 @@ func(
  
  # Trailing commas in multiple chained non-nested parens.
 -zero(one).two(three).four(five)
--
--func1(arg1).func2(arg2).func3(arg3).func4(arg4).func5(arg5)
 +zero(
 +    one,
 +).two(
@@ -109,14 +107,14 @@ func(
 +    five,
 +)
  
--(a, b, c, d) = func1(arg1) and func2(arg2)
+-func1(arg1).func2(arg2).func3(arg3).func4(arg4).func5(arg5)
 +func1(arg1).func2(
 +    arg2,
 +).func3(arg3).func4(
 +    arg4,
 +).func5(arg5)
  
--func(argument1, (one, two), argument4, argument5, argument6)
+-(a, b, c, d) = func1(arg1) and func2(arg2)
 +(
 +    a,
 +    b,
@@ -124,6 +122,8 @@ func(
 +    d,
 +) = func1(arg1) and func2(arg2)
  
+-func(argument1, (one, two), argument4, argument5, argument6)
+\ No newline at end of file
 +func(
 +    argument1,
 +    (
@@ -234,8 +234,6 @@ func1(arg1).func2(arg2).func3(arg3).func4(arg4).func5(arg5)
 (a, b, c, d) = func1(arg1) and func2(arg2)
 
 func(argument1, (one, two), argument4, argument5, argument6)
-
-
 ```
 
 

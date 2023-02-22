@@ -58,7 +58,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
  
  
  # Example from https://github.com/psf/black/issues/3229
-@@ -43,9 +41,6 @@
+@@ -43,8 +41,6 @@
  )
  
  # Regression test for https://github.com/psf/black/issues/3414.
@@ -67,9 +67,7 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 -).xxxxxxxxxxxxxxxxxx(), (
 +assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx(), (
      "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
--)
--
-+)
+ )
 \ No newline at end of file
 
 ```
@@ -178,8 +176,6 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 ).xxxxxxxxxxxxxxxxxx(), (
     "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 )
-
-
 ```
 
 

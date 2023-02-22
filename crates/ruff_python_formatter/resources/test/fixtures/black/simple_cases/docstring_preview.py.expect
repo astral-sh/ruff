@@ -46,4 +46,3 @@ def single_quote_docstring_over_line_limit():
 
 def single_quote_docstring_over_line_limit2():
     "We do not want to put the closing quote on a new line as that is invalid (see GH-3141)."
-

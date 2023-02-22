@@ -107,11 +107,13 @@ if True:
          },
      )
      ec2client.get_waiter("instance_stopped").wait(
-@@ -97,4 +97,3 @@
+@@ -96,4 +96,4 @@
+         WaiterConfig={
              "Delay": 5,
          },
-     )
--
+-    )
+\ No newline at end of file
++    )
 
 ```
 
@@ -322,8 +324,6 @@ if True:
             "Delay": 5,
         },
     )
-
-
 ```
 
 

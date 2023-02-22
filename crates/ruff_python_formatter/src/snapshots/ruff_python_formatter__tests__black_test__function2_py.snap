@@ -67,11 +67,13 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ```diff
 --- Black
 +++ Ruff
-@@ -64,4 +64,3 @@
+@@ -63,4 +63,4 @@
+ 
  
  with hmm_but_this_should_get_two_preceding_newlines():
-     pass
--
+-    pass
+\ No newline at end of file
++    pass
 
 ```
 
@@ -216,8 +218,6 @@ else:
 
 with hmm_but_this_should_get_two_preceding_newlines():
     pass
-
-
 ```
 
 

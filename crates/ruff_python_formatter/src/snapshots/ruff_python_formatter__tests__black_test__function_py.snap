@@ -168,7 +168,7 @@ def __await__(): return (yield)
  
  
  def long_lines():
-@@ -135,15 +130,13 @@
+@@ -135,14 +130,13 @@
      a,
      **kwargs,
  ) -> A:
@@ -184,7 +184,7 @@ def __await__(): return (yield)
  
  def __await__():
 -    return (yield)
--
+\ No newline at end of file
 +    return yield
 
 ```
@@ -488,8 +488,6 @@ def f(
 
 def __await__():
     return (yield)
-
-
 ```
 
 

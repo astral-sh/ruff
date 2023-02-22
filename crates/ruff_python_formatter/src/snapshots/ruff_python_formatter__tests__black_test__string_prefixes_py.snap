@@ -53,11 +53,13 @@ def docstring_multiline():
  
  
  def docstring_singleline():
-@@ -18,4 +18,3 @@
+@@ -17,4 +17,4 @@
+ def docstring_multiline():
      R"""
      clear out all of the issues opened in that time :p
-     """
--
+-    """
+\ No newline at end of file
++    """
 
 ```
 
@@ -110,8 +112,6 @@ def docstring_multiline():
     R"""
     clear out all of the issues opened in that time :p
     """
-
-
 ```
 
 

@@ -353,7 +353,7 @@ instruction()#comment with bad spacing
      )
  
  
-@@ -167,8 +174,7 @@
+@@ -167,7 +174,7 @@
  #######################
  
  
@@ -361,8 +361,9 @@ instruction()#comment with bad spacing
 +instruction()  #comment with bad spacing
  
  # END COMMENTS
- # MORE END COMMENTS
--
+-# MORE END COMMENTS
+\ No newline at end of file
++# MORE END COMMENTS
 
 ```
 
@@ -728,8 +729,6 @@ instruction()  # comment with bad spacing
 
 # END COMMENTS
 # MORE END COMMENTS
-
-
 ```
 
 

@@ -69,11 +69,13 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
      raise err
  
  try:
-@@ -40,4 +38,3 @@
+@@ -39,4 +37,4 @@
+     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
      some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
  ) as err:
-     raise err
--
+-    raise err
+\ No newline at end of file
++    raise err
 
 ```
 
@@ -168,8 +170,6 @@ except (
     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
 ) as err:
     raise err
-
-
 ```
 
 

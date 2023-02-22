@@ -114,11 +114,13 @@ class ClassWithDecoInitAndVarsAndDocstringWithInner2:
 ```diff
 --- Black
 +++ Ruff
-@@ -163,4 +163,3 @@
+@@ -162,4 +162,4 @@
+ 
      @deco
      def __init__(self):
-         pass
--
+-        pass
+\ No newline at end of file
++        pass
 
 ```
 
@@ -461,8 +463,6 @@ class ClassWithDecoInitAndVarsAndDocstringWithInner2:
     @deco
     def __init__(self):
         pass
-
-
 ```
 
 

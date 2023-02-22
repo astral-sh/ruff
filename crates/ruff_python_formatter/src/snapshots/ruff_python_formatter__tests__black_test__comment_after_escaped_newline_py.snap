@@ -23,7 +23,7 @@ def bobtwo(): \
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1,8 @@
+@@ -1,6 +1,8 @@
 -def bob():  # pylint: disable=W9016
 +def bob():
 +    # pylint: disable=W9016
@@ -31,10 +31,11 @@ def bobtwo(): \
  
  
 -def bobtwo():  # some comment here
+-    pass
+\ No newline at end of file
 +def bobtwo():
 +    # some comment here
-     pass
--
++    pass
 
 ```
 
@@ -61,8 +62,6 @@ def bob():  # pylint: disable=W9016
 
 def bobtwo():  # some comment here
     pass
-
-
 ```
 
 

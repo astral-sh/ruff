@@ -18,11 +18,13 @@ class ClassWithDocstring:
 ```diff
 --- Black
 +++ Ruff
-@@ -2,4 +2,3 @@
+@@ -1,4 +1,4 @@
+ # Make sure when the file ends with class's docstring,
  # It doesn't add extra blank lines.
  class ClassWithDocstring:
-     """A docstring."""
--
+-    """A docstring."""
+\ No newline at end of file
++    """A docstring."""
 
 ```
 
@@ -43,8 +45,6 @@ class ClassWithDocstring:
 # It doesn't add extra blank lines.
 class ClassWithDocstring:
     """A docstring."""
-
-
 ```
 
 

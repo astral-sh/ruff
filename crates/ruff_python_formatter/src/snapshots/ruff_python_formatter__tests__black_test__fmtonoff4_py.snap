@@ -47,11 +47,13 @@ def f(): pass
      pass
  
  
-@@ -18,4 +22,3 @@
+@@ -17,4 +21,4 @@
+     ]
  )
  def f():
-     pass
--
+-    pass
+\ No newline at end of file
++    pass
 
 ```
 
@@ -108,8 +110,6 @@ def f():
 )
 def f():
     pass
-
-
 ```
 
 

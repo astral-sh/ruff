@@ -60,7 +60,7 @@ class A:
              )
              + 1
          )
-@@ -21,15 +20,20 @@
+@@ -21,14 +20,20 @@
              "Your password must contain at least %(min_length)d character.",
              "Your password must contain at least %(min_length)d characters.",
              self.min_length,
@@ -76,6 +76,8 @@ class A:
 -            4,
 -            3,
 -        ) < self.connection.mysql_version < (10, 5, 2):
+-            pass
+\ No newline at end of file
 +        if (
 +            self.connection.mysql_is_mariadb
 +            and (
@@ -86,8 +88,7 @@ class A:
 +            < self.connection.mysql_version
 +            < (10, 5, 2)
 +        ):
-             pass
--
++            pass
 
 ```
 
@@ -173,8 +174,6 @@ class A:
             3,
         ) < self.connection.mysql_version < (10, 5, 2):
             pass
-
-
 ```
 
 

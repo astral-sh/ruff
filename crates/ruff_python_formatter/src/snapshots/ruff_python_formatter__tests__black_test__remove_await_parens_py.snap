@@ -183,7 +183,7 @@ async def main():
  
  
  # Keep brackets around non power operations and nested awaits
-@@ -82,13 +86,12 @@
+@@ -82,12 +86,12 @@
  
  
  async def main():
@@ -197,8 +197,9 @@ async def main():
  
  
  async def main():
-     await (yield)
--
+-    await (yield)
+\ No newline at end of file
++    await (yield)
 
 ```
 
@@ -401,8 +402,6 @@ async def main():
 
 async def main():
     await (yield)
-
-
 ```
 
 

@@ -473,11 +473,13 @@ class C:
  
          assert (
              expectedexpectedexpectedexpectedexpectedexpectedexpectedexpectedexpect
-@@ -179,4 +202,3 @@
+@@ -178,4 +201,4 @@
+                 key8: value8,
                  key9: value9,
              }
-         )
--
+-        )
+\ No newline at end of file
++        )
 
 ```
 
@@ -875,8 +877,6 @@ class C:
                 key9: value9,
             }
         )
-
-
 ```
 
 

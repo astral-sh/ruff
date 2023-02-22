@@ -17,18 +17,19 @@ if (e123456.get_tk_patchlevel() >= (8, 6, 0, 'final') or
 ```diff
 --- Black
 +++ Ruff
-@@ -1,7 +1,5 @@
+@@ -1,6 +1,5 @@
 -if e123456.get_tk_patchlevel() >= (8, 6, 0, "final") or (
 -    8,
 -    5,
 -    8,
 -) <= get_tk_patchlevel() < (8, 6):
+-    pass
+\ No newline at end of file
 +if (
 +    e123456.get_tk_patchlevel() >= (8, 6, 0, 'final')
 +    or (8, 5, 8) <= get_tk_patchlevel() < (8, 6)
 +):
-     pass
--
++    pass
 
 ```
 
@@ -52,8 +53,6 @@ if e123456.get_tk_patchlevel() >= (8, 6, 0, "final") or (
     8,
 ) <= get_tk_patchlevel() < (8, 6):
     pass
-
-
 ```
 
 

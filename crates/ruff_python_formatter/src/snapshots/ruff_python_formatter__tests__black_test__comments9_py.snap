@@ -264,7 +264,7 @@ def bar():
  @decorator1
  @decorator2  # fmt: skip
  def bar():
-@@ -150,13 +155,13 @@
+@@ -150,12 +155,13 @@
  # Regression test for https://github.com/psf/black/issues/3454.
  def foo():
      pass
@@ -280,9 +280,10 @@ def bar():
  @decorator1
 -# A standalone comment
  def bar():
+-    pass
+\ No newline at end of file
 +    # A standalone comment
-     pass
--
++    pass
 
 ```
 
@@ -623,8 +624,6 @@ def foo():
 # A standalone comment
 def bar():
     pass
-
-
 ```
 
 

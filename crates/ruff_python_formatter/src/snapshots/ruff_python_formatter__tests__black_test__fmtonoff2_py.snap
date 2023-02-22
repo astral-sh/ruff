@@ -54,7 +54,7 @@ def test_calculate_fades():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,39 +3,42 @@
+@@ -3,38 +3,42 @@
  TmSt = 1
  TmEx = 2
  
@@ -79,12 +79,12 @@ def test_calculate_fades():
  def test_fader(test):
      pass
  
--def check_fader(test):
- 
-+def check_fader(test):
-     pass
- 
 +
+ def check_fader(test):
++    pass
+ 
+-    pass
+ 
  def verify_fader(test):
 -  # misaligned comment
 +    # misaligned comment
@@ -106,8 +106,9 @@ def test_calculate_fades():
 +        (None, 4, 0, 0, 10, 0, 0, 6, 10),
      ]
  
- # fmt: on
--
+-# fmt: on
+\ No newline at end of file
++# fmt: on
 
 ```
 
@@ -204,8 +205,6 @@ def test_calculate_fades():
     ]
 
 # fmt: on
-
-
 ```
 
 

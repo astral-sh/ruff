@@ -21,7 +21,7 @@ f = ["This is a very long line that should be formatted into a clearer line ", "
 ```diff
 --- Black
 +++ Ruff
-@@ -1,11 +1,10 @@
+@@ -1,7 +1,7 @@
  a = 3
  # fmt: off
 -b,    c = 1, 2
@@ -31,12 +31,6 @@ f = ["This is a very long line that should be formatted into a clearer line ", "
  e = 5
  # fmt: on
  f = [
-     "This is a very long line that should be formatted into a clearer line ",
-     "by rearranging.",
--]
--
-+]
-\ No newline at end of file
 
 ```
 
@@ -68,8 +62,6 @@ f = [
     "This is a very long line that should be formatted into a clearer line ",
     "by rearranging.",
 ]
-
-
 ```
 
 

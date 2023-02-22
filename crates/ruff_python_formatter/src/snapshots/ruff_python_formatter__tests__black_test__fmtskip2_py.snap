@@ -17,7 +17,7 @@ l3 = ["I have", "trailing comma", "so I should be braked",]
 ```diff
 --- Black
 +++ Ruff
-@@ -3,10 +3,13 @@
+@@ -3,7 +3,11 @@
      "into multiple lines",
      "because it is way too long",
  ]
@@ -30,11 +30,6 @@ l3 = ["I have", "trailing comma", "so I should be braked",]
  l3 = [
      "I have",
      "trailing comma",
-     "so I should be braked",
--]
--
-+]
-\ No newline at end of file
 
 ```
 
@@ -72,8 +67,6 @@ l3 = [
     "trailing comma",
     "so I should be braked",
 ]
-
-
 ```
 
 

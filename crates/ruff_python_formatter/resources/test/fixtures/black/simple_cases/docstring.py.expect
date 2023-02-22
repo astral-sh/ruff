@@ -217,4 +217,3 @@ def stable_quote_normalization_with_immediate_inner_single_quote(self):
 
     <text here, since without another non-empty line black is stable>
     """
-

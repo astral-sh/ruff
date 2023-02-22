@@ -107,7 +107,7 @@ assert (
          name,
          description,
          othr.default,
-@@ -52,8 +54,13 @@
+@@ -52,7 +54,13 @@
      )
  
  
@@ -115,7 +115,7 @@ assert (
 -    very_long_arguments_that_surpass_the_limit,
 -    which_is_eighty_eight_in_this_case_plus_a_bit_more,
 -) == {"x": "this need to pass the line limit as well", "b": "but only by a little bit"}
--
+\ No newline at end of file
 +assert (
 +    a_function(
 +        very_long_arguments_that_surpass_the_limit,
@@ -262,8 +262,6 @@ assert a_function(
     very_long_arguments_that_surpass_the_limit,
     which_is_eighty_eight_in_this_case_plus_a_bit_more,
 ) == {"x": "this need to pass the line limit as well", "b": "but only by a little bit"}
-
-
 ```
 
 

@@ -210,7 +210,7 @@ def foo() -> tuple[int, int, int,]:
      return 2
  
  
-@@ -99,23 +98,18 @@
+@@ -99,22 +98,18 @@
      return 2
  
  
@@ -237,13 +237,14 @@ def foo() -> tuple[int, int, int,]:
 -        int,
 -    ]
 -):
+-    return 2
+\ No newline at end of file
 +def foo() -> tuple[
 +    int,
 +    int,
 +    int,
 +]:
-     return 2
--
++    return 2
 
 ```
 
@@ -491,8 +492,6 @@ def foo() -> (
     ]
 ):
     return 2
-
-
 ```
 
 

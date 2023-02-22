@@ -189,7 +189,7 @@ def g():
  
      prev = leaf.prev_sibling
      if not prev:
-@@ -79,12 +85,15 @@
+@@ -79,11 +85,15 @@
              return NO
  
          if prevp.type == token.EQUAL:
@@ -200,6 +200,8 @@ def g():
 -                syms.arglist,
 -                syms.argument,
 -            }:
+-                return NO
+\ No newline at end of file
 +            if (
 +                prevp.parent
 +                and prevp.parent.type
@@ -211,8 +213,7 @@ def g():
 +                    syms.argument,
 +                }
 +            ):
-                 return NO
--
++                return NO
 
 ```
 
@@ -413,8 +414,6 @@ def g():
                 syms.argument,
             }:
                 return NO
-
-
 ```
 
 

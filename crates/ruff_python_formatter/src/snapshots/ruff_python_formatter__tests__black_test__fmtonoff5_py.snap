@@ -163,7 +163,7 @@ elif   unformatted:
  
          print("This will be formatted")
  
-@@ -68,21 +63,21 @@
+@@ -68,20 +63,21 @@
  class Named(t.Protocol):
      # fmt: off
      @property
@@ -188,8 +188,9 @@ elif   unformatted:
 -elif   unformatted:
 +elif unformatted:
      # fmt: on
-     will_be_formatted()
--
+-    will_be_formatted()
+\ No newline at end of file
++    will_be_formatted()
 
 ```
 
@@ -372,8 +373,6 @@ if x:
 elif   unformatted:
     # fmt: on
     will_be_formatted()
-
-
 ```
 
 

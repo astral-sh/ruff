@@ -181,7 +181,7 @@ def foo3(list_a, list_b):
                  "'dog' is an invalid value for Version. Error: Must start and end with"
                  " a letter or numeral and contain only ascii numeric and '.', '_' and"
                  " '-'. see https://packaging.python.org/specifications/core-metadata",
-@@ -50,46 +61,34 @@
+@@ -50,45 +61,34 @@
          ],
      )
      def test_fails_invalid_post_data(
@@ -240,7 +240,7 @@ def foo3(list_a, list_b):
 -        )
 -        .filter(User.xyz.is_(None))
 -    )
--
+\ No newline at end of file
 +    return # Standlone comment but weirdly placed.
 +    User.query.filter(User.foo == "bar").filter(
 +        db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
@@ -445,8 +445,6 @@ def foo3(list_a, list_b):
         )
         .filter(User.xyz.is_(None))
     )
-
-
 ```
 
 
