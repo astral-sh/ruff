@@ -133,12 +133,12 @@ impl<U> crate::fold::Fold<U> for ConstantOptimizer {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[cfg(feature = "constant-optimization")]
     #[test]
     fn test_constant_opt() {
-        use super::*;
-        use crate::fold::Fold;
-        use crate::*;
+        use crate::{fold::Fold, *};
 
         let start = Default::default();
         let end = None;

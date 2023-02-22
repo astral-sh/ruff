@@ -151,7 +151,7 @@ fn is_starred(exp: &ast::Expr) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::lexer::LexicalErrorType;
+    use super::*;
     use crate::parser::{parse_program, ParseErrorType};
 
     macro_rules! function_and_lambda {
