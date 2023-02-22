@@ -1,4 +1,5 @@
 use crate::ast::comparable::ComparableExpr;
+use crate::ast::helpers::unparse_expr;
 use crate::ast::types::{Node, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
@@ -285,23 +286,14 @@ pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>
     };
 
     for outer_assignment_target in &outer_assignment_targets {
-        let mut outer_name = None;
         for inner_assignment_target in &inner_assignment_targets {
             // Compare the targets structurally.
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                // Compute the textual name of the outer target lazily.
-                if outer_name.is_none() {
-                    outer_name = Some(
-                        checker
-                            .locator
-                            .slice(&Range::from_located(outer_assignment_target.expr)),
-                    );
-                }
                 checker.diagnostics.push(Diagnostic::new(
                     RedefinedLoopName {
-                        name: (*outer_name.unwrap()).to_string(),
+                        name: unparse_expr(outer_assignment_target.expr, checker.stylist),
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,
                     },

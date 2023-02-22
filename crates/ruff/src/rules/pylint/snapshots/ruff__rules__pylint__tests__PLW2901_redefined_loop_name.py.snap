@@ -316,7 +316,7 @@ expression: diagnostics
   parent: ~
 - kind:
     RedefinedLoopName:
-      name: a. i
+      name: a.i
       outer_kind: For
       inner_kind: Assignment
   location:
