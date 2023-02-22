@@ -1,0 +1,17 @@
+[package]
+name = "ruff_testing_macros"
+edition = "2021"
+version = "0.0.0"
+publish = false
+
+[lib]
+proc-macro = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+glob = "0.3.1"
+proc-macro-error = { version = "1.0.4", default-features = false }
+proc-macro2 = "1.0.36"
+quote = "1.0.14"
+syn = "1.0.107"
