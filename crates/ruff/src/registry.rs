@@ -185,6 +185,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::UnreliableCallableCheck,
     rules::flake8_bugbear::rules::StripWithMultiCharacters,
     rules::flake8_bugbear::rules::MutableArgumentDefault,
+    rules::flake8_bugbear::rules::NoExplicitStacklevel,
     rules::flake8_bugbear::rules::UnusedLoopControlVariable,
     rules::flake8_bugbear::rules::FunctionCallArgumentDefault,
     rules::flake8_bugbear::rules::GetAttrWithConstant,
