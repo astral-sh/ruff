@@ -27,9 +27,9 @@ impl<I> SoftKeywordTransformer<I>
 where
     I: Iterator<Item = LexResult>,
 {
-    pub fn new(tokenizer: I, mode: Mode) -> Self {
+    pub fn new(lexer: I, mode: Mode) -> Self {
         Self {
-            underlying: tokenizer.multipeek(),
+            underlying: lexer.multipeek(),
             start_of_line: matches!(mode, Mode::Interactive | Mode::Module),
         }
     }

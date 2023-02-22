@@ -67,20 +67,20 @@
 //!
 //! ```
 //! use rustpython_parser::mode::Mode;
-//! use rustpython_parser::lexer::make_tokenizer;
+//! use rustpython_parser::lexer::lex;
 //!
 //! let python_source = r#"
 //! def is_odd(i):
 //!     return bool(i & 1)
 //! "#;
-//! let mut tokens = make_tokenizer(python_source, Mode::Module);
+//! let mut tokens = lex(python_source, Mode::Module);
 //! assert!(tokens.all(|t| t.is_ok()));
 //! ```
 //!
 //! These tokens can be directly fed into the parser to generate an AST:
 //!
 //! ```
-//! use rustpython_parser::lexer::make_tokenizer;
+//! use rustpython_parser::lexer::lex;
 //! use rustpython_parser::mode::Mode;
 //! use rustpython_parser::parser::parse_tokens;
 //!
@@ -88,7 +88,7 @@
 //! def is_odd(i):
 //!    return bool(i & 1)
 //! "#;
-//! let tokens = make_tokenizer(python_source, Mode::Module);
+//! let tokens = lex(python_source, Mode::Module);
 //! let ast = parse_tokens(tokens, Mode::Module, "<embedded>");
 //!
 //! assert!(ast.is_ok());

@@ -164,7 +164,7 @@ pub fn parse_located(
     source_path: &str,
     location: Location,
 ) -> Result<ast::Mod, ParseError> {
-    let lxr = lexer::make_tokenizer_located(source, mode, location);
+    let lxr = lexer::lex_located(source, mode, location);
     parse_tokens(lxr, mode, source_path)
 }
 
@@ -175,14 +175,14 @@ pub fn parse_located(
 /// # Example
 ///
 /// As an example, instead of parsing a string, we can parse a list of tokens after we generate
-/// them using the [`lexer::make_tokenizer`] function:
+/// them using the [`lexer::lex`] function:
 ///
 /// ```
-/// use rustpython_parser::lexer::make_tokenizer;
+/// use rustpython_parser::lexer::lex;
 /// use rustpython_parser::mode::Mode;
 /// use rustpython_parser::parser::parse_tokens;
 ///
-/// let expr = parse_tokens(make_tokenizer("1 + 2", Mode::Expression), Mode::Expression, "<embedded>");
+/// let expr = parse_tokens(lex("1 + 2", Mode::Expression), Mode::Expression, "<embedded>");
 /// assert!(expr.is_ok());
 /// ```
 pub fn parse_tokens(
@@ -191,11 +191,11 @@ pub fn parse_tokens(
     source_path: &str,
 ) -> Result<ast::Mod, ParseError> {
     let marker_token = (Default::default(), mode.to_marker(), Default::default());
-    let tokenizer = iter::once(Ok(marker_token))
+    let lexer = iter::once(Ok(marker_token))
         .chain(lxr)
         .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
     python::TopParser::new()
-        .parse(tokenizer.into_iter())
+        .parse(lexer.into_iter())
         .map_err(|e| parse_error_from_lalrpop(e, source_path))
 }
 

@@ -4,7 +4,7 @@
 //! governing what is and is not a valid token are defined in the Python reference
 //! guide section on [Lexical analysis].
 //!
-//! The primary function in this module is [`make_tokenizer`], which takes a string slice
+//! The primary function in this module is [`lex`], which takes a string slice
 //! and returns an iterator over the tokens in the source code. The tokens are currently returned
 //! as a `Result<Spanned, LexicalError>`, where [`Spanned`] is a tuple containing the
 //! start and end [`Location`] and a [`Tok`] denoting the token.
@@ -12,12 +12,12 @@
 //! # Example
 //!
 //! ```
-//! use rustpython_parser::lexer::{make_tokenizer, Tok};
+//! use rustpython_parser::lexer::{lex, Tok};
 //! use rustpython_parser::mode::Mode;
 //! use rustpython_parser::token::StringKind;
 //!
 //! let source = "x = 'RustPython'";
-//! let tokens = make_tokenizer(source, Mode::Module)
+//! let tokens = lex(source, Mode::Module)
 //!     .map(|tok| tok.expect("Failed to lex"))
 //!     .collect::<Vec<_>>();
 //!
@@ -195,29 +195,29 @@ pub type Spanned = (Location, Tok, Location);
 /// The result of lexing a token.
 pub type LexResult = Result<Spanned, LexicalError>;
 
-/// Create a new tokenizer from a source string.
+/// Create a new lexer from a source string.
 ///
 /// # Examples
 ///
 /// ```
 /// use rustpython_parser::mode::Mode;
-/// use rustpython_parser::lexer::{make_tokenizer};
+/// use rustpython_parser::lexer::{lex};
 ///
 /// let source = "def hello(): return 'world'";
-/// let tokenizer = make_tokenizer(source, Mode::Module);
+/// let lexer = lex(source, Mode::Module);
 ///
-/// for token in tokenizer {
+/// for token in lexer {
 ///    println!("{:?}", token);
 /// }
 /// ```
 #[inline]
-pub fn make_tokenizer(source: &str, mode: Mode) -> impl Iterator<Item = LexResult> + '_ {
-    make_tokenizer_located(source, mode, Location::default())
+pub fn lex(source: &str, mode: Mode) -> impl Iterator<Item = LexResult> + '_ {
+    lex_located(source, mode, Location::default())
 }
 
-/// Create a new tokenizer from a source string, starting at a given location.
-/// You probably want to use [`make_tokenizer`] instead.
-pub fn make_tokenizer_located(
+/// Create a new lexer from a source string, starting at a given location.
+/// You probably want to use [`lex`] instead.
+pub fn lex_located(
     source: &str,
     mode: Mode,
     start_location: Location,
@@ -230,7 +230,7 @@ where
     T: Iterator<Item = char>,
 {
     /// Create a new lexer from T and a starting location. You probably want to use
-    /// [`make_tokenizer`] instead.
+    /// [`lex`] instead.
     pub fn new(input: T, start: Location) -> Self {
         let mut lxr = Lexer {
             at_begin_of_line: true,
@@ -1320,7 +1320,7 @@ impl std::fmt::Display for LexicalErrorType {
 
 #[cfg(test)]
 mod tests {
-    use super::{make_tokenizer, StringKind, Tok};
+    use super::{lex, StringKind, Tok};
     use crate::mode::Mode;
     use num_bigint::BigInt;
 
@@ -1329,7 +1329,7 @@ mod tests {
     const UNIX_EOL: &str = "\n";
 
     pub fn lex_source(source: &str) -> Vec<Tok> {
-        let lexer = make_tokenizer(source, Mode::Module);
+        let lexer = lex(source, Mode::Module);
         lexer.map(|x| x.unwrap().1).collect()
     }
 
