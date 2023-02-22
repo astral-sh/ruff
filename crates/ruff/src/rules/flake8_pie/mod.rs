@@ -1,4 +1,5 @@
 //! Rules from [flake8-pie](https://pypi.org/project/flake8-pie/).
+mod fixes;
 pub(crate) mod rules;
 
 #[cfg(test)]
@@ -20,6 +21,7 @@ mod tests {
     #[test_case(Rule::UnnecessarySpread, Path::new("PIE800.py"); "PIE800")]
     #[test_case(Rule::PreferListBuiltin, Path::new("PIE807.py"); "PIE807")]
     #[test_case(Rule::PreferUniqueEnums, Path::new("PIE796.py"); "PIE796")]
+    #[test_case(Rule::PreferSimpleAnyAll, Path::new("PIE802.py"); "PIE802")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
