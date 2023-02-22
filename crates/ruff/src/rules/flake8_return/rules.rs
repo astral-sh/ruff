@@ -179,6 +179,8 @@ const NORETURN_FUNCS: &[&[&str]] = &[
     &["posix", "_exit"],
     &["posix", "abort"],
     &["sys", "exit"],
+    &["typing", "assert_never"],
+    &["typing_extensions", "assert_never"],
     &["_thread", "exit"],
     &["_winapi", "ExitProcess"],
     // third-party modules
