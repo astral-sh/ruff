@@ -1,3 +1,4 @@
+pub use check_to_continue::{check_to_continue, CheckToContinue};
 pub use error_instead_of_exception::{error_instead_of_exception, ErrorInsteadOfException};
 pub use prefer_type_error::{prefer_type_error, PreferTypeError};
 pub use raise_vanilla_args::{raise_vanilla_args, RaiseVanillaArgs};
@@ -8,6 +9,7 @@ pub use try_consider_else::{try_consider_else, TryConsiderElse};
 pub use verbose_log_message::{verbose_log_message, VerboseLogMessage};
 pub use verbose_raise::{verbose_raise, VerboseRaise};
 
+mod check_to_continue;
 mod error_instead_of_exception;
 mod prefer_type_error;
 mod raise_vanilla_args;
