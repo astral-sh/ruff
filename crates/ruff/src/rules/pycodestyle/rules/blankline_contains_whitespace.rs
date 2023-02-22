@@ -26,7 +26,7 @@ pub fn blankline_contains_whitespace(
     line: &str,
     autofix: bool,
 ) -> Option<Diagnostic> {
-    if line.trim().is_empty() {
+    if !line.is_empty() && line.trim().is_empty() {
         let start = Location::new(lineno + 1, 0);
         let end = Location::new(lineno + 1, line.len());
         let mut diagnostic = Diagnostic::new(BlanklineContainsWhitespace, Range::new(start, end));
