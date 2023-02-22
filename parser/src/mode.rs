@@ -39,19 +39,17 @@ impl std::str::FromStr for Mode {
         match s {
             "exec" | "single" => Ok(Mode::Module),
             "eval" => Ok(Mode::Expression),
-            _ => Err(ModeParseError { _priv: () }),
+            _ => Err(ModeParseError(())),
         }
     }
 }
 
 /// Returned when a given mode is not valid.
 #[derive(Debug)]
-pub struct ModeParseError {
-    _priv: (),
-}
+pub struct ModeParseError(());
 
 impl std::fmt::Display for ModeParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, r#"mode should be "exec", "eval", or "single""#)
+        write!(f, r#"mode must be "exec", "eval", or "single""#)
     }
 }
