@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::fs;
 use crate::settings::options::Options;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,13 +29,13 @@ impl Pyproject {
 
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
-    let contents = fs::read_file(path)?;
+    let contents = std::fs::read_to_string(path)?;
     toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
-    let contents = fs::read_file(path)?;
+    let contents = std::fs::read_to_string(path)?;
     toml::from_str(&contents).map_err(Into::into)
 }
 

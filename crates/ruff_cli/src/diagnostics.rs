@@ -81,7 +81,7 @@ pub fn lint_path(
     };
 
     // Read the file from disk.
-    let contents = fs::read_file(path)?;
+    let contents = std::fs::read_to_string(path)?;
 
     // Lint the file.
     let (
