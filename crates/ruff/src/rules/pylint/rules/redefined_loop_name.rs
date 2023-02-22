@@ -259,20 +259,7 @@ pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>
                 (outer_assignment_targets, visitor.assignment_targets)
             }
             // For and async for.
-            StmtKind::For {
-                target,
-                body,
-                iter: _,
-                orelse: _,
-                ..
-            }
-            | StmtKind::AsyncFor {
-                target,
-                body,
-                iter: _,
-                orelse: _,
-                ..
-            } => {
+            StmtKind::For { target, body, .. } | StmtKind::AsyncFor { target, body, .. } => {
                 let outer_assignment_targets: Vec<ExprWithBindingKind<'a>> =
                     assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
                         .map(|expr| ExprWithBindingKind {
