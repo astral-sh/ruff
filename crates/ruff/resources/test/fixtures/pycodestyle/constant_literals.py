@@ -17,20 +17,16 @@ if None == False:  # E711, E712 (fix)
     pass
 
 ###
-# Unfixable errors
-###
-if "abc" == None:  # E711
-    pass
-if None == "abc":  # E711
-    pass
-if "abc" == False:  # E712
-    pass
-if False == "abc":  # E712
-    pass
-
-###
 # Non-errors
 ###
+if "abc" == None:
+    pass
+if None == "abc":
+    pass
+if "abc" == False:
+    pass
+if False == "abc":
+    pass
 if "def" == "abc":
     pass
 if False is None:
