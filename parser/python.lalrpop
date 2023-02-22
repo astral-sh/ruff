@@ -5,7 +5,7 @@
 
 use crate::{
     ast,
-    error::{LexicalError, LexicalErrorType},
+    lexer::{LexicalError, LexicalErrorType},
     function::{ArgumentList, parse_args, parse_params, validate_arguments},
     lexer,
     context::set_context,

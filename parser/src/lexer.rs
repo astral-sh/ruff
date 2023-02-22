@@ -35,9 +35,9 @@
 //! [Lexical analysis]: https://docs.python.org/3/reference/lexical_analysis.html
 pub use super::token::{StringKind, Tok};
 use crate::ast::Location;
-use crate::error::{LexicalError, LexicalErrorType};
 use crate::mode::Mode;
 use crate::soft_keywords::SoftKeywordTransformer;
+use crate::string::FStringErrorType;
 use num_bigint::BigInt;
 use num_traits::identities::Zero;
 use num_traits::Num;
@@ -1208,6 +1208,112 @@ where
         match token {
             Ok((_, Tok::EndOfFile, _)) => None,
             r => Some(r),
+        }
+    }
+}
+
+/// Represents an error that occur during lexing and are
+/// returned by the `parse_*` functions in the iterator in the
+/// [lexer] implementation.
+///
+/// [lexer]: crate::lexer
+#[derive(Debug, PartialEq)]
+pub struct LexicalError {
+    /// The type of error that occurred.
+    pub error: LexicalErrorType,
+    /// The location of the error.
+    pub location: Location,
+}
+
+impl LexicalError {
+    /// Creates a new `LexicalError` with the given error type and location.
+    pub fn new(error: LexicalErrorType, location: Location) -> Self {
+        Self { error, location }
+    }
+}
+
+/// Represents the different types of errors that can occur during lexing.
+#[derive(Debug, PartialEq)]
+pub enum LexicalErrorType {
+    // TODO: Can probably be removed, the places it is used seem to be able
+    // to use the `UnicodeError` variant instead.
+    #[doc(hidden)]
+    StringError,
+    // TODO: Should take a start/end position to report.
+    /// Decoding of a unicode escape sequence in a string literal failed.
+    UnicodeError,
+    /// The nesting of brackets/braces/parentheses is not balanced.
+    NestingError,
+    /// The indentation is not consistent.
+    IndentationError,
+    /// Inconsistent use of tabs and spaces.
+    TabError,
+    /// Encountered a tab after a space.
+    TabsAfterSpaces,
+    /// A non-default argument follows a default argument.
+    DefaultArgumentError,
+    /// A duplicate argument was found in a function definition.
+    DuplicateArgumentError(String),
+    /// A positional argument follows a keyword argument.
+    PositionalArgumentError,
+    /// An iterable argument unpacking `*args` follows keyword argument unpacking `**kwargs`.
+    UnpackedArgumentError,
+    /// A keyword argument was repeated.
+    DuplicateKeywordArgumentError(String),
+    /// An unrecognized token was encountered.
+    UnrecognizedToken { tok: char },
+    /// An f-string error containing the [`FStringErrorType`].
+    FStringError(FStringErrorType),
+    /// An unexpected character was encountered after a line continuation.
+    LineContinuationError,
+    /// An unexpected end of file was encountered.
+    Eof,
+    /// An unexpected error occurred.
+    OtherError(String),
+}
+
+impl std::fmt::Display for LexicalErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            LexicalErrorType::StringError => write!(f, "Got unexpected string"),
+            LexicalErrorType::FStringError(error) => write!(f, "f-string: {error}"),
+            LexicalErrorType::UnicodeError => write!(f, "Got unexpected unicode"),
+            LexicalErrorType::NestingError => write!(f, "Got unexpected nesting"),
+            LexicalErrorType::IndentationError => {
+                write!(f, "unindent does not match any outer indentation level")
+            }
+            LexicalErrorType::TabError => {
+                write!(f, "inconsistent use of tabs and spaces in indentation")
+            }
+            LexicalErrorType::TabsAfterSpaces => {
+                write!(f, "Tabs not allowed as part of indentation after spaces")
+            }
+            LexicalErrorType::DefaultArgumentError => {
+                write!(f, "non-default argument follows default argument")
+            }
+            LexicalErrorType::DuplicateArgumentError(arg_name) => {
+                write!(f, "duplicate argument '{arg_name}' in function definition")
+            }
+            LexicalErrorType::DuplicateKeywordArgumentError(arg_name) => {
+                write!(f, "keyword argument repeated: {arg_name}")
+            }
+            LexicalErrorType::PositionalArgumentError => {
+                write!(f, "positional argument follows keyword argument")
+            }
+            LexicalErrorType::UnpackedArgumentError => {
+                write!(
+                    f,
+                    "iterable argument unpacking follows keyword argument unpacking"
+                )
+            }
+            LexicalErrorType::UnrecognizedToken { tok } => {
+                write!(f, "Got unexpected token {tok}")
+            }
+            LexicalErrorType::LineContinuationError => {
+                write!(f, "unexpected character after line continuation character")
+            }
+            LexicalErrorType::Eof => write!(f, "unexpected EOF while parsing"),
+            LexicalErrorType::OtherError(msg) => write!(f, "{msg}"),
         }
     }
 }

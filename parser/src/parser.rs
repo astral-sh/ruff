@@ -12,12 +12,14 @@
 //! [Abstract Syntax Tree]: https://en.wikipedia.org/wiki/Abstract_syntax_tree
 //! [`Mode`]: crate::mode
 
-use crate::lexer::{LexResult, Tok};
+use crate::lexer::{LexResult, LexicalError, LexicalErrorType, Tok};
 pub use crate::mode::Mode;
-use crate::{ast, error::ParseError, lexer, python};
+use crate::{ast, lexer, python};
 use ast::Location;
 use itertools::Itertools;
 use std::iter;
+
+pub(super) use lalrpop_util::ParseError as LalrpopError;
 
 /// Parse a full Python program usually consisting of multiple lines.
 ///  
@@ -194,7 +196,124 @@ pub fn parse_tokens(
         .filter_ok(|(_, tok, _)| !matches!(tok, Tok::Comment { .. } | Tok::NonLogicalNewline));
     python::TopParser::new()
         .parse(tokenizer.into_iter())
-        .map_err(|e| crate::error::parse_error_from_lalrpop(e, source_path))
+        .map_err(|e| parse_error_from_lalrpop(e, source_path))
+}
+
+/// Represents represent errors that occur during parsing and are
+/// returned by the `parse_*` functions in the [parser] module.
+///
+/// [parser]: crate::parser
+pub type ParseError = rustpython_compiler_core::BaseError<ParseErrorType>;
+
+/// Represents the different types of errors that can occur during parsing.
+#[derive(Debug, PartialEq, thiserror::Error)]
+pub enum ParseErrorType {
+    /// Parser encountered an unexpected end of input
+    Eof,
+    /// Parser encountered an extra token
+    ExtraToken(Tok),
+    /// Parser encountered an invalid token
+    InvalidToken,
+    /// Parser encountered an unexpected token
+    UnrecognizedToken(Tok, Option<String>),
+    // Maps to `User` type from `lalrpop-util`
+    /// Parser encountered an error during lexing.
+    Lexical(LexicalErrorType),
+}
+
+// Convert `lalrpop_util::ParseError` to our internal type
+fn parse_error_from_lalrpop(
+    err: LalrpopError<Location, Tok, LexicalError>,
+    source_path: &str,
+) -> ParseError {
+    let source_path = source_path.to_owned();
+    match err {
+        // TODO: Are there cases where this isn't an EOF?
+        LalrpopError::InvalidToken { location } => ParseError {
+            error: ParseErrorType::Eof,
+            location,
+            source_path,
+        },
+        LalrpopError::ExtraToken { token } => ParseError {
+            error: ParseErrorType::ExtraToken(token.1),
+            location: token.0,
+            source_path,
+        },
+        LalrpopError::User { error } => ParseError {
+            error: ParseErrorType::Lexical(error.error),
+            location: error.location,
+            source_path,
+        },
+        LalrpopError::UnrecognizedToken { token, expected } => {
+            // Hacky, but it's how CPython does it. See PyParser_AddToken,
+            // in particular "Only one possible expected token" comment.
+            let expected = (expected.len() == 1).then(|| expected[0].clone());
+            ParseError {
+                error: ParseErrorType::UnrecognizedToken(token.1, expected),
+                location: token.0.with_col_offset(1),
+                source_path,
+            }
+        }
+        LalrpopError::UnrecognizedEOF { location, expected } => {
+            // This could be an initial indentation error that we should ignore
+            let indent_error = expected == ["Indent"];
+            if indent_error {
+                ParseError {
+                    error: ParseErrorType::Lexical(LexicalErrorType::IndentationError),
+                    location,
+                    source_path,
+                }
+            } else {
+                ParseError {
+                    error: ParseErrorType::Eof,
+                    location,
+                    source_path,
+                }
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for ParseErrorType {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            ParseErrorType::Eof => write!(f, "Got unexpected EOF"),
+            ParseErrorType::ExtraToken(ref tok) => write!(f, "Got extraneous token: {tok:?}"),
+            ParseErrorType::InvalidToken => write!(f, "Got invalid token"),
+            ParseErrorType::UnrecognizedToken(ref tok, ref expected) => {
+                if *tok == Tok::Indent {
+                    write!(f, "unexpected indent")
+                } else if expected.as_deref() == Some("Indent") {
+                    write!(f, "expected an indented block")
+                } else {
+                    write!(f, "invalid syntax. Got unexpected token {tok}")
+                }
+            }
+            ParseErrorType::Lexical(ref error) => write!(f, "{error}"),
+        }
+    }
+}
+
+impl ParseErrorType {
+    /// Returns true if the error is an indentation error.
+    pub fn is_indentation_error(&self) -> bool {
+        match self {
+            ParseErrorType::Lexical(LexicalErrorType::IndentationError) => true,
+            ParseErrorType::UnrecognizedToken(token, expected) => {
+                *token == Tok::Indent || expected.clone() == Some("Indent".to_owned())
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns true if the error is a tab error.
+    pub fn is_tab_error(&self) -> bool {
+        matches!(
+            self,
+            ParseErrorType::Lexical(LexicalErrorType::TabError)
+                | ParseErrorType::Lexical(LexicalErrorType::TabsAfterSpaces)
+        )
+    }
 }
 
 #[cfg(test)]
