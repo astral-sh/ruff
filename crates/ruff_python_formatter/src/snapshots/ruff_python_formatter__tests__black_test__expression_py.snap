@@ -267,14 +267,11 @@ last_call()
 ```diff
 --- Black
 +++ Ruff
-@@ -1,5 +1,6 @@
+@@ -1,3 +1,4 @@
 +...
  "some_string"
--b"\\xa3"
-+b'\\xa3'
+ b"\\xa3"
  Name
- None
- True
 @@ -38,7 +39,8 @@
  lambda a, b, c=True, *, d=(1 << v2), e="str": a
  lambda a, b, c=True, *vararg, d=(v1 << 2), e="str", **kwargs: a + b
@@ -285,15 +282,6 @@ last_call()
      "port1": port1_resource,
      "port2": port2_resource,
  }[port_id]
-@@ -56,7 +58,7 @@
- {"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
- {**a, **b, **c}
- {"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
--({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
-+({"a": "b"}, (True or False), (+value), "string", b'bytes') or None
- ()
- (1,)
- (1, 2)
 @@ -100,7 +102,8 @@
  {a: b * -2 for a, b in dictionary.items()}
  {
@@ -470,7 +458,7 @@ last_call()
 ```py
 ...
 "some_string"
-b'\\xa3'
+b"\\xa3"
 Name
 None
 True
@@ -528,7 +516,7 @@ str or None if (1 if True else 2) else str or bytes or None
 {"2.7": dead, "3.7": (long_live or die_hard), **{"3.6": verygood}}
 {**a, **b, **c}
 {"2.7", "3.6", "3.7", "3.8", "3.9", ("4.0" if gilectomy else "3.10")}
-({"a": "b"}, (True or False), (+value), "string", b'bytes') or None
+({"a": "b"}, (True or False), (+value), "string", b"bytes") or None
 ()
 (1,)
 (1, 2)

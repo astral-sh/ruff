@@ -652,7 +652,7 @@ fn format_constant(
                 write!(f, [text("False")])?;
             }
         }
-        Constant::Str(_) => write!(f, [string_literal(expr)])?,
+        Constant::Str(_) | Constant::Bytes(_) => write!(f, [string_literal(expr)])?,
         _ => write!(f, [literal(Range::from_located(expr))])?,
     }
     Ok(())
