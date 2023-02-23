@@ -71,6 +71,7 @@ pub trait Buffer {
     /// Restores the snapshot buffer
     ///
     /// ## Panics
+    ///
     /// If the passed snapshot id is a snapshot of another buffer OR
     /// if the snapshot is restored out of order
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot);
@@ -433,8 +434,8 @@ where
 
 /// A Buffer that removes any soft line breaks.
 ///
-/// * Removes [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::Soft).
-/// * Replaces [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::SoftOrSpace) with a [`Space`](FormatElement::Space)
+/// - Removes [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::Soft).
+/// - Replaces [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::SoftOrSpace) with a [`Space`](FormatElement::Space)
 ///
 /// # Examples
 ///

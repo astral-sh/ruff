@@ -9,9 +9,11 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for packages that are missing an `__init__.py` file.
     ///
     /// ## Why is this bad?
+    ///
     /// Python packages are directories that contain a file named `__init__.py`.
     /// The existence of this file indicates that the directory is a Python
     /// package, and so it can be imported the same way a module can be
@@ -25,7 +27,8 @@ define_violation!(
     /// the absence of the `__init__.py` file is probably an oversight.
     ///
     /// ## Options
-    /// * `namespace-packages`
+    ///
+    /// - `namespace-packages`
     pub struct ImplicitNamespacePackage {
         pub filename: String,
     }

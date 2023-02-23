@@ -9,25 +9,29 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for class methods that use a name other than `cls` for their
     /// first argument.
     ///
     /// ## Why is this bad?
+    ///
     /// [PEP 8] recommends the use of `cls` as the first argument for all class
     /// methods:
     ///
-    /// > Always use cls for the first argument to class methods.
+    /// > Always use `cls` for the first argument to class methods.
     /// >
     /// > If a function argument’s name clashes with a reserved keyword, it is generally better to
     /// > append a single trailing underscore rather than use an abbreviation or spelling corruption.
-    /// > Thus class_ is better than clss. (Perhaps better is to avoid such clashes by using a synonym.)
+    /// > Thus `class_` is better than `clss`. (Perhaps better is to avoid such clashes by using a synonym.)
     ///
     /// ## Options
-    /// * `pep8-naming.classmethod-decorators`
-    /// * `pep8-naming.staticmethod-decorators`
-    /// * `pep8-naming.ignore-names`
+    ///
+    /// - `pep8-naming.classmethod-decorators`
+    /// - `pep8-naming.staticmethod-decorators`
+    /// - `pep8-naming.ignore-names`
     ///
     /// ## Example
+    ///
     /// ```python
     /// class Example:
     ///     @classmethod
@@ -36,6 +40,7 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// class Example:
     ///     @classmethod

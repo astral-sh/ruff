@@ -9,18 +9,22 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for the unintentional use of type annotations.
     ///
     /// ## Why is this bad?
+    ///
     /// The use of a colon (`:`) in lieu of an assignment (`=`) can be syntactically valid, but
     /// is almost certainly a mistake when used in a subscript or attribute assignment.
     ///
     /// ## Example
+    ///
     /// ```python
     /// a["b"]: 1
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// a["b"] = 1
     /// ```

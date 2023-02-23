@@ -8,9 +8,11 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for code that raises `Exception` directly.
     ///
     /// ## Why is this bad?
+    ///
     /// Handling such exceptions requires the use of `except Exception`, which
     /// captures _any_ raised exception, including failed assertions,
     /// division by zero, and more.
@@ -20,6 +22,7 @@ define_violation!(
     /// don't intend to handle.
     ///
     /// ## Example
+    ///
     /// ```python
     /// def main_function():
     ///     if not cond:
@@ -34,6 +37,7 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// def main_function():
     ///     if not cond:

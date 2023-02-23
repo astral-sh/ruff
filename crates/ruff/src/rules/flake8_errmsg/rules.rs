@@ -8,9 +8,11 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for the use of string literals in exception constructors.
     ///
     /// ## Why is this bad?
+    ///
     /// Python includes the `raise` in the default traceback (and formatters
     /// like Rich and IPython do too).
     ///
@@ -18,12 +20,15 @@ define_violation!(
     /// traceback, which can make the traceback less readable.
     ///
     /// ## Example
+    ///
     /// Given:
+    ///
     /// ```python
     /// raise RuntimeError("'Some value' is incorrect")
     /// ```
     ///
     /// Python will produce a traceback like:
+    ///
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 2, in <module>
@@ -32,12 +37,14 @@ define_violation!(
     /// ```
     ///
     /// Instead, assign the string to a variable:
+    ///
     /// ```python
     /// msg = "'Some value' is incorrect"
     /// raise RuntimeError(msg)
     /// ```
     ///
     /// Which will produce a traceback like:
+    ///
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 3, in <module>
@@ -55,9 +62,11 @@ impl Violation for RawStringInException {
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for the use of f-strings in exception constructors.
     ///
     /// ## Why is this bad?
+    ///
     /// Python includes the `raise` in the default traceback (and formatters
     /// like Rich and IPython do too).
     ///
@@ -65,13 +74,16 @@ define_violation!(
     /// traceback, which can make the traceback less readable.
     ///
     /// ## Example
+    ///
     /// Given:
+    ///
     /// ```python
     /// sub = "Some value"
     /// raise RuntimeError(f"{sub!r} is incorrect")
     /// ```
     ///
     /// Python will produce a traceback like:
+    ///
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 2, in <module>
@@ -80,6 +92,7 @@ define_violation!(
     /// ```
     ///
     /// Instead, assign the string to a variable:
+    ///
     /// ```python
     /// sub = "Some value"
     /// msg = f"{sub!r} is incorrect"
@@ -87,6 +100,7 @@ define_violation!(
     /// ```
     ///
     /// Which will produce a traceback like:
+    ///
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 3, in <module>
@@ -104,10 +118,12 @@ impl Violation for FStringInException {
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for the use of `.format` calls on string literals in exception
     /// constructors.
     ///
     /// ## Why is this bad?
+    ///
     /// Python includes the `raise` in the default traceback (and formatters
     /// like Rich and IPython do too).
     ///
@@ -115,13 +131,16 @@ define_violation!(
     /// traceback, which can make the traceback less readable.
     ///
     /// ## Example
+    ///
     /// Given:
+    ///
     /// ```python
     /// sub = "Some value"
     /// raise RuntimeError("'{}' is incorrect".format(sub))
     /// ```
     ///
     /// Python will produce a traceback like:
+    ///
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 2, in <module>
@@ -130,6 +149,7 @@ define_violation!(
     /// ```
     ///
     /// Instead, assign the string to a variable:
+    ///
     /// ```python
     /// sub = "Some value"
     /// msg = "'{}' is incorrect".format(sub)
@@ -137,6 +157,7 @@ define_violation!(
     /// ```
     ///
     /// Which will produce a traceback like:
+    ///
     /// ```python
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 3, in <module>

@@ -21,9 +21,11 @@ pub struct ApiBan {
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for banned imports.
     ///
     /// ## Why is this bad?
+    ///
     /// Projects may want to ensure that specific modules or module members are
     /// not be imported or accessed.
     ///
@@ -36,7 +38,8 @@ define_violation!(
     /// automatic way.
     ///
     /// ## Options
-    /// * `flake8-tidy-imports.banned-api`
+    ///
+    /// - `flake8-tidy-imports.banned-api`
     pub struct BannedApi {
         pub name: String,
         pub message: String,

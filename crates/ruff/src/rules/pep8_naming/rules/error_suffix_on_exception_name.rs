@@ -8,9 +8,11 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for custom exception definitions that omit the `Error` suffix.
     ///
     /// ## Why is this bad?
+    ///
     /// The `Error` suffix is recommended by [PEP 8]:
     ///
     /// > Because exceptions should be classes, the class naming convention
@@ -18,12 +20,14 @@ define_violation!(
     /// > exception names (if the exception actually is an error).
     ///
     /// ## Example
+    ///
     /// ```python
     /// class Validation(Exception):
     ///     ...
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// class ValidationError(Exception):
     ///     ...

@@ -31,11 +31,13 @@ impl fmt::Display for BindingKind {
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for variables defined in `for` loops and `with` statements that
     /// get overwritten within the body, for example by another `for` loop or
     /// `with` statement or by direct assignment.
     ///
     /// ## Why is this bad?
+    ///
     /// Redefinition of a loop variable inside the loop's body causes its value
     /// to differ from the original loop iteration for the remainder of the
     /// block, in a way that will likely cause bugs.
@@ -51,6 +53,7 @@ define_violation!(
     /// variable may not be visible at the same time.
     ///
     /// ## Example
+    ///
     /// ```python
     /// for i in range(10):
     ///     i = 9

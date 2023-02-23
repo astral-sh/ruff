@@ -13,10 +13,12 @@ use super::fix_with;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for the unnecessary nesting of multiple consecutive context
     /// managers.
     ///
     /// ## Why is this bad?
+    ///
     /// In Python 3, a single `with` block can include multiple context
     /// managers.
     ///
@@ -25,6 +27,7 @@ define_violation!(
     /// readable.
     ///
     /// ## Example
+    ///
     /// ```python
     /// with A() as a:
     ///     with B() as b:
@@ -32,13 +35,15 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// with A() as a, B() as b:
     ///     pass
     /// ```
     ///
     /// ## References
-    /// * [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
+    ///
+    /// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
     pub struct MultipleWithStatements {
         pub fixable: bool,
     }

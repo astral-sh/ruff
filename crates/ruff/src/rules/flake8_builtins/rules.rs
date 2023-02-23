@@ -9,10 +9,12 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for variable (and function) assignments that use the same name
     /// as a builtin.
     ///
     /// ## Why is this bad?
+    ///
     /// Reusing a builtin name for the name of a variable increases the
     /// difficulty of reading and maintaining the code, and can cause
     /// non-obvious errors, as readers may mistake the variable for the
@@ -23,9 +25,10 @@ define_violation!(
     ///
     /// ## Options
     ///
-    /// * `flake8-builtins.builtins-ignorelist`
+    /// - `flake8-builtins.builtins-ignorelist`
     ///
     /// ## Example
+    ///
     /// ```python
     /// def find_max(list_of_lists):
     ///     max = 0
@@ -36,6 +39,7 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// def find_max(list_of_lists):
     ///     result = 0
@@ -45,7 +49,7 @@ define_violation!(
     ///     return result
     /// ```
     ///
-    /// * [Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
+    /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
     pub struct BuiltinVariableShadowing {
         pub name: String,
     }
@@ -60,9 +64,11 @@ impl Violation for BuiltinVariableShadowing {
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for any function arguments that use the same name as a builtin.
     ///
     /// ## Why is this bad?
+    ///
     /// Reusing a builtin name for the name of an argument increases the
     /// difficulty of reading and maintaining the code, and can cause
     /// non-obvious errors, as readers may mistake the argument for the
@@ -73,9 +79,10 @@ define_violation!(
     ///
     /// ## Options
     ///
-    /// * `flake8-builtins.builtins-ignorelist`
+    /// - `flake8-builtins.builtins-ignorelist`
     ///
     /// ## Example
+    ///
     /// ```python
     /// def remove_duplicates(list, list2):
     ///     result = set()
@@ -87,6 +94,7 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// def remove_duplicates(list1, list2):
     ///     result = set()
@@ -98,6 +106,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
+    ///
     /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
     /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
     pub struct BuiltinArgumentShadowing {
@@ -114,9 +123,11 @@ impl Violation for BuiltinArgumentShadowing {
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for any class attributes that use the same name as a builtin.
     ///
     /// ## Why is this bad?
+    ///
     /// Reusing a builtin name for the name of an attribute increases the
     /// difficulty of reading and maintaining the code, and can cause
     /// non-obvious errors, as readers may mistake the attribute for the
@@ -128,9 +139,10 @@ define_violation!(
     ///
     /// ## Options
     ///
-    /// * `flake8-builtins.builtins-ignorelist`
+    /// - `flake8-builtins.builtins-ignorelist`
     ///
     /// ## Example
+    ///
     /// ```python
     /// class Shadow:
     ///     def int():
@@ -138,6 +150,7 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// class Shadow:
     ///     def to_int():
@@ -145,6 +158,7 @@ define_violation!(
     /// ```
     ///
     /// Or:
+    ///
     /// ```python
     /// class Shadow:
     ///     # Callable as `int(shadow)`
@@ -153,6 +167,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
+    ///
     /// - [_Is it bad practice to use a built-in function name as an attribute or method identifier?_](https://stackoverflow.com/questions/9109333/is-it-bad-practice-to-use-a-built-in-function-name-as-an-attribute-or-method-ide)
     /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
     pub struct BuiltinAttributeShadowing {

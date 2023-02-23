@@ -8,9 +8,11 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for the use of legacy `np.random` function calls.
     ///
     /// ## Why is this bad?
+    ///
     /// According to the NumPy documentation's [Legacy Random Generation]:
     ///
     /// > The `RandomState` provides access to legacy generators... This class
@@ -29,6 +31,7 @@ define_violation!(
     /// details.
     ///
     /// ## Examples
+    ///
     /// ```python
     /// import numpy as np
     ///
@@ -37,6 +40,7 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// rng = np.random.default_rng(1337)
     /// rng.normal()

@@ -347,6 +347,7 @@ impl TextRange {
     ///
     ///
     /// ## Panics
+    ///
     /// If `start - amount` is less than zero.
     ///
     /// ## Examples
@@ -366,6 +367,7 @@ impl TextRange {
     /// Adds an offset to the start position.
     ///
     /// ## Panics
+    ///
     /// If `start + amount > end`
     ///
     /// ## Examples
@@ -386,6 +388,7 @@ impl TextRange {
     ///
     ///
     /// ## Panics
+    ///
     /// If `end - amount < 0` or `end - amount < start`
     ///
     /// ## Examples
@@ -406,6 +409,7 @@ impl TextRange {
     ///
     ///
     /// ## Panics
+    ///
     /// If `end + amount > u32::MAX`
     ///
     /// ## Examples

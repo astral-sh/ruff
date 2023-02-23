@@ -15,9 +15,11 @@ use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for the presence of unused variables in function scopes.
     ///
     /// ## Why is this bad?
+    ///
     /// A variable that is defined but not used is likely a mistake, and should
     /// be removed to avoid confusion.
     ///
@@ -26,9 +28,11 @@ define_violation!(
     /// [`dummy-variable-rgx`] pattern.
     ///
     /// ## Options
-    /// * `dummy-variable-rgx`
+    ///
+    /// - `dummy-variable-rgx`
     ///
     /// ## Example
+    ///
     /// ```python
     /// def foo():
     ///     x = 1
@@ -37,6 +41,7 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// def foo():
     ///     x = 1

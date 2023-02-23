@@ -14,22 +14,27 @@ use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for inline strings that use single quotes or double quotes,
     /// depending on the value of the [`flake8-quotes.inline-quotes`] option.
     ///
     /// ## Why is this bad?
+    ///
     /// Consistency is good. Use either single or double quotes for inline
     /// strings, but be consistent.
     ///
     /// ## Options
-    /// * `flake8-quotes.inline-quotes`
+    ///
+    /// - `flake8-quotes.inline-quotes`
     ///
     /// ## Example
+    ///
     /// ```python
     /// foo = 'bar'
     /// ```
     ///
     /// Assuming `inline-quotes` is set to `double`, use instead:
+    ///
     /// ```python
     /// foo = "bar"
     /// ```
@@ -58,18 +63,22 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for multiline strings that use single quotes or double quotes,
     /// depending on the value of the [`flake8-quotes.multiline-quotes`]
     /// setting.
     ///
     /// ## Why is this bad?
+    ///
     /// Consistency is good. Use either single or double quotes for multiline
     /// strings, but be consistent.
     ///
     /// ## Options
-    /// * `flake8-quotes.multiline-quotes`
+    ///
+    /// - `flake8-quotes.multiline-quotes`
     ///
     /// ## Example
+    ///
     /// ```python
     /// foo = '''
     /// bar
@@ -77,6 +86,7 @@ define_violation!(
     /// ```
     ///
     /// Assuming `multiline-quotes` is set to `double`, use instead:
+    ///
     /// ```python
     /// foo = """
     /// bar
@@ -107,17 +117,21 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for docstrings that use single quotes or double quotes, depending
     /// on the value of the [`flake8-quotes.docstring-quotes`] setting.
     ///
     /// ## Why is this bad?
+    ///
     /// Consistency is good. Use either single or double quotes for docstring
     /// strings, but be consistent.
     ///
     /// ## Options
-    /// * `flake8-quotes.docstring-quotes`
+    ///
+    /// - `flake8-quotes.docstring-quotes`
     ///
     /// ## Example
+    ///
     /// ```python
     /// '''
     /// bar
@@ -125,6 +139,7 @@ define_violation!(
     /// ```
     ///
     /// Assuming `docstring-quotes` is set to `double`, use instead:
+    ///
     /// ```python
     /// """
     /// bar
@@ -155,19 +170,23 @@ impl AlwaysAutofixableViolation for BadQuotesDocstring {
 
 define_violation!(
     /// ## What it does
+    ///
     /// Checks for strings that include escaped quotes, and suggests changing
     /// the quote style to avoid the need to escape them.
     ///
     /// ## Why is this bad?
+    ///
     /// It's preferable to avoid escaped quotes in strings. By changing the
     /// outer quote style, you can avoid escaping inner quotes.
     ///
     /// ## Example
+    ///
     /// ```python
     /// foo = 'bar\'s'
     /// ```
     ///
     /// Use instead:
+    ///
     /// ```python
     /// foo = "bar's"
     /// ```

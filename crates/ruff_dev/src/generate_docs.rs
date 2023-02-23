@@ -100,6 +100,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
         out.push_str("\n\n");
         out.push_str(&after);
     }
+    out.push('\n');
 }
 
 #[cfg(test)]
