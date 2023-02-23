@@ -1,11 +1,13 @@
+# Configuring Ruff
+
 Ruff can be configured via a `pyproject.toml` file, a `ruff.toml` file, or through the command line.
 
 For a complete enumeration of the available configuration options, see
 [_Settings_](/docs/settings/).
 
-### Configure via `pyproject.toml`
+### Via `pyproject.toml`
 
-If left unspecified, the default configuration is equivalent to:
+If left unspecified, Ruff's default configuration is equivalent to:
 
 ```toml
 [tool.ruff]
@@ -89,16 +91,18 @@ select = ["E", "F", "Q"]
 docstring-quotes = "double"
 ```
 
+For a complete enumeration of the available configuration options, see
+[_Settings_](/docs/settings/).
+
 Ruff mirrors Flake8's rule code system, in which each rule code consists of a one-to-three letter
 prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
 (e.g., `F` for Pyflakes, `E` for pycodestyle, `ANN` for flake8-annotations). The set of enabled
-rules is determined by the `select` and `ignore` options, which support both the full code (e.g.,
-`F401`) and the prefix (e.g., `F`).
+rules is determined by the `select` and `ignore` options, which accept either the full code (e.g.,
+`F401`) or the prefix (e.g., `F`).
 
-As a special-case, Ruff also supports the `ALL` code, which enables all rules. Note that some of the
+As a special-case, Ruff also supports the `ALL` code, which enables all rules. Note that some
 pydocstyle rules conflict (e.g., `D203` and `D211`) as they represent alternative docstring
-formats. Enabling `ALL` without further configuration may result in suboptimal behavior, especially
-for the pydocstyle plugin.
+formats. Ruff will automatically disable any conflicting rules when `ALL` is enabled.
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
@@ -111,11 +115,13 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
 * By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
   consider turning off autofix for specific rules or categories (see the [_FAQ_](/docs/faq/#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
 
-### Configure via `ruff.toml`
+### Via `ruff.toml`
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
-an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted). For example, the
-`pyproject.toml` described above would be represented via the following `ruff.toml`:
+an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted).
+
+For example, the `pyproject.toml` described above would be represented via the following
+`ruff.toml`:
 
 ```toml
 # Enable flake8-bugbear (`B`) rules.
@@ -138,8 +144,8 @@ For a complete enumeration of the available configuration options, see
 
 ### Command-line interface
 
-Some configuration settings can be provided via the command-line, such as those related to
-rule enablement and disablement, file discovery, logging level, and more:
+Some configuration options can be provided via the command-line, such as those related to rule
+enablement and disablement, file discovery, logging level, and more:
 
 ```shell
 ruff check path/to/code/ --select F401 --select F403 --quiet
@@ -265,7 +271,7 @@ Log levels:
 Similar to [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
 Ruff supports hierarchical configuration, such that the "closest" `pyproject.toml` file in the
 directory hierarchy is used for every individual file, with all paths in the `pyproject.toml` file
-(e.g., `exclude` globs, `src` paths) being resolved relative to the directory containing the
+(e.g., `exclude` globs, `src` paths) being resolved relative to the directory containing that
 `pyproject.toml` file.
 
 There are a few exceptions to these rules:
@@ -312,7 +318,7 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
 For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
-### Rule resolution
+### Rule selection
 
 The set of enabled rules is controlled via the [`select`](/docs/settings#select) and
 [`ignore`](/docs/settings#ignore) settings, along with the
@@ -341,7 +347,7 @@ Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no
 Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
 with the exception of `F401`.
 
-### Suppressing errors
+### Error suppression
 
 To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](/docs/settings#ignore)
 or [`extend-ignore`](/docs/settings#extend-ignore), either on the command-line
@@ -391,7 +397,7 @@ setting, which enables the same functionality via a `pyproject.toml` file.
 Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
 equivalent to `# ruff: noqa`.
 
-#### Automatic error suppression
+#### Automatic `noqa` management
 
 Ruff supports several workflows to aid in `noqa` management.
 
