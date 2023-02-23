@@ -3863,6 +3863,10 @@ where
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
         if let PatternKind::MatchAs {
             name: Some(name), ..
+        }
+        | PatternKind::MatchStar { name: Some(name) }
+        | PatternKind::MatchMapping {
+            rest: Some(name), ..
         } = &pattern.node
         {
             self.add_binding(
