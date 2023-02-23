@@ -34,6 +34,35 @@ FATHOM_SCRIPT: str = (
 )
 
 
+def clean_file_content(content: str, title: str) -> str:
+    """Add missing title, fix the headers depth, and remove trailing empty lines."""
+    lines = content.splitlines()
+    if lines[0].startswith("# "):
+        return content
+
+    in_code_block = False
+    for i, line in enumerate(lines):
+        if line.startswith("```"):
+            in_code_block = not in_code_block
+        if not in_code_block and line.startswith("#"):
+            lines[i] = line[1:]
+
+    # Remove trailing empty lines.
+    for line in reversed(lines):
+        if line == "":
+            del lines[-1]
+        else:
+            break
+
+    content = "\n".join(lines) + "\n"
+
+    # Add a missing title.
+    if not lines[0].startswith("# "):
+        return f"# {title}\n\n" + content
+
+    return content
+
+
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
 
@@ -59,33 +88,30 @@ def main() -> None:
                 continue
 
             if filename == "settings.md":
-                f.write(
-                    subprocess.check_output(
-                        ["cargo", "dev", "generate-options"],
-                        encoding="utf-8",
-                    ),
+                file_content = subprocess.check_output(
+                    ["cargo", "dev", "generate-options"],
+                    encoding="utf-8",
                 )
-                continue
+            else:
+                block = content.split(f"<!-- Begin section: {title} -->\n\n")
+                if len(block) != 2:
+                    msg = f"Section {title} not found in README.md"
+                    raise ValueError(msg)
 
-            block = content.split(f"<!-- Begin section: {title} -->")
-            if len(block) != 2:
-                msg = f"Section {title} not found in README.md"
-                raise ValueError(msg)
+                block = block[1].split(f"\n<!-- End section: {title} -->")
+                if len(block) != 2:
+                    msg = f"Section {title} not found in README.md"
+                    raise ValueError(msg)
 
-            block = block[1].split(f"<!-- End section: {title} -->")
-            if len(block) != 2:
-                msg = f"Section {title} not found in README.md"
-                raise ValueError(msg)
+                file_content = block[0]
 
-            f.write(block[0])
-
-            if filename == "rules.md":
-                f.write(
-                    subprocess.check_output(
+                if filename == "rules.md":
+                    file_content += "\n" + subprocess.check_output(
                         ["cargo", "dev", "generate-rules-table"],
                         encoding="utf-8",
-                    ),
-                )
+                    )
+
+            f.write(clean_file_content(file_content, title))
 
     # Add the nav section to mkdocs.yml.
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
