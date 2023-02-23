@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PreferSimpleAnyAll: ~
+    UnnecessaryComprehensionAnyAll: ~
   location:
     row: 9
     column: 0
@@ -20,7 +20,7 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    PreferSimpleAnyAll: ~
+    UnnecessaryComprehensionAnyAll: ~
   location:
     row: 10
     column: 0
