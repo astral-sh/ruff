@@ -3,7 +3,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 use std::collections::HashMap;
 
 define_violation!(
@@ -81,12 +81,34 @@ fn is_if_returning(node: &Stmt) -> bool {
 
 struct ContinueChecker {
     assignments_from_calls: HashMap<String, Stmt>,
+    violations: Vec<Diagnostic>,
 }
 
 impl ContinueChecker {
     fn new() -> Self {
         Self {
             assignments_from_calls: HashMap::new(),
+            violations: vec![],
+        }
+    }
+
+    fn handle_name(&mut self, id: &str) {
+        let assignment = self.assignments_from_calls.get(id);
+        if let Some(clean_assign) = assignment {
+            if let StmtKind::Assign { value, .. } = &clean_assign.node {
+                if let ExprKind::Call { func, .. } = &value.node {
+                    if let ExprKind::Name { .. } = &func.node {
+                        self.violations
+                            .push(Diagnostic::new(CheckToContinue, Range::from_located(value)));
+                    }
+                }
+            }
+        }
+    }
+
+    fn handle_unary(&mut self, operand: &Expr) {
+        if let ExprKind::Name { id, .. } = &operand.node {
+            self.handle_name(id);
         }
     }
 
@@ -140,23 +162,37 @@ impl ContinueChecker {
 
         for if_stmt in ifs_stmt {
             if let StmtKind::If { test, .. } = &if_stmt.node {
-                if let ExprKind::Name { id, ctx } = &test.node {
-                    let assignment = self.assignments_from_calls.get(id);
-                    if let Some(clean_assign) = assignment {}
+                match &test.node {
+                    ExprKind::Name { id, .. } => self.handle_name(id),
+                    ExprKind::UnaryOp { operand, .. } => self.handle_unary(operand),
+                    _ => (),
                 }
             }
         }
     }
 
-    fn scan_deeper(&mut self, stmt: &Stmt, may_contain_violations: bool) {
+    fn scan_deeper(&mut self, stmt: &Stmt, mut may_contain_violations: bool) {
         self.scan_assignments(stmt);
         if may_contain_violations {
             self.find_violations(stmt);
+        } else {
+            let bodies = get_bodies(stmt);
+            let last_stmt = match bodies.last() {
+                Some(item) => item,
+                None => return,
+            };
+            if let StmtKind::Return { .. } = &last_stmt.node {
+                may_contain_violations = true;
+            }
+        }
+        let bodies = get_bodies(stmt);
+        for body in bodies {
+            self.scan_deeper(body, may_contain_violations);
         }
     }
 }
 
 /// TRY100
-pub fn check_to_continue(checker: &Checker) {
+pub fn check_to_continue(checker: &mut Checker) {
     let continue_check = ContinueChecker::new();
 }
