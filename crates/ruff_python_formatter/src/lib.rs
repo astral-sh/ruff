@@ -208,7 +208,7 @@ mod tests {
     impl std::fmt::Display for CodeFrame<'_> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             writeln!(f, "```{}", self.language)?;
-            writeln!(f, "{}", self.code)?;
+            write!(f, "{}", self.code)?;
             writeln!(f, "```")?;
             writeln!(f)
         }

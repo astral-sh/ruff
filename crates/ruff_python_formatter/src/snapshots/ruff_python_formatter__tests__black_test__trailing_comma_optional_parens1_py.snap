@@ -31,7 +31,6 @@ class A:
             3,
         ) < self.connection.mysql_version < (10, 5, 2):
             pass
-
 ```
 
 ## Black Differences
@@ -76,8 +75,6 @@ class A:
 -            4,
 -            3,
 -        ) < self.connection.mysql_version < (10, 5, 2):
--            pass
-\ No newline at end of file
 +        if (
 +            self.connection.mysql_is_mariadb
 +            and (
@@ -88,8 +85,7 @@ class A:
 +            < self.connection.mysql_version
 +            < (10, 5, 2)
 +        ):
-+            pass
-
+             pass
 ```
 
 ## Ruff Output
@@ -134,7 +130,6 @@ class A:
             < (10, 5, 2)
         ):
             pass
-
 ```
 
 ## Black Output

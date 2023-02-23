@@ -100,7 +100,6 @@ def foo3(list_a, list_b):
         )
         .filter(User.xyz.is_(None))
     )
-
 ```
 
 ## Black Differences
@@ -240,12 +239,10 @@ def foo3(list_a, list_b):
 -        )
 -        .filter(User.xyz.is_(None))
 -    )
-\ No newline at end of file
 +    return # Standlone comment but weirdly placed.
 +    User.query.filter(User.foo == "bar").filter(
 +        db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
 +    ).filter(User.xyz.is_(None))
-
 ```
 
 ## Ruff Output
@@ -345,7 +342,6 @@ def foo3(list_a, list_b):
     User.query.filter(User.foo == "bar").filter(
         db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
     ).filter(User.xyz.is_(None))
-
 ```
 
 ## Black Output

@@ -90,7 +90,6 @@ if x:
 elif   unformatted:
 # fmt: on
     will_be_formatted  ()
-
 ```
 
 ## Black Differences
@@ -188,10 +187,7 @@ elif   unformatted:
 -elif   unformatted:
 +elif unformatted:
      # fmt: on
--    will_be_formatted()
-\ No newline at end of file
-+    will_be_formatted()
-
+     will_be_formatted()
 ```
 
 ## Ruff Output
@@ -280,7 +276,6 @@ if x:
 elif unformatted:
     # fmt: on
     will_be_formatted()
-
 ```
 
 ## Black Output

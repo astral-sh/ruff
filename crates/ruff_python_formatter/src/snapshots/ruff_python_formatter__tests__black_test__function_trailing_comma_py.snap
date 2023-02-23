@@ -67,7 +67,6 @@ some_module.some_function(
 some_module.some_function(
     argument1, (one, two,), argument4, argument5, argument6
 )
-
 ```
 
 ## Black Differences
@@ -176,7 +175,6 @@ some_module.some_function(
  )
  
  # Inner trailing comma causes outer to explode
-
 ```
 
 ## Ruff Output

@@ -171,7 +171,6 @@ instruction()#comment with bad spacing
 
 # END COMMENTS
 # MORE END COMMENTS
-
 ```
 
 ## Black Differences
@@ -361,10 +360,7 @@ instruction()#comment with bad spacing
 +instruction()  #comment with bad spacing
  
  # END COMMENTS
--# MORE END COMMENTS
-\ No newline at end of file
-+# MORE END COMMENTS
-
+ # MORE END COMMENTS
 ```
 
 ## Ruff Output
@@ -550,7 +546,6 @@ instruction()  #comment with bad spacing
 
 # END COMMENTS
 # MORE END COMMENTS
-
 ```
 
 ## Black Output

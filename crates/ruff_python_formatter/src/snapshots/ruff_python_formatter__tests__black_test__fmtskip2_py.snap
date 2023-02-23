@@ -9,7 +9,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 l1 = ["This list should be broken up", "into multiple lines", "because it is way too long"]
 l2 = ["But this list shouldn't", "even though it also has", "way too many characters in it"]  # fmt: skip
 l3 = ["I have", "trailing comma", "so I should be braked",]
-
 ```
 
 ## Black Differences
@@ -30,7 +29,6 @@ l3 = ["I have", "trailing comma", "so I should be braked",]
  l3 = [
      "I have",
      "trailing comma",
-
 ```
 
 ## Ruff Output

@@ -882,6 +882,8 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
             }
         }?;
 
+        write!(f, [hard_line_break()])?;
+
         // Any trailing comments come on the lines after.
         for trivia in &self.item.trivia {
             if matches!(trivia.relationship, Relationship::Trailing) {

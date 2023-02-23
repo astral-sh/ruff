@@ -11,7 +11,6 @@ class A:
         for line in range(10):
             if True:
                 pass  # fmt: skip
-
 ```
 
 ## Black Differences
@@ -24,9 +23,7 @@ class A:
          for line in range(10):
              if True:
 -                pass  # fmt: skip
-\ No newline at end of file
 +                pass
-
 ```
 
 ## Ruff Output
@@ -37,7 +34,6 @@ class A:
         for line in range(10):
             if True:
                 pass
-
 ```
 
 ## Black Output
