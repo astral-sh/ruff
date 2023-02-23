@@ -5,7 +5,6 @@ use rustpython_parser::lexer::LexResult;
 use crate::attachment::attach;
 use crate::context::ASTFormatContext;
 use crate::core::locator::Locator;
-use crate::core::rustpython_helpers;
 use crate::cst::Stmt;
 use crate::newlines::normalize_newlines;
 use crate::parentheses::normalize_parentheses;
@@ -24,13 +23,13 @@ pub mod trivia;
 
 pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
     // Tokenize once.
-    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
     // Extract trivia.
     let trivia = trivia::extract_trivia_tokens(&tokens);
 
     // Parse the AST.
-    let python_ast = rustpython_helpers::parse_program_tokens(tokens, "<filename>")?;
+    let python_ast = ruff_rustpython::parse_program_tokens(tokens, "<filename>")?;
 
     // Convert to a CST.
     let mut python_cst: Vec<Stmt> = python_ast.into_iter().map(Into::into).collect();

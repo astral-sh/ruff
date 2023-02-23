@@ -24,7 +24,7 @@ use crate::registry::{Diagnostic, LintSource, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-use crate::{directives, fs, rustpython_helpers};
+use crate::{directives, fs};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -115,7 +115,7 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
     if use_ast || use_imports || use_doc_lines {
-        match rustpython_helpers::parse_program_tokens(tokens, &path.to_string_lossy()) {
+        match ruff_rustpython::parse_program_tokens(tokens, &path.to_string_lossy()) {
             Ok(python_ast) => {
                 if use_ast {
                     diagnostics.extend(check_ast(
@@ -226,7 +226,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     let contents = std::fs::read_to_string(path)?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(&contents);
@@ -290,7 +290,7 @@ pub fn lint_only(
     autofix: flags::Autofix,
 ) -> LinterResult<Vec<Message>> {
     // Tokenize once.
-    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);
@@ -359,7 +359,7 @@ pub fn lint_fix<'a>(
     // Continuously autofix until the source code stabilizes.
     loop {
         // Tokenize once.
-        let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&transformed);
+        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&transformed);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(&transformed);
