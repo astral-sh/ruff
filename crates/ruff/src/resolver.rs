@@ -30,7 +30,7 @@ pub enum PyprojectDiscovery {
 }
 
 impl PyprojectDiscovery {
-    fn top_level_settings(&self) -> &AllSettings {
+    pub fn top_level_settings(&self) -> &AllSettings {
         match self {
             PyprojectDiscovery::Fixed(settings) => settings,
             PyprojectDiscovery::Hierarchical(settings) => settings,
@@ -82,13 +82,7 @@ impl Resolver {
                 .settings
                 .iter()
                 .rev()
-                .find_map(|(root, settings)| {
-                    if path.starts_with(root) {
-                        Some(settings)
-                    } else {
-                        None
-                    }
-                })
+                .find_map(|(root, settings)| path.starts_with(root).then_some(settings))
                 .unwrap_or(default),
         }
     }

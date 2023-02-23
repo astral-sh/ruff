@@ -41,23 +41,21 @@ pub fn run(
 
     // Initialize the cache.
     if matches!(cache, flags::Cache::Enabled) {
+        fn init_cache(path: &std::path::Path) {
+            if let Err(e) = cache::init(path) {
+                error!(
+                    "Failed to initialize cache at {}: {e:?}",
+                    path.to_string_lossy()
+                );
+            }
+        }
         match &pyproject_strategy {
             PyprojectDiscovery::Fixed(settings) => {
-                if let Err(e) = cache::init(&settings.cli.cache_dir) {
-                    error!(
-                        "Failed to initialize cache at {}: {e:?}",
-                        settings.cli.cache_dir.to_string_lossy()
-                    );
-                }
+                init_cache(&settings.cli.cache_dir);
             }
             PyprojectDiscovery::Hierarchical(default) => {
                 for settings in std::iter::once(default).chain(resolver.iter()) {
-                    if let Err(e) = cache::init(&settings.cli.cache_dir) {
-                        error!(
-                            "Failed to initialize cache at {}: {e:?}",
-                            settings.cli.cache_dir.to_string_lossy()
-                        );
-                    }
+                    init_cache(&settings.cli.cache_dir);
                 }
             }
         }
