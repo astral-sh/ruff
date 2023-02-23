@@ -40,7 +40,7 @@ pub fn run(
     }
 
     // Initialize the cache.
-    if matches!(cache, flags::Cache::Enabled) {
+    if cache.into() {
         match &pyproject_strategy {
             PyprojectDiscovery::Fixed(settings) => {
                 if let Err(e) = cache::init(&settings.cli.cache_dir) {
