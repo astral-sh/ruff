@@ -57,10 +57,7 @@ def clean_file_content(content: str, title: str) -> str:
     content = "\n".join(lines) + "\n"
 
     # Add a missing title.
-    if not lines[0].startswith("# "):
-        return f"# {title}\n\n" + content
-
-    return content
+    return f"# {title}\n\n" + content
 
 
 def main() -> None:
@@ -110,7 +107,6 @@ def main() -> None:
                         ["cargo", "dev", "generate-rules-table"],
                         encoding="utf-8",
                     )
-
             f.write(clean_file_content(file_content, title))
 
     # Add the nav section to mkdocs.yml.
