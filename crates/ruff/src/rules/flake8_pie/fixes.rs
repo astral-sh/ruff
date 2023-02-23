@@ -7,7 +7,7 @@ use crate::fix::Fix;
 use crate::source_code::{Locator, Stylist};
 
 /// (PIE802) Convert `[i for i in a]` into `i for i in a`
-pub fn fix_prefer_simple_any_all(
+pub fn fix_unnecessary_comprehension_any_all(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,

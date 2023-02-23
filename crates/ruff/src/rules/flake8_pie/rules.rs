@@ -91,9 +91,9 @@ define_violation!(
     /// any(x.id for x in bar)
     /// all(x.id for x in bar)
     /// ```
-    pub struct PreferSimpleAnyAll;
+    pub struct UnnecessaryComprehensionAnyAll;
 );
-impl AlwaysAutofixableViolation for PreferSimpleAnyAll {
+impl AlwaysAutofixableViolation for UnnecessaryComprehensionAnyAll {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary list comprehension.")
@@ -329,16 +329,22 @@ pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], value
 }
 
 /// PIE802
-pub fn prefer_simple_any_all(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
+pub fn unnecessary_comprehension_any_all(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
     if let ExprKind::Name { id, .. } = &func.node {
         if (id == "all" || id == "any") && args.len() == 1 {
             if !checker.is_builtin(id) {
                 return;
             }
             if let ExprKind::ListComp { .. } = args[0].node {
-                let mut diagnostic = Diagnostic::new(PreferSimpleAnyAll, Range::from_located(expr));
+                let mut diagnostic =
+                    Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from_located(expr));
                 if checker.patch(diagnostic.kind.rule()) {
-                    match fixes::fix_prefer_simple_any_all(
+                    match fixes::fix_unnecessary_comprehension_any_all(
                         checker.locator,
                         checker.stylist,
                         &args[0],
