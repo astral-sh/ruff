@@ -1985,6 +1985,7 @@ dependencies = [
  "result-like",
  "ruff_macros",
  "ruff_python",
+ "ruff_rustpython",
  "rustc-hash",
  "rustpython-common",
  "rustpython-parser",
@@ -2109,6 +2110,7 @@ dependencies = [
  "insta",
  "once_cell",
  "ruff_formatter",
+ "ruff_rustpython",
  "ruff_testing_macros",
  "ruff_text_size",
  "rustc-hash",
@@ -2116,6 +2118,16 @@ dependencies = [
  "rustpython-parser",
  "similar",
  "test-case",
+]
+
+[[package]]
+name = "ruff_rustpython"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "once_cell",
+ "rustpython-common",
+ "rustpython-parser",
 ]
 
 [[package]]

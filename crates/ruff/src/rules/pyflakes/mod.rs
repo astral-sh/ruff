@@ -20,7 +20,7 @@ mod tests {
     use crate::settings::flags;
     use crate::source_code::{Indexer, Locator, Stylist};
     use crate::test::test_path;
-    use crate::{directives, rustpython_helpers, settings};
+    use crate::{directives, settings};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"); "F401_0")]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"); "F401_1")]
@@ -243,7 +243,7 @@ mod tests {
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(&Linter::Pyflakes);
-        let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_contents(&contents, &locator);
         let indexer: Indexer = tokens.as_slice().into();
