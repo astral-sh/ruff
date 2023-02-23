@@ -1,9 +1,9 @@
 use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::string::TRIPLE_QUOTE_PREFIXES;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
-use crate::docstrings::constants;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;
 use crate::message::Location;
@@ -54,7 +54,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     {
         return;
     };
-    if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
+    if TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
         if checker
             .settings
             .rules

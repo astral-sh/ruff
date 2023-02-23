@@ -2110,6 +2110,7 @@ dependencies = [
  "insta",
  "once_cell",
  "ruff_formatter",
+ "ruff_python",
  "ruff_rustpython",
  "ruff_testing_macros",
  "ruff_text_size",
