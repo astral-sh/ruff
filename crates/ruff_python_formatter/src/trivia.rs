@@ -183,7 +183,14 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
 
         if matches!(tok, Tok::Lpar) {
             if prev_tok.map_or(true, |(_, prev_tok, _)| {
-                !matches!(prev_tok, Tok::Name { .. })
+                !matches!(
+                    prev_tok,
+                    Tok::Name { .. }
+                        | Tok::Int { .. }
+                        | Tok::Float { .. }
+                        | Tok::Complex { .. }
+                        | Tok::String { .. }
+                )
             }) {
                 parens.push((start, true));
             } else {
