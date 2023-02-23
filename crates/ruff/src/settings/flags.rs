@@ -1,25 +1,9 @@
 use crate::fix;
 
-#[derive(Debug, Copy, Clone, Hash)]
+#[derive(Debug, Copy, Clone, Hash, result_like::BoolLike)]
 pub enum Autofix {
     Enabled,
     Disabled,
-}
-
-impl Autofix {
-    pub const fn is_enabled(self) -> bool {
-        matches!(self, Self::Enabled)
-    }
-}
-
-impl From<bool> for Autofix {
-    fn from(value: bool) -> Self {
-        if value {
-            Self::Enabled
-        } else {
-            Self::Disabled
-        }
-    }
 }
 
 impl From<fix::FixMode> for Autofix {

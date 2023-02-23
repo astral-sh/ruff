@@ -153,7 +153,7 @@ pub fn organize_imports(
         None
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
-        if autofix.is_enabled() && settings.rules.should_fix(diagnostic.kind.rule()) {
+        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 indent(&expected, indentation),
                 range.location,
