@@ -1180,7 +1180,7 @@ FuncDef: ast::Stmt = {
 };
 
 Parameters: ast::Arguments = {
-    "(" <a: (ParameterList<TypedParameter>)?> ")" =>? {
+    "(" <a: (ParameterList<TypedParameter, StarTypedParameter>)?> ")" =>? {
         let args = validate_arguments(
             a.unwrap_or_else(|| ast::Arguments {
                 posonlyargs: vec![],
@@ -1199,8 +1199,8 @@ Parameters: ast::Arguments = {
 
 // Note that this is a macro which is used once for function defs, and
 // once for lambda defs.
-ParameterList<ArgType>: ast::Arguments = {
-    <param1:ParameterDefs<ArgType>> <args2:("," ParameterListStarArgs<ArgType>)?> ","? =>? {
+ParameterList<ArgType, StarArgType>: ast::Arguments = {
+    <param1:ParameterDefs<ArgType>> <args2:("," ParameterListStarArgs<ArgType, StarArgType>)?> ","? =>? {
         let (posonlyargs, args, defaults) = parse_params(param1)?;
 
         // Now gather rest of parameters:
@@ -1235,7 +1235,7 @@ ParameterList<ArgType>: ast::Arguments = {
             kw_defaults,
         })
     },
-    <params:ParameterListStarArgs<ArgType>> ","? => {
+    <params:ParameterListStarArgs<ArgType, StarArgType>> ","? => {
         let (vararg, kwonlyargs, kw_defaults, kwarg) = params;
         ast::Arguments {
             posonlyargs: vec![],
@@ -1291,11 +1291,18 @@ TypedParameter: ast::Arg = {
     },
 };
 
+StarTypedParameter: ast::Arg = {
+    <location:@L> <arg:Identifier> <a:(":" TestOrStarExpr)?> <end_location:@R> => {
+        let annotation = a.map(|x| Box::new(x.1));
+        ast::Arg::new(location, end_location, ast::ArgData { arg, annotation, type_comment: None })
+    },
+};
+
 // Use inline here to make sure the "," is not creating an ambiguity.
 // TODO: figure out another grammar that makes this inline no longer required.
 #[inline]
-ParameterListStarArgs<ArgType>: (Option<Box<ast::Arg>>, Vec<ast::Arg>, Vec<ast::Expr>, Option<Box<ast::Arg>>) = {
-    <location:@L> "*" <va:ArgType?> <kw:("," ParameterDef<ArgType>)*> <kwarg:("," KwargParameter<ArgType>)?> =>? {
+ParameterListStarArgs<ArgType, StarArgType>: (Option<Box<ast::Arg>>, Vec<ast::Arg>, Vec<ast::Expr>, Option<Box<ast::Arg>>) = {
+    <location:@L> "*" <va:StarArgType?> <kw:("," ParameterDef<ArgType>)*> <kwarg:("," KwargParameter<ArgType>)?> =>? {
         // Extract keyword arguments:
         let mut kwonlyargs = Vec::new();
         let mut kw_defaults = Vec::new();
@@ -1413,7 +1420,7 @@ NamedExpression: ast::Expr = {
 };
 
 LambdaDef: ast::Expr = {
-    <location:@L> "lambda" <p:ParameterList<UntypedParameter>?> ":" <body:Test<"all">> <end_location:@R> =>? {
+    <location:@L> "lambda" <p:ParameterList<UntypedParameter, UntypedParameter>?> ":" <body:Test<"all">> <end_location:@R> =>? {
         let p = validate_arguments(
             p.unwrap_or_else(|| {
                 ast::Arguments {

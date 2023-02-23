@@ -809,4 +809,16 @@ match x:
         .unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
+
+    #[test]
+    fn test_variadic_generics() {
+        let parse_ast = parse_program(
+            r#"
+def args_to_tuple(*args: *Ts) -> Tuple[*Ts]: ...
+"#,
+            "<test>",
+        )
+        .unwrap();
+        insta::assert_debug_snapshot!(parse_ast);
+    }
 }

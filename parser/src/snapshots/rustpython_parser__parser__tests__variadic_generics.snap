@@ -1,0 +1,188 @@
+---
+source: compiler/parser/src/parser.rs
+expression: parse_ast
+---
+[
+    Located {
+        location: Location {
+            row: 2,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 2,
+                column: 48,
+            },
+        ),
+        custom: (),
+        node: FunctionDef {
+            name: "args_to_tuple",
+            args: Arguments {
+                posonlyargs: [],
+                args: [],
+                vararg: Some(
+                    Located {
+                        location: Location {
+                            row: 2,
+                            column: 19,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 2,
+                                column: 28,
+                            },
+                        ),
+                        custom: (),
+                        node: ArgData {
+                            arg: "args",
+                            annotation: Some(
+                                Located {
+                                    location: Location {
+                                        row: 2,
+                                        column: 25,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 2,
+                                            column: 28,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Starred {
+                                        value: Located {
+                                            location: Location {
+                                                row: 2,
+                                                column: 26,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 2,
+                                                    column: 28,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Name {
+                                                id: "Ts",
+                                                ctx: Load,
+                                            },
+                                        },
+                                        ctx: Load,
+                                    },
+                                },
+                            ),
+                            type_comment: None,
+                        },
+                    },
+                ),
+                kwonlyargs: [],
+                kw_defaults: [],
+                kwarg: None,
+                defaults: [],
+            },
+            body: [
+                Located {
+                    location: Location {
+                        row: 2,
+                        column: 45,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 2,
+                            column: 48,
+                        },
+                    ),
+                    custom: (),
+                    node: Expr {
+                        value: Located {
+                            location: Location {
+                                row: 2,
+                                column: 45,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 2,
+                                    column: 48,
+                                },
+                            ),
+                            custom: (),
+                            node: Constant {
+                                value: Ellipsis,
+                                kind: None,
+                            },
+                        },
+                    },
+                },
+            ],
+            decorator_list: [],
+            returns: Some(
+                Located {
+                    location: Location {
+                        row: 2,
+                        column: 33,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 2,
+                            column: 43,
+                        },
+                    ),
+                    custom: (),
+                    node: Subscript {
+                        value: Located {
+                            location: Location {
+                                row: 2,
+                                column: 33,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 2,
+                                    column: 38,
+                                },
+                            ),
+                            custom: (),
+                            node: Name {
+                                id: "Tuple",
+                                ctx: Load,
+                            },
+                        },
+                        slice: Located {
+                            location: Location {
+                                row: 2,
+                                column: 39,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 2,
+                                    column: 42,
+                                },
+                            ),
+                            custom: (),
+                            node: Starred {
+                                value: Located {
+                                    location: Location {
+                                        row: 2,
+                                        column: 40,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 2,
+                                            column: 42,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Name {
+                                        id: "Ts",
+                                        ctx: Load,
+                                    },
+                                },
+                                ctx: Load,
+                            },
+                        },
+                        ctx: Load,
+                    },
+                },
+            ),
+            type_comment: None,
+        },
+    },
+]
