@@ -22,6 +22,9 @@ pub mod shared_traits;
 pub mod trivia;
 
 pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
+    // Create a reusable locator.
+    let locator = Locator::new(contents);
+
     // Tokenize once.
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
@@ -37,7 +40,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
     // Attach trivia.
     attach(&mut python_cst, trivia);
     normalize_newlines(&mut python_cst);
-    normalize_parentheses(&mut python_cst);
+    normalize_parentheses(&mut python_cst, &locator);
 
     format!(
         ASTFormatContext::new(
@@ -45,7 +48,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
                 indent_style: IndentStyle::Space(4),
                 line_width: 88.try_into().unwrap(),
             },
-            Locator::new(contents)
+            locator,
         ),
         [format::builders::block(&python_cst)]
     )

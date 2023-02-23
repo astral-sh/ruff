@@ -292,17 +292,6 @@ last_call()
  }
  Python3 > Python2 > COBOL
  Life is Life
-@@ -122,8 +125,8 @@
- call(b, **self.screen_kwargs)
- lukasz.langa.pl
- call.me(maybe)
--(1).real
--(1.0).real
-+1.real
-+1.0.real
- ....__class__
- list[str]
- dict[str, int]
 @@ -138,33 +141,33 @@
  very_long_variable_name_filters: t.List[
      t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
@@ -311,12 +300,12 @@ last_call()
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 +xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
 +    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
-+)
-+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
-+    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
  )
 -xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
++xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
++    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
++)
 +xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
 +    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))
  )
@@ -583,8 +572,8 @@ call(**self.screen_kwargs)
 call(b, **self.screen_kwargs)
 lukasz.langa.pl
 call.me(maybe)
-1.real
-1.0.real
+(1).real
+(1.0).real
 ....__class__
 list[str]
 dict[str, int]
