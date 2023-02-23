@@ -491,6 +491,7 @@ ruff_macros::register_rules!(
     rules::flake8_pie::rules::UnnecessaryDictKwargs,
     rules::flake8_pie::rules::PreferListBuiltin,
     rules::flake8_pie::rules::SingleStartsEndsWith,
+    rules::flake8_pie::rules::UnnecessaryComprehensionAnyAll,
     // flake8-commas
     rules::flake8_commas::rules::TrailingCommaMissing,
     rules::flake8_commas::rules::TrailingCommaOnBareTupleProhibited,

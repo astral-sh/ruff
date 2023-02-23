@@ -2490,6 +2490,13 @@ where
                 if self.settings.rules.enabled(&Rule::UnnecessaryDictKwargs) {
                     flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnnecessaryComprehensionAnyAll)
+                {
+                    flake8_pie::rules::unnecessary_comprehension_any_all(self, expr, func, args);
+                }
 
                 // flake8-bandit
                 if self.settings.rules.enabled(&Rule::ExecBuiltin) {
