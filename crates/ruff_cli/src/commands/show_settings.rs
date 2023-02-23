@@ -29,8 +29,8 @@ pub fn show_settings(
     let settings = resolver.resolve(path, pyproject_strategy);
 
     let mut stdout = BufWriter::new(io::stdout().lock());
-    write!(stdout, "Resolved settings for: {path:?}")?;
-    write!(stdout, "{settings:#?}")?;
+    writeln!(stdout, "Resolved settings for: {path:?}")?;
+    writeln!(stdout, "{settings:#?}")?;
 
     Ok(())
 }
