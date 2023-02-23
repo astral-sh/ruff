@@ -68,7 +68,9 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer {
             }
             StmtKind::For { target, iter, .. } | StmtKind::AsyncFor { target, iter, .. } => {
                 use_inferred_parens(target);
-                use_inferred_parens(iter);
+                if !matches!(iter.node, ExprKind::Tuple { .. }) {
+                    use_inferred_parens(iter);
+                }
             }
             StmtKind::While { test, .. } => {
                 use_inferred_parens(test);
