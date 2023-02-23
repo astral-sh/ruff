@@ -757,6 +757,7 @@ impl Linter {
     }
 }
 
+#[derive(is_macro::Is)]
 pub enum LintSource {
     Ast,
     Io,
