@@ -124,7 +124,7 @@ impl<'a> Scope<'a> {
 //        StarImportation
 //        FutureImportation
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, is_macro::Is)]
 pub enum BindingKind<'a> {
     Annotation,
     Argument,

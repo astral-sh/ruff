@@ -229,9 +229,8 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if `member` is bound as a builtin.
     pub fn is_builtin(&self, member: &str) -> bool {
-        self.find_binding(member).map_or(false, |binding| {
-            matches!(binding.kind, BindingKind::Builtin)
-        })
+        self.find_binding(member)
+            .map_or(false, |binding| binding.kind.is_builtin())
     }
 
     pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
@@ -1928,9 +1927,7 @@ where
                     if self.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| {
-                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        })
+                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
                     {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
@@ -1992,9 +1989,7 @@ where
                     if self.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| {
-                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        })
+                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
                     {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
@@ -4136,7 +4131,7 @@ impl<'a> Checker<'a> {
             let existing_binding_index = self.scopes[*scope_index].bindings.get(&name).unwrap();
             let existing = &self.bindings[*existing_binding_index];
             let in_current_scope = stack_index == 0;
-            if !matches!(existing.kind, BindingKind::Builtin)
+            if !existing.kind.is_builtin()
                 && existing.source.as_ref().map_or(true, |left| {
                     binding.source.as_ref().map_or(true, |right| {
                         !branch_detection::different_forks(
@@ -4156,7 +4151,7 @@ impl<'a> Checker<'a> {
                         | BindingKind::StarImportation(..)
                         | BindingKind::FutureImportation
                 );
-                if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
+                if binding.kind.is_loop_var() && existing_is_import {
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::ImportShadowedByLoopVar {
@@ -4170,7 +4165,7 @@ impl<'a> Checker<'a> {
                     if !existing.used()
                         && binding.redefines(existing)
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
-                        && !(matches!(existing.kind, BindingKind::FunctionDefinition)
+                        && !(existing.kind.is_function_definition()
                             && visibility::is_overload(
                                 self,
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
@@ -4205,36 +4200,29 @@ impl<'a> Checker<'a> {
 
         let scope = self.current_scope();
         let binding = if let Some(index) = scope.bindings.get(&name) {
-            if matches!(self.bindings[*index].kind, BindingKind::Builtin) {
-                // Avoid overriding builtins.
-                binding
-            } else if matches!(self.bindings[*index].kind, BindingKind::Global) {
-                // If the original binding was a global, and the new binding conflicts within
-                // the current scope, then the new binding is also a global.
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
-                    kind: BindingKind::Global,
-                    ..binding
+            let b = &self.bindings[*index];
+            match &b.kind {
+                BindingKind::Builtin => {
+                    // Avoid overriding builtins.
+                    binding
                 }
-            } else if matches!(self.bindings[*index].kind, BindingKind::Nonlocal) {
-                // If the original binding was a nonlocal, and the new binding conflicts within
-                // the current scope, then the new binding is also a nonlocal.
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
-                    kind: BindingKind::Nonlocal,
-                    ..binding
+                kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
+                    // If the original binding was a global or nonlocal, and the new binding conflicts within
+                    // the current scope, then the new binding is also as the same.
+                    Binding {
+                        runtime_usage: b.runtime_usage,
+                        synthetic_usage: b.synthetic_usage,
+                        typing_usage: b.typing_usage,
+                        kind: kind.clone(),
+                        ..binding
+                    }
                 }
-            } else {
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
+                _ => Binding {
+                    runtime_usage: b.runtime_usage,
+                    synthetic_usage: b.synthetic_usage,
+                    typing_usage: b.typing_usage,
                     ..binding
-                }
+                },
             }
         } else {
             binding
@@ -4243,7 +4231,7 @@ impl<'a> Checker<'a> {
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-        if !(matches!(binding.kind, BindingKind::Annotation) && scope.bindings.contains_key(name)) {
+        if !(binding.kind.is_annotation() && scope.bindings.contains_key(name)) {
             if let Some(rebound_index) = scope.bindings.insert(name, binding_index) {
                 scope
                     .rebounds
@@ -4282,7 +4270,7 @@ impl<'a> Checker<'a> {
                 let context = self.execution_context();
                 self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
 
-                if matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                if self.bindings[*index].kind.is_annotation()
                     && !self.in_deferred_string_type_definition
                     && !self.in_deferred_type_definition
                 {
@@ -4430,9 +4418,7 @@ impl<'a> Checker<'a> {
                     .current_scope()
                     .bindings
                     .get(id)
-                    .map_or(false, |index| {
-                        matches!(self.bindings[*index].kind, BindingKind::Global)
-                    })
+                    .map_or(false, |index| self.bindings[*index].kind.is_global())
                 {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
@@ -4935,7 +4921,7 @@ impl<'a> Checker<'a> {
             {
                 for (name, index) in &scope.bindings {
                     let binding = &self.bindings[*index];
-                    if matches!(binding.kind, BindingKind::Global) {
+                    if binding.kind.is_global() {
                         if let Some(stmt) = &binding.source {
                             if matches!(stmt.node, StmtKind::Global { .. }) {
                                 diagnostics.push(Diagnostic::new(

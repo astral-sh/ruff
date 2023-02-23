@@ -9,7 +9,7 @@ use super::helpers;
 use super::types::Argumentable;
 use crate::ast::function_type;
 use crate::ast::function_type::FunctionType;
-use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeKind};
+use crate::ast::types::{Binding, FunctionDef, Lambda, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
@@ -111,7 +111,7 @@ fn function(
             .map(|index| &bindings[*index])
         {
             if !binding.used()
-                && matches!(binding.kind, BindingKind::Argument)
+                && binding.kind.is_argument()
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
                 diagnostics.push(Diagnostic::new(
@@ -156,7 +156,7 @@ fn method(
             .map(|index| &bindings[*index])
         {
             if !binding.used()
-                && matches!(binding.kind, BindingKind::Argument)
+                && binding.kind.is_argument()
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
                 diagnostics.push(Diagnostic::new(
