@@ -3,16 +3,28 @@ import argparse
 import shutil
 import subprocess
 from pathlib import Path
+from typing import NamedTuple
 
 import yaml
 
-SECTIONS: list[tuple[str, str]] = [
-    ("Overview", "index.md"),
-    ("Installation and Usage", "installation-and-usage.md"),
-    ("Configuration", "configuration.md"),
-    ("Rules", "rules.md"),
-    ("Settings", "settings.md"),
-    ("Acknowledgements", "acknowledgements.md"),
+
+class Section(NamedTuple):
+    """A section to include in the MkDocs documentation."""
+
+    title: str
+    filename: str
+    generated: bool
+
+
+SECTIONS: list[Section] = [
+    Section("Overview", "index.md", generated=True),
+    Section("Installation and Usage", "installation-and-usage.md", generated=False),
+    Section("Configuration", "configuration.md", generated=False),
+    Section("Rules", "rules.md", generated=True),
+    Section("Settings", "settings.md", generated=True),
+    Section("Editor Integrations", "editor-integrations.md", generated=False),
+    Section("FAQ", "faq.md", generated=False),
+    Section("Contributing", "contributing.md", generated=True),
 ]
 
 DOCUMENTATION_LINK: str = (
@@ -39,16 +51,29 @@ def main() -> None:
         raise ValueError(msg)
     content = content.replace(DOCUMENTATION_LINK, "")
 
-    # Make the documentation links in the README more relative.
+    # Convert any inter-documentation links to relative links.
     content = content.replace("https://beta.ruff.rs", "")
 
     Path("docs").mkdir(parents=True, exist_ok=True)
 
     # Split the README.md into sections.
-    for title, filename in SECTIONS:
+    for title, filename, generated in SECTIONS:
+        if not generated:
+            continue
+
         with Path(f"docs/{filename}").open("w+") as f:
+            if filename == "contributing.md":
+                # Copy the CONTRIBUTING.md.
+                shutil.copy("CONTRIBUTING.md", "docs/contributing.md")
+                continue
+
             if filename == "settings.md":
-                f.write(subprocess.check_output(["cargo", "dev", "generate-options"], encoding="utf-8"))
+                f.write(
+                    subprocess.check_output(
+                        ["cargo", "dev", "generate-options"],
+                        encoding="utf-8",
+                    ),
+                )
                 continue
 
             block = content.split(f"<!-- Begin section: {title} -->")
@@ -64,24 +89,17 @@ def main() -> None:
             f.write(block[0])
 
             if filename == "rules.md":
-                f.write(subprocess.check_output(["cargo", "dev", "generate-rules-table"], encoding="utf-8"))
-
-    # Copy the CONTRIBUTING.md.
-    shutil.copy("CONTRIBUTING.md", "docs/contributing.md")
+                f.write(
+                    subprocess.check_output(
+                        ["cargo", "dev", "generate-rules-table"],
+                        encoding="utf-8",
+                    ),
+                )
 
     # Add the nav section to mkdocs.yml.
     with Path("mkdocs.template.yml").open(encoding="utf8") as fp:
         config = yaml.safe_load(fp)
-    config["nav"] = [
-        {"Overview": "index.md"},
-        {"Installation and Usage": "installation-and-usage.md"},
-        {"Configuration": "configuration.md"},
-        {"Rules": "rules.md"},
-        {"Settings": "settings.md"},
-        {"Editor Integrations": "editor-integrations.md"},
-        {"FAQ": "faq.md"},
-        {"Contributing": "contributing.md"},
-    ]
+    config["nav"] = [{section.title: section.filename} for section in SECTIONS]
     config["extra"] = {"analytics": {"provider": "fathom"}}
 
     Path(".overrides/partials/integrations/analytics").mkdir(
