@@ -95,7 +95,7 @@ mod tests {
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
         while (line := next(fp)).strip() != "// ruff":
             text += line
-        text += " "*8 + f"// {plugin}\n"
+        text += " " * 8 + f"// {plugin}\n"
         text += line
         text += fp.read()
 
