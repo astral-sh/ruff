@@ -13,7 +13,7 @@ use crate::cst::{
     Arguments, Boolop, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, Unaryop,
 };
 use crate::format::helpers::{is_self_closing, is_simple_power, is_simple_slice};
-use crate::format::numbers::int_literal;
+use crate::format::numbers::{float_literal, int_literal};
 use crate::format::strings::string_literal;
 use crate::shared_traits::AsFormat;
 use crate::trivia::{Parenthesize, Relationship, TriviaKind};
@@ -654,6 +654,7 @@ fn format_constant(
             }
         }
         Constant::Int(_) => write!(f, [int_literal(Range::from_located(expr))])?,
+        Constant::Float(_) => write!(f, [float_literal(Range::from_located(expr))])?,
         Constant::Str(_) | Constant::Bytes(_) => write!(f, [string_literal(expr)])?,
         _ => write!(f, [literal(Range::from_located(expr))])?,
     }
