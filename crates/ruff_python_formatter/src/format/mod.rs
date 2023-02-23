@@ -10,5 +10,6 @@ mod expr;
 mod helpers;
 mod operator;
 mod stmt;
+mod strings;
 mod unaryop;
 mod withitem;

@@ -13,6 +13,7 @@ use crate::cst::{
     Arguments, Boolop, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, Unaryop,
 };
 use crate::format::helpers::{is_self_closing, is_simple_power, is_simple_slice};
+use crate::format::strings::string_literal;
 use crate::shared_traits::AsFormat;
 use crate::trivia::{Parenthesize, Relationship, TriviaKind};
 
@@ -128,8 +129,6 @@ fn format_tuple(
                     write!(
                         f,
                         [soft_block_indent(&format_with(|f| {
-                            // TODO(charlie): If the magic trailing comma isn't present, and the
-                            // tuple is _already_ expanded, we're not supposed to add this.
                             let magic_trailing_comma = expr
                                 .trivia
                                 .iter()
@@ -641,10 +640,21 @@ fn format_joined_str(
 fn format_constant(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
-    _constant: &Constant,
+    constant: &Constant,
     _kind: Option<&str>,
 ) -> FormatResult<()> {
-    write!(f, [literal(Range::from_located(expr))])?;
+    match constant {
+        Constant::None => write!(f, [text("None")])?,
+        Constant::Bool(value) => {
+            if *value {
+                write!(f, [text("True")])?;
+            } else {
+                write!(f, [text("False")])?;
+            }
+        }
+        Constant::Str(_) => write!(f, [string_literal(expr)])?,
+        _ => write!(f, [literal(Range::from_located(expr))])?,
+    }
     Ok(())
 }
 
