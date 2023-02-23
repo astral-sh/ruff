@@ -6,7 +6,7 @@ pub const TRIPLE_QUOTE_PREFIXES: &[&str] = &[
     "u\"\"\"", "u'''", "r\"\"\"", "r'''", "U\"\"\"", "U'''", "R\"\"\"", "R'''", "\"\"\"", "'''",
 ];
 pub const SINGLE_QUOTE_PREFIXES: &[&str] = &[
-    "u\"", "u'", "r\"", "r'", "u\"", "u'", "r\"", "r'", "U\"", "U'", "R\"", "R'", "\"", "'",
+    "u\"", "u'", "r\"", "r'", "U\"", "U'", "R\"", "R'", "\"", "'",
 ];
 pub const TRIPLE_QUOTE_SUFFIXES: &[&str] = &["\"\"\"", "'''"];
 pub const SINGLE_QUOTE_SUFFIXES: &[&str] = &["\"", "'"];
@@ -53,7 +53,7 @@ pub fn strip_quotes_and_prefixes(s: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use crate::string::{is_lower, is_upper, strip_quotes_and_prefixes};
+    use crate::str::{is_lower, is_upper, strip_quotes_and_prefixes};
 
     #[test]
     fn test_is_lower() {

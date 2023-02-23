@@ -1,4 +1,4 @@
-use ruff_python::string::{
+use ruff_python::str::{
     SINGLE_QUOTE_PREFIXES, SINGLE_QUOTE_SUFFIXES, TRIPLE_QUOTE_PREFIXES, TRIPLE_QUOTE_SUFFIXES,
 };
 

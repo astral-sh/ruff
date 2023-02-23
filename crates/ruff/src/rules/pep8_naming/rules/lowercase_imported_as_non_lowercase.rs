@@ -1,5 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::string;
+use ruff_python::str;
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::helpers::identifier_range;
@@ -51,7 +51,7 @@ pub fn lowercase_imported_as_non_lowercase(
     asname: &str,
     locator: &Locator,
 ) -> Option<Diagnostic> {
-    if !string::is_upper(name) && string::is_lower(name) && asname.to_lowercase() != asname {
+    if !str::is_upper(name) && str::is_lower(name) && asname.to_lowercase() != asname {
         return Some(Diagnostic::new(
             LowercaseImportedAsNonLowercase {
                 name: name.to_string(),

@@ -1,5 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::string::{self};
+use ruff_python::str::{self};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::helpers::identifier_range;
@@ -56,8 +56,8 @@ pub fn camelcase_imported_as_acronym(
     locator: &Locator,
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name)
-        && !string::is_lower(asname)
-        && string::is_upper(asname)
+        && !str::is_lower(asname)
+        && str::is_upper(asname)
         && helpers::is_acronym(name, asname)
     {
         return Some(Diagnostic::new(

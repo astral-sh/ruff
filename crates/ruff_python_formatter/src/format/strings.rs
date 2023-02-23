@@ -37,6 +37,7 @@ impl Format<ASTFormatContext<'_>> for StringLiteralPart {
             }
         }
 
+        // Retain raw prefixes.
         let mut is_raw = false;
         if leading_quote.contains('r') {
             is_raw = true;
@@ -44,6 +45,11 @@ impl Format<ASTFormatContext<'_>> for StringLiteralPart {
         } else if leading_quote.contains('R') {
             is_raw = true;
             f.write_element(FormatElement::StaticText { text: "R" })?;
+        }
+
+        // Normalize bytes literals to use b"...".
+        if leading_quote.contains('b') || leading_quote.contains('B') {
+            f.write_element(FormatElement::StaticText { text: "b" })?;
         }
 
         if trailing_quote.len() == 1 {

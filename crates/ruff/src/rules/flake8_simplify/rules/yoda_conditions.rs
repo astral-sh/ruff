@@ -1,7 +1,7 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
 use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::string::{self};
+use ruff_python::str::{self};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -46,10 +46,10 @@ impl Violation for YodaConditions {
 /// Return `true` if an [`Expr`] is a constant or a constant-like name.
 fn is_constant_like(expr: &Expr) -> bool {
     match &expr.node {
-        ExprKind::Attribute { attr, .. } => string::is_upper(attr),
+        ExprKind::Attribute { attr, .. } => str::is_upper(attr),
         ExprKind::Constant { .. } => true,
         ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant_like),
-        ExprKind::Name { id, .. } => string::is_upper(id),
+        ExprKind::Name { id, .. } => str::is_upper(id),
         _ => false,
     }
 }
