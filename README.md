@@ -119,7 +119,7 @@ pip install ruff
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
-and with [a variety of other package managers](https://beta.ruff.rs/docs/installation-and-usage/).
+and with [a variety of other package managers](https://beta.ruff.rs/docs/installation/).
 
 ### Usage
 
@@ -143,7 +143,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```
 
 Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
-with other editors through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
+alongside any other editor through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
 
 ### Configuration
 
