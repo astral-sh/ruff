@@ -52,6 +52,8 @@ impl Format<ASTFormatContext<'_>> for StringLiteralPart {
             f.write_element(FormatElement::StaticText { text: "b" })?;
         }
 
+        // TODO(charlie): Avoid allocating if there's nothing to escape. In other words, if we can
+        // use the string body directly, do so!
         if trailing_quote.len() == 1 {
             // Single-quoted string.
             if dquotes == 0 || squotes > 0 {
@@ -178,6 +180,7 @@ fn double_escape(text: &str) -> String {
                 escaped.push('\'');
             } else if *next == '"' {
                 chars.next();
+                escaped.push('\\');
                 escaped.push('"');
             } else if *next == '\\' {
                 chars.next();
@@ -210,6 +213,7 @@ fn single_escape(text: &str) -> String {
                 escaped.push('"');
             } else if *next == '\'' {
                 chars.next();
+                escaped.push('\\');
                 escaped.push('\'');
             } else if *next == '\\' {
                 chars.next();
@@ -241,6 +245,8 @@ mod tests {
 
     #[test]
     fn test_single_escape() {
-        assert_eq!(single_escape(r#"It's \"mine\""#), r#"It\'s "mine""#);
+        assert_eq!(single_escape(r#"It's mine"#), r#"It\'s mine"#);
+        assert_eq!(single_escape(r#"It\'s "mine""#), r#"It\'s "mine""#);
+        assert_eq!(single_escape(r#"It\\'s mine"#), r#"It\\\'s mine"#);
     }
 }
