@@ -53,7 +53,6 @@ func(
     argument5,
     argument6,
 )
-
 ```
 
 ## Black Differences
@@ -123,7 +122,6 @@ func(
 +) = func1(arg1) and func2(arg2)
  
 -func(argument1, (one, two), argument4, argument5, argument6)
-\ No newline at end of file
 +func(
 +    argument1,
 +    (
@@ -134,8 +132,6 @@ func(
 +    argument5,
 +    argument6,
 +)
-\ No newline at end of file
-
 ```
 
 ## Ruff Output

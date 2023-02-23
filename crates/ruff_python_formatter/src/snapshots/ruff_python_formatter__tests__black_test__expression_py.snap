@@ -260,7 +260,6 @@ bbbb >> bbbb * bbbb
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ^bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa^aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 last_call()
 # standalone comment at ENDMARKER
-
 ```
 
 ## Black Differences
@@ -308,7 +307,7 @@ last_call()
  ()
  (1,)
  (1, 2)
-@@ -88,33 +90,34 @@
+@@ -88,32 +90,33 @@
  ]
  {i for i in (1, 2, 3)}
  {(i**2) for i in (1, 2, 3)}
@@ -346,12 +345,10 @@ last_call()
      arg,
      another,
 -    kwarg="hey",
--    **kwargs
 +    kwarg='hey',
-+    **kwargs,
+     **kwargs,
  )  # note: no trailing comma pre-3.6
  call(*gidgets[:2])
- call(a, *gidgets[:2])
 @@ -122,8 +125,8 @@
  call(b, **self.screen_kwargs)
  lukasz.langa.pl
@@ -371,18 +368,18 @@ last_call()
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 +xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
 +    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
-+)
-+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
-+    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
  )
 -xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 +xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
-+    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))
++    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
  )
 -xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 -)  # type: ignore
++xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
++    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))
++)
  slice[0]
  slice[0:1]
  slice[0:1:2]
@@ -436,10 +433,18 @@ last_call()
  g = 1, *"ten"
 -what_is_up_with_those_new_coord_names = (coord_names + set(vars_to_create)) + set(
 -    vars_to_remove
--)
++what_is_up_with_those_new_coord_names = (
++    (coord_names
++    + set(vars_to_create))
++    + set(vars_to_remove)
+ )
 -what_is_up_with_those_new_coord_names = (coord_names | set(vars_to_create)) - set(
 -    vars_to_remove
--)
++what_is_up_with_those_new_coord_names = (
++    (coord_names
++    | set(vars_to_create))
++    - set(vars_to_remove)
+ )
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -447,11 +452,7 @@ last_call()
 -    )
 -    .order_by(models.Customer.id.asc())
 -    .all()
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names
-+    + set(vars_to_create))
-+    + set(vars_to_remove)
- )
+-)
 -result = (
 -    session.query(models.Customer.id)
 -    .filter(
@@ -461,11 +462,7 @@ last_call()
 -        models.Customer.id.asc(),
 -    )
 -    .all()
-+what_is_up_with_those_new_coord_names = (
-+    (coord_names
-+    | set(vars_to_create))
-+    - set(vars_to_remove)
- )
+-)
 +result = session.query(models.Customer.id).filter(
 +    models.Customer.account_id == account_id,
 +    models.Customer.email == email_address,
@@ -533,15 +530,6 @@ last_call()
      ^ aaaaaaaaaaaaaaaa.i
      << aaaaaaaaaaaaaaaa.k
      >> aaaaaaaaaaaaaaaa.l**aaaaaaaaaaaaaaaa.m // aaaaaaaaaaaaaaaa.n
-@@ -366,5 +371,4 @@
-     ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-     ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
- )
--last_call()
--# standalone comment at ENDMARKER
-\ No newline at end of file
-+last_call()# standalone comment at ENDMARKER
-
 ```
 
 ## Ruff Output
@@ -920,8 +908,8 @@ bbbb >> bbbb * bbbb
     ^ bbbb.a & aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     ^ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 )
-last_call()# standalone comment at ENDMARKER
-
+last_call()
+# standalone comment at ENDMARKER
 ```
 
 ## Black Output
@@ -1043,7 +1031,7 @@ call(
     arg,
     another,
     kwarg="hey",
-    **kwargs
+    **kwargs,
 )  # note: no trailing comma pre-3.6
 call(*gidgets[:2])
 call(a, *gidgets[:2])

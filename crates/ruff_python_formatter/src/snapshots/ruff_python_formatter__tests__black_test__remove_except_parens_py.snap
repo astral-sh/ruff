@@ -41,7 +41,6 @@ try:
     a.something
 except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error, some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error) as err:
     raise err
-
 ```
 
 ## Black Differences
@@ -69,14 +68,6 @@ except (some.really.really.really.looooooooooooooooooooooooooooooooong.module.ov
      raise err
  
  try:
-@@ -39,4 +37,4 @@
-     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
-     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
- ) as err:
--    raise err
-\ No newline at end of file
-+    raise err
-
 ```
 
 ## Ruff Output
@@ -122,7 +113,6 @@ except (
     some.really.really.really.looooooooooooooooooooooooooooooooong.module.over89.chars.Error,
 ) as err:
     raise err
-
 ```
 
 ## Black Output

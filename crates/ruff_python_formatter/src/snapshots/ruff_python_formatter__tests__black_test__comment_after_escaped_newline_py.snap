@@ -15,7 +15,6 @@ def bobtwo(): \
     \
   # some comment here
     pass
-
 ```
 
 ## Black Differences
@@ -31,12 +30,9 @@ def bobtwo(): \
  
  
 -def bobtwo():  # some comment here
--    pass
-\ No newline at end of file
 +def bobtwo():
 +    # some comment here
-+    pass
-
+     pass
 ```
 
 ## Ruff Output
@@ -50,7 +46,6 @@ def bob():
 def bobtwo():
     # some comment here
     pass
-
 ```
 
 ## Black Output

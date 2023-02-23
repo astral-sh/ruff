@@ -101,7 +101,6 @@ def f(
         )
     )
 def __await__(): return (yield)
-
 ```
 
 ## Black Differences
@@ -184,9 +183,7 @@ def __await__(): return (yield)
  
  def __await__():
 -    return (yield)
-\ No newline at end of file
 +    return yield
-
 ```
 
 ## Ruff Output
@@ -334,7 +331,6 @@ def f(
 
 def __await__():
     return yield
-
 ```
 
 ## Black Output

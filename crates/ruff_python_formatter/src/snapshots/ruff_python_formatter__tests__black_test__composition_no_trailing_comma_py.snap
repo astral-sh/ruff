@@ -187,7 +187,6 @@ class C:
                 key9: value9
             }
         )
-
 ```
 
 ## Black Differences
@@ -473,14 +472,6 @@ class C:
  
          assert (
              expectedexpectedexpectedexpectedexpectedexpectedexpectedexpectedexpect
-@@ -178,4 +201,4 @@
-                 key8: value8,
-                 key9: value9,
-             }
--        )
-\ No newline at end of file
-+        )
-
 ```
 
 ## Ruff Output
@@ -690,7 +681,6 @@ class C:
                 key9: value9,
             }
         )
-
 ```
 
 ## Black Output

@@ -61,7 +61,6 @@ def example7():
 
 def example8():
     return (((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((None)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
-
 ```
 
 ## Black Differences
@@ -108,14 +107,6 @@ def example8():
  
  
  def example4():
-@@ -82,4 +74,4 @@
- 
- 
- def example8():
--    return None
-\ No newline at end of file
-+    return None
-
 ```
 
 ## Ruff Output
@@ -198,7 +189,6 @@ def example7():
 
 def example8():
     return None
-
 ```
 
 ## Black Output

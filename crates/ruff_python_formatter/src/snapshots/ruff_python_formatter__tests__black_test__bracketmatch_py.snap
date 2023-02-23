@@ -12,7 +12,6 @@ pem_spam = lambda l, spam = {
     "x": 3
 }: not spam.get(l.strip())
 lambda x=lambda y={1: 3}: y['x':lambda y: {1: 2}]: x
-
 ```
 
 ## Black Differences
@@ -26,10 +25,7 @@ lambda x=lambda y={1: 3}: y['x':lambda y: {1: 2}]: x
      pass
  pem_spam = lambda l, spam={"x": 3}: not spam.get(l.strip())
 -lambda x=lambda y={1: 3}: y["x" : lambda y: {1: 2}]: x
-\ No newline at end of file
 +lambda x=lambda y={1: 3}: y['x' : lambda y: {1: 2}]: x
-\ No newline at end of file
-
 ```
 
 ## Ruff Output

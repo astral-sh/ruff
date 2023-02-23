@@ -39,7 +39,6 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 ).xxxxxxxxxxxxxxxxxx(), (
     "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 )
-
 ```
 
 ## Black Differences
@@ -68,8 +67,6 @@ assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(
 +assert xxxxxxxxx.xxxxxxxxx.xxxxxxxxx(xxxxxxxxx).xxxxxxxxxxxxxxxxxx(), (
      "xxx {xxxxxxxxx} xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
  )
-\ No newline at end of file
-
 ```
 
 ## Ruff Output

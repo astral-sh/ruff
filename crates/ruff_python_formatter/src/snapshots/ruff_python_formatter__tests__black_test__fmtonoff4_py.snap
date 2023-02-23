@@ -19,7 +19,6 @@ def f(): pass
     3, 4,
 ])
 def f(): pass
-
 ```
 
 ## Black Differences
@@ -47,14 +46,6 @@ def f(): pass
      pass
  
  
-@@ -17,4 +21,4 @@
-     ]
- )
- def f():
--    pass
-\ No newline at end of file
-+    pass
-
 ```
 
 ## Ruff Output
@@ -84,7 +75,6 @@ def f():
 )
 def f():
     pass
-
 ```
 
 ## Black Output

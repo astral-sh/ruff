@@ -23,7 +23,6 @@ x = [
 x = [
     1, 2, 3, 4
 ]
-
 ```
 
 ## Black Differences
@@ -54,7 +53,6 @@ x = [
  ]
  # fmt: on
  
-
 ```
 
 ## Ruff Output

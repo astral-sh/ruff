@@ -15,7 +15,6 @@ if (
     print("I'm good!")
 else:
     print("I'm bad")
-
 ```
 
 ## Black Differences
@@ -33,10 +32,7 @@ else:
 +if a == 3 and b != 9 and c is not None:  # fmt: skip
      print("I'm good!")
  else:
--    print("I'm bad")
-\ No newline at end of file
-+    print("I'm bad")
-
+     print("I'm bad")
 ```
 
 ## Ruff Output
@@ -47,7 +43,6 @@ if a == 3 and b != 9 and c is not None:  # fmt: skip
     print("I'm good!")
 else:
     print("I'm bad")
-
 ```
 
 ## Black Output

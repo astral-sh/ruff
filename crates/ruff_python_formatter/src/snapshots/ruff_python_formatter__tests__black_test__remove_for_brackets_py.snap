@@ -25,7 +25,6 @@ for (k, v) in dfkasdjfldsjflkdsjflkdsjfdslkfjldsjfgkjdshgkljjdsfldgkhsdofudsfuds
 # Test deeply nested brackets
 for (((((k, v))))) in d.items():
     print(k, v)
-
 ```
 
 ## Black Differences
@@ -42,7 +41,7 @@ for (((((k, v))))) in d.items():
      if hasattr(module, "_verify_python3_env"):
          module._verify_python3_env = lambda: None
  
-@@ -17,11 +17,9 @@
+@@ -17,9 +17,7 @@
  for (
      k,
      v,
@@ -53,11 +52,6 @@ for (((((k, v))))) in d.items():
      print(k, v)
  
  # Test deeply nested brackets
- for k, v in d.items():
--    print(k, v)
-\ No newline at end of file
-+    print(k, v)
-
 ```
 
 ## Ruff Output
@@ -88,7 +82,6 @@ for (
 # Test deeply nested brackets
 for k, v in d.items():
     print(k, v)
-
 ```
 
 ## Black Output

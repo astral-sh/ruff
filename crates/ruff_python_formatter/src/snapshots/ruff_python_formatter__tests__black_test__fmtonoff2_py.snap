@@ -46,7 +46,6 @@ def test_calculate_fades():
     ]
 
 # fmt: on
-
 ```
 
 ## Black Differences
@@ -63,9 +62,9 @@ def test_calculate_fades():
  
  # Test data:
  #   Position, Volume, State, TmSt/TmEx/None, [call, [arg1...]]
--
--@pytest.mark.parametrize('test', [
  
+-@pytest.mark.parametrize('test', [
+-
 -    # Test don't manage the volume
 +@pytest.mark.parametrize(
 +    'test',
@@ -106,10 +105,7 @@ def test_calculate_fades():
 +        (None, 4, 0, 0, 10, 0, 0, 6, 10),
      ]
  
--# fmt: on
-\ No newline at end of file
-+# fmt: on
-
+ # fmt: on
 ```
 
 ## Ruff Output
@@ -159,7 +155,6 @@ def test_calculate_fades():
     ]
 
 # fmt: on
-
 ```
 
 ## Black Output

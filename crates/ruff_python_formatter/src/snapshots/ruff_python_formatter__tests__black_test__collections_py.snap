@@ -77,7 +77,6 @@ if True:
     ec2client.get_waiter("instance_stopped").wait(
         InstanceIds=[instance.id], WaiterConfig={"Delay": 5,},
     )
-
 ```
 
 ## Black Differences
@@ -107,14 +106,6 @@ if True:
          },
      )
      ec2client.get_waiter("instance_stopped").wait(
-@@ -96,4 +96,4 @@
-         WaiterConfig={
-             "Delay": 5,
-         },
--    )
-\ No newline at end of file
-+    )
-
 ```
 
 ## Ruff Output
@@ -219,7 +210,6 @@ if True:
             "Delay": 5,
         },
     )
-
 ```
 
 ## Black Output
