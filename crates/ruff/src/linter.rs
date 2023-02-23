@@ -199,7 +199,7 @@ pub fn check_path(
     };
 
     // Enforce `noqa` directives.
-    if (matches!(noqa, flags::Noqa::Enabled) && !diagnostics.is_empty())
+    if (noqa.into() && !diagnostics.is_empty())
         || settings
             .rules
             .iter_enabled()
