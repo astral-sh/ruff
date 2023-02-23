@@ -162,3 +162,39 @@ impl Format<ASTFormatContext<'_>> for IntLiteral {
 pub const fn int_literal(range: Range) -> IntLiteral {
     IntLiteral { range }
 }
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct ComplexLiteral {
+    range: Range,
+}
+
+impl Format<ASTFormatContext<'_>> for ComplexLiteral {
+    fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+        let (source, start, end) = f.context().locator().slice(self.range);
+
+        if source[start..end].ends_with('j') {
+            write!(f, [literal(self.range)])?;
+        } else if source[start..end].ends_with('J') {
+            write!(
+                f,
+                [literal(Range::new(
+                    self.range.location,
+                    Location::new(
+                        self.range.end_location.row(),
+                        self.range.end_location.column() - 1
+                    ),
+                ))]
+            )?;
+            write!(f, [text("j")])?;
+        } else {
+            unreachable!("expected complex literal to end with j or J");
+        }
+
+        Ok(())
+    }
+}
+
+#[inline]
+pub const fn complex_literal(range: Range) -> ComplexLiteral {
+    ComplexLiteral { range }
+}
