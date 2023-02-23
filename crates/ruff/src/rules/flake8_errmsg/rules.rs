@@ -29,7 +29,7 @@ define_violation!(
     ///
     /// Python will produce a traceback like:
     ///
-    /// ```python
+    /// ```console
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 2, in <module>
     ///     raise RuntimeError("Some value is incorrect")
@@ -45,7 +45,7 @@ define_violation!(
     ///
     /// Which will produce a traceback like:
     ///
-    /// ```python
+    /// ```console
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 3, in <module>
     ///     raise RuntimeError(msg)
@@ -84,7 +84,7 @@ define_violation!(
     ///
     /// Python will produce a traceback like:
     ///
-    /// ```python
+    /// ```console
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 2, in <module>
     ///     raise RuntimeError(f"{sub!r} is incorrect")
@@ -101,7 +101,7 @@ define_violation!(
     ///
     /// Which will produce a traceback like:
     ///
-    /// ```python
+    /// ```console
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 3, in <module>
     ///     raise RuntimeError(msg)
@@ -141,7 +141,7 @@ define_violation!(
     ///
     /// Python will produce a traceback like:
     ///
-    /// ```python
+    /// ```console
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 2, in <module>
     ///     raise RuntimeError("'{}' is incorrect".format(sub))
@@ -158,7 +158,7 @@ define_violation!(
     ///
     /// Which will produce a traceback like:
     ///
-    /// ```python
+    /// ```console
     /// Traceback (most recent call last):
     ///   File "tmp.py", line 3, in <module>
     ///     raise RuntimeError(msg)

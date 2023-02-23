@@ -25,9 +25,11 @@ define_violation!(
     ///
     /// ```python
     /// if sys.platform.startswith("linux"):
-    ///    # Linux specific definitions
+    ///     # Linux specific definitions
+    ///     ...
     /// else:
-    ///   # Posix specific definitions
+    ///     # Posix specific definitions
+    ///     ...
     /// ```
     ///
     /// Instead, use a simple string comparison, such as `==` or `!=`:
@@ -35,8 +37,10 @@ define_violation!(
     /// ```python
     /// if sys.platform == "linux":
     ///     # Linux specific definitions
+    ///     ...
     /// else:
     ///     # Posix specific definitions
+    ///     ...
     /// ```
     ///
     /// ## References

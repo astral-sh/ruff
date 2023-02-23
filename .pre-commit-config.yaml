@@ -9,6 +9,9 @@ repos:
     rev: 0.7.16
     hooks:
       - id: mdformat
+        additional_dependencies:
+          - mdformat-black
+          - black==23.1.0 # Must be the latest version of Black
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.33.0

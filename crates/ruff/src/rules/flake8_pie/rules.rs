@@ -74,7 +74,7 @@ define_violation!(
     /// For example, compare the performance of `all` with a list comprehension against that
     /// of a generator (~40x faster here):
     ///
-    /// ```python
+    /// ```console
     /// In [1]: %timeit all([i for i in range(1000)])
     /// 8.14 µs ± 25.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
     ///
