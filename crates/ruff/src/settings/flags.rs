@@ -6,6 +6,12 @@ pub enum Autofix {
     Disabled,
 }
 
+impl Autofix {
+    pub const fn is_enabled(self) -> bool {
+        matches!(self, Self::Enabled)
+    }
+}
+
 impl From<bool> for Autofix {
     fn from(value: bool) -> Self {
         if value {

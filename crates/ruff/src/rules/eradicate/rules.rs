@@ -60,9 +60,7 @@ pub fn commented_out_code(
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
         let mut diagnostic = Diagnostic::new(CommentedOutCode, Range::new(start, end));
-        if matches!(autofix, flags::Autofix::Enabled)
-            && settings.rules.should_fix(&Rule::CommentedOutCode)
-        {
+        if autofix.is_enabled() && settings.rules.should_fix(&Rule::CommentedOutCode) {
             diagnostic.amend(Fix::deletion(location, end_location));
         }
         Some(diagnostic)
