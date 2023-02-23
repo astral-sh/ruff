@@ -2,8 +2,8 @@ use rustpython_parser::ast::Constant;
 
 use crate::cst::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Excepthandler, ExcepthandlerKind, Expr,
-    ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern, PatternKind, Stmt, StmtKind,
-    Unaryop, Withitem,
+    ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern, PatternKind, SliceSegment,
+    SliceSegmentKind, Stmt, StmtKind, Unaryop, Withitem,
 };
 
 pub trait Visitor<'a> {
@@ -39,6 +39,9 @@ pub trait Visitor<'a> {
     }
     fn visit_excepthandler(&mut self, excepthandler: &'a mut Excepthandler) {
         walk_excepthandler(self, excepthandler);
+    }
+    fn visit_slice_segment(&mut self, slice_segment: &'a mut SliceSegment) {
+        walk_slice_segment(self, slice_segment);
     }
     fn visit_format_spec(&mut self, format_spec: &'a mut Expr) {
         walk_expr(self, format_spec);
@@ -420,14 +423,10 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Exp
             visitor.visit_expr_context(ctx);
         }
         ExprKind::Slice { lower, upper, step } => {
-            if let Some(expr) = lower {
-                visitor.visit_expr(expr);
-            }
-            if let Some(expr) = upper {
-                visitor.visit_expr(expr);
-            }
+            visitor.visit_slice_segment(lower);
+            visitor.visit_slice_segment(upper);
             if let Some(expr) = step {
-                visitor.visit_expr(expr);
+                visitor.visit_slice_segment(expr);
             }
         }
     }
@@ -462,6 +461,18 @@ pub fn walk_excepthandler<'a, V: Visitor<'a> + ?Sized>(
                 visitor.visit_expr(expr);
             }
             visitor.visit_body(body);
+        }
+    }
+}
+
+pub fn walk_slice_segment<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    slice_segment: &'a mut SliceSegment,
+) {
+    match &mut slice_segment.node {
+        SliceSegmentKind::Empty => {}
+        SliceSegmentKind::Index { value } => {
+            visitor.visit_expr(value);
         }
     }
 }

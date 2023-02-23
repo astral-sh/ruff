@@ -10,7 +10,8 @@ use crate::builders::literal;
 use crate::context::ASTFormatContext;
 use crate::core::types::Range;
 use crate::cst::{
-    Arguments, Boolop, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, Unaryop,
+    Arguments, Boolop, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, SliceSegment,
+    SliceSegmentKind, Unaryop,
 };
 use crate::format::helpers::{is_self_closing, is_simple_power, is_simple_slice};
 use crate::format::numbers::{complex_literal, float_literal, int_literal};
@@ -187,52 +188,68 @@ fn format_tuple(
 fn format_slice(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
-    lower: Option<&Expr>,
-    upper: Option<&Expr>,
-    step: Option<&Expr>,
+    lower: &SliceSegment,
+    upper: &SliceSegment,
+    step: Option<&SliceSegment>,
 ) -> FormatResult<()> {
-    // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
-    let is_simple = lower.map_or(true, is_simple_slice)
-        && upper.map_or(true, is_simple_slice)
-        && step.map_or(true, is_simple_slice);
-
-    if let Some(lower) = lower {
-        write!(f, [lower.format()])?;
-        if !is_simple {
-            write!(f, [space()])?;
-        }
-    }
-    write!(f, [text(":")])?;
-    if let Some(upper) = upper {
-        if !is_simple {
-            write!(f, [space()])?;
-        }
-        write!(f, [upper.format()])?;
-        if !is_simple && step.is_some() {
-            write!(f, [space()])?;
-        }
-    }
-    if let Some(step) = step {
-        if !is_simple && upper.is_some() {
-            write!(f, [space()])?;
-        }
-        write!(f, [text(":")])?;
-        if !is_simple {
-            write!(f, [space()])?;
-        }
-        write!(f, [step.format()])?;
+    // // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
+    let lower_is_simple = if let SliceSegmentKind::Index { value } = &lower.node {
+        is_simple_slice(value)
     } else {
-        let magic_trailing_colon = expr
-            .trivia
-            .iter()
-            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingColon));
-        if magic_trailing_colon {
-            if !is_simple && upper.is_some() {
-                write!(f, [space()])?;
+        true
+    };
+    let upper_is_simple = if let SliceSegmentKind::Index { value } = &upper.node {
+        is_simple_slice(value)
+    } else {
+        true
+    };
+    let step_is_simple = step.map_or(true, |step| {
+        if let SliceSegmentKind::Index { value } = &step.node {
+            is_simple_slice(value)
+        } else {
+            true
+        }
+    });
+    let is_simple = lower_is_simple && upper_is_simple && step_is_simple;
+
+    write!(
+        f,
+        [group(&format_with(|f| {
+            if let SliceSegmentKind::Index { value } = &lower.node {
+                write!(f, [value.format()])?;
+                if !is_simple {
+                    write!(f, [space()])?;
+                }
             }
             write!(f, [text(":")])?;
-        }
-    }
+
+            if let SliceSegmentKind::Index { value } = &upper.node {
+                if !is_simple {
+                    write!(f, [space()])?;
+                }
+                write!(f, [if_group_breaks(&soft_line_break())])?;
+                write!(f, [value.format()])?;
+            }
+
+            if let Some(step) = step {
+                if matches!(upper.node, SliceSegmentKind::Index { .. }) {
+                    if !is_simple {
+                        write!(f, [space()])?;
+                    }
+                }
+                write!(f, [text(":")])?;
+
+                if let SliceSegmentKind::Index { value } = &step.node {
+                    if !is_simple {
+                        write!(f, [space()])?;
+                    }
+                    write!(f, [if_group_breaks(&soft_line_break())])?;
+                    write!(f, [value.format()])?;
+                }
+            }
+            Ok(())
+        }))]
+    )?;
 
     Ok(())
 }
@@ -973,13 +990,9 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             ExprKind::Name { id, .. } => format_name(f, self.item, id),
             ExprKind::List { elts, .. } => format_list(f, self.item, elts),
             ExprKind::Tuple { elts, .. } => format_tuple(f, self.item, elts),
-            ExprKind::Slice { lower, upper, step } => format_slice(
-                f,
-                self.item,
-                lower.as_deref(),
-                upper.as_deref(),
-                step.as_deref(),
-            ),
+            ExprKind::Slice { lower, upper, step } => {
+                format_slice(f, self.item, lower, upper, step.as_ref())
+            }
             _ => {
                 unimplemented!("Implement ExprKind: {:?}", self.item.node)
             }
