@@ -280,9 +280,7 @@ fn docstring(
         },
         Range::new(start, end),
     );
-    if matches!(autofix, flags::Autofix::Enabled)
-        && settings.rules.should_fix(&Rule::BadQuotesDocstring)
-    {
+    if autofix.is_enabled() && settings.rules.should_fix(&Rule::BadQuotesDocstring) {
         let quote_count = if trivia.is_multiline { 3 } else { 1 };
         let string_contents = &trivia.raw_text[quote_count..trivia.raw_text.len() - quote_count];
         let quote = good_docstring(&quotes_settings.docstring_quotes).repeat(quote_count);
@@ -357,9 +355,7 @@ fn strings(
                 Range::new(*start, *end),
             );
 
-            if matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(&Rule::BadQuotesMultilineString)
-            {
+            if autofix.is_enabled() && settings.rules.should_fix(&Rule::BadQuotesMultilineString) {
                 let string_contents = &trivia.raw_text[3..trivia.raw_text.len() - 3];
                 let quote = good_multiline(&quotes_settings.multiline_quotes);
                 let mut fixed_contents = String::with_capacity(
@@ -389,7 +385,7 @@ fn strings(
                 {
                     let mut diagnostic =
                         Diagnostic::new(AvoidableEscapedQuote, Range::new(*start, *end));
-                    if matches!(autofix, flags::Autofix::Enabled)
+                    if autofix.is_enabled()
                         && settings.rules.should_fix(&Rule::AvoidableEscapedQuote)
                     {
                         let quote = bad_single(&quotes_settings.inline_quotes);
@@ -450,9 +446,7 @@ fn strings(
                     },
                     Range::new(*start, *end),
                 );
-                if matches!(autofix, flags::Autofix::Enabled)
-                    && settings.rules.should_fix(&Rule::BadQuotesInlineString)
-                {
+                if autofix.is_enabled() && settings.rules.should_fix(&Rule::BadQuotesInlineString) {
                     let quote = good_single(&quotes_settings.inline_quotes);
                     let mut fixed_contents =
                         String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);

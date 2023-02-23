@@ -42,10 +42,10 @@ pub fn check_physical_lines(
     let enforce_mixed_spaces_and_tabs = settings.rules.enabled(&Rule::MixedSpacesAndTabs);
     let enforce_bidirectional_unicode = settings.rules.enabled(&Rule::BidirectionalUnicode);
 
-    let fix_unnecessary_coding_comment = matches!(autofix, flags::Autofix::Enabled)
-        && settings.rules.should_fix(&Rule::UTF8EncodingDeclaration);
-    let fix_shebang_whitespace = matches!(autofix, flags::Autofix::Enabled)
-        && settings.rules.should_fix(&Rule::ShebangWhitespace);
+    let fix_unnecessary_coding_comment =
+        autofix.is_enabled() && settings.rules.should_fix(&Rule::UTF8EncodingDeclaration);
+    let fix_shebang_whitespace =
+        autofix.is_enabled() && settings.rules.should_fix(&Rule::ShebangWhitespace);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
@@ -145,8 +145,7 @@ pub fn check_physical_lines(
         if let Some(diagnostic) = no_newline_at_end_of_file(
             stylist,
             contents,
-            matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
+            autofix.is_enabled() && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
         ) {
             diagnostics.push(diagnostic);
         }

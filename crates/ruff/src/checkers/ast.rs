@@ -187,7 +187,7 @@ impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self, code: &Rule) -> bool {
-        matches!(self.autofix, flags::Autofix::Enabled) && self.settings.rules.should_fix(code)
+        self.autofix.is_enabled() && self.settings.rules.should_fix(code)
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
