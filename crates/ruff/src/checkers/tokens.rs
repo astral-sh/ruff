@@ -108,7 +108,7 @@ pub fn check_tokens(
                     locator,
                     *start,
                     *end,
-                    autofix.is_enabled() && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
+                    autofix.into() && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
                 ));
             }
         }
