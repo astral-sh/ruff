@@ -17,6 +17,7 @@ pub const BUILTINS: &[&str] = &[
     "Ellipsis",
     "EnvironmentError",
     "Exception",
+    "ExceptionGroup",
     "False",
     "FileExistsError",
     "FileNotFoundError",
