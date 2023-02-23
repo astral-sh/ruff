@@ -1,7 +1,7 @@
 Ruff can be configured via a `pyproject.toml` file, a `ruff.toml` file, or through the command line.
 
-For a complete enumeration of the available configuration options, see the
-[documentation](/docs/settings/).
+For a complete enumeration of the available configuration options, see
+[_Settings_](/docs/settings/).
 
 ### Configure via `pyproject.toml`
 
@@ -109,7 +109,7 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
   you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
   extension.
 * By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
-  consider turning off autofix for specific rules or categories (see: [FAQ](/docs/faq/#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
+  consider turning off autofix for specific rules or categories (see the [_FAQ_](/docs/faq/#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
 
 ### Configure via `ruff.toml`
 
@@ -133,7 +133,8 @@ unfixable = ["B"]
 "path/to/file.py" = ["E402"]
 ```
 
-For a full list of configurable options, see the [list of all options](/docs/settings/).
+For a complete enumeration of the available configuration options, see
+[_Settings_](/docs/settings/).
 
 ### Command-line interface
 
@@ -313,8 +314,8 @@ For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Rule resolution
 
-The set of enabled rules is controlled via the [`select`](/docs/settings#select)
-and [`ignore`](/docs/settings#ignore) settings, along with the
+The set of enabled rules is controlled via the [`select`](/docs/settings#select) and
+[`ignore`](/docs/settings#ignore) settings, along with the
 [`extend-select`](/docs/settings#extend-select) and
 [`extend-ignore`](/docs/settings#extend-ignore) modifiers.
 
@@ -337,8 +338,8 @@ ignore = ["F401"]
 
 Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no other rules.
 
-Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules, with
-the exception of `F401`.
+Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
+with the exception of `F401`.
 
 ### Suppressing errors
 
@@ -346,8 +347,9 @@ To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](/docs/s
 or [`extend-ignore`](/docs/settings#extend-ignore), either on the command-line
 or in your `pyproject.toml` file.
 
-To ignore a violation inline, Ruff uses a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
-To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
+To ignore a violation inline, Ruff uses a `noqa` system similar to
+[Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html). To ignore an individual
+violation, add `# noqa: {code}` to the end of the line, like so:
 
 ```python
 # Ignore F841.
@@ -394,17 +396,17 @@ equivalent to `# ruff: noqa`.
 Ruff supports several workflows to aid in `noqa` management.
 
 First, Ruff provides a special rule code, `RUF100`, to enforce that your `noqa` directives are
-"valid", in that the violations they _say_ they ignore are actually being triggered on that line (and
-thus suppressed). You can run `ruff check /path/to/file.py --extend-select RUF100` to flag unused `noqa`
-directives.
+"valid", in that the violations they _say_ they ignore are actually being triggered on that line
+(and thus suppressed). You can run `ruff check /path/to/file.py --extend-select RUF100` to flag
+unused `noqa` directives.
 
 Second, Ruff can _automatically remove_ unused `noqa` directives via its autofix functionality.
-You can run `ruff check /path/to/file.py --extend-select RUF100 --fix` to automatically remove unused
-`noqa` directives.
+You can run `ruff check /path/to/file.py --extend-select RUF100 --fix` to automatically remove
+unused `noqa` directives.
 
 Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This is useful when
-migrating a new codebase to Ruff. You can run `ruff check /path/to/file.py --add-noqa` to automatically
-add `noqa` directives to all failing lines, with the appropriate rule codes.
+migrating a new codebase to Ruff. You can run `ruff check /path/to/file.py --add-noqa` to
+automatically add `noqa` directives to all failing lines, with the appropriate rule codes.
 
 #### Action comments
 
@@ -453,4 +455,3 @@ As an example: to enable autocompletion for Zsh, run
 fpath+=~/.zfunc
 autoload -Uz compinit && compinit
 ```
-

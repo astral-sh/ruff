@@ -201,8 +201,8 @@ and in how Ruff and isort treat inline comments in some cases (see: [#1381](http
 Like isort, Ruff's import sorting is compatible with Black.
 
 Ruff does not yet support all of isort's configuration options, though it does support many of
-them. You can find the supported settings in the [API reference](https://beta.ruff.rs/docs/settings/#isort). For example, you can set
-`known-first-party` like so:
+them. You can find the supported settings in the [API reference](https://beta.ruff.rs/docs/settings/#isort).
+For example, you can set `known-first-party` like so:
 
 ```toml
 [tool.ruff]
@@ -317,8 +317,9 @@ have _complete_ certainty when making changes to code, even for the seemingly tr
 In the future, Ruff will support enabling autofix behavior based on the safety of the patch.
 
 In the meantime, if you find that the autofix is too aggressive, you can disable it on a per-rule or
-per-category basis using the [`unfixable`](https://beta.ruff.rs/docs/settings/#unfixable) mechanic. For example, to disable autofix
-for some possibly-unsafe rules, you could add the following to your `pyproject.toml`:
+per-category basis using the [`unfixable`](https://beta.ruff.rs/docs/settings/#unfixable) mechanic.
+For example, to disable autofix for some possibly-unsafe rules, you could add the following to your
+`pyproject.toml`:
 
 ```toml
 [tool.ruff]
