@@ -28,10 +28,7 @@ pub fn run_stdin(
             return Ok(Diagnostics::default());
         }
     }
-    let settings = match pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => settings,
-        PyprojectDiscovery::Hierarchical(settings) => settings,
-    };
+    let settings = pyproject_strategy.top_level_settings();
     let package_root = filename
         .and_then(Path::parent)
         .and_then(|path| packaging::detect_package_root(path, &settings.lib.namespace_packages));

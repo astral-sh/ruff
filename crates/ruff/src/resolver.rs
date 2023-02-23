@@ -19,7 +19,7 @@ use crate::settings::{pyproject, AllSettings, Settings};
 
 /// The strategy used to discover the relevant `pyproject.toml` file for each
 /// Python file.
-#[derive(Debug)]
+#[derive(Debug, is_macro::Is)]
 pub enum PyprojectDiscovery {
     /// Use a fixed `pyproject.toml` file for all Python files (i.e., one
     /// provided on the command-line).
@@ -222,7 +222,7 @@ pub fn python_files_in_path(
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
     let mut seen = FxHashSet::default();
-    if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
+    if pyproject_strategy.is_hierarchical() {
         for path in &paths {
             for ancestor in path.ancestors() {
                 if seen.insert(ancestor) {
@@ -271,7 +271,7 @@ pub fn python_files_in_path(
         Box::new(|result| {
             // Search for the `pyproject.toml` file in this directory, before we visit any
             // of its contents.
-            if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
+            if pyproject_strategy.is_hierarchical() {
                 if let Ok(entry) = &result {
                     if entry
                         .file_type()
@@ -366,7 +366,7 @@ pub fn python_file_at_path(
 
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::default();
-    if matches!(pyproject_strategy, PyprojectDiscovery::Hierarchical(..)) {
+    if pyproject_strategy.is_hierarchical() {
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
                 let (root, settings) =
