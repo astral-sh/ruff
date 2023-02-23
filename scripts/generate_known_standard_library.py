@@ -42,7 +42,7 @@ pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<(u32, u32), FxHashSet<&'static
         FxHashMap::from_iter([
 """,
     )
-    for (major, minor) in VERSIONS:
+    for major, minor in VERSIONS:
         version = f"{major}.{minor}"
         url = URL.format(version)
         invdata = fetch_inventory(FakeApp(), "", url)

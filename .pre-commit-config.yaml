@@ -46,5 +46,16 @@ repos:
         pass_filenames: false
         exclude: target
 
+  # Black
+  - repo: https://github.com/psf/black
+    rev: 23.1.0
+    hooks:
+      - id: black
+        exclude: |
+          (?x)^(
+            crates/ruff/resources/.*|
+            crates/ruff_python_formatter/resources/.*
+          )$
+
 ci:
   skip: [cargo-fmt, clippy, dev-generate-all]
