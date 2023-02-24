@@ -1,5 +1,6 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
 import argparse
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -89,8 +90,8 @@ def main() -> None:
     # Rewrite links to the documentation.
     for src, dst in LINK_REWRITES.items():
         content = content.replace(f"({src})", f"({dst})")
-    if "https://beta.ruff.rs" in content:
-        msg = "Unexpected absolute link to documentation"
+    if m := re.search(r"\(https://beta.ruff.rs/docs/.*\)", content):
+        msg = f"Unexpected absolute link to documentation: {m.group(0)}"
         raise ValueError(msg)
 
     Path("docs").mkdir(parents=True, exist_ok=True)
