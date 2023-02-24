@@ -146,15 +146,11 @@ pub fn unused_loop_control_variable(
         // applying the fix if doing so wouldn't actually cause us to ignore the
         // violation in the next pass.
         let rename = format!("_{name}");
-        let rename = if checker
+        let rename = checker
             .settings
             .dummy_variable_rgx
             .is_match(rename.as_str())
-        {
-            Some(rename)
-        } else {
-            None
-        };
+            .then_some(rename);
 
         let mut diagnostic = Diagnostic::new(
             UnusedLoopControlVariable {
