@@ -56,9 +56,9 @@ Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
 ```shell
-cargo fmt --all  # Auto-formatting...
+cargo fmt  # Auto-formatting...
 cargo clippy --fix --workspace --all-targets --all-features  # Linting...
-cargo test --all  # Testing...
+cargo test  # Testing...
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
@@ -135,7 +135,7 @@ Run `cargo dev generate-all` to generate the code for your new fixture. Then run
 locally with (e.g.) `cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `crates/ruff/src/[linter]/mod.rs` file. Then, run `cargo test --all`.
+`test_case` macro in the relevant `crates/ruff/src/[linter]/mod.rs` file. Then, run `cargo test`.
 Your test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the
 generated snapshot, then commit the snapshot file alongside the rest of your changes.
 
