@@ -202,7 +202,7 @@ def bar():
      pass
  
  
-@@ -87,18 +87,18 @@
+@@ -87,19 +87,19 @@
  
  # leading 1
  @deco1
@@ -223,33 +223,34 @@ def bar():
  
  def main():
      if a:
-+
          # Leading comment before inline function
++
          def inline():
              pass
-@@ -108,12 +108,14 @@
-             pass
+ 
+@@ -109,12 +109,14 @@
  
      else:
-+
          # More leading comments
++
          def inline_after_else():
              pass
  
  
  if a:
-+
      # Leading comment before "top-level inline" function
++
      def top_level_quote_inline():
          pass
-@@ -123,6 +125,7 @@
-         pass
+ 
+@@ -124,6 +126,7 @@
  
  else:
-+
      # More leading comments
++
      def top_level_quote_inline_after_else():
          pass
+ 
 @@ -138,9 +141,11 @@
  # Regression test for https://github.com/psf/black/issues/3454.
  def foo():
@@ -386,8 +387,8 @@ def decorated_with_split_leading_comments():
 
 def main():
     if a:
-
         # Leading comment before inline function
+
         def inline():
             pass
 
@@ -396,15 +397,15 @@ def main():
             pass
 
     else:
-
         # More leading comments
+
         def inline_after_else():
             pass
 
 
 if a:
-
     # Leading comment before "top-level inline" function
+
     def top_level_quote_inline():
         pass
 
@@ -413,8 +414,8 @@ if a:
         pass
 
 else:
-
     # More leading comments
+
     def top_level_quote_inline_after_else():
         pass
 

@@ -1,3 +1,7 @@
+use crate::core::locator::Locator;
+use crate::core::types::Range;
+use rustpython_parser::ast::Location;
+
 /// Return the leading quote for a string or byte literal (e.g., `"""`).
 pub fn leading_quote(content: &str) -> Option<&str> {
     if let Some(first_line) = content.lines().next() {
@@ -30,6 +34,25 @@ pub fn is_radix_literal(content: &str) -> bool {
         || content.starts_with("0B")
         || content.starts_with("0O")
         || content.starts_with("0X")
+}
+
+pub fn expand_indented_block(
+    location: Location,
+    end_location: Location,
+    locator: &Locator,
+) -> Location {
+    let contents = locator.contents();
+    let index = locator.index(end_location);
+    let offset = contents[index..]
+        .lines()
+        .skip(1)
+        .take_while(|line| {
+            line.chars()
+                .take(location.column())
+                .all(char::is_whitespace)
+        })
+        .count();
+    Location::new(end_location.row() + 1 + offset, 0)
 }
 
 #[cfg(test)]

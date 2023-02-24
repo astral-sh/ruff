@@ -1,5 +1,6 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use crate::core::helpers::expand_indented_block;
 use rustpython_parser::ast::{Constant, Location};
 use rustpython_parser::Mode;
 
@@ -157,12 +158,29 @@ impl From<rustpython_parser::ast::Cmpop> for Cmpop {
     }
 }
 
+pub type Body = Located<Vec<Stmt>>;
+
+impl From<(Vec<rustpython_parser::ast::Stmt>, &Locator<'_>)> for Body {
+    fn from((body, locator): (Vec<rustpython_parser::ast::Stmt>, &Locator)) -> Self {
+        Body {
+            location: body.first().unwrap().location,
+            end_location: body.last().unwrap().end_location,
+            node: body
+                .into_iter()
+                .map(|node| (node, locator).into())
+                .collect(),
+            trivia: vec![],
+            parentheses: Parenthesize::Never,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum StmtKind {
     FunctionDef {
         name: Ident,
         args: Box<Arguments>,
-        body: Vec<Stmt>,
+        body: Body,
         decorator_list: Vec<Expr>,
         returns: Option<Box<Expr>>,
         type_comment: Option<String>,
@@ -170,7 +188,7 @@ pub enum StmtKind {
     AsyncFunctionDef {
         name: Ident,
         args: Box<Arguments>,
-        body: Vec<Stmt>,
+        body: Body,
         decorator_list: Vec<Expr>,
         returns: Option<Box<Expr>>,
         type_comment: Option<String>,
@@ -179,7 +197,7 @@ pub enum StmtKind {
         name: Ident,
         bases: Vec<Expr>,
         keywords: Vec<Keyword>,
-        body: Vec<Stmt>,
+        body: Body,
         decorator_list: Vec<Expr>,
     },
     Return {
@@ -207,35 +225,35 @@ pub enum StmtKind {
     For {
         target: Box<Expr>,
         iter: Box<Expr>,
-        body: Vec<Stmt>,
-        orelse: Vec<Stmt>,
+        body: Body,
+        orelse: Option<Body>,
         type_comment: Option<String>,
     },
     AsyncFor {
         target: Box<Expr>,
         iter: Box<Expr>,
-        body: Vec<Stmt>,
-        orelse: Vec<Stmt>,
+        body: Body,
+        orelse: Option<Body>,
         type_comment: Option<String>,
     },
     While {
         test: Box<Expr>,
-        body: Vec<Stmt>,
-        orelse: Vec<Stmt>,
+        body: Body,
+        orelse: Option<Body>,
     },
     If {
         test: Box<Expr>,
-        body: Vec<Stmt>,
-        orelse: Vec<Stmt>,
+        body: Body,
+        orelse: Option<Body>,
     },
     With {
         items: Vec<Withitem>,
-        body: Vec<Stmt>,
+        body: Body,
         type_comment: Option<String>,
     },
     AsyncWith {
         items: Vec<Withitem>,
-        body: Vec<Stmt>,
+        body: Body,
         type_comment: Option<String>,
     },
     Match {
@@ -247,16 +265,16 @@ pub enum StmtKind {
         cause: Option<Box<Expr>>,
     },
     Try {
-        body: Vec<Stmt>,
+        body: Body,
         handlers: Vec<Excepthandler>,
-        orelse: Vec<Stmt>,
-        finalbody: Vec<Stmt>,
+        orelse: Option<Body>,
+        finalbody: Option<Body>,
     },
     TryStar {
-        body: Vec<Stmt>,
+        body: Body,
         handlers: Vec<Excepthandler>,
-        orelse: Vec<Stmt>,
-        finalbody: Vec<Stmt>,
+        orelse: Option<Body>,
+        finalbody: Option<Body>,
     },
     Assert {
         test: Box<Expr>,
@@ -417,7 +435,7 @@ pub enum ExcepthandlerKind {
     ExceptHandler {
         type_: Option<Box<Expr>>,
         name: Option<Ident>,
-        body: Vec<Stmt>,
+        body: Body,
     },
 }
 
@@ -479,7 +497,7 @@ pub struct Withitem {
 pub struct MatchCase {
     pub pattern: Pattern,
     pub guard: Option<Box<Expr>>,
-    pub body: Vec<Stmt>,
+    pub body: Body,
 }
 
 #[allow(clippy::enum_variant_names)]
@@ -555,10 +573,16 @@ impl From<(rustpython_parser::ast::Excepthandler, &Locator<'_>)> for Excepthandl
             node: ExcepthandlerKind::ExceptHandler {
                 type_: type_.map(|type_| Box::new((*type_, locator).into())),
                 name,
-                body: body
-                    .into_iter()
-                    .map(|node| (node, locator).into())
-                    .collect(),
+                body: Body {
+                    location: excepthandler.location,
+                    end_location: excepthandler.end_location,
+                    node: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    trivia: vec![],
+                    parentheses: Parenthesize::Always,
+                },
             },
             trivia: vec![],
             parentheses: Parenthesize::Never,
@@ -720,10 +744,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                         .into_iter()
                         .map(|node| (node, locator).into())
                         .collect(),
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
                     decorator_list: decorator_list
                         .into_iter()
                         .map(|node| (node, locator).into())
@@ -747,10 +768,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 node: StmtKind::FunctionDef {
                     name,
                     args: Box::new((*args, locator).into()),
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
                     decorator_list: decorator_list
                         .into_iter()
                         .map(|node| (node, locator).into())
@@ -764,16 +782,13 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
             rustpython_parser::ast::StmtKind::If { test, body, orelse } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
+                // .map(|end_location| {
+                // expand_indented_block(stmt.location, end_location, locator)
+                // }),
                 node: StmtKind::If {
                     test: Box::new((*test, locator).into()),
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    orelse: orelse
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
+                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -801,10 +816,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 node: StmtKind::AsyncFunctionDef {
                     name,
                     args: Box::new((*args, locator).into()),
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
                     decorator_list: decorator_list
                         .into_iter()
                         .map(|node| (node, locator).into())
@@ -867,14 +879,8 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 node: StmtKind::For {
                     target: Box::new((*target, locator).into()),
                     iter: Box::new((*iter, locator).into()),
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    orelse: orelse
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
+                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
                     type_comment,
                 },
                 trivia: vec![],
@@ -892,14 +898,8 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 node: StmtKind::AsyncFor {
                     target: Box::new((*target, locator).into()),
                     iter: Box::new((*iter, locator).into()),
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    orelse: orelse
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
+                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
                     type_comment,
                 },
                 trivia: vec![],
@@ -910,14 +910,8 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 end_location: stmt.end_location,
                 node: StmtKind::While {
                     test: Box::new((*test, locator).into()),
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    orelse: orelse
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
+                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -934,10 +928,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                         .into_iter()
                         .map(|node| (node, locator).into())
                         .collect(),
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
                     type_comment,
                 },
                 trivia: vec![],
@@ -955,10 +946,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                         .into_iter()
                         .map(|node| (node, locator).into())
                         .collect(),
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
                     type_comment,
                 },
                 trivia: vec![],
@@ -996,22 +984,13 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Try {
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
                     handlers: handlers
                         .into_iter()
                         .map(|node| (node, locator).into())
                         .collect(),
-                    orelse: orelse
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    finalbody: finalbody
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
+                    finalbody: (!finalbody.is_empty()).then(|| (finalbody, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1025,22 +1004,13 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::TryStar {
-                    body: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    body: (body, locator).into(),
                     handlers: handlers
                         .into_iter()
                         .map(|node| (node, locator).into())
                         .collect(),
-                    orelse: orelse
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    finalbody: finalbody
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
+                    finalbody: (!finalbody.is_empty()).then(|| (finalbody, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,

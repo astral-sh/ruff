@@ -108,6 +108,15 @@ impl<'a> Locator<'a> {
         self.index.get_or_init(|| index(self.contents))
     }
 
+    pub fn index(&self, location: Location) -> usize {
+        let index = self.get_or_init_index();
+        truncate(location, index, self.contents)
+    }
+
+    pub fn contents(&self) -> &str {
+        self.contents
+    }
+
     /// Slice the source code at a [`Range`].
     pub fn slice(&self, range: Range) -> (Rc<str>, usize, usize) {
         let index = self.get_or_init_index();
