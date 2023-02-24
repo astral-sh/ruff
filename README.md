@@ -147,9 +147,9 @@ alongside any other editor through the [Ruff LSP](https://github.com/charliermar
 
 ### Configuration
 
-Ruff can be configured via a `pyproject.toml` file, a `ruff.toml` file, or through the command line
-(see: [_Configuration_](https://beta.ruff.rs/docs/configuration/), or
-[_Settings_](https://beta.ruff.rs/docs/settings/) for a complete list of all configuration options).
+Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (see:
+[_Configuration_](https://beta.ruff.rs/docs/configuration/), or [_Settings_](https://beta.ruff.rs/docs/settings/)
+for a complete list of all configuration options).
 
 If left unspecified, the default configuration is equivalent to:
 
