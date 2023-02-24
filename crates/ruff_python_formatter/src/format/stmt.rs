@@ -26,11 +26,7 @@ fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatRe
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -189,11 +185,7 @@ fn format_func_def(
             dynamic_text(name, TextSize::default()),
             text("("),
             group(&soft_block_indent(&format_with(|f| {
-                if stmt
-                    .trivia
-                    .iter()
-                    .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma))
-                {
+                if stmt.trivia.iter().any(|c| c.kind.is_magic_trailing_comma()) {
                     write!(f, [expand_parent()])?;
                 }
                 write!(f, [args.format()])
@@ -212,11 +204,7 @@ fn format_func_def(
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -261,11 +249,7 @@ fn format_assign(
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -437,11 +421,7 @@ fn format_return(
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -585,10 +565,7 @@ fn format_import_from(
     if names.iter().any(|name| name.node.name == "*") {
         write!(f, [text("*")])?;
     } else {
-        let magic_trailing_comma = stmt
-            .trivia
-            .iter()
-            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+        let magic_trailing_comma = stmt.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
             f,
             [group(&format_args![
@@ -617,11 +594,7 @@ fn format_import_from(
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -666,11 +639,7 @@ fn format_expr(
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }

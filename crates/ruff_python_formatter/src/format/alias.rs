@@ -6,7 +6,6 @@ use crate::builders::literal;
 use crate::context::ASTFormatContext;
 use crate::cst::Alias;
 use crate::shared_traits::AsFormat;
-use crate::trivia::TriviaKind;
 
 pub struct FormatAlias<'a> {
     item: &'a Alias,
@@ -34,11 +33,7 @@ impl Format<ASTFormatContext<'_>> for FormatAlias<'_> {
         let mut first = true;
         for range in alias.trivia.iter().filter_map(|trivia| {
             if trivia.relationship.is_trailing() {
-                if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                    Some(range)
-                } else {
-                    None
-                }
+                trivia.kind.end_of_line_comment()
             } else {
                 None
             }

@@ -34,11 +34,7 @@ fn format_starred(
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -63,11 +59,7 @@ fn format_name(
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -146,10 +138,8 @@ fn format_tuple(
                     write!(
                         f,
                         [soft_block_indent(&format_with(|f| {
-                            let magic_trailing_comma = expr
-                                .trivia
-                                .iter()
-                                .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+                            let magic_trailing_comma =
+                                expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
                             let is_unbroken =
                                 expr.location.row() == expr.end_location.unwrap().row();
                             if magic_trailing_comma {
@@ -170,10 +160,8 @@ fn format_tuple(
                         }))]
                     )?;
                 } else {
-                    let magic_trailing_comma = expr
-                        .trivia
-                        .iter()
-                        .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+                    let magic_trailing_comma =
+                        expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
                     let is_unbroken = expr.location.row() == expr.end_location.unwrap().row();
                     if magic_trailing_comma {
                         write!(f, [expand_parent()])?;
@@ -257,11 +245,7 @@ fn format_slice(
             let mut first = true;
             for range in lower.trivia.iter().filter_map(|trivia| {
                 if trivia.relationship.is_trailing() {
-                    if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                        Some(range)
-                    } else {
-                        None
-                    }
+                    trivia.kind.end_of_line_comment()
                 } else {
                     None
                 }
@@ -296,11 +280,7 @@ fn format_slice(
             let mut first = true;
             for range in upper.trivia.iter().filter_map(|trivia| {
                 if trivia.relationship.is_trailing() {
-                    if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                        Some(range)
-                    } else {
-                        None
-                    }
+                    trivia.kind.end_of_line_comment()
                 } else {
                     None
                 }
@@ -343,11 +323,7 @@ fn format_slice(
                 let mut first = true;
                 for range in step.trivia.iter().filter_map(|trivia| {
                     if trivia.relationship.is_trailing() {
-                        if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                            Some(range)
-                        } else {
-                            None
-                        }
+                        trivia.kind.end_of_line_comment()
                     } else {
                         None
                     }
@@ -366,11 +342,7 @@ fn format_slice(
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -391,10 +363,7 @@ fn format_list(
 ) -> FormatResult<()> {
     write!(f, [text("[")])?;
     if !elts.is_empty() {
-        let magic_trailing_comma = expr
-            .trivia
-            .iter()
-            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+        let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
             f,
             [group(&format_args![soft_block_indent(&format_with(|f| {
@@ -429,10 +398,7 @@ fn format_set(
     } else {
         write!(f, [text("{")])?;
         if !elts.is_empty() {
-            let magic_trailing_comma = expr
-                .trivia
-                .iter()
-                .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+            let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
             write!(
                 f,
                 [group(&format_args![soft_block_indent(&format_with(|f| {
@@ -475,11 +441,7 @@ fn format_call(
         let mut first = true;
         for range in expr.trivia.iter().filter_map(|trivia| {
             if trivia.relationship.is_trailing() {
-                if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                    Some(range)
-                } else {
-                    None
-                }
+                trivia.kind.end_of_line_comment()
             } else {
                 None
             }
@@ -496,11 +458,7 @@ fn format_call(
         let mut first = true;
         for range in expr.trivia.iter().filter_map(|trivia| {
             if trivia.relationship.is_trailing() {
-                if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                    Some(range)
-                } else {
-                    None
-                }
+                trivia.kind.end_of_line_comment()
             } else {
                 None
             }
@@ -511,10 +469,7 @@ fn format_call(
             write!(f, [line_suffix(&literal(range))])?;
         }
 
-        let magic_trailing_comma = expr
-            .trivia
-            .iter()
-            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+        let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
             f,
             [group(&format_args![soft_block_indent(&format_with(|f| {
@@ -758,11 +713,7 @@ fn format_compare(
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -819,10 +770,7 @@ fn format_dict(
 ) -> FormatResult<()> {
     write!(f, [text("{")])?;
     if !keys.is_empty() {
-        let magic_trailing_comma = expr
-            .trivia
-            .iter()
-            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+        let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
             f,
             [soft_block_indent(&format_with(|f| {
@@ -890,11 +838,7 @@ fn format_attribute(
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -930,11 +874,7 @@ fn format_bool_op(
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
@@ -972,11 +912,7 @@ fn format_bin_op(
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
         if trivia.relationship.is_trailing() {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
+            trivia.kind.end_of_line_comment()
         } else {
             None
         }
