@@ -23,7 +23,7 @@ def test_error():
     """
 
     # recursive case
-    assert not (a or not (b or c))  # note that we only reduce once here
+    assert not (a or not (b or c))
     assert not (a or not (b and c))
 
     # detected, but no autofix for messages
