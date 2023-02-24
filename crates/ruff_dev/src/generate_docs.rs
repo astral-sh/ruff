@@ -134,7 +134,7 @@ Something [`else`][other].
 
 [other]: http://example.com.
 
-[mccabe.max-complexity]: ../../settings#max-complexity"
+[mccabe.max-complexity]: ../../settings#max-complexity\n"
         );
     }
 }
