@@ -1,6 +1,6 @@
 # Configuring Ruff
 
-Ruff can be configured through a `pyproject.toml` file, a `ruff.toml` file, or the command line.
+Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file.
 
 For a complete enumeration of the available configuration options, see
 [_Settings_](settings.md).
@@ -117,11 +117,11 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
 
 ## Using `ruff.toml`
 
-As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
-an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted).
+As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` (or `.ruff.toml`) file,
+which implements an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted).
 
 For example, the `pyproject.toml` described above would be represented via the following
-`ruff.toml`:
+`ruff.toml` (or `.ruff.toml`):
 
 ```toml
 # Enable flake8-bugbear (`B`) rules.
@@ -139,8 +139,7 @@ unfixable = ["B"]
 "path/to/file.py" = ["E402"]
 ```
 
-For a complete enumeration of the available configuration options, see
-[_Settings_](settings.md).
+For a complete enumeration of the available configuration options, see [_Settings_](settings.md).
 
 ## Command-line interface
 
@@ -302,8 +301,9 @@ extend = "../pyproject.toml"
 line-length = 100
 ```
 
-All of the above rules apply equivalently to `ruff.toml` files. If Ruff detects both a `ruff.toml`
-and `pyproject.toml` file, it will defer to the `ruff.toml`.
+All of the above rules apply equivalently to `ruff.toml` and `.ruff.toml`  files. If Ruff detects
+multiple configuration files in the same directory, the `.ruff.toml` file will take precedence over
+the `ruff.toml` file, and the `ruff.toml` file will take precedence over the `pyproject.toml` file.
 
 ## Python file discovery
 
