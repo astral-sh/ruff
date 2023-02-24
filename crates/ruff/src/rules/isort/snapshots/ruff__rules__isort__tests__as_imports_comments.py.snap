@@ -1,0 +1,22 @@
+---
+source: crates/ruff/src/rules/isort/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnsortedImports: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 16
+    column: 0
+  fix:
+    content: "from bar import (  # Comment on `bar`\n    Member,  # Comment on `Member`\n)\nfrom baz import Member as Alias  # Comment on `Alias`  # Comment on `baz`\nfrom bop import Member  # Comment on `Member`  # Comment on `bop`\nfrom foo import (  # Comment on `foo`\n    Member as Alias,  # Comment on `Alias`\n)\n"
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 16
+      column: 0
+  parent: ~
+
