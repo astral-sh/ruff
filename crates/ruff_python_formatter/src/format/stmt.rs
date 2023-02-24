@@ -12,7 +12,7 @@ use crate::cst::{
 use crate::format::builders::{block, join_names};
 use crate::format::helpers::is_self_closing;
 use crate::shared_traits::AsFormat;
-use crate::trivia::{Parenthesize, TriviaKind};
+use crate::trivia::TriviaKind;
 
 fn format_break(f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
     write!(f, [text("break")])
@@ -613,7 +613,7 @@ fn format_expr(
     stmt: &Stmt,
     expr: &Expr,
 ) -> FormatResult<()> {
-    if matches!(stmt.parentheses, Parenthesize::Always) {
+    if stmt.parentheses.is_always() {
         write!(
             f,
             [group(&format_args![

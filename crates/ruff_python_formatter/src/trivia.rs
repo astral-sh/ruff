@@ -84,7 +84,7 @@ pub enum Relationship {
     Dangling,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
 pub enum Parenthesize {
     /// Always parenthesize the statement or expression.
     Always,

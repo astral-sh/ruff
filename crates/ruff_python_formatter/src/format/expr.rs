@@ -128,7 +128,7 @@ fn format_tuple(
         write!(
             f,
             [group(&format_with(|f| {
-                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                if expr.parentheses.is_if_expanded() {
                     write!(f, [if_group_breaks(&text("("))])?;
                 }
                 if matches!(
@@ -178,7 +178,7 @@ fn format_tuple(
                         }
                     }
                 }
-                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                if expr.parentheses.is_if_expanded() {
                     write!(f, [if_group_breaks(&text(")"))])?;
                 }
                 Ok(())
@@ -940,7 +940,7 @@ fn format_unary_op(
             ExprKind::BoolOp { .. } | ExprKind::Compare { .. } | ExprKind::BinOp { .. }
         )
     {
-        let parenthesized = matches!(operand.parentheses, Parenthesize::Always);
+        let parenthesized = operand.parentheses.is_always();
         if !parenthesized {
             write!(f, [text("(")])?;
         }
@@ -992,7 +992,7 @@ fn format_if_exp(
 
 impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        if matches!(self.item.parentheses, Parenthesize::Always) {
+        if self.item.parentheses.is_always() {
             write!(f, [text("(")])?;
         }
 
@@ -1075,7 +1075,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             }
         }
 
-        if matches!(self.item.parentheses, Parenthesize::Always) {
+        if self.item.parentheses.is_always() {
             write!(f, [text(")")])?;
         }
 
