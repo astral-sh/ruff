@@ -68,7 +68,6 @@ define_violation!(
     /// ## Example
     ///
     /// ```python
-    /// # fmt: off
     /// z = "The quick brown fox jumps over the lazy "\
     ///     "dog."
     /// ```
@@ -76,7 +75,6 @@ define_violation!(
     /// Use instead:
     ///
     /// ```python
-    /// # fmt: off
     /// z = (
     ///     "The quick brown fox jumps over the lazy "
     ///     "dog."
@@ -110,7 +108,6 @@ define_violation!(
     /// ## Example
     ///
     /// ```python
-    /// # fmt: off
     /// z = (
     ///     "The quick brown fox jumps over the lazy "
     ///     + "dog"
@@ -120,7 +117,6 @@ define_violation!(
     /// Use instead:
     ///
     /// ```python
-    /// # fmt: off
     /// z = (
     ///     "The quick brown fox jumps over the lazy "
     ///     "dog"
