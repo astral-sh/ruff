@@ -33,18 +33,18 @@ FATHOM_SCRIPT: str = (
     "</script>"
 )
 
-
-# TODO(charlie): Either generalize this ("Fix all links to known pages based on the
-# sections above"), or stop auto-generating these sections, and just maintain two
-# copies of the documentation.
 LINK_REWRITES: dict[str, str] = {
     "https://beta.ruff.rs/docs/": "index.md",
     "https://beta.ruff.rs/docs/configuration/": "configuration.md",
-    "https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery": "configuration.md#pyprojecttoml-discovery",
+    "https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery": (
+        "configuration.md#pyprojecttoml-discovery"
+    ),
     "https://beta.ruff.rs/docs/contributing/": "contributing.md",
     "https://beta.ruff.rs/docs/editor-integrations/": "editor-integrations.md",
     "https://beta.ruff.rs/docs/faq/": "faq.md",
-    "https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8": "faq.md#how-does-ruff-compare-to-flake8",
+    "https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8": (
+        "faq.md#how-does-ruff-compare-to-flake8"
+    ),
     "https://beta.ruff.rs/docs/installation/": "installation.md",
     "https://beta.ruff.rs/docs/rules/": "rules.md",
     "https://beta.ruff.rs/docs/rules/#error-e": "rules.md#error-e",
@@ -81,7 +81,6 @@ def clean_file_content(content: str, title: str) -> str:
 
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
-
     subprocess.run(["cargo", "dev", "generate-docs"], check=True)
 
     with Path("README.md").open(encoding="utf8") as fp:
