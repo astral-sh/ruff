@@ -2172,8 +2172,9 @@ where
         // Pre-visit.
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
-                // Ex) Optional[...]
-                if !self.in_deferred_string_type_definition
+                // Ex) Optional[...], Union[...]
+                if self.in_type_definition
+                    && !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(&Rule::TypingUnion)
                     && (self.settings.target_version >= PythonVersion::Py310
