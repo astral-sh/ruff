@@ -1,4 +1,4 @@
-//! Discover Python files, and their corresponding `Settings`, from the
+//! Discover Python files, and their corresponding [`Settings`], from the
 //! filesystem.
 
 use std::collections::BTreeMap;
@@ -65,12 +65,12 @@ pub struct Resolver {
 }
 
 impl Resolver {
-    /// Add a resolved `Settings` under a given `PathBuf` scope.
+    /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
     pub fn add(&mut self, path: PathBuf, settings: AllSettings) {
         self.settings.insert(path, settings);
     }
 
-    /// Return the appropriate `AllSettings` for a given `Path`.
+    /// Return the appropriate [`AllSettings`] for a given [`Path`].
     pub fn resolve_all<'a>(
         &'a self,
         path: &Path,
@@ -97,7 +97,7 @@ impl Resolver {
         &self.resolve_all(path, strategy).lib
     }
 
-    /// Return an iterator over the resolved `Settings` in this `Resolver`.
+    /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn iter(&self) -> impl Iterator<Item = &AllSettings> {
         self.settings.values()
     }
@@ -112,8 +112,8 @@ impl ConfigProcessor for &NoOpProcessor {
     fn process_config(&self, _config: &mut Configuration) {}
 }
 
-/// Recursively resolve a `Configuration` from a `pyproject.toml` file at the
-/// specified `Path`.
+/// Recursively resolve a [`Configuration`] from a `pyproject.toml` file at the
+/// specified [`Path`].
 // TODO(charlie): This whole system could do with some caching. Right now, if a
 // configuration file extends another in the same path, we'll re-parse the same
 // file at least twice (possibly more than twice, since we'll also parse it when
@@ -161,26 +161,26 @@ pub fn resolve_configuration(
     Ok(configuration)
 }
 
-/// Extract the project root (scope) and `Settings` from a given
+/// Extract the project root (scope) and [`Settings`] from a given
 /// `pyproject.toml`.
 pub fn resolve_scoped_settings(
     pyproject: &Path,
     relativity: &Relativity,
     processor: impl ConfigProcessor,
 ) -> Result<(PathBuf, AllSettings)> {
-    let project_root = relativity.resolve(pyproject);
     let configuration = resolve_configuration(pyproject, relativity, processor)?;
+    let project_root = relativity.resolve(pyproject);
     let settings = AllSettings::from_configuration(configuration, &project_root)?;
     Ok((project_root, settings))
 }
 
-/// Extract the `Settings` from a given `pyproject.toml`.
+/// Extract the [`Settings`] from a given `pyproject.toml`.
 pub fn resolve_settings(pyproject: &Path, relativity: &Relativity) -> Result<AllSettings> {
     let (_project_root, settings) = resolve_scoped_settings(pyproject, relativity, &NoOpProcessor)?;
     Ok(settings)
 }
 
-/// Extract the `Settings` from a given `pyproject.toml` and process the
+/// Extract the [`Settings`] from a given `pyproject.toml` and process the
 /// configuration with the given [`ConfigProcessor`].
 pub fn resolve_settings_with_processor(
     pyproject: &Path,
@@ -197,18 +197,18 @@ fn match_exclusion(file_path: &str, file_basename: &str, exclusion: &globset::Gl
     exclusion.is_match(file_path) || exclusion.is_match(file_basename)
 }
 
-/// Return `true` if the `Path` appears to be that of a Python file.
+/// Return `true` if the [`Path`] appears to be that of a Python file.
 fn is_python_path(path: &Path) -> bool {
     path.extension()
         .map_or(false, |ext| ext == "py" || ext == "pyi")
 }
 
-/// Return `true` if the `Path` appears to be that of a Python interface definition file (`.pyi`).
+/// Return `true` if the [`Path`] appears to be that of a Python interface definition file (`.pyi`).
 pub fn is_interface_definition_path(path: &Path) -> bool {
     path.extension().map_or(false, |ext| ext == "pyi")
 }
 
-/// Return `true` if the `Entry` appears to be that of a Python file.
+/// Return `true` if the [`DirEntry`] appears to be that of a Python file.
 pub fn is_python_entry(entry: &DirEntry) -> bool {
     is_python_path(entry.path())
         && !entry
@@ -357,7 +357,7 @@ pub fn python_files_in_path(
     Ok((files.into_inner().unwrap(), resolver.into_inner().unwrap()))
 }
 
-/// Return `true` if the Python file at `Path` is _not_ excluded.
+/// Return `true` if the Python file at [`Path`] is _not_ excluded.
 pub fn python_file_at_path(
     path: &Path,
     pyproject_strategy: &PyprojectDiscovery,
@@ -386,7 +386,7 @@ pub fn python_file_at_path(
     Ok(!is_file_excluded(&path, &resolver, pyproject_strategy))
 }
 
-/// Return `true` if the given top-level `Path` should be excluded.
+/// Return `true` if the given top-level [`Path`] should be excluded.
 fn is_file_excluded(
     path: &Path,
     resolver: &Resolver,
