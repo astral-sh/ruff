@@ -15,34 +15,14 @@ impl From<fix::FixMode> for Autofix {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash)]
+#[derive(Debug, Copy, Clone, Hash, result_like::BoolLike)]
 pub enum Noqa {
     Enabled,
     Disabled,
 }
 
-impl From<bool> for Noqa {
-    fn from(value: bool) -> Self {
-        if value {
-            Self::Enabled
-        } else {
-            Self::Disabled
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, Hash)]
+#[derive(Debug, Copy, Clone, Hash, result_like::BoolLike)]
 pub enum Cache {
     Enabled,
     Disabled,
-}
-
-impl From<bool> for Cache {
-    fn from(value: bool) -> Self {
-        if value {
-            Self::Enabled
-        } else {
-            Self::Disabled
-        }
-    }
 }

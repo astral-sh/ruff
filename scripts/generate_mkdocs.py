@@ -28,10 +28,6 @@ SECTIONS: list[Section] = [
     Section("Contributing", "contributing.md", generated=True),
 ]
 
-DOCUMENTATION_LINK: str = (
-    "For more, see the [documentation](https://beta.ruff.rs/docs/)."
-)
-
 FATHOM_SCRIPT: str = (
     '<script src="https://cdn.usefathom.com/script.js" data-site="DUAEBFLB" defer>'
     "</script>"
@@ -45,12 +41,6 @@ def main() -> None:
 
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
-
-    # Remove the documentation link, since we're _in_ the docs.
-    if DOCUMENTATION_LINK not in content:
-        msg = "README.md is not in the expected format."
-        raise ValueError(msg)
-    content = content.replace(DOCUMENTATION_LINK, "")
 
     # Convert any inter-documentation links to relative links.
     content = content.replace("https://beta.ruff.rs", "")

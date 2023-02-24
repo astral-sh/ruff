@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
 use crate::rules::isort::types::Importable;
-use ruff_python::string;
+use ruff_python::str;
 
 use super::settings::RelativeImportsOrder;
 use super::types::EitherImport::{Import, ImportFrom};
@@ -31,7 +31,7 @@ fn prefix(
     } else if variables.contains(name) {
         // Ex) `variable`
         Prefix::Variables
-    } else if name.len() > 1 && string::is_upper(name) {
+    } else if name.len() > 1 && str::is_upper(name) {
         // Ex) `CONSTANT`
         Prefix::Constants
     } else if name.chars().next().map_or(false, char::is_uppercase) {

@@ -1,5 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::string;
+use ruff_python::str;
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::helpers::identifier_range;
@@ -52,7 +52,7 @@ pub fn camelcase_imported_as_lowercase(
     asname: &str,
     locator: &Locator,
 ) -> Option<Diagnostic> {
-    if helpers::is_camelcase(name) && string::is_lower(asname) {
+    if helpers::is_camelcase(name) && str::is_lower(asname) {
         return Some(Diagnostic::new(
             CamelcaseImportedAsLowercase {
                 name: name.to_string(),

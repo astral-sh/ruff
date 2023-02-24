@@ -1,6 +1,16 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+/// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
+pub const TRIPLE_QUOTE_PREFIXES: &[&str] = &[
+    "u\"\"\"", "u'''", "r\"\"\"", "r'''", "U\"\"\"", "U'''", "R\"\"\"", "R'''", "\"\"\"", "'''",
+];
+pub const SINGLE_QUOTE_PREFIXES: &[&str] = &[
+    "u\"", "u'", "r\"", "r'", "U\"", "U'", "R\"", "R'", "\"", "'",
+];
+pub const TRIPLE_QUOTE_SUFFIXES: &[&str] = &["\"\"\"", "'''"];
+pub const SINGLE_QUOTE_SUFFIXES: &[&str] = &["\"", "'"];
+
 pub static STRING_QUOTE_PREFIX_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r#"^(?i)[urb]*['"](?P<raw>.*)['"]$"#).unwrap());
 
@@ -43,7 +53,7 @@ pub fn strip_quotes_and_prefixes(s: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use crate::string::{is_lower, is_upper, strip_quotes_and_prefixes};
+    use crate::str::{is_lower, is_upper, strip_quotes_and_prefixes};
 
     #[test]
     fn test_is_lower() {

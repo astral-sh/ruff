@@ -5,7 +5,7 @@ use ruff::registry::{Linter, Rule, RuleNamespace, UpstreamCategory};
 use strum::IntoEnumIterator;
 
 const FIX_SYMBOL: &str = "🛠";
-const URL_PREFIX: &str = "https://beta.ruff.rs/docs/rules";
+const URL_PREFIX: &str = "/docs/rules";
 
 fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
     table_out.push_str("| Code | Name | Message | Fix |");
