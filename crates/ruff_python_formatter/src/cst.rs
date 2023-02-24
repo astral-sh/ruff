@@ -396,9 +396,9 @@ pub enum ExprKind {
         ctx: ExprContext,
     },
     Slice {
-        lower: SliceSegment,
-        upper: SliceSegment,
-        step: Option<SliceSegment>,
+        lower: SliceIndex,
+        upper: SliceIndex,
+        step: Option<SliceIndex>,
     },
 }
 
@@ -424,14 +424,14 @@ pub enum ExcepthandlerKind {
 pub type Excepthandler = Located<ExcepthandlerKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum SliceSegmentKind {
+pub enum SliceIndexKind {
     /// The index slot exists, but is empty.
     Empty,
     /// The index slot contains an expression.
     Index { value: Box<Expr> },
 }
 
-pub type SliceSegment = Located<SliceSegmentKind>;
+pub type SliceIndex = Located<SliceIndexKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
@@ -1417,7 +1417,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 parentheses: Parenthesize::Never,
             },
             rustpython_parser::ast::ExprKind::Slice { lower, upper, step } => {
-                // Locate the colon tokens.
+                // Locate the colon tokens, which indicate the number of index segments.
                 let (source, start, end) =
                     locator.slice(Range::new(expr.location, expr.end_location.unwrap()));
                 let tokens = rustpython_parser::lexer::lex_located(
@@ -1426,6 +1426,8 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                     expr.location,
                 );
 
+                // Find the first and (if it exists) second colon in the slice, avoiding any
+                // semicolons within nested slices, and any lambda expressions.
                 let mut first_colon = None;
                 let mut second_colon = None;
                 let mut lambda = 0;
@@ -1455,27 +1457,25 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                     }
                 }
 
-                let lower = SliceSegment::new(
+                let lower = SliceIndex::new(
                     expr.location,
                     first_colon.unwrap(),
-                    lower
-                        .map_or(SliceSegmentKind::Empty, |node| SliceSegmentKind::Index {
-                            value: Box::new((*node, locator).into()),
-                        }),
+                    lower.map_or(SliceIndexKind::Empty, |node| SliceIndexKind::Index {
+                        value: Box::new((*node, locator).into()),
+                    }),
                 );
-                let upper = SliceSegment::new(
+                let upper = SliceIndex::new(
                     first_colon.unwrap(),
                     second_colon.unwrap_or(expr.end_location.unwrap()),
-                    upper
-                        .map_or(SliceSegmentKind::Empty, |node| SliceSegmentKind::Index {
-                            value: Box::new((*node, locator).into()),
-                        }),
+                    upper.map_or(SliceIndexKind::Empty, |node| SliceIndexKind::Index {
+                        value: Box::new((*node, locator).into()),
+                    }),
                 );
                 let step = second_colon.map(|second_colon| {
-                    SliceSegment::new(
+                    SliceIndex::new(
                         second_colon,
                         expr.end_location.unwrap(),
-                        step.map_or(SliceSegmentKind::Empty, |node| SliceSegmentKind::Index {
+                        step.map_or(SliceIndexKind::Empty, |node| SliceIndexKind::Index {
                             value: Box::new((*node, locator).into()),
                         }),
                     )

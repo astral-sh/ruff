@@ -5,7 +5,7 @@ use rustpython_parser::Tok;
 
 use crate::core::types::Range;
 use crate::cst::{
-    Alias, Excepthandler, ExcepthandlerKind, Expr, ExprKind, SliceSegment, SliceSegmentKind, Stmt,
+    Alias, Excepthandler, ExcepthandlerKind, Expr, ExprKind, SliceIndex, SliceIndexKind, Stmt,
     StmtKind,
 };
 
@@ -16,7 +16,7 @@ pub enum Node<'a> {
     Expr(&'a Expr),
     Alias(&'a Alias),
     Excepthandler(&'a Excepthandler),
-    SliceSegment(&'a SliceSegment),
+    SliceIndex(&'a SliceIndex),
 }
 
 impl Node<'_> {
@@ -27,7 +27,7 @@ impl Node<'_> {
             Node::Expr(node) => node.id(),
             Node::Alias(node) => node.id(),
             Node::Excepthandler(node) => node.id(),
-            Node::SliceSegment(node) => node.id(),
+            Node::SliceIndex(node) => node.id(),
         }
     }
 }
@@ -37,7 +37,6 @@ pub enum TriviaTokenKind {
     OwnLineComment,
     EndOfLineComment,
     MagicTrailingComma,
-    MagicTrailingColon,
     EmptyLine,
     Parentheses,
 }
@@ -74,7 +73,6 @@ pub enum TriviaKind {
     /// ```
     EndOfLineComment(Range),
     MagicTrailingComma,
-    MagicTrailingColon,
     EmptyLine,
     Parentheses,
 }
@@ -107,10 +105,6 @@ impl Trivia {
         match token.kind {
             TriviaTokenKind::MagicTrailingComma => Self {
                 kind: TriviaKind::MagicTrailingComma,
-                relationship,
-            },
-            TriviaTokenKind::MagicTrailingColon => Self {
-                kind: TriviaKind::MagicTrailingColon,
                 relationship,
             },
             TriviaTokenKind::EmptyLine => Self {
@@ -612,10 +606,10 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 }
             }
             ExprKind::Slice { lower, upper, step } => {
-                result.push(Node::SliceSegment(lower));
-                result.push(Node::SliceSegment(upper));
+                result.push(Node::SliceIndex(lower));
+                result.push(Node::SliceIndex(upper));
                 if let Some(step) = step {
-                    result.push(Node::SliceSegment(step));
+                    result.push(Node::SliceIndex(step));
                 }
             }
         },
@@ -630,8 +624,8 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 result.push(Node::Stmt(stmt));
             }
         }
-        Node::SliceSegment(slice_segment) => {
-            if let SliceSegmentKind::Index { value } = &slice_segment.node {
+        Node::SliceIndex(slice_index) => {
+            if let SliceIndexKind::Index { value } = &slice_index.node {
                 result.push(Node::Expr(value));
             }
         }
@@ -675,7 +669,7 @@ pub fn decorate_token<'a>(
             Node::Expr(node) => node.location,
             Node::Alias(node) => node.location,
             Node::Excepthandler(node) => node.location,
-            Node::SliceSegment(node) => node.location,
+            Node::SliceIndex(node) => node.location,
             Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
         };
         let end = match &child {
@@ -683,7 +677,7 @@ pub fn decorate_token<'a>(
             Node::Expr(node) => node.end_location.unwrap(),
             Node::Alias(node) => node.end_location.unwrap(),
             Node::Excepthandler(node) => node.end_location.unwrap(),
-            Node::SliceSegment(node) => node.end_location.unwrap(),
+            Node::SliceIndex(node) => node.end_location.unwrap(),
             Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
         };
 
@@ -695,7 +689,7 @@ pub fn decorate_token<'a>(
                 Node::Expr(node) => node.location,
                 Node::Alias(node) => node.location,
                 Node::Excepthandler(node) => node.location,
-                Node::SliceSegment(node) => node.location,
+                Node::SliceIndex(node) => node.location,
                 Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
             };
             let existing_end = match &existing {
@@ -703,7 +697,7 @@ pub fn decorate_token<'a>(
                 Node::Expr(node) => node.end_location.unwrap(),
                 Node::Alias(node) => node.end_location.unwrap(),
                 Node::Excepthandler(node) => node.end_location.unwrap(),
-                Node::SliceSegment(node) => node.end_location.unwrap(),
+                Node::SliceIndex(node) => node.end_location.unwrap(),
                 Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
             };
             if start == existing_start && end == existing_end {
@@ -763,7 +757,7 @@ pub struct TriviaIndex {
     pub expr: FxHashMap<usize, Vec<Trivia>>,
     pub alias: FxHashMap<usize, Vec<Trivia>>,
     pub excepthandler: FxHashMap<usize, Vec<Trivia>>,
-    pub slice_segment: FxHashMap<usize, Vec<Trivia>>,
+    pub slice_index: FxHashMap<usize, Vec<Trivia>>,
 }
 
 fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
@@ -797,9 +791,9 @@ fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
                 .or_insert_with(Vec::new)
                 .push(comment);
         }
-        Node::SliceSegment(node) => {
+        Node::SliceIndex(node) => {
             trivia
-                .slice_segment
+                .slice_index
                 .entry(node.id())
                 .or_insert_with(Vec::new)
                 .push(comment);
@@ -878,7 +872,7 @@ pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaI
                     unreachable!("Attach token to the ast: {:?}", token);
                 }
             }
-            TriviaTokenKind::MagicTrailingComma | TriviaTokenKind::MagicTrailingColon => {
+            TriviaTokenKind::MagicTrailingComma => {
                 if let Some(enclosing_node) = enclosing_node {
                     add_comment(
                         Trivia::from_token(&token, Relationship::Trailing),
