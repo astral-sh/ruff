@@ -759,6 +759,7 @@ impl Linter {
     }
 }
 
+#[derive(is_macro::Is)]
 pub enum LintSource {
     Ast,
     Io,
@@ -766,7 +767,7 @@ pub enum LintSource {
     LogicalLines,
     Tokens,
     Imports,
-    NoQa,
+    Noqa,
     Filesystem,
 }
 
@@ -775,7 +776,7 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> &'static LintSource {
         match self {
-            Rule::UnusedNOQA => &LintSource::NoQa,
+            Rule::UnusedNOQA => &LintSource::Noqa,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::DocLineTooLong

@@ -6,7 +6,6 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::registry::LintSource;
 use crate::settings::Settings;
 
 bitflags! {
@@ -21,7 +20,7 @@ impl Flags {
         if settings
             .rules
             .iter_enabled()
-            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports))
+            .any(|rule_code| rule_code.lint_source().is_imports())
         {
             Self::NOQA | Self::ISORT
         } else {

@@ -20,7 +20,7 @@ use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::{add_noqa, rule_is_ignored};
-use crate::registry::{Diagnostic, LintSource, Rule};
+use crate::registry::{Diagnostic, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
@@ -81,7 +81,7 @@ pub fn check_path(
     if settings
         .rules
         .iter_enabled()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Tokens))
+        .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
     }
@@ -90,7 +90,7 @@ pub fn check_path(
     if settings
         .rules
         .iter_enabled()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Filesystem))
+        .any(|rule_code| rule_code.lint_source().is_filesystem())
     {
         diagnostics.extend(check_file_path(path, package, settings));
     }
@@ -99,7 +99,7 @@ pub fn check_path(
     if settings
         .rules
         .iter_enabled()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::LogicalLines))
+        .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
         diagnostics.extend(check_logical_lines(&tokens, locator, stylist, settings));
     }
@@ -108,12 +108,12 @@ pub fn check_path(
     let use_ast = settings
         .rules
         .iter_enabled()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Ast));
+        .any(|rule_code| rule_code.lint_source().is_ast());
     let use_imports = !directives.isort.skip_file
         && settings
             .rules
             .iter_enabled()
-            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::Imports));
+            .any(|rule_code| rule_code.lint_source().is_imports());
     if use_ast || use_imports || use_doc_lines {
         match ruff_rustpython::parse_program_tokens(tokens, &path.to_string_lossy()) {
             Ok(python_ast) => {
@@ -177,7 +177,7 @@ pub fn check_path(
     if settings
         .rules
         .iter_enabled()
-        .any(|rule_code| matches!(rule_code.lint_source(), LintSource::PhysicalLines))
+        .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
             path,
@@ -203,7 +203,7 @@ pub fn check_path(
         || settings
             .rules
             .iter_enabled()
-            .any(|rule_code| matches!(rule_code.lint_source(), LintSource::NoQa))
+            .any(|rule_code| rule_code.lint_source().is_noqa())
     {
         check_noqa(
             &mut diagnostics,

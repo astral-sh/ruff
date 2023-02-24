@@ -23,7 +23,7 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
-use crate::ast::types::{BindingKind, Range, RefEquality};
+use crate::ast::types::{Range, RefEquality};
 use crate::ast::visitor::Visitor;
 use crate::ast::{helpers, visitor};
 use crate::checkers::ast::Checker;
@@ -185,7 +185,7 @@ pub fn unused_loop_control_variable(
                             .and_then(|source| (source == &RefEquality(stmt)).then_some(binding))
                     });
                 if let Some(binding) = binding {
-                    if matches!(binding.kind, BindingKind::LoopVar) {
+                    if binding.kind.is_loop_var() {
                         if !binding.used() {
                             diagnostic.amend(Fix::replacement(
                                 rename,
