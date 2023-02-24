@@ -7,6 +7,9 @@ logging.warning("Hello %s", "World!", "again", something="else")
 
 logging.warning("Hello %s", "World!")
 
+# do not handle calls without any args
+logging.info("100% dynamic")
+
 import warning
 
 warning.warning("Hello %s %s", "World!")
