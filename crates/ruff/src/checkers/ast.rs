@@ -4200,8 +4200,8 @@ impl<'a> Checker<'a> {
 
         let scope = self.current_scope();
         let binding = if let Some(index) = scope.bindings.get(&name) {
-            let b = &self.bindings[*index];
-            match &b.kind {
+            let existing = &self.bindings[*index];
+            match &existing.kind {
                 BindingKind::Builtin => {
                     // Avoid overriding builtins.
                     binding
@@ -4210,17 +4210,17 @@ impl<'a> Checker<'a> {
                     // If the original binding was a global or nonlocal, and the new binding conflicts within
                     // the current scope, then the new binding is also as the same.
                     Binding {
-                        runtime_usage: b.runtime_usage,
-                        synthetic_usage: b.synthetic_usage,
-                        typing_usage: b.typing_usage,
+                        runtime_usage: existing.runtime_usage,
+                        synthetic_usage: existing.synthetic_usage,
+                        typing_usage: existing.typing_usage,
                         kind: kind.clone(),
                         ..binding
                     }
                 }
                 _ => Binding {
-                    runtime_usage: b.runtime_usage,
-                    synthetic_usage: b.synthetic_usage,
-                    typing_usage: b.typing_usage,
+                    runtime_usage: existing.runtime_usage,
+                    synthetic_usage: existing.synthetic_usage,
+                    typing_usage: existing.typing_usage,
                     ..binding
                 },
             }

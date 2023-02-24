@@ -203,7 +203,7 @@ pub fn check_path(
         || settings
             .rules
             .iter_enabled()
-            .any(|rule_code| rule_code.lint_source().is_no_qa())
+            .any(|rule_code| rule_code.lint_source().is_noqa())
     {
         check_noqa(
             &mut diagnostics,
