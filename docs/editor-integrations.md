@@ -194,6 +194,11 @@ Ruff should then appear as a runnable action:
 Ruff is also available as the [Ruff](https://plugins.jetbrains.com/plugin/20574-ruff) plugin on the
 IntelliJ Marketplace (maintained by @koxudaxi).
 
+## TextMate (Unofficial)
+
+Ruff is also available via the [`textmate2-ruff-linter`](https://github.com/vigo/textmate2-ruff-linter)
+bundle for TextMate.
+
 ## GitHub Actions
 
 GitHub Actions has everything you need to run Ruff out-of-the-box:
