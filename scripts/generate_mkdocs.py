@@ -1,5 +1,6 @@
 """Generate an MkDocs-compatible `docs` and `mkdocs.yml` from the README.md."""
 import argparse
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -33,9 +34,28 @@ FATHOM_SCRIPT: str = (
     "</script>"
 )
 
+LINK_REWRITES: dict[str, str] = {
+    "https://beta.ruff.rs/docs/": "index.md",
+    "https://beta.ruff.rs/docs/configuration/": "configuration.md",
+    "https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery": (
+        "configuration.md#pyprojecttoml-discovery"
+    ),
+    "https://beta.ruff.rs/docs/contributing/": "contributing.md",
+    "https://beta.ruff.rs/docs/editor-integrations/": "editor-integrations.md",
+    "https://beta.ruff.rs/docs/faq/": "faq.md",
+    "https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8": (
+        "faq.md#how-does-ruff-compare-to-flake8"
+    ),
+    "https://beta.ruff.rs/docs/installation/": "installation.md",
+    "https://beta.ruff.rs/docs/rules/": "rules.md",
+    "https://beta.ruff.rs/docs/rules/#error-e": "rules.md#error-e",
+    "https://beta.ruff.rs/docs/settings/": "settings.md",
+    "https://beta.ruff.rs/docs/usage/": "usage.md",
+}
+
 
 def clean_file_content(content: str, title: str) -> str:
-    """Add missing title, fix the headers depth, and remove trailing empty lines."""
+    """Add missing title, fix the header depth, and remove trailing empty lines."""
     lines = content.splitlines()
     if lines[0].startswith("# "):
         return content
@@ -62,14 +82,17 @@ def clean_file_content(content: str, title: str) -> str:
 
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
-
     subprocess.run(["cargo", "dev", "generate-docs"], check=True)
 
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
 
-    # Convert any inter-documentation links to relative links.
-    content = content.replace("https://beta.ruff.rs", "")
+    # Rewrite links to the documentation.
+    for src, dst in LINK_REWRITES.items():
+        content = content.replace(f"({src})", f"({dst})")
+    if m := re.search(r"\(https://beta.ruff.rs/docs/.*\)", content):
+        msg = f"Unexpected absolute link to documentation: {m.group(0)}"
+        raise ValueError(msg)
 
     Path("docs").mkdir(parents=True, exist_ok=True)
 
@@ -107,6 +130,7 @@ def main() -> None:
                         ["cargo", "dev", "generate-rules-table"],
                         encoding="utf-8",
                     )
+
             f.write(clean_file_content(file_content, title))
 
     # Add the nav section to mkdocs.yml.

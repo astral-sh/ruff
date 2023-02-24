@@ -3,7 +3,7 @@
 Ruff can be configured through a `pyproject.toml` file, a `ruff.toml` file, or the command line.
 
 For a complete enumeration of the available configuration options, see
-[_Settings_](/docs/settings/).
+[_Settings_](settings.md).
 
 ## Using `pyproject.toml`
 
@@ -92,7 +92,7 @@ docstring-quotes = "double"
 ```
 
 For a complete enumeration of the available configuration options, see
-[_Settings_](/docs/settings/).
+[_Settings_](settings.md).
 
 Ruff mirrors Flake8's rule code system, in which each rule code consists of a one-to-three letter
 prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
@@ -113,7 +113,7 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
   you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
   extension.
 * By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
-  consider turning off autofix for specific rules or categories (see the [_FAQ_](/docs/faq/#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
+  consider turning off autofix for specific rules or categories (see [_FAQ_](faq.md#ruff-tried-to-fix-something--but-it-broke-my-code)).
 
 ## Using `ruff.toml`
 
@@ -140,7 +140,7 @@ unfixable = ["B"]
 ```
 
 For a complete enumeration of the available configuration options, see
-[_Settings_](/docs/settings/).
+[_Settings_](settings.md).
 
 ## Command-line interface
 
@@ -292,7 +292,7 @@ There are a few exceptions to these rules:
 Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
 Ruff does not merge settings across configuration files; instead, the "closest" configuration file
 is used, and any parent configuration files are ignored. In lieu of this implicit cascade, Ruff
-supports an [`extend`](/docs/settings#extend) field, which allows you to inherit the settings from another
+supports an [`extend`](settings.md#extend) field, which allows you to inherit the settings from another
 `pyproject.toml` file, like so:
 
 ```toml
@@ -308,22 +308,22 @@ and `pyproject.toml` file, it will defer to the `ruff.toml`.
 ## Python file discovery
 
 When passed a path on the command-line, Ruff will automatically discover all Python files in that
-path, taking into account the [`exclude`](/docs/settings#exclude) and
-[`extend-exclude`](/docs/settings#extend-exclude) settings in each directory's
+path, taking into account the [`exclude`](settings.md#exclude) and
+[`extend-exclude`](settings.md#extend-exclude) settings in each directory's
 `pyproject.toml` file.
 
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
-`.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](/docs/settings#respect-gitignore)).
+`.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](settings.md#respect-gitignore)).
 
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
 For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ## Rule selection
 
-The set of enabled rules is controlled via the [`select`](/docs/settings#select) and
-[`ignore`](/docs/settings#ignore) settings, along with the
-[`extend-select`](/docs/settings#extend-select) and
-[`extend-ignore`](/docs/settings#extend-ignore) modifiers.
+The set of enabled rules is controlled via the [`select`](settings.md#select) and
+[`ignore`](settings.md#ignore) settings, along with the
+[`extend-select`](settings.md#extend-select) and
+[`extend-ignore`](settings.md#extend-ignore) modifiers.
 
 To resolve the enabled rule set, Ruff may need to reconcile `select` and `ignore` from a variety
 of sources, including the current `pyproject.toml`, any inherited `pyproject.toml` files, and the
@@ -349,8 +349,8 @@ with the exception of `F401`.
 
 ## Error suppression
 
-To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](/docs/settings#ignore)
-or [`extend-ignore`](/docs/settings#extend-ignore), either on the command-line
+To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](settings.md#ignore)
+or [`extend-ignore`](settings.md#extend-ignore), either on the command-line
 or in your `pyproject.toml` file.
 
 To ignore a violation inline, Ruff uses a `noqa` system similar to
@@ -391,7 +391,7 @@ like so:
 # ruff: noqa: F841
 ```
 
-Or see the [`per-file-ignores`](/docs/settings#per-file-ignores) configuration
+Or see the [`per-file-ignores`](settings.md#per-file-ignores) configuration
 setting, which enables the same functionality via a `pyproject.toml` file.
 
 Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
