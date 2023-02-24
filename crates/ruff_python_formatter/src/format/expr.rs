@@ -17,7 +17,7 @@ use crate::format::helpers::{is_self_closing, is_simple_power, is_simple_slice};
 use crate::format::numbers::{complex_literal, float_literal, int_literal};
 use crate::format::strings::string_literal;
 use crate::shared_traits::AsFormat;
-use crate::trivia::{Parenthesize, Relationship, TriviaKind};
+use crate::trivia::{Parenthesize, TriviaKind};
 
 pub struct FormatExpr<'a> {
     item: &'a Expr,
@@ -33,7 +33,7 @@ fn format_starred(
     // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -62,7 +62,7 @@ fn format_name(
     // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -96,7 +96,7 @@ fn format_subscript(
 
             // Apply any dangling comments.
             for trivia in &expr.trivia {
-                if matches!(trivia.relationship, Relationship::Dangling) {
+                if trivia.relationship.is_dangling() {
                     if let TriviaKind::OwnLineComment(range) = trivia.kind {
                         write!(f, [expand_parent()])?;
                         write!(f, [hard_line_break()])?;
@@ -236,7 +236,7 @@ fn format_slice(
 
             // Apply any dangling comments.
             for trivia in &lower.trivia {
-                if matches!(trivia.relationship, Relationship::Dangling) {
+                if trivia.relationship.is_dangling() {
                     if let TriviaKind::OwnLineComment(range) = trivia.kind {
                         write!(f, [expand_parent()])?;
                         write!(f, [hard_line_break()])?;
@@ -256,7 +256,7 @@ fn format_slice(
             // Format any end-of-line comments.
             let mut first = true;
             for range in lower.trivia.iter().filter_map(|trivia| {
-                if matches!(trivia.relationship, Relationship::Trailing) {
+                if trivia.relationship.is_trailing() {
                     if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                         Some(range)
                     } else {
@@ -282,7 +282,7 @@ fn format_slice(
 
             // Apply any dangling comments.
             for trivia in &upper.trivia {
-                if matches!(trivia.relationship, Relationship::Dangling) {
+                if trivia.relationship.is_dangling() {
                     if let TriviaKind::OwnLineComment(range) = trivia.kind {
                         write!(f, [expand_parent()])?;
                         write!(f, [hard_line_break()])?;
@@ -295,7 +295,7 @@ fn format_slice(
             // Format any end-of-line comments.
             let mut first = true;
             for range in upper.trivia.iter().filter_map(|trivia| {
-                if matches!(trivia.relationship, Relationship::Trailing) {
+                if trivia.relationship.is_trailing() {
                     if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                         Some(range)
                     } else {
@@ -329,7 +329,7 @@ fn format_slice(
 
                 // Apply any dangling comments.
                 for trivia in &step.trivia {
-                    if matches!(trivia.relationship, Relationship::Dangling) {
+                    if trivia.relationship.is_dangling() {
                         if let TriviaKind::OwnLineComment(range) = trivia.kind {
                             write!(f, [expand_parent()])?;
                             write!(f, [hard_line_break()])?;
@@ -342,7 +342,7 @@ fn format_slice(
                 // Format any end-of-line comments.
                 let mut first = true;
                 for range in step.trivia.iter().filter_map(|trivia| {
-                    if matches!(trivia.relationship, Relationship::Trailing) {
+                    if trivia.relationship.is_trailing() {
                         if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                             Some(range)
                         } else {
@@ -365,7 +365,7 @@ fn format_slice(
     // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -474,7 +474,7 @@ fn format_call(
         // Format any end-of-line comments.
         let mut first = true;
         for range in expr.trivia.iter().filter_map(|trivia| {
-            if matches!(trivia.relationship, Relationship::Trailing) {
+            if trivia.relationship.is_trailing() {
                 if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                     Some(range)
                 } else {
@@ -495,7 +495,7 @@ fn format_call(
         // Format any end-of-line comments.
         let mut first = true;
         for range in expr.trivia.iter().filter_map(|trivia| {
-            if matches!(trivia.relationship, Relationship::Trailing) {
+            if trivia.relationship.is_trailing() {
                 if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                     Some(range)
                 } else {
@@ -560,7 +560,7 @@ fn format_call(
 
                 // Apply any dangling trailing comments.
                 for trivia in &expr.trivia {
-                    if matches!(trivia.relationship, Relationship::Dangling) {
+                    if trivia.relationship.is_dangling() {
                         if let TriviaKind::OwnLineComment(range) = trivia.kind {
                             write!(f, [expand_parent()])?;
                             write!(f, [hard_line_break()])?;
@@ -757,7 +757,7 @@ fn format_compare(
     // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -889,7 +889,7 @@ fn format_attribute(
     // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -929,7 +929,7 @@ fn format_bool_op(
     // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -971,7 +971,7 @@ fn format_bin_op(
     // Format any end-of-line comments.
     let mut first = true;
     for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -1062,7 +1062,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
 
         // Any leading comments come on the line before.
         for trivia in &self.item.trivia {
-            if matches!(trivia.relationship, Relationship::Leading) {
+            if trivia.relationship.is_leading() {
                 if let TriviaKind::OwnLineComment(range) = trivia.kind {
                     write!(f, [expand_parent()])?;
                     write!(f, [literal(range)])?;
@@ -1130,7 +1130,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
 
         // Any trailing comments come on the lines after.
         for trivia in &self.item.trivia {
-            if matches!(trivia.relationship, Relationship::Trailing) {
+            if trivia.relationship.is_trailing() {
                 if let TriviaKind::OwnLineComment(range) = trivia.kind {
                     write!(f, [expand_parent()])?;
                     write!(f, [literal(range)])?;

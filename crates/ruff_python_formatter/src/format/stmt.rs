@@ -12,7 +12,7 @@ use crate::cst::{
 use crate::format::builders::{block, join_names};
 use crate::format::helpers::is_self_closing;
 use crate::shared_traits::AsFormat;
-use crate::trivia::{Parenthesize, Relationship, TriviaKind};
+use crate::trivia::{Parenthesize, TriviaKind};
 
 fn format_break(f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
     write!(f, [text("break")])
@@ -25,7 +25,7 @@ fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatRe
     // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -211,7 +211,7 @@ fn format_func_def(
     // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -260,7 +260,7 @@ fn format_assign(
     // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -436,7 +436,7 @@ fn format_return(
     // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -616,7 +616,7 @@ fn format_import_from(
     // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -665,7 +665,7 @@ fn format_expr(
     // Format any end-of-line comments.
     let mut first = true;
     for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
+        if trivia.relationship.is_trailing() {
             if let TriviaKind::EndOfLineComment(range) = trivia.kind {
                 Some(range)
             } else {
@@ -730,7 +730,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         // Any leading comments come on the line before.
         for trivia in &self.item.trivia {
-            if matches!(trivia.relationship, Relationship::Leading) {
+            if trivia.relationship.is_leading() {
                 match trivia.kind {
                     TriviaKind::EmptyLine => {
                         write!(f, [empty_line()])?;
@@ -886,7 +886,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
 
         // Any trailing comments come on the lines after.
         for trivia in &self.item.trivia {
-            if matches!(trivia.relationship, Relationship::Trailing) {
+            if trivia.relationship.is_trailing() {
                 match trivia.kind {
                     TriviaKind::EmptyLine => {
                         write!(f, [empty_line()])?;

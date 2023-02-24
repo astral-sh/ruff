@@ -4,7 +4,7 @@ use ruff_text_size::TextRange;
 
 use crate::context::ASTFormatContext;
 use crate::core::types::Range;
-use crate::trivia::{Relationship, Trivia, TriviaKind};
+use crate::trivia::{Trivia, TriviaKind};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Literal {
@@ -36,7 +36,7 @@ pub struct LeadingComments<'a> {
 impl Format<ASTFormatContext<'_>> for LeadingComments<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         for comment in self.comments {
-            if matches!(comment.relationship, Relationship::Leading) {
+            if comment.relationship.is_leading() {
                 if let TriviaKind::OwnLineComment(range) = comment.kind {
                     write!(f, [hard_line_break()])?;
                     write!(f, [literal(range)])?;
@@ -60,7 +60,7 @@ pub struct TrailingComments<'a> {
 impl Format<ASTFormatContext<'_>> for TrailingComments<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         for comment in self.comments {
-            if matches!(comment.relationship, Relationship::Trailing) {
+            if comment.relationship.is_trailing() {
                 if let TriviaKind::OwnLineComment(range) = comment.kind {
                     write!(f, [hard_line_break()])?;
                     write!(f, [literal(range)])?;
