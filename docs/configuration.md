@@ -3,7 +3,7 @@
 Ruff can be configured through a `pyproject.toml` file, a `ruff.toml` file, or the command line.
 
 For a complete enumeration of the available configuration options, see
-[_Settings_](/docs/settings/).
+[_Settings_](https://beta.ruff.rs/docs/settings/).
 
 ### Using `pyproject.toml`
 
@@ -92,7 +92,7 @@ docstring-quotes = "double"
 ```
 
 For a complete enumeration of the available configuration options, see
-[_Settings_](/docs/settings/).
+[_Settings_](https://beta.ruff.rs/docs/settings/).
 
 Ruff mirrors Flake8's rule code system, in which each rule code consists of a one-to-three letter
 prefix, followed by three digits (e.g., `F401`). The prefix indicates that "source" of the rule
@@ -113,7 +113,7 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
   you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
   extension.
 * By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
-  consider turning off autofix for specific rules or categories (see the [_FAQ_](/docs/faq/#ruff-tried-to-fix-something-but-it-broke-my-code-what-should-i-do)).
+  consider turning off autofix for specific rules or categories (see the [_FAQ_](https://beta.ruff.rs/docs/faq/#ruff-tried-to-fix-something-but-it-broke-my-code).
 
 ### Using `ruff.toml`
 
