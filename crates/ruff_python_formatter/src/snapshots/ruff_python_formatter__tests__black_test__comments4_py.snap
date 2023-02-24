@@ -107,17 +107,6 @@ def foo3(list_a, list_b):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,8 +1,8 @@
- from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
--    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
-+    MyLovelyCompanyTeamProjectComponent,
- )
- from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
--    MyLovelyCompanyTeamProjectComponent as component,  # DRY
-+    MyLovelyCompanyTeamProjectComponent as component,
- )
- 
- 
 @@ -10,39 +10,50 @@
      @pytest.mark.parametrize(
          ("post_data", "message"),
@@ -249,10 +238,10 @@ def foo3(list_a, list_b):
 
 ```py
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
-    MyLovelyCompanyTeamProjectComponent,
+    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
 )
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
-    MyLovelyCompanyTeamProjectComponent as component,
+    MyLovelyCompanyTeamProjectComponent as component,  # DRY
 )
 
 
