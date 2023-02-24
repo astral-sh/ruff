@@ -24,16 +24,11 @@ impl Violation for UnpackInsteadOfConcatenatingToCollectionLiteral {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnpackInsteadOfConcatenatingToCollectionLiteral { fixable, .. } = self;
-        if *fixable {
-            Some(
-                |UnpackInsteadOfConcatenatingToCollectionLiteral { expr, .. }| {
-                    format!("Replace with `{expr}`")
-                },
-            )
-        } else {
-            None
-        }
+        self.fixable.then_some(
+            |UnpackInsteadOfConcatenatingToCollectionLiteral { expr, .. }| {
+                format!("Replace with `{expr}`")
+            },
+        )
     }
 }
 

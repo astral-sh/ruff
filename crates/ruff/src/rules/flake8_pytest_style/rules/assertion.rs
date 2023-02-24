@@ -66,12 +66,8 @@ impl Violation for CompositeAssertion {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let CompositeAssertion { fixable } = self;
-        if *fixable {
-            Some(|_| format!("Break down assertion into multiple parts"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|_| format!("Break down assertion into multiple parts"))
     }
 }
 
