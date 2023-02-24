@@ -78,7 +78,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
         if line.starts_with("## ") {
             in_options = line == "## Options\n";
         } else if in_options {
-            if let Some(rest) = line.strip_prefix("* `") {
+            if let Some(rest) = line.strip_prefix("- `") {
                 let option = rest.trim_end().trim_end_matches('`');
 
                 assert!(
@@ -87,7 +87,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
                 );
 
                 let anchor = option.rsplit('.').next().unwrap();
-                out.push_str(&format!("* [`{option}`][{option}]\n"));
+                out.push_str(&format!("- [`{option}`][{option}]\n"));
                 after.push_str(&format!("[{option}]: ../../settings#{anchor}"));
 
                 continue;
@@ -117,7 +117,7 @@ Something [`else`][other].
 
 ## Options
 
-* `mccabe.max-complexity`
+- `mccabe.max-complexity`
 
 [other]: http://example.com.",
             &mut out,
@@ -130,7 +130,7 @@ Something [`else`][other].
 
 ## Options
 
-* [`mccabe.max-complexity`][mccabe.max-complexity]
+- [`mccabe.max-complexity`][mccabe.max-complexity]
 
 [other]: http://example.com.
 
