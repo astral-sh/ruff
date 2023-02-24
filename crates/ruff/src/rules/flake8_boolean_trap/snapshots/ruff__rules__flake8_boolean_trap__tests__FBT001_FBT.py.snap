@@ -85,10 +85,10 @@ expression: diagnostics
 - kind:
     BooleanPositionalArgInFunctionDefinition: ~
   location:
-    row: 77
+    row: 81
     column: 18
   end_location:
-    row: 77
+    row: 81
     column: 29
   fix: ~
   parent: ~

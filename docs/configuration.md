@@ -5,7 +5,7 @@ Ruff can be configured through a `pyproject.toml` file, a `ruff.toml` file, or t
 For a complete enumeration of the available configuration options, see
 [_Settings_](settings.md).
 
-### Using `pyproject.toml`
+## Using `pyproject.toml`
 
 If left unspecified, Ruff's default configuration is equivalent to:
 
@@ -115,7 +115,7 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
 * By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
   consider turning off autofix for specific rules or categories (see [_FAQ_](faq.md#ruff-tried-to-fix-something--but-it-broke-my-code)).
 
-### Using `ruff.toml`
+## Using `ruff.toml`
 
 As an alternative to `pyproject.toml`, Ruff will also respect a `ruff.toml` file, which implements
 an equivalent schema (though the `[tool.ruff]` hierarchy can be omitted).
@@ -142,7 +142,7 @@ unfixable = ["B"]
 For a complete enumeration of the available configuration options, see
 [_Settings_](settings.md).
 
-### Command-line interface
+## Command-line interface
 
 Some configuration options can be provided via the command-line, such as those related to rule
 enablement and disablement, file discovery, logging level, and more:
@@ -266,7 +266,7 @@ Log levels:
 
 <!-- End auto-generated subcommand help. -->
 
-### `pyproject.toml` discovery
+## `pyproject.toml` discovery
 
 Similar to [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
 Ruff supports hierarchical configuration, such that the "closest" `pyproject.toml` file in the
@@ -305,7 +305,7 @@ line-length = 100
 All of the above rules apply equivalently to `ruff.toml` files. If Ruff detects both a `ruff.toml`
 and `pyproject.toml` file, it will defer to the `ruff.toml`.
 
-### Python file discovery
+## Python file discovery
 
 When passed a path on the command-line, Ruff will automatically discover all Python files in that
 path, taking into account the [`exclude`](settings.md#exclude) and
@@ -318,7 +318,7 @@ By default, Ruff will also skip any files that are omitted via `.ignore`, `.giti
 Files that are passed to `ruff` directly are always linted, regardless of the above criteria.
 For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
-### Rule selection
+## Rule selection
 
 The set of enabled rules is controlled via the [`select`](settings.md#select) and
 [`ignore`](settings.md#ignore) settings, along with the
@@ -347,7 +347,7 @@ Running `ruff check --select F401` would result in Ruff enforcing `F401`, and no
 Running `ruff check --extend-select B` would result in Ruff enforcing the `E`, `F`, and `B` rules,
 with the exception of `F401`.
 
-### Error suppression
+## Error suppression
 
 To omit a lint rule entirely, add it to the "ignore" list via [`ignore`](settings.md#ignore)
 or [`extend-ignore`](settings.md#extend-ignore), either on the command-line
@@ -397,7 +397,7 @@ setting, which enables the same functionality via a `pyproject.toml` file.
 Note that Ruff will also respect Flake8's `# flake8: noqa` directive, and will treat it as
 equivalent to `# ruff: noqa`.
 
-#### Automatic `noqa` management
+### Automatic `noqa` management
 
 Ruff supports several workflows to aid in `noqa` management.
 
@@ -414,7 +414,7 @@ Third, Ruff can _automatically add_ `noqa` directives to all failing lines. This
 migrating a new codebase to Ruff. You can run `ruff check /path/to/file.py --add-noqa` to
 automatically add `noqa` directives to all failing lines, with the appropriate rule codes.
 
-#### Action comments
+### Action comments
 
 Ruff respects `isort`'s [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 (`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which
@@ -424,7 +424,7 @@ configuration.
 See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
 
-### Exit codes
+## Exit codes
 
 By default, Ruff exits with the following status codes:
 
@@ -443,7 +443,7 @@ Ruff supports two command-line flags that alter its exit code behavior:
   `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
   autofixing.
 
-### Autocompletion
+## Autocompletion
 
 Ruff supports autocompletion for most shells. A shell-specific completion script can be generated
 by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,

@@ -32,6 +32,9 @@ pub use space_around_operator::{
     space_around_operator, MultipleSpacesAfterOperator, MultipleSpacesBeforeOperator,
     TabAfterOperator, TabBeforeOperator,
 };
+pub use trailing_whitespace::{
+    trailing_whitespace, BlankLineContainsWhitespace, TrailingWhitespace,
+};
 pub use type_comparison::{type_comparison, TypeComparison};
 pub use whitespace_around_keywords::{
     whitespace_around_keywords, MultipleSpacesAfterKeyword, MultipleSpacesBeforeKeyword,
@@ -60,6 +63,7 @@ mod mixed_spaces_and_tabs;
 mod no_newline_at_end_of_file;
 mod not_tests;
 mod space_around_operator;
+mod trailing_whitespace;
 mod type_comparison;
 mod whitespace_around_keywords;
 mod whitespace_before_comment;

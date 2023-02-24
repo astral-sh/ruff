@@ -1,3 +1,5 @@
+# FAQ
+
 ## Is Ruff compatible with Black?
 
 Yes. Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as

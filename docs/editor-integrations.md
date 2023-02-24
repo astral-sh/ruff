@@ -1,3 +1,5 @@
+# Editor Integrations
+
 ## VS Code (Official)
 
 Download the [Ruff VS Code extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff),

@@ -140,7 +140,7 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
             text += line
         text += line
         linter_variant = pascal_case(linter)
-        text += " "*8 + f'({linter_variant}, "{code}") => Rule::{name},\n'
+        text += " " * 8 + f'({linter_variant}, "{code}") => Rule::{name},\n'
         text += fp.read()
 
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:

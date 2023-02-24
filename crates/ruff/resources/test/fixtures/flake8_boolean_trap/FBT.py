@@ -59,6 +59,10 @@ getattr(someobj, attrname, False)
 mylist.index(True)
 int(True)
 str(int(False))
+cfg.get("hello", True)
+cfg.getint("hello", True)
+cfg.getfloat("hello", True)
+cfg.getboolean("hello", True)
 
 
 class Registry:

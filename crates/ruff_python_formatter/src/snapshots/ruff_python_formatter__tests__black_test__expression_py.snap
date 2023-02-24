@@ -292,18 +292,7 @@ last_call()
  }
  Python3 > Python2 > COBOL
  Life is Life
-@@ -122,8 +125,8 @@
- call(b, **self.screen_kwargs)
- lukasz.langa.pl
- call.me(maybe)
--(1).real
--(1.0).real
-+1.real
-+1.0.real
- ....__class__
- list[str]
- dict[str, int]
-@@ -138,33 +141,33 @@
+@@ -138,15 +141,15 @@
  very_long_variable_name_filters: t.List[
      t.Tuple[str, t.Union[str, t.List[t.Optional[str]]]],
  ]
@@ -311,12 +300,12 @@ last_call()
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
 +xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
 +    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
-+)
-+xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
-+    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
  )
 -xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = classmethod(  # type: ignore
 -    sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__)
++xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
++    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))  # type: ignore
++)
 +xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
 +    classmethod(sync(async_xxxx_xxx_xxxx_xxxxx_xxxx_xxx.__func__))
  )
@@ -326,37 +315,6 @@ last_call()
  slice[0]
  slice[0:1]
  slice[0:1:2]
--slice[:]
-+slice[::]
- slice[:-1]
--slice[1:]
-+slice[1::]
- slice[::-1]
- slice[d :: d + 1]
- slice[:c, c - 1]
- numpy[:, 0:1]
- numpy[:, :-1]
--numpy[0, :]
-+numpy[0, ::]
- numpy[:, i]
- numpy[0, :2]
- numpy[:N, 0]
- numpy[:2, :4]
- numpy[2:4, 1:5]
--numpy[4:, 2:]
-+numpy[4:, 2::]
- numpy[:, (0, 1, 2, 5)]
- numpy[0, [0]]
- numpy[:, [i]]
-@@ -172,7 +175,7 @@
- numpy[-(c + 1) :, d]
- numpy[:, l[-2]]
- numpy[:, ::-1]
--numpy[np.newaxis, :]
-+numpy[np.newaxis, ::]
- (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
- {"2.7": dead, "3.7": long_live or die_hard}
- {"2.7", "3.6", "3.7", "3.8", "3.9", "4.0" if gilectomy else "3.10"}
 @@ -201,30 +204,26 @@
  e = (1,).count(1)
  f = 1, *range(10)
@@ -583,8 +541,8 @@ call(**self.screen_kwargs)
 call(b, **self.screen_kwargs)
 lukasz.langa.pl
 call.me(maybe)
-1.real
-1.0.real
+(1).real
+(1.0).real
 ....__class__
 list[str]
 dict[str, int]
@@ -611,21 +569,21 @@ xxxx_xxx_xxxx_xxxxx_xxxx_xxx: Callable[..., List[SomeClass]] = (
 slice[0]
 slice[0:1]
 slice[0:1:2]
-slice[::]
+slice[:]
 slice[:-1]
-slice[1::]
+slice[1:]
 slice[::-1]
 slice[d :: d + 1]
 slice[:c, c - 1]
 numpy[:, 0:1]
 numpy[:, :-1]
-numpy[0, ::]
+numpy[0, :]
 numpy[:, i]
 numpy[0, :2]
 numpy[:N, 0]
 numpy[:2, :4]
 numpy[2:4, 1:5]
-numpy[4:, 2::]
+numpy[4:, 2:]
 numpy[:, (0, 1, 2, 5)]
 numpy[0, [0]]
 numpy[:, [i]]
@@ -633,7 +591,7 @@ numpy[1 : c + 1, c]
 numpy[-(c + 1) :, d]
 numpy[:, l[-2]]
 numpy[:, ::-1]
-numpy[np.newaxis, ::]
+numpy[np.newaxis, :]
 (str or None) if (sys.version_info[0] > (3,)) else (str or bytes or None)
 {"2.7": dead, "3.7": long_live or die_hard}
 {"2.7", "3.6", "3.7", "3.8", "3.9", "4.0" if gilectomy else "3.10"}

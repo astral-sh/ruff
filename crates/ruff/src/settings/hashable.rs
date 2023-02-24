@@ -1,3 +1,4 @@
+use derivative::Derivative;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
@@ -54,9 +55,11 @@ impl Hash for HashableGlobMatcher {
     }
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct HashableGlobSet {
     patterns: Vec<FilePattern>,
+    #[derivative(Debug = "ignore")]
     globset: GlobSet,
 }
 

@@ -26,7 +26,7 @@ impl Violation for LambdaAssignment {
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         self.fixable
-            .then_some(|v| format!("Rewrite `{}` as a `def`", v.name))
+            .then_some(|LambdaAssignment { name, .. }| format!("Rewrite `{name}` as a `def`"))
     }
 }
 

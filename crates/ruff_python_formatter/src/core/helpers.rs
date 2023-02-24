@@ -23,9 +23,17 @@ pub fn trailing_quote(content: &str) -> Option<&&str> {
         .find(|&pattern| content.ends_with(pattern))
 }
 
+pub fn is_radix_literal(content: &str) -> bool {
+    content.starts_with("0b")
+        || content.starts_with("0o")
+        || content.starts_with("0x")
+        || content.starts_with("0B")
+        || content.starts_with("0O")
+        || content.starts_with("0X")
+}
+
 #[cfg(test)]
 mod tests {
-
     #[test]
     fn test_prefixes() {
         let prefixes = ruff_python::str::TRIPLE_QUOTE_PREFIXES
