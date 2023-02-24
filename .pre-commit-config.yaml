@@ -13,7 +13,6 @@ repos:
           - --disable
           - MD013 # line-length
           - MD033 # no-inline-html
-          - MD041 # first-line-h1
           - --
 
   - repo: local
