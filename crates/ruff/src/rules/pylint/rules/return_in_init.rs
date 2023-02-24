@@ -33,8 +33,8 @@ define_violation!(
     ///
     /// ```python
     /// class Example:
-    ///    def __init__(self):
-    ///       self.value = []
+    ///     def __init__(self):
+    ///         self.value = []
     /// ```
     ///
     /// ## References

@@ -28,9 +28,9 @@ define_violation!(
     /// import asyncio
     ///
     /// for i in range(10):
-    ///    # This creates a weak reference to the task, which may be garbage
-    ///    # collected at any time.
-    ///    asyncio.create_task(some_coro(param=i))
+    ///     # This creates a weak reference to the task, which may be garbage
+    ///     # collected at any time.
+    ///     asyncio.create_task(some_coro(param=i))
     /// ```
     ///
     /// Use instead:

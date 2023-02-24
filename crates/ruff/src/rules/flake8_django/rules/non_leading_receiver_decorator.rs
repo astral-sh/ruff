@@ -25,10 +25,11 @@ define_violation!(
     /// from django.dispatch import receiver
     /// from django.db.models.signals import post_save
     ///
+    ///
     /// @transaction.atomic
     /// @receiver(post_save, sender=MyModel)
     /// def my_handler(sender, instance, created, **kwargs):
-    ///    pass
+    ///     pass
     /// ```
     ///
     /// Use instead:
@@ -36,6 +37,7 @@ define_violation!(
     /// ```python
     /// from django.dispatch import receiver
     /// from django.db.models.signals import post_save
+    ///
     ///
     /// @receiver(post_save, sender=MyModel)
     /// @transaction.atomic

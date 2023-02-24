@@ -35,6 +35,7 @@ define_violation!(
     ///     def __init__(self):
     ///         self._private_member = "..."
     ///
+    ///
     /// var = Class()
     /// print(var._private_member)
     /// ```
@@ -45,6 +46,7 @@ define_violation!(
     /// class Class:
     ///     def __init__(self):
     ///         self.public_member = "..."
+    ///
     ///
     /// var = Class()
     /// print(var.public_member)

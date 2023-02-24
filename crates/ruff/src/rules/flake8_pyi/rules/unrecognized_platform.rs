@@ -81,7 +81,7 @@ define_violation!(
     ///
     /// ```python
     /// if sys.platform == "linux":
-    ///    ...
+    ///     ...
     /// ```
     ///
     /// ## References

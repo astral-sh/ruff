@@ -92,7 +92,7 @@ define_violation!(
     /// elif x == 2:
     ///     return "Goodbye"
     /// else:
-    ///    return "Goodnight"
+    ///     return "Goodnight"
     /// ```
     ///
     /// Use instead:

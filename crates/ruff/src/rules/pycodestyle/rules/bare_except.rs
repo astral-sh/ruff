@@ -22,7 +22,7 @@ define_violation!(
     ///
     /// ```python
     /// try:
-    ///     raise(KeyboardInterrupt("You probably don't mean to break CTRL-C."))
+    ///     raise KeyboardInterrupt("You probably don't mean to break CTRL-C.")
     /// except:
     ///     print("But a bare `except` will ignore keyboard interrupts.")
     /// ```

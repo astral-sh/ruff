@@ -30,6 +30,7 @@ define_violation!(
     /// ## Example
     ///
     /// ```python
+    /// # fmt: off
     /// foo = 'bar'
     /// ```
     ///
@@ -80,6 +81,7 @@ define_violation!(
     /// ## Example
     ///
     /// ```python
+    /// # fmt: off
     /// foo = '''
     /// bar
     /// '''
@@ -133,6 +135,7 @@ define_violation!(
     /// ## Example
     ///
     /// ```python
+    /// # fmt: off
     /// '''
     /// bar
     /// '''
@@ -182,6 +185,7 @@ define_violation!(
     /// ## Example
     ///
     /// ```python
+    /// # fmt: off
     /// foo = 'bar\'s'
     /// ```
     ///

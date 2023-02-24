@@ -48,6 +48,7 @@ pub struct Options {
     /// rather than condensing to a single line:
     ///
     /// ```python
+    /// # fmt: off
     /// from .utils import (
     ///     test_directory as test_directory,
     ///     test_id as test_id

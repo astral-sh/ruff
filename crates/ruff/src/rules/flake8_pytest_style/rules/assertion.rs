@@ -42,6 +42,7 @@ define_violation!(
     /// def test_foo():
     ///     assert something and something_else
     ///
+    ///
     /// def test_bar():
     ///     assert not (something or something_else)
     /// ```
@@ -52,6 +53,7 @@ define_violation!(
     /// def test_foo():
     ///     assert something
     ///     assert something_else
+    ///
     ///
     /// def test_bar():
     ///     assert not something

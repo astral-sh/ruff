@@ -27,7 +27,7 @@ define_violation!(
     /// try:
     ///     function()
     /// except Exception as e:
-    ///     logging.error('%s error occurred: %s', e)  # [logging-too-few-args]
+    ///     logging.error("%s error occurred: %s", e)
     ///     raise
     /// ```
     ///
@@ -39,7 +39,7 @@ define_violation!(
     /// try:
     ///     function()
     /// except Exception as e:
-    ///     logging.error('%s error occurred: %s', type(e), e)
+    ///     logging.error("%s error occurred: %s", type(e), e)
     ///     raise
     /// ```
     pub struct LoggingTooFewArgs;
@@ -68,7 +68,7 @@ define_violation!(
     /// try:
     ///     function()
     /// except Exception as e:
-    ///     logging.error('Error occurred: %s', type(e), e)  # [logging-too-many-args]
+    ///     logging.error("Error occurred: %s", type(e), e)
     ///     raise
     /// ```
     ///
@@ -80,7 +80,7 @@ define_violation!(
     /// try:
     ///     function()
     /// except Exception as e:
-    ///     logging.error('%s error occurred: %s', type(e), e)
+    ///     logging.error("%s error occurred: %s", type(e), e)
     ///     raise
     /// ```
     pub struct LoggingTooManyArgs;

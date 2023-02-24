@@ -27,6 +27,8 @@ define_violation!(
     /// def main_function():
     ///     if not cond:
     ///         raise Exception()
+    ///
+    ///
     /// def consumer_func():
     ///     try:
     ///         do_step()
@@ -42,6 +44,8 @@ define_violation!(
     /// def main_function():
     ///     if not cond:
     ///         raise CustomException()
+    ///
+    ///
     /// def consumer_func():
     ///     try:
     ///         do_step()
