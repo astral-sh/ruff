@@ -55,12 +55,8 @@ impl Violation for MultipleWithStatements {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultipleWithStatements { fixable, .. } = self;
-        if *fixable {
-            Some(|_| format!("Combine `with` statements"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|_| format!("Combine `with` statements"))
     }
 }
 
