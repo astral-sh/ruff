@@ -38,6 +38,25 @@ FATHOM_SCRIPT: str = (
 )
 
 
+# TODO(charlie): Either generalize this ("Fix all links to known pages based on the
+# sections above"), or stop auto-generating these sections, and just maintain two
+# copies of the documentation.
+LINK_REWRITES: dict[str, str] = {
+    "https://beta.ruff.rs/docs/": "index.md",
+    "https://beta.ruff.rs/docs/configuration/": "configuration.md",
+    "https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery": "configuration.md#pyprojecttoml-discovery",
+    "https://beta.ruff.rs/docs/contributing/": "contributing.md",
+    "https://beta.ruff.rs/docs/editor-integrations/": "editor-integrations.md",
+    "https://beta.ruff.rs/docs/faq/": "faq.md",
+    "https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8": "faq.md#how-does-ruff-compare-to-flake8",
+    "https://beta.ruff.rs/docs/installation/": "installation.md",
+    "https://beta.ruff.rs/docs/rules/": "rules.md",
+    "https://beta.ruff.rs/docs/rules/#error-e": "rules.md#error-e",
+    "https://beta.ruff.rs/docs/settings/": "settings.md",
+    "https://beta.ruff.rs/docs/usage/": "usage.md",
+}
+
+
 def main() -> None:
     """Generate an MkDocs-compatible `docs` and `mkdocs.yml`."""
 
@@ -46,14 +65,12 @@ def main() -> None:
     with Path("README.md").open(encoding="utf8") as fp:
         content = fp.read()
 
-    # Remove the documentation link, since we're _in_ the docs.
-    if DOCUMENTATION_LINK not in content:
-        msg = "README.md is not in the expected format."
+    # Rewrite links to the documentation.
+    for src, dst in LINK_REWRITES.items():
+        content = content.replace(f"({src})", f"({dst})")
+    if "https://beta.ruff.rs" in content:
+        msg = "Unexpected absolute link to documentation"
         raise ValueError(msg)
-    content = content.replace(DOCUMENTATION_LINK, "")
-
-    # Convert any inter-documentation links to relative links.
-    content = content.replace("https://beta.ruff.rs", "")
 
     Path("docs").mkdir(parents=True, exist_ok=True)
 
@@ -87,7 +104,7 @@ def main() -> None:
                 msg = f"Section {title} not found in README.md"
                 raise ValueError(msg)
 
-            f.write(block[0])
+            f.write(block[0].strip())
 
             if filename == "rules.md":
                 f.write(
