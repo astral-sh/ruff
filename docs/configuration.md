@@ -113,7 +113,7 @@ If you're wondering how to configure Ruff, here are some **recommended guideline
   you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
   extension.
 * By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
-  consider turning off autofix for specific rules or categories (see the [_FAQ_](https://beta.ruff.rs/docs/faq/#ruff-tried-to-fix-something-but-it-broke-my-code).
+  consider turning off autofix for specific rules or categories (see the [_FAQ_](https://beta.ruff.rs/docs/faq/#ruff-tried-to-fix-something-but-it-broke-my-code)).
 
 ### Using `ruff.toml`
 
