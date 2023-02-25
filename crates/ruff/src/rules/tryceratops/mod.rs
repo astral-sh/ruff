@@ -18,6 +18,7 @@ mod tests {
     #[test_case(Rule::RaiseVanillaClass, Path::new("TRY002.py"); "TRY002")]
     #[test_case(Rule::RaiseVanillaArgs, Path::new("TRY003.py"); "TRY003")]
     #[test_case(Rule::PreferTypeError, Path::new("TRY004.py"); "TRY004")]
+    #[test_case(Rule::CheckToContinue, Path::new("TRY100.py"); "TRY100")]
     #[test_case(Rule::ReraiseNoCause, Path::new("TRY200.py"); "TRY200")]
     #[test_case(Rule::VerboseRaise, Path::new("TRY201.py"); "TRY201")]
     #[test_case(Rule::TryConsiderElse, Path::new("TRY300.py"); "TRY300")]

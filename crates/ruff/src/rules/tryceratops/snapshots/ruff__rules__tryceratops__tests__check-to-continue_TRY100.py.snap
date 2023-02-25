@@ -1,0 +1,25 @@
+---
+source: crates/ruff/src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    CheckToContinue: ~
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 21
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    CheckToContinue: ~
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 25
+    column: 17
+  fix: ~
+  parent: ~
+
