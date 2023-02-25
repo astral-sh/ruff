@@ -117,13 +117,11 @@ impl ContinueChecker {
             if let ExprKind::Call { .. } = &value.node {
                 return true;
             }
-            let first_target = match targets.first() {
-                Some(item) => item,
-                None => return false,
+            if let Some(first_target) = targets.first() {
+                if let ExprKind::Name { id, .. } = &first_target.node {
+                    self.assignments_from_calls.remove(id);
+                }
             };
-            if let ExprKind::Name { id, .. } = &first_target.node {
-                self.assignments_from_calls.remove(id);
-            }
         }
         false
     }
@@ -137,12 +135,10 @@ impl ContinueChecker {
 
         for raw in raw_assignments {
             if let StmtKind::Assign { targets, .. } = &raw.node {
-                let first_target = match targets.first() {
-                    Some(item) => item,
-                    None => continue,
-                };
-                if let ExprKind::Name { id, .. } = &first_target.node {
-                    self.assignments_from_calls.insert(id.clone(), raw.clone());
+                if let Some(first_target) = targets.first() {
+                    if let ExprKind::Name { id, .. } = &first_target.node {
+                        self.assignments_from_calls.insert(id.clone(), raw.clone());
+                    }
                 }
             }
         }
@@ -177,10 +173,7 @@ impl ContinueChecker {
             self.find_violations(stmt);
         } else {
             let bodies = get_bodies(stmt);
-            let last_stmt = match bodies.last() {
-                Some(item) => item,
-                None => return,
-            };
+            let Some(last_stmt) = bodies.last() else { return };
             if let StmtKind::Return { .. } = &last_stmt.node {
                 may_contain_violations = true;
             }
@@ -193,6 +186,10 @@ impl ContinueChecker {
 }
 
 /// TRY100
-pub fn check_to_continue(checker: &mut Checker) {
-    let continue_check = ContinueChecker::new();
+pub fn check_to_continue(checker: &mut Checker, stmt: &Stmt) {
+    let mut continue_check = ContinueChecker::new();
+    continue_check.scan_deeper(stmt, false);
+    for violation in continue_check.violations {
+        checker.diagnostics.push(violation);
+    }
 }

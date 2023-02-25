@@ -569,6 +569,10 @@ where
                     flake8_bugbear::rules::cached_instance_method(self, decorator_list);
                 }
 
+                if self.settings.rules.enabled(&Rule::CheckToContinue) {
+                    tryceratops::rules::check_to_continue(self, stmt);
+                }
+
                 if self.settings.rules.enabled(&Rule::UnnecessaryReturnNone)
                     || self.settings.rules.enabled(&Rule::ImplicitReturnValue)
                     || self.settings.rules.enabled(&Rule::ImplicitReturn)
