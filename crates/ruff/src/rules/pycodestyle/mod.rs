@@ -81,6 +81,7 @@ mod tests {
     #[test_case(Rule::MultipleSpacesAfterKeyword, Path::new("E27.py"))]
     #[test_case(Rule::MultipleSpacesAfterOperator, Path::new("E22.py"))]
     #[test_case(Rule::MultipleSpacesBeforeKeyword, Path::new("E27.py"))]
+    #[test_case(Rule::MissingWhitespaceAfterKeyword, Path::new("E27.py"))]
     #[test_case(Rule::MultipleSpacesBeforeOperator, Path::new("E22.py"))]
     #[test_case(Rule::NoIndentedBlock, Path::new("E11.py"))]
     #[test_case(Rule::NoIndentedBlockComment, Path::new("E11.py"))]
