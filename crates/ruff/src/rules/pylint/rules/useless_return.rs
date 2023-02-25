@@ -66,7 +66,7 @@ pub fn useless_return(checker: &mut Checker, stmt: &Stmt) {
         return;
     }
     let mut diagnostic = Diagnostic::new(UselessReturn, Range::from_located(stmt));
-    if !checker.patch(diagnostic.kind.rule()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match delete_stmt(
             stmt,
             None,
