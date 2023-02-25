@@ -16,7 +16,7 @@ pub struct Message {
     pub fix: Option<Fix>,
     pub filename: String,
     pub source: Option<Source>,
-    pub noqa_line: usize,
+    pub noqa_row: usize,
 }
 
 impl Message {
@@ -24,7 +24,7 @@ impl Message {
         diagnostic: Diagnostic,
         filename: String,
         source: Option<Source>,
-        noqa_line: usize,
+        noqa_row: usize,
     ) -> Self {
         Self {
             kind: diagnostic.kind,
@@ -36,7 +36,7 @@ impl Message {
             fix: diagnostic.fix,
             filename,
             source,
-            noqa_line,
+            noqa_row,
         }
     }
 }

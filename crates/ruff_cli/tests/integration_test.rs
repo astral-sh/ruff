@@ -113,7 +113,7 @@ fn test_stdin_json() -> Result<()> {
       "column": 10
     }},
     "filename": "{file_path}",
-    "noqa_line": 1
+    "noqa_row": 1
   }}
 ]
 "#

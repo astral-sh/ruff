@@ -50,7 +50,7 @@ struct ExpandedMessage<'a> {
     location: Location,
     end_location: Location,
     filename: &'a str,
-    noqa_line: usize,
+    noqa_row: usize,
 }
 
 #[derive(Serialize)]
@@ -198,7 +198,7 @@ impl Printer {
                                 location: message.location,
                                 end_location: message.end_location,
                                 filename: &message.filename,
-                                noqa_line: message.noqa_line,
+                                noqa_row: message.noqa_row,
                             })
                             .collect::<Vec<_>>()
                     )?

@@ -332,8 +332,8 @@ pub fn lint_only(
                     None
                 };
                 let lineno = diagnostic.location.row();
-                let noqa_line = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-                Message::from_diagnostic(diagnostic, path_lossy.to_string(), source, noqa_line)
+                let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
+                Message::from_diagnostic(diagnostic, path_lossy.to_string(), source, noqa_row)
             })
             .collect()
     })
@@ -472,12 +472,12 @@ This indicates a bug in `{}`. If you could open an issue at:
                             None
                         };
                         let lineno = diagnostic.location.row();
-                        let noqa_line = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
+                        let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
                         Message::from_diagnostic(
                             diagnostic,
                             path_lossy.to_string(),
                             source,
-                            noqa_line,
+                            noqa_row,
                         )
                     })
                     .collect()
