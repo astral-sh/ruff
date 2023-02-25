@@ -34,8 +34,8 @@ pub use space_around_operator::{
 };
 pub use type_comparison::{type_comparison, TypeComparison};
 pub use whitespace_around_keywords::{
-    whitespace_around_keywords, MultipleSpacesAfterKeyword, MultipleSpacesBeforeKeyword,
-    TabAfterKeyword, TabBeforeKeyword,
+    whitespace_around_keywords, MissingWhitespaceAfterKeyword, MultipleSpacesAfterKeyword,
+    MultipleSpacesBeforeKeyword, TabAfterKeyword, TabBeforeKeyword,
 };
 pub use whitespace_before_comment::{
     whitespace_before_comment, MultipleLeadingHashesForBlockComment, NoSpaceAfterBlockComment,

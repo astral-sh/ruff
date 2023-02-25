@@ -9,6 +9,16 @@ use crate::registry::DiagnosticKind;
 use crate::violation::Violation;
 
 define_violation!(
+    pub struct MissingWhitespaceAfterKeyword;
+);
+impl Violation for MissingWhitespaceAfterKeyword {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Missing whitespace after keyword")
+    }
+}
+
+define_violation!(
     pub struct MultipleSpacesAfterKeyword;
 );
 impl Violation for MultipleSpacesAfterKeyword {
@@ -70,6 +80,8 @@ pub fn whitespace_around_keywords(line: &str) -> Vec<(usize, DiagnosticKind)> {
             diagnostics.push((after.start(), TabAfterKeyword.into()));
         } else if after.as_str().len() > 1 {
             diagnostics.push((after.start(), MultipleSpacesAfterKeyword.into()));
+        } else if after.as_str().is_empty() {
+            diagnostics.push((after.start(), MissingWhitespaceAfterKeyword.into()));
         }
     }
     diagnostics
