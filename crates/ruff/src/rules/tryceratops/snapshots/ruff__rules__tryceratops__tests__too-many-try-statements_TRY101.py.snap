@@ -1,0 +1,35 @@
+---
+source: crates/ruff/src/rules/tryceratops/mod.rs
+expression: diagnostics
+---
+- kind:
+    TooManyTryStatements: ~
+  location:
+    row: 10
+    column: 4
+  end_location:
+    row: 20
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    TooManyTryStatements: ~
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 31
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    TooManyTryStatements: ~
+  location:
+    row: 35
+    column: 4
+  end_location:
+    row: 51
+    column: 13
+  fix: ~
+  parent: ~
+
