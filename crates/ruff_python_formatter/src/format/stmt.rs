@@ -387,7 +387,13 @@ fn format_if(
     write!(f, [text(":"), block_indent(&block(body))])?;
     if let Some(orelse) = orelse {
         if orelse.node.len() == 1 {
-            if let StmtKind::If { test, body, orelse } = &orelse.node[0].node {
+            if let StmtKind::If {
+                test,
+                body,
+                orelse,
+                is_elif: true,
+            } = &orelse.node[0].node
+            {
                 write!(f, [text("el")])?;
                 format_if(f, test, body, orelse.as_ref())?;
             } else {
@@ -457,10 +463,14 @@ fn format_try(
         write!(f, [handler.format()])?;
     }
     if let Some(orelse) = orelse {
-        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+        write!(f, [text("else:")])?;
+        write!(f, [end_of_line_comments(orelse)])?;
+        write!(f, [block_indent(&block(orelse))])?;
     }
     if let Some(finalbody) = finalbody {
-        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
+        write!(f, [text("finally:")])?;
+        write!(f, [end_of_line_comments(finalbody)])?;
+        write!(f, [block_indent(&block(finalbody))])?;
     }
     Ok(())
 }
@@ -776,7 +786,9 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
             StmtKind::While { test, body, orelse } => {
                 format_while(f, self.item, test, body, orelse.as_ref())
             }
-            StmtKind::If { test, body, orelse } => format_if(f, test, body, orelse.as_ref()),
+            StmtKind::If {
+                test, body, orelse, ..
+            } => format_if(f, test, body, orelse.as_ref()),
             StmtKind::With {
                 items,
                 body,

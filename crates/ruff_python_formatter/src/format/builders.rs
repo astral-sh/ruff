@@ -2,7 +2,6 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::builders::literal;
 use crate::context::ASTFormatContext;
 use crate::core::types::Range;
 use crate::cst::{Body, Stmt};
@@ -45,6 +44,22 @@ impl Format<ASTFormatContext<'_>> for Block<'_> {
             }
             write!(f, [stmt.format()])?;
         }
+
+        // Any trailing comments come on the lines after.
+        for trivia in &self.body.trivia {
+            if matches!(trivia.relationship, Relationship::Dangling) {
+                match trivia.kind {
+                    TriviaKind::EmptyLine => {
+                        write!(f, [empty_line()])?;
+                    }
+                    TriviaKind::OwnLineComment(range) => {
+                        write!(f, [literal(range), hard_line_break()])?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         Ok(())
     }
 }

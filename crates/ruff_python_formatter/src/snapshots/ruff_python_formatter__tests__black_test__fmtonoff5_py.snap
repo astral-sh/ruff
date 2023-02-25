@@ -165,7 +165,7 @@ elif   unformatted:
  
          print("This will be formatted")
  
-@@ -68,20 +62,21 @@
+@@ -68,20 +62,19 @@
  class Named(t.Protocol):
      # fmt: off
      @property
@@ -177,11 +177,9 @@ elif   unformatted:
  class Factory(t.Protocol):
      def this_will_be_formatted(self, **kwargs) -> Named:
          ...
+-
+     # fmt: on
  
--    # fmt: on
- 
-+# fmt: on
-+
  
  # Regression test for https://github.com/psf/black/issues/3436.
  if x:
@@ -267,9 +265,7 @@ class Named(t.Protocol):
 class Factory(t.Protocol):
     def this_will_be_formatted(self, **kwargs) -> Named:
         ...
-
-
-# fmt: on
+    # fmt: on
 
 
 # Regression test for https://github.com/psf/black/issues/3436.

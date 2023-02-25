@@ -230,7 +230,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             }
         }
         Node::Body(body) => {
-            for stmt in body.node.iter() {
+            for stmt in &body.node {
                 result.push(Node::Stmt(stmt));
             }
         }
@@ -370,7 +370,9 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     result.push(Node::Body(orelse));
                 }
             }
-            StmtKind::If { test, body, orelse } => {
+            StmtKind::If {
+                test, body, orelse, ..
+            } => {
                 result.push(Node::Expr(test));
                 result.push(Node::Body(body));
                 if let Some(orelse) = orelse {
@@ -393,9 +395,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     if let Some(expr) = &case.guard {
                         result.push(Node::Expr(expr));
                     }
-                    for stmt in &case.body {
-                        result.push(Node::Stmt(stmt));
-                    }
+                    result.push(Node::Body(&case.body));
                 }
             }
             StmtKind::Raise { exc, cause } => {

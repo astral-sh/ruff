@@ -1,6 +1,7 @@
-use crate::core::locator::Locator;
-use crate::core::types::Range;
 use rustpython_parser::ast::Location;
+
+use crate::core::locator::Locator;
+
 
 /// Return the leading quote for a string or byte literal (e.g., `"""`).
 pub fn leading_quote(content: &str) -> Option<&str> {
@@ -36,23 +37,81 @@ pub fn is_radix_literal(content: &str) -> bool {
         || content.starts_with("0X")
 }
 
+/// Expand the range of a compound statement.
+///
+/// `location` is the start of the compound statement (e.g., the `if` in `if x:`).
+/// `end_location` is the end of the last statement in the body.
 pub fn expand_indented_block(
     location: Location,
     end_location: Location,
     locator: &Locator,
-) -> Location {
+) -> (Location, Location) {
     let contents = locator.contents();
-    let index = locator.index(end_location);
-    let offset = contents[index..]
-        .lines()
-        .skip(1)
-        .take_while(|line| {
-            line.chars()
-                .take(location.column())
-                .all(char::is_whitespace)
-        })
-        .count();
-    Location::new(end_location.row() + 1 + offset, 0)
+    let start_index = locator.index(location);
+    let end_index = locator.index(end_location);
+
+    // Find the colon, which indicates the end of the header.
+    let mut nesting = 0;
+    let mut colon = None;
+    for (start, tok, _end) in rustpython_parser::lexer::lex_located(
+        &contents[start_index..end_index],
+        rustpython_parser::Mode::Module,
+        location,
+    )
+    .flatten()
+    {
+        match tok {
+            rustpython_parser::Tok::Colon if nesting == 0 => {
+                colon = Some(start);
+                break;
+            }
+            rustpython_parser::Tok::Lpar
+            | rustpython_parser::Tok::Lsqb
+            | rustpython_parser::Tok::Lbrace => nesting += 1,
+            rustpython_parser::Tok::Rpar
+            | rustpython_parser::Tok::Rsqb
+            | rustpython_parser::Tok::Rbrace => nesting -= 1,
+            _ => {}
+        }
+    }
+    let colon_location = colon.unwrap();
+    let colon_index = locator.index(colon_location);
+
+    // From here, we have two options: simple statement or compound statement.
+    let indent = rustpython_parser::lexer::lex_located(
+        &contents[colon_index..end_index],
+        rustpython_parser::Mode::Module,
+        colon_location,
+    )
+    .flatten()
+    .find_map(|(start, tok, _end)| match tok {
+        rustpython_parser::Tok::Indent => Some(start),
+        _ => None,
+    });
+
+    let Some(indent_location) = indent else {
+        // Simple statement: from the colon to the end of the line.
+        return (colon_location, Location::new(end_location.row() + 1, 0));
+    };
+
+    // Compound statement: from the colon to the end of the block.
+    let mut offset = 0;
+    for (index, line) in contents[end_index..].lines().skip(1).enumerate() {
+        if line.is_empty() {
+            continue;
+        } else if line
+            .chars()
+            .take(indent_location.column())
+            .all(char::is_whitespace)
+        {
+            offset = index + 1;
+        } else {
+            break;
+        }
+    }
+
+    let end_location = Location::new(end_location.row() + 1 + offset, 0);
+    (colon_location, end_location)
 }
 
 #[cfg(test)]

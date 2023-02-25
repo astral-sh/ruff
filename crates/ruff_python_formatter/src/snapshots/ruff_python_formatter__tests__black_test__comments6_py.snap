@@ -195,7 +195,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +    b,
 +    c,
 +    d,
-+):  # type: int# type: int# type: int# type: int# type: int
++):  # type: int# type: int# type: int# type: int
      # type: (...) -> None
  
      element = 0  # type: int
@@ -208,12 +208,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      an_element_with_a_long_value = calls() or more_calls() and more()  # type: bool
  
      tup = (
-@@ -66,26 +64,26 @@
-         + element
-         + another_element
-         + another_element_with_long_name
--    )  # type: int
-+    )
+@@ -70,22 +68,22 @@
  
  
  def f(
@@ -231,7 +226,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -    x,  # not a type comment
 -):  # type: (int) -> None
 +    x,
-+):  # not a type comment# type: (int) -> None
++):  # not a type comment
      pass
  
  
@@ -338,7 +333,7 @@ def f(
     b,
     c,
     d,
-):  # type: int# type: int# type: int# type: int# type: int
+):  # type: int# type: int# type: int# type: int
     # type: (...) -> None
 
     element = 0  # type: int
@@ -359,7 +354,7 @@ def f(
         + element
         + another_element
         + another_element_with_long_name
-    )
+    )  # type: int
 
 
 def f(
@@ -372,7 +367,7 @@ def f(
 
 def f(
     x,
-):  # not a type comment# type: (int) -> None
+):  # not a type comment
     pass
 
 

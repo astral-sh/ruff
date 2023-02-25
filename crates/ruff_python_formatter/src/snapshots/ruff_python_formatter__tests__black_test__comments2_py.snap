@@ -196,15 +196,7 @@ instruction()#comment with bad spacing
      "Generator",
  ]
  
-@@ -54,32 +54,39 @@
-     # for compiler in compilers.values():
-     # add_compiler(compiler)
-     add_compiler(compilers[(7.0, 32)])
--    # add_compiler(compilers[(7.1, 64)])
- 
- 
-+# add_compiler(compilers[(7.1, 64)])
-+
+@@ -60,26 +60,32 @@
  # Comment before function.
  def inline_comments_in_brackets_ruin_everything():
      if typedargslist:
@@ -229,7 +221,7 @@ instruction()#comment with bad spacing
 +            parameters.what_if_this_was_actually_long.children[0],
 +            body,
 +            parameters.children[-1],
-+        ]
++        ]  # type: ignore
      if (
          self._proc is not None
 -        # has the child process finished?
@@ -246,7 +238,7 @@ instruction()#comment with bad spacing
      ):
          pass
      # no newline before or after
-@@ -103,42 +110,42 @@
+@@ -103,35 +109,35 @@
      ############################################################################
  
      call2(
@@ -298,16 +290,7 @@ instruction()#comment with bad spacing
      ]
      while True:
          if False:
-             continue
- 
--            # and round and round we go
--        # and round and round we go
-+    # and round and round we go
-+    # and round and round we go
- 
-     # let's return
-     return Node(
-@@ -167,7 +174,7 @@
+@@ -167,7 +173,7 @@
  #######################
  
  
@@ -377,9 +360,8 @@ else:
     # for compiler in compilers.values():
     # add_compiler(compiler)
     add_compiler(compilers[(7.0, 32)])
+    # add_compiler(compilers[(7.1, 64)])
 
-
-# add_compiler(compilers[(7.1, 64)])
 
 # Comment before function.
 def inline_comments_in_brackets_ruin_everything():
@@ -400,7 +382,7 @@ def inline_comments_in_brackets_ruin_everything():
             parameters.what_if_this_was_actually_long.children[0],
             body,
             parameters.children[-1],
-        ]
+        ]  # type: ignore
     if (
         self._proc is not None
         and # has the child process finished?
@@ -467,8 +449,8 @@ short
         if False:
             continue
 
-    # and round and round we go
-    # and round and round we go
+            # and round and round we go
+        # and round and round we go
 
     # let's return
     return Node(

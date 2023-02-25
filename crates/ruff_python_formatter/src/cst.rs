@@ -245,6 +245,7 @@ pub enum StmtKind {
         test: Box<Expr>,
         body: Body,
         orelse: Option<Body>,
+        is_elif: bool,
     },
     With {
         items: Vec<Withitem>,
@@ -567,22 +568,33 @@ impl From<(rustpython_parser::ast::Excepthandler, &Locator<'_>)> for Excepthandl
     fn from((excepthandler, locator): (rustpython_parser::ast::Excepthandler, &Locator)) -> Self {
         let rustpython_parser::ast::ExcepthandlerKind::ExceptHandler { type_, name, body } =
             excepthandler.node;
+
+        // Find the start and end of the `body`.
+        let body = {
+            let (body_location, body_end_location) = expand_indented_block(
+                excepthandler.location,
+                body.last().unwrap().end_location.unwrap(),
+                locator,
+            );
+            Body {
+                location: body_location,
+                end_location: Some(body_end_location),
+                node: body
+                    .into_iter()
+                    .map(|node| (node, locator).into())
+                    .collect(),
+                trivia: vec![],
+                parentheses: Parenthesize::Never,
+            }
+        };
+
         Excepthandler {
             location: excepthandler.location,
-            end_location: excepthandler.end_location,
+            end_location: body.end_location,
             node: ExcepthandlerKind::ExceptHandler {
                 type_: type_.map(|type_| Box::new((*type_, locator).into())),
                 name,
-                body: Body {
-                    location: excepthandler.location,
-                    end_location: excepthandler.end_location,
-                    node: body
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    trivia: vec![],
-                    parentheses: Parenthesize::Always,
-                },
+                body,
             },
             trivia: vec![],
             parentheses: Parenthesize::Never,
@@ -665,16 +677,32 @@ impl From<(rustpython_parser::ast::Pattern, &Locator<'_>)> for Pattern {
 
 impl From<(rustpython_parser::ast::MatchCase, &Locator<'_>)> for MatchCase {
     fn from((match_case, locator): (rustpython_parser::ast::MatchCase, &Locator)) -> Self {
+        // Find the start and end of the `body`.
+        let body = {
+            let (body_location, body_end_location) = expand_indented_block(
+                match_case.pattern.location,
+                match_case.body.last().unwrap().end_location.unwrap(),
+                locator,
+            );
+            Body {
+                location: body_location,
+                end_location: Some(body_end_location),
+                node: match_case
+                    .body
+                    .into_iter()
+                    .map(|node| (node, locator).into())
+                    .collect(),
+                trivia: vec![],
+                parentheses: Parenthesize::Never,
+            }
+        };
+
         MatchCase {
             pattern: (match_case.pattern, locator).into(),
             guard: match_case
                 .guard
                 .map(|guard| Box::new((*guard, locator).into())),
-            body: match_case
-                .body
-                .into_iter()
-                .map(|node| (node, locator).into())
-                .collect(),
+            body,
         }
     }
 }
@@ -731,24 +759,179 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 keywords,
                 body,
                 decorator_list,
-            } => Stmt {
+            } => {
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                Stmt {
+                    location: decorator_list
+                        .first()
+                        .map_or(stmt.location, |expr| expr.location),
+                    end_location: body.end_location,
+                    node: StmtKind::ClassDef {
+                        name,
+                        bases: bases
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        keywords: keywords
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        body,
+                        decorator_list: decorator_list
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
+            rustpython_parser::ast::StmtKind::If { test, body, orelse } => {
+                fn is_elif(orelse: &[rustpython_parser::ast::Stmt], locator: &Locator) -> bool {
+                    if orelse.len() == 1
+                        && matches!(orelse[0].node, rustpython_parser::ast::StmtKind::If { .. })
+                    {
+                        let (source, start, end) = locator.slice(Range::new(
+                            orelse[0].location,
+                            orelse[0].end_location.unwrap(),
+                        ));
+                        if source[start..end].starts_with("elif") {
+                            return true;
+                        }
+                    }
+                    false
+                }
+
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                if !orelse.is_empty() {
+                    if is_elif(&orelse, locator) {
+                        // Find the start and end of the `elif`.
+                        let elif: Stmt = (orelse[0].clone(), locator).into();
+                        let StmtKind::If {
+                            test: elif_test, body: elif_body, orelse: elif_orelse, ..
+                        } = elif.node else {
+                            unreachable!();
+                        };
+                        let orelse = Some(Body {
+                            location: elif.location,
+                            end_location: elif.end_location,
+                            node: vec![Stmt {
+                                location: elif.location,
+                                end_location: elif.end_location,
+                                node: StmtKind::If {
+                                    test: elif_test,
+                                    body: elif_body,
+                                    orelse: elif_orelse,
+                                    is_elif: true,
+                                },
+                                trivia: vec![],
+                                parentheses: Parenthesize::Never,
+                            }],
+                            trivia: vec![],
+                            parentheses: Parenthesize::Never,
+                        });
+
+                        Stmt {
+                            location: stmt.location,
+                            end_location: elif.end_location,
+                            node: StmtKind::If {
+                                test: Box::new((*test, locator).into()),
+                                body,
+                                orelse,
+                                is_elif: false,
+                            },
+                            trivia: vec![],
+                            parentheses: Parenthesize::Never,
+                        }
+                    } else {
+                        // Find the start and end of the `else`.
+                        let (orelse_location, orelse_end_location) = expand_indented_block(
+                            body.end_location.unwrap(),
+                            orelse.last().unwrap().end_location.unwrap(),
+                            locator,
+                        );
+                        let orelse = Body {
+                            location: orelse_location,
+                            end_location: Some(orelse_end_location),
+                            node: orelse
+                                .into_iter()
+                                .map(|node| (node, locator).into())
+                                .collect(),
+                            trivia: vec![],
+                            parentheses: Parenthesize::Never,
+                        };
+
+                        Stmt {
+                            location: stmt.location,
+                            end_location: orelse.end_location,
+                            node: StmtKind::If {
+                                test: Box::new((*test, locator).into()),
+                                body,
+                                orelse: Some(orelse),
+                                is_elif: false,
+                            },
+                            trivia: vec![],
+                            parentheses: Parenthesize::Never,
+                        }
+                    }
+                } else {
+                    // No `else` block.
+                    Stmt {
+                        location: stmt.location,
+                        end_location: body.end_location,
+                        node: StmtKind::If {
+                            test: Box::new((*test, locator).into()),
+                            body,
+                            orelse: None,
+                            is_elif: false,
+                        },
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                }
+            }
+            rustpython_parser::ast::StmtKind::Assert { test, msg } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
-                node: StmtKind::ClassDef {
-                    name,
-                    bases: bases
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    keywords: keywords
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    body: (body, locator).into(),
-                    decorator_list: decorator_list
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
+                node: StmtKind::Assert {
+                    test: Box::new((*test, locator).into()),
+                    msg: msg.map(|node| Box::new((*node, locator).into())),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -760,49 +943,46 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 decorator_list,
                 returns,
                 type_comment,
-            } => Stmt {
-                location: decorator_list
-                    .first()
-                    .map_or(stmt.location, |expr| expr.location),
-                end_location: stmt.end_location,
-                node: StmtKind::FunctionDef {
-                    name,
-                    args: Box::new((*args, locator).into()),
-                    body: (body, locator).into(),
-                    decorator_list: decorator_list
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    returns: returns.map(|r| Box::new((*r, locator).into())),
-                    type_comment,
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
-            rustpython_parser::ast::StmtKind::If { test, body, orelse } => Stmt {
-                location: stmt.location,
-                end_location: stmt.end_location,
-                // .map(|end_location| {
-                // expand_indented_block(stmt.location, end_location, locator)
-                // }),
-                node: StmtKind::If {
-                    test: Box::new((*test, locator).into()),
-                    body: (body, locator).into(),
-                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
-            rustpython_parser::ast::StmtKind::Assert { test, msg } => Stmt {
-                location: stmt.location,
-                end_location: stmt.end_location,
-                node: StmtKind::Assert {
-                    test: Box::new((*test, locator).into()),
-                    msg: msg.map(|node| Box::new((*node, locator).into())),
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
+            } => {
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                Stmt {
+                    location: decorator_list
+                        .first()
+                        .map_or(stmt.location, |expr| expr.location),
+                    end_location: body.end_location,
+                    node: StmtKind::FunctionDef {
+                        name,
+                        args: Box::new((*args, locator).into()),
+                        body,
+                        decorator_list: decorator_list
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        returns: returns.map(|r| Box::new((*r, locator).into())),
+                        type_comment,
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
             rustpython_parser::ast::StmtKind::AsyncFunctionDef {
                 name,
                 args,
@@ -810,23 +990,46 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 decorator_list,
                 returns,
                 type_comment,
-            } => Stmt {
-                location: stmt.location,
-                end_location: stmt.end_location,
-                node: StmtKind::AsyncFunctionDef {
-                    name,
-                    args: Box::new((*args, locator).into()),
-                    body: (body, locator).into(),
-                    decorator_list: decorator_list
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    returns: returns.map(|r| Box::new((*r, locator).into())),
-                    type_comment,
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
+            } => {
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                Stmt {
+                    location: decorator_list
+                        .first()
+                        .map_or(stmt.location, |expr| expr.location),
+                    end_location: body.end_location,
+                    node: StmtKind::AsyncFunctionDef {
+                        name,
+                        args: Box::new((*args, locator).into()),
+                        body,
+                        decorator_list: decorator_list
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        returns: returns.map(|r| Box::new((*r, locator).into())),
+                        type_comment,
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
             rustpython_parser::ast::StmtKind::Delete { targets } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
@@ -873,85 +1076,253 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 body,
                 orelse,
                 type_comment,
-            } => Stmt {
-                location: stmt.location,
-                end_location: stmt.end_location,
-                node: StmtKind::For {
-                    target: Box::new((*target, locator).into()),
-                    iter: Box::new((*iter, locator).into()),
-                    body: (body, locator).into(),
-                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
-                    type_comment,
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
+            } => {
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                // Find the start and end of the `orelse`.
+                let orelse = if !orelse.is_empty() {
+                    let (orelse_location, orelse_end_location) = expand_indented_block(
+                        body.end_location.unwrap(),
+                        orelse.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Some(Body {
+                        location: orelse_location,
+                        end_location: Some(orelse_end_location),
+                        node: orelse
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    })
+                } else {
+                    None
+                };
+
+                Stmt {
+                    location: stmt.location,
+                    end_location: orelse.as_ref().unwrap_or(&body).end_location,
+                    node: StmtKind::For {
+                        target: Box::new((*target, locator).into()),
+                        iter: Box::new((*iter, locator).into()),
+                        body,
+                        orelse,
+                        type_comment,
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
             rustpython_parser::ast::StmtKind::AsyncFor {
                 target,
                 iter,
                 body,
                 orelse,
                 type_comment,
-            } => Stmt {
-                location: stmt.location,
-                end_location: stmt.end_location,
-                node: StmtKind::AsyncFor {
-                    target: Box::new((*target, locator).into()),
-                    iter: Box::new((*iter, locator).into()),
-                    body: (body, locator).into(),
-                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
-                    type_comment,
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
-            rustpython_parser::ast::StmtKind::While { test, body, orelse } => Stmt {
-                location: stmt.location,
-                end_location: stmt.end_location,
-                node: StmtKind::While {
-                    test: Box::new((*test, locator).into()),
-                    body: (body, locator).into(),
-                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
+            } => {
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                // Find the start and end of the `orelse`.
+                let orelse = if !orelse.is_empty() {
+                    let (orelse_location, orelse_end_location) = expand_indented_block(
+                        body.end_location.unwrap(),
+                        orelse.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Some(Body {
+                        location: orelse_location,
+                        end_location: Some(orelse_end_location),
+                        node: orelse
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    })
+                } else {
+                    None
+                };
+
+                Stmt {
+                    location: stmt.location,
+                    end_location: orelse.as_ref().unwrap_or(&body).end_location,
+                    node: StmtKind::AsyncFor {
+                        target: Box::new((*target, locator).into()),
+                        iter: Box::new((*iter, locator).into()),
+                        body,
+                        orelse,
+                        type_comment,
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
+            rustpython_parser::ast::StmtKind::While { test, body, orelse } => {
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                // Find the start and end of the `orelse`.
+                let orelse = if !orelse.is_empty() {
+                    let (orelse_location, orelse_end_location) = expand_indented_block(
+                        body.end_location.unwrap(),
+                        orelse.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Some(Body {
+                        location: orelse_location,
+                        end_location: Some(orelse_end_location),
+                        node: orelse
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    })
+                } else {
+                    None
+                };
+
+                Stmt {
+                    location: stmt.location,
+                    end_location: orelse.as_ref().unwrap_or(&body).end_location,
+                    node: StmtKind::While {
+                        test: Box::new((*test, locator).into()),
+                        body,
+                        orelse,
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
             rustpython_parser::ast::StmtKind::With {
                 items,
                 body,
                 type_comment,
-            } => Stmt {
-                location: stmt.location,
-                end_location: stmt.end_location,
-                node: StmtKind::With {
-                    items: items
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    body: (body, locator).into(),
-                    type_comment,
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
+            } => {
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                Stmt {
+                    location: stmt.location,
+                    end_location: body.end_location,
+                    node: StmtKind::With {
+                        items: items
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        body,
+                        type_comment,
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
             rustpython_parser::ast::StmtKind::AsyncWith {
                 items,
                 body,
                 type_comment,
-            } => Stmt {
-                location: stmt.location,
-                end_location: stmt.end_location,
-                node: StmtKind::AsyncWith {
-                    items: items
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    body: (body, locator).into(),
-                    type_comment,
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
+            } => {
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                Stmt {
+                    location: stmt.location,
+                    end_location: body.end_location,
+                    node: StmtKind::AsyncWith {
+                        items: items
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        body,
+                        type_comment,
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
             rustpython_parser::ast::StmtKind::Match { subject, cases } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
@@ -965,6 +1336,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
+
             rustpython_parser::ast::StmtKind::Raise { exc, cause } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
@@ -980,21 +1352,109 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 handlers,
                 orelse,
                 finalbody,
-            } => Stmt {
-                location: stmt.location,
-                end_location: stmt.end_location,
-                node: StmtKind::Try {
-                    body: (body, locator).into(),
-                    handlers: handlers
-                        .into_iter()
-                        .map(|node| (node, locator).into())
-                        .collect(),
-                    orelse: (!orelse.is_empty()).then(|| (orelse, locator).into()),
-                    finalbody: (!finalbody.is_empty()).then(|| (finalbody, locator).into()),
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
+            } => {
+                // Find the start and end of the `body`.
+                let body = {
+                    let (body_location, body_end_location) = expand_indented_block(
+                        stmt.location,
+                        body.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Body {
+                        location: body_location,
+                        end_location: Some(body_end_location),
+                        node: body
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    }
+                };
+
+                let handlers: Vec<Excepthandler> = handlers
+                    .into_iter()
+                    .map(|node| (node, locator).into())
+                    .collect();
+
+                // Find the start and end of the `orelse`.
+                let orelse = if !orelse.is_empty() {
+                    let (orelse_location, orelse_end_location) = expand_indented_block(
+                        handlers
+                            .last()
+                            .map_or(body.end_location.unwrap(), |handler| {
+                                handler.end_location.unwrap()
+                            }),
+                        orelse.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Some(Body {
+                        location: orelse_location,
+                        end_location: Some(orelse_end_location),
+                        node: orelse
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    })
+                } else {
+                    None
+                };
+
+                // Find the start and end of the `finalbody`.
+                let finalbody = if !finalbody.is_empty() {
+                    let (finalbody_location, finalbody_end_location) = expand_indented_block(
+                        orelse.as_ref().map_or(
+                            handlers
+                                .last()
+                                .map_or(body.end_location.unwrap(), |handler| {
+                                    handler.end_location.unwrap()
+                                }),
+                            |orelse| orelse.end_location.unwrap(),
+                        ),
+                        finalbody.last().unwrap().end_location.unwrap(),
+                        locator,
+                    );
+                    Some(Body {
+                        location: finalbody_location,
+                        end_location: Some(finalbody_end_location),
+                        node: finalbody
+                            .into_iter()
+                            .map(|node| (node, locator).into())
+                            .collect(),
+                        trivia: vec![],
+                        parentheses: Parenthesize::Never,
+                    })
+                } else {
+                    None
+                };
+
+                Stmt {
+                    location: stmt.location,
+                    end_location: Some(
+                        finalbody.as_ref().map_or(
+                            orelse.as_ref().map_or(
+                                handlers
+                                    .last()
+                                    .map_or(body.end_location.unwrap(), |handler| {
+                                        handler.end_location.unwrap()
+                                    }),
+                                |orelse| orelse.end_location.unwrap(),
+                            ),
+                            |finalbody| finalbody.end_location.unwrap(),
+                        ),
+                    ),
+                    node: StmtKind::Try {
+                        body,
+                        handlers,
+                        orelse,
+                        finalbody,
+                    },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
             rustpython_parser::ast::StmtKind::TryStar {
                 body,
                 handlers,

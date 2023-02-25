@@ -198,7 +198,9 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
                 visitor.visit_body(orelse);
             }
         }
-        StmtKind::If { test, body, orelse } => {
+        StmtKind::If {
+            test, body, orelse, ..
+        } => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
             if let Some(orelse) = orelse {
