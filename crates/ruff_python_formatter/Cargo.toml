@@ -13,6 +13,7 @@ ruff_text_size = { path = "../ruff_text_size" }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
+is-macro = { workspace = true }
 once_cell = { workspace = true }
 rustc-hash = { workspace = true }
 rustpython-common = { workspace = true }

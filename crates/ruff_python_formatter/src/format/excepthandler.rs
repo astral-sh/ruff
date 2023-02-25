@@ -7,7 +7,6 @@ use crate::context::ASTFormatContext;
 use crate::cst::{Excepthandler, ExcepthandlerKind};
 use crate::format::builders::block;
 use crate::shared_traits::AsFormat;
-use crate::trivia::{Relationship, TriviaKind};
 
 pub struct FormatExcepthandler<'a> {
     item: &'a Excepthandler,
@@ -46,12 +45,8 @@ impl Format<ASTFormatContext<'_>> for FormatExcepthandler<'_> {
         // Format any end-of-line comments.
         let mut first = true;
         for range in excepthandler.trivia.iter().filter_map(|trivia| {
-            if matches!(trivia.relationship, Relationship::Trailing) {
-                if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                    Some(range)
-                } else {
-                    None
-                }
+            if trivia.relationship.is_trailing() {
+                trivia.kind.end_of_line_comment()
             } else {
                 None
             }
