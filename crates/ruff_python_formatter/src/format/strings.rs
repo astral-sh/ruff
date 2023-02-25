@@ -8,7 +8,6 @@ use crate::context::ASTFormatContext;
 use crate::core::helpers::{leading_quote, trailing_quote};
 use crate::core::types::Range;
 use crate::cst::Expr;
-use crate::trivia::Parenthesize;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct StringLiteralPart {
@@ -142,7 +141,7 @@ impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
         write!(
             f,
             [group(&format_with(|f| {
-                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                if expr.parentheses.is_if_expanded() {
                     write!(f, [if_group_breaks(&text("("))])?;
                 }
                 for (i, elt) in elts.iter().enumerate() {
@@ -151,7 +150,7 @@ impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
                         write!(f, [soft_line_break_or_space()])?;
                     }
                 }
-                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                if expr.parentheses.is_if_expanded() {
                     write!(f, [if_group_breaks(&text(")"))])?;
                 }
                 Ok(())

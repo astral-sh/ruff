@@ -48,7 +48,7 @@ pub struct TriviaToken {
     pub kind: TriviaTokenKind,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
 pub enum TriviaKind {
     /// A Comment that is separated by at least one line break from the
     /// preceding token.
@@ -77,14 +77,14 @@ pub enum TriviaKind {
     Parentheses,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
 pub enum Relationship {
     Leading,
     Trailing,
     Dangling,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, is_macro::Is)]
 pub enum Parenthesize {
     /// Always parenthesize the statement or expression.
     Always,
