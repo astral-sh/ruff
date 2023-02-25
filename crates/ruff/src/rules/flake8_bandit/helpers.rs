@@ -4,11 +4,8 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::checkers::ast::Checker;
 
-static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-    r"(^(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)$|_(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)_|^(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)_|_(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)$)"
-).unwrap()
-});
+static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(^|_)(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)($|_)").unwrap());
 
 pub fn string_literal(expr: &Expr) -> Option<&str> {
     match &expr.node {
