@@ -1,0 +1,40 @@
+---
+source: compiler/parser/src/string.rs
+expression: parse_ast
+---
+[
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 21,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 1,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 1,
+                        column: 21,
+                    },
+                ),
+                custom: (),
+                node: Constant {
+                    value: Str(
+                        "\r",
+                    ),
+                    kind: None,
+                },
+            },
+        },
+    },
+]

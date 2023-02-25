@@ -1048,4 +1048,28 @@ mod tests {
         let parse_ast = parse_program(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
+
+    macro_rules! test_aliases_parse {
+        ($($name:ident: $alias:expr,)*) => {
+        $(
+            #[test]
+            fn $name() {
+                let source = format!(r#""\N{{{0}}}""#, $alias);
+                let parse_ast = parse_program(&source, "<test>").unwrap();
+                insta::assert_debug_snapshot!(parse_ast);
+            }
+        )*
+        }
+    }
+
+    test_aliases_parse! {
+        test_backspace_alias: "BACKSPACE",
+        test_bell_alias: "BEL",
+        test_carriage_return_alias: "CARRIAGE RETURN",
+        test_delete_alias: "DELETE",
+        test_escape_alias: "ESCAPE",
+        test_form_feed_alias: "FORM FEED",
+        test_hts_alias: "HTS",
+        test_character_tabulation_with_justification_alias: "CHARACTER TABULATION WITH JUSTIFICATION",
+    }
 }
