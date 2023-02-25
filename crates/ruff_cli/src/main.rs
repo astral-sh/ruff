@@ -9,7 +9,6 @@ use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ::ruff::logging::{set_up_logging, LogLevel};
-use ::ruff::resolver::PyprojectDiscovery;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::CliSettings;
 use ::ruff::{fix, fs, warn_user_once};
@@ -151,10 +150,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         show_fixes,
         update_check,
         ..
-    } = match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => settings.cli.clone(),
-        PyprojectDiscovery::Hierarchical(settings) => settings.cli.clone(),
-    };
+    } = pyproject_strategy.top_level_settings().cli.clone();
 
     // Autofix rules are as follows:
     // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or

@@ -65,8 +65,7 @@ pub fn lint_path(
     // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
-    let metadata = if matches!(cache, flags::Cache::Enabled)
-        && matches!(autofix, fix::FixMode::None | fix::FixMode::Generate)
+    let metadata = if cache.into() && matches!(autofix, fix::FixMode::None | fix::FixMode::Generate)
     {
         let metadata = path.metadata()?;
         if let Some(messages) =
@@ -81,7 +80,7 @@ pub fn lint_path(
     };
 
     // Read the file from disk.
-    let contents = fs::read_file(path)?;
+    let contents = std::fs::read_to_string(path)?;
 
     // Lint the file.
     let (

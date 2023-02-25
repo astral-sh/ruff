@@ -6,12 +6,13 @@ use log::debug;
 use ruff_python::sys::KNOWN_STANDARD_LIBRARY;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
 
 use super::types::{ImportBlock, Importable};
 use crate::settings::types::PythonVersion;
 
 #[derive(
-    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash,
+    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash, EnumIter,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ImportType {
@@ -153,7 +154,7 @@ pub fn categorize_imports<'a>(
             .insert(import_from, aliases);
     }
     // Categorize `StmtKind::ImportFrom` (with re-export).
-    for ((import_from, alias), comments) in block.import_from_as {
+    for ((import_from, alias), aliases) in block.import_from_as {
         let classification = categorize(
             &import_from.module_base(),
             import_from.level,
@@ -169,7 +170,7 @@ pub fn categorize_imports<'a>(
             .entry(classification)
             .or_default()
             .import_from_as
-            .insert((import_from, alias), comments);
+            .insert((import_from, alias), aliases);
     }
     // Categorize `StmtKind::ImportFrom` (with star).
     for (import_from, comments) in block.import_from_star {

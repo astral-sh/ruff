@@ -33,10 +33,8 @@ pub mod resolver;
 mod rule_redirects;
 mod rule_selector;
 mod rules;
-mod rustpython_helpers;
 pub mod settings;
 pub mod source_code;
-mod vendor;
 mod violation;
 mod visibility;
 

@@ -4,8 +4,7 @@ use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
 use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, StmtKind};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers;
 use crate::ast::helpers::to_absolute;
@@ -371,7 +370,7 @@ pub fn remove_argument(
     if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count: usize = 0;
-        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
+        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, stmt_at).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
@@ -403,7 +402,7 @@ pub fn remove_argument(
     {
         // Case 2: argument or keyword is _not_ the last node.
         let mut seen_comma = false;
-        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
+        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, stmt_at).flatten() {
             if seen_comma {
                 if matches!(tok, Tok::NonLogicalNewline) {
                     // Also delete any non-logical newlines after the comma.
@@ -426,7 +425,7 @@ pub fn remove_argument(
     } else {
         // Case 3: argument or keyword is the last node, so we have to find the last
         // comma in the stmt.
-        for (start, tok, _) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
+        for (start, tok, _) in lexer::lex_located(contents, Mode::Module, stmt_at).flatten() {
             if start == expr_at {
                 fix_end = Some(expr_end);
                 break;
@@ -448,8 +447,8 @@ pub fn remove_argument(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use rustpython_parser as parser;
     use rustpython_parser::ast::Location;
-    use rustpython_parser::parser;
 
     use crate::autofix::helpers::{next_stmt_break, trailing_semicolon};
     use crate::source_code::Locator;

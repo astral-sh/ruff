@@ -32,12 +32,8 @@ impl Violation for ImportReplacements {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let ImportReplacements { fixable, .. } = self;
-        if *fixable {
-            Some(|ImportReplacements { module, .. }| format!("Import from `{module}`"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|ImportReplacements { module, .. }| format!("Import from `{module}`"))
     }
 }
 

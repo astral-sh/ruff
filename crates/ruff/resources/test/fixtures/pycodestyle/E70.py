@@ -57,3 +57,6 @@ class C: ...; ...
 #: E701:2:12
 match *0, 1, *2:
     case 0,: y = 0
+#:
+class Foo:
+    match: Optional[Match] = None

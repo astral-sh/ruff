@@ -1,9 +1,13 @@
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::core::types::Range;
-use crate::cst::{Alias, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind};
+use crate::cst::{
+    Alias, Excepthandler, ExcepthandlerKind, Expr, ExprKind, SliceIndex, SliceIndexKind, Stmt,
+    StmtKind,
+};
 
 #[derive(Clone, Debug)]
 pub enum Node<'a> {
@@ -12,6 +16,7 @@ pub enum Node<'a> {
     Expr(&'a Expr),
     Alias(&'a Alias),
     Excepthandler(&'a Excepthandler),
+    SliceIndex(&'a SliceIndex),
 }
 
 impl Node<'_> {
@@ -22,6 +27,7 @@ impl Node<'_> {
             Node::Expr(node) => node.id(),
             Node::Alias(node) => node.id(),
             Node::Excepthandler(node) => node.id(),
+            Node::SliceIndex(node) => node.id(),
         }
     }
 }
@@ -31,7 +37,6 @@ pub enum TriviaTokenKind {
     OwnLineComment,
     EndOfLineComment,
     MagicTrailingComma,
-    MagicTrailingColon,
     EmptyLine,
     Parentheses,
 }
@@ -45,7 +50,8 @@ pub struct TriviaToken {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TriviaKind {
-    /// A Comment that is separated by at least one line break from the preceding token.
+    /// A Comment that is separated by at least one line break from the
+    /// preceding token.
     ///
     /// # Examples
     ///
@@ -67,7 +73,6 @@ pub enum TriviaKind {
     /// ```
     EndOfLineComment(Range),
     MagicTrailingComma,
-    MagicTrailingColon,
     EmptyLine,
     Parentheses,
 }
@@ -100,10 +105,6 @@ impl Trivia {
         match token.kind {
             TriviaTokenKind::MagicTrailingComma => Self {
                 kind: TriviaKind::MagicTrailingComma,
-                relationship,
-            },
-            TriviaTokenKind::MagicTrailingColon => Self {
-                kind: TriviaKind::MagicTrailingColon,
                 relationship,
             },
             TriviaTokenKind::EmptyLine => Self {
@@ -169,19 +170,20 @@ pub fn extract_trivia_tokens(lxr: &[LexResult]) -> Vec<TriviaToken> {
                         end: *prev_end,
                         kind: TriviaTokenKind::MagicTrailingComma,
                     });
-                } else if prev_tok == &Tok::Colon {
-                    tokens.push(TriviaToken {
-                        start: *prev_start,
-                        end: *prev_end,
-                        kind: TriviaTokenKind::MagicTrailingColon,
-                    });
                 }
             }
         }
 
         if matches!(tok, Tok::Lpar) {
             if prev_tok.map_or(true, |(_, prev_tok, _)| {
-                !matches!(prev_tok, Tok::Name { .. })
+                !matches!(
+                    prev_tok,
+                    Tok::Name { .. }
+                        | Tok::Int { .. }
+                        | Tok::Float { .. }
+                        | Tok::Complex { .. }
+                        | Tok::String { .. }
+                )
             }) {
                 parens.push((start, true));
             } else {
@@ -441,12 +443,8 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     result.push(Node::Alias(name));
                 }
             }
-            StmtKind::Global { .. } => {
-                // TODO(charlie): Ident, not sure how to handle?
-            }
-            StmtKind::Nonlocal { .. } => {
-                // TODO(charlie): Ident, not sure how to handle?
-            }
+            StmtKind::Global { .. } => {}
+            StmtKind::Nonlocal { .. } => {}
         },
         // TODO(charlie): Actual logic, this doesn't do anything.
         Node::Expr(expr) => match &expr.node {
@@ -608,14 +606,10 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 }
             }
             ExprKind::Slice { lower, upper, step } => {
-                if let Some(lower) = lower {
-                    result.push(Node::Expr(lower));
-                }
-                if let Some(upper) = upper {
-                    result.push(Node::Expr(upper));
-                }
+                result.push(Node::SliceIndex(lower));
+                result.push(Node::SliceIndex(upper));
                 if let Some(step) = step {
-                    result.push(Node::Expr(step));
+                    result.push(Node::SliceIndex(step));
                 }
             }
         },
@@ -628,6 +622,11 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             }
             for stmt in body {
                 result.push(Node::Stmt(stmt));
+            }
+        }
+        Node::SliceIndex(slice_index) => {
+            if let SliceIndexKind::Index { value } = &slice_index.node {
+                result.push(Node::Expr(value));
             }
         }
     }
@@ -670,6 +669,7 @@ pub fn decorate_token<'a>(
             Node::Expr(node) => node.location,
             Node::Alias(node) => node.location,
             Node::Excepthandler(node) => node.location,
+            Node::SliceIndex(node) => node.location,
             Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
         };
         let end = match &child {
@@ -677,6 +677,7 @@ pub fn decorate_token<'a>(
             Node::Expr(node) => node.end_location.unwrap(),
             Node::Alias(node) => node.end_location.unwrap(),
             Node::Excepthandler(node) => node.end_location.unwrap(),
+            Node::SliceIndex(node) => node.end_location.unwrap(),
             Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
         };
 
@@ -688,6 +689,7 @@ pub fn decorate_token<'a>(
                 Node::Expr(node) => node.location,
                 Node::Alias(node) => node.location,
                 Node::Excepthandler(node) => node.location,
+                Node::SliceIndex(node) => node.location,
                 Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
             };
             let existing_end = match &existing {
@@ -695,6 +697,7 @@ pub fn decorate_token<'a>(
                 Node::Expr(node) => node.end_location.unwrap(),
                 Node::Alias(node) => node.end_location.unwrap(),
                 Node::Excepthandler(node) => node.end_location.unwrap(),
+                Node::SliceIndex(node) => node.end_location.unwrap(),
                 Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
             };
             if start == existing_start && end == existing_end {
@@ -754,10 +757,10 @@ pub struct TriviaIndex {
     pub expr: FxHashMap<usize, Vec<Trivia>>,
     pub alias: FxHashMap<usize, Vec<Trivia>>,
     pub excepthandler: FxHashMap<usize, Vec<Trivia>>,
-    pub withitem: FxHashMap<usize, Vec<Trivia>>,
+    pub slice_index: FxHashMap<usize, Vec<Trivia>>,
 }
 
-fn add_comment<'a>(comment: Trivia, node: &Node<'a>, trivia: &mut TriviaIndex) {
+fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
     match node {
         Node::Mod(_) => {}
         Node::Stmt(node) => {
@@ -784,6 +787,13 @@ fn add_comment<'a>(comment: Trivia, node: &Node<'a>, trivia: &mut TriviaIndex) {
         Node::Excepthandler(node) => {
             trivia
                 .excepthandler
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::SliceIndex(node) => {
+            trivia
+                .slice_index
                 .entry(node.id())
                 .or_insert_with(Vec::new)
                 .push(comment);
@@ -862,7 +872,7 @@ pub fn decorate_trivia(tokens: Vec<TriviaToken>, python_ast: &[Stmt]) -> TriviaI
                     unreachable!("Attach token to the ast: {:?}", token);
                 }
             }
-            TriviaTokenKind::MagicTrailingComma | TriviaTokenKind::MagicTrailingColon => {
+            TriviaTokenKind::MagicTrailingComma => {
                 if let Some(enclosing_node) = enclosing_node {
                     add_comment(
                         Trivia::from_token(&token, Relationship::Trailing),

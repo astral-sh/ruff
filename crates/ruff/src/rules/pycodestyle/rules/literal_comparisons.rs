@@ -102,68 +102,72 @@ pub fn literal_comparisons(
     // Check `left`.
     let mut comparator = left;
     let next = &comparators[0];
-    if check_none_comparisons
-        && matches!(
-            comparator.node,
-            ExprKind::Constant {
-                value: Constant::None,
-                kind: None
-            }
-        )
-    {
-        if matches!(op, Cmpop::Eq) {
-            let diagnostic =
-                Diagnostic::new(NoneComparison(op.into()), Range::from_located(comparator));
-            if checker.patch(diagnostic.kind.rule()) && !helpers::is_constant_non_singleton(next) {
-                bad_ops.insert(0, Cmpop::Is);
-            }
-            diagnostics.push(diagnostic);
-        }
-        if matches!(op, Cmpop::NotEq) {
-            let diagnostic =
-                Diagnostic::new(NoneComparison(op.into()), Range::from_located(comparator));
-            if checker.patch(diagnostic.kind.rule()) && !helpers::is_constant_non_singleton(next) {
-                bad_ops.insert(0, Cmpop::IsNot);
-            }
-            diagnostics.push(diagnostic);
-        }
-    }
 
-    if check_true_false_comparisons {
-        if let ExprKind::Constant {
-            value: Constant::Bool(value),
-            kind: None,
-        } = comparator.node
+    if !helpers::is_constant_non_singleton(next) {
+        if check_none_comparisons
+            && matches!(
+                comparator.node,
+                ExprKind::Constant {
+                    value: Constant::None,
+                    kind: None
+                }
+            )
         {
             if matches!(op, Cmpop::Eq) {
-                let diagnostic = Diagnostic::new(
-                    TrueFalseComparison(value, op.into()),
-                    Range::from_located(comparator),
-                );
-                if checker.patch(diagnostic.kind.rule())
-                    && !helpers::is_constant_non_singleton(next)
-                {
+                let diagnostic =
+                    Diagnostic::new(NoneComparison(op.into()), Range::from_located(comparator));
+                if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(0, Cmpop::Is);
                 }
                 diagnostics.push(diagnostic);
             }
             if matches!(op, Cmpop::NotEq) {
-                let diagnostic = Diagnostic::new(
-                    TrueFalseComparison(value, op.into()),
-                    Range::from_located(comparator),
-                );
-                if checker.patch(diagnostic.kind.rule())
-                    && !helpers::is_constant_non_singleton(next)
-                {
+                let diagnostic =
+                    Diagnostic::new(NoneComparison(op.into()), Range::from_located(comparator));
+                if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(0, Cmpop::IsNot);
                 }
                 diagnostics.push(diagnostic);
+            }
+        }
+
+        if check_true_false_comparisons {
+            if let ExprKind::Constant {
+                value: Constant::Bool(value),
+                kind: None,
+            } = comparator.node
+            {
+                if matches!(op, Cmpop::Eq) {
+                    let diagnostic = Diagnostic::new(
+                        TrueFalseComparison(value, op.into()),
+                        Range::from_located(comparator),
+                    );
+                    if checker.patch(diagnostic.kind.rule()) {
+                        bad_ops.insert(0, Cmpop::Is);
+                    }
+                    diagnostics.push(diagnostic);
+                }
+                if matches!(op, Cmpop::NotEq) {
+                    let diagnostic = Diagnostic::new(
+                        TrueFalseComparison(value, op.into()),
+                        Range::from_located(comparator),
+                    );
+                    if checker.patch(diagnostic.kind.rule()) {
+                        bad_ops.insert(0, Cmpop::IsNot);
+                    }
+                    diagnostics.push(diagnostic);
+                }
             }
         }
     }
 
     // Check each comparator in order.
     for (idx, (op, next)) in izip!(ops, comparators).enumerate() {
+        if helpers::is_constant_non_singleton(comparator) {
+            comparator = next;
+            continue;
+        }
+
         if check_none_comparisons
             && matches!(
                 next.node,
@@ -176,9 +180,7 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 let diagnostic =
                     Diagnostic::new(NoneComparison(op.into()), Range::from_located(next));
-                if checker.patch(diagnostic.kind.rule())
-                    && !helpers::is_constant_non_singleton(comparator)
-                {
+                if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(idx, Cmpop::Is);
                 }
                 diagnostics.push(diagnostic);
@@ -186,9 +188,7 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::NotEq) {
                 let diagnostic =
                     Diagnostic::new(NoneComparison(op.into()), Range::from_located(next));
-                if checker.patch(diagnostic.kind.rule())
-                    && !helpers::is_constant_non_singleton(comparator)
-                {
+                if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(idx, Cmpop::IsNot);
                 }
                 diagnostics.push(diagnostic);
@@ -206,9 +206,7 @@ pub fn literal_comparisons(
                         TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch(diagnostic.kind.rule())
-                        && !helpers::is_constant_non_singleton(comparator)
-                    {
+                    if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(idx, Cmpop::Is);
                     }
                     diagnostics.push(diagnostic);
@@ -218,9 +216,7 @@ pub fn literal_comparisons(
                         TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch(diagnostic.kind.rule())
-                        && !helpers::is_constant_non_singleton(comparator)
-                    {
+                    if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(idx, Cmpop::IsNot);
                     }
                     diagnostics.push(diagnostic);

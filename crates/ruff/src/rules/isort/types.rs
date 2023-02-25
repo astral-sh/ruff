@@ -55,26 +55,26 @@ impl Importable for ImportFromData<'_> {
 }
 
 #[derive(Debug, Default)]
+pub struct ImportFromStatement<'a> {
+    pub comments: CommentSet<'a>,
+    pub aliases: FxHashMap<AliasData<'a>, CommentSet<'a>>,
+    pub trailing_comma: TrailingComma,
+}
+
+#[derive(Debug, Default)]
 pub struct ImportBlock<'a> {
     // Set of (name, asname), used to track regular imports.
     // Ex) `import module`
     pub import: FxHashMap<AliasData<'a>, CommentSet<'a>>,
     // Map from (module, level) to `AliasData`, used to track 'from' imports.
     // Ex) `from module import member`
-    pub import_from: FxHashMap<
-        ImportFromData<'a>,
-        (
-            CommentSet<'a>,
-            FxHashMap<AliasData<'a>, CommentSet<'a>>,
-            TrailingComma,
-        ),
-    >,
+    pub import_from: FxHashMap<ImportFromData<'a>, ImportFromStatement<'a>>,
     // Set of (module, level, name, asname), used to track re-exported 'from' imports.
     // Ex) `from module import member as member`
-    pub import_from_as: FxHashMap<(ImportFromData<'a>, AliasData<'a>), CommentSet<'a>>,
+    pub import_from_as: FxHashMap<(ImportFromData<'a>, AliasData<'a>), ImportFromStatement<'a>>,
     // Map from (module, level) to `AliasData`, used to track star imports.
     // Ex) `from module import *`
-    pub import_from_star: FxHashMap<ImportFromData<'a>, CommentSet<'a>>,
+    pub import_from_star: FxHashMap<ImportFromData<'a>, ImportFromStatement<'a>>,
 }
 
 type AliasDataWithComments<'a> = (AliasData<'a>, CommentSet<'a>);

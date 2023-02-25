@@ -8,8 +8,9 @@ use rustpython_parser::ast::{
     Suite, Withitem,
 };
 
+use ruff_rustpython::vendor::{bytes, str};
+
 use crate::source_code::stylist::{Indentation, LineEnding, Quote, Stylist};
-use crate::vendor::{bytes, str};
 
 mod precedence {
     pub const ASSIGN: u8 = 3;
@@ -1258,7 +1259,7 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::parser;
+    use rustpython_parser as parser;
 
     use crate::source_code::stylist::{Indentation, LineEnding, Quote};
     use crate::source_code::Generator;

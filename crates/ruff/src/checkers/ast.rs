@@ -6,18 +6,17 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
+use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python::typing::TYPING_EXTENSIONS;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
+use rustpython_parser as parser;
 use rustpython_parser::ast::{
     Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
     ExprKind, KeywordData, Located, Location, Operator, Pattern, PatternKind, Stmt, StmtKind,
     Suite,
 };
-use rustpython_parser::parser;
 use smallvec::smallvec;
-
-use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python::typing::TYPING_EXTENSIONS;
 
 use crate::ast::helpers::{
     binding_range, collect_call_path, extract_handler_names, from_relative_import, to_module_path,
@@ -188,7 +187,7 @@ impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self, code: &Rule) -> bool {
-        matches!(self.autofix, flags::Autofix::Enabled) && self.settings.rules.should_fix(code)
+        self.autofix.into() && self.settings.rules.should_fix(code)
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -230,9 +229,8 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if `member` is bound as a builtin.
     pub fn is_builtin(&self, member: &str) -> bool {
-        self.find_binding(member).map_or(false, |binding| {
-            matches!(binding.kind, BindingKind::Builtin)
-        })
+        self.find_binding(member)
+            .map_or(false, |binding| binding.kind.is_builtin())
     }
 
     pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
@@ -296,7 +294,7 @@ impl<'a> Checker<'a> {
         // members from the fix that will eventually be excluded by a `noqa`.
         // Unfortunately, we _do_ want to register a `Diagnostic` for each
         // eventually-ignored import, so that our `noqa` counts are accurate.
-        if matches!(self.noqa, flags::Noqa::Disabled) {
+        if !self.noqa.to_bool() {
             return false;
         }
         noqa::rule_is_ignored(code, lineno, self.noqa_line_for, self.locator)
@@ -1932,9 +1930,7 @@ where
                     if self.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| {
-                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        })
+                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
                     {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
@@ -1996,9 +1992,7 @@ where
                     if self.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| {
-                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        })
+                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
                     {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
@@ -2063,8 +2057,8 @@ where
                 value,
                 ..
             } => {
-                // If we're in a class or module scope, then the annotation needs to be available
-                // at runtime.
+                // If we're in a class or module scope, then the annotation needs to be
+                // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 if !self.annotations_future_enabled
                     && matches!(
@@ -2181,8 +2175,9 @@ where
         // Pre-visit.
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
-                // Ex) Optional[...]
-                if !self.in_deferred_string_type_definition
+                // Ex) Optional[...], Union[...]
+                if self.in_type_definition
+                    && !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(&Rule::TypingUnion)
                     && (self.settings.target_version >= PythonVersion::Py310
@@ -2493,6 +2488,13 @@ where
                 // flake8-pie
                 if self.settings.rules.enabled(&Rule::UnnecessaryDictKwargs) {
                     flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnnecessaryComprehensionAnyAll)
+                {
+                    flake8_pie::rules::unnecessary_comprehension_any_all(self, expr, func, args);
                 }
 
                 // flake8-bandit
@@ -3860,6 +3862,10 @@ where
     fn visit_pattern(&mut self, pattern: &'b Pattern) {
         if let PatternKind::MatchAs {
             name: Some(name), ..
+        }
+        | PatternKind::MatchStar { name: Some(name) }
+        | PatternKind::MatchMapping {
+            rest: Some(name), ..
         } = &pattern.node
         {
             self.add_binding(
@@ -4129,7 +4135,7 @@ impl<'a> Checker<'a> {
             let existing_binding_index = self.scopes[*scope_index].bindings.get(&name).unwrap();
             let existing = &self.bindings[*existing_binding_index];
             let in_current_scope = stack_index == 0;
-            if !matches!(existing.kind, BindingKind::Builtin)
+            if !existing.kind.is_builtin()
                 && existing.source.as_ref().map_or(true, |left| {
                     binding.source.as_ref().map_or(true, |right| {
                         !branch_detection::different_forks(
@@ -4149,7 +4155,7 @@ impl<'a> Checker<'a> {
                         | BindingKind::StarImportation(..)
                         | BindingKind::FutureImportation
                 );
-                if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
+                if binding.kind.is_loop_var() && existing_is_import {
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::ImportShadowedByLoopVar {
@@ -4163,7 +4169,7 @@ impl<'a> Checker<'a> {
                     if !existing.used()
                         && binding.redefines(existing)
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
-                        && !(matches!(existing.kind, BindingKind::FunctionDefinition)
+                        && !(existing.kind.is_function_definition()
                             && visibility::is_overload(
                                 self,
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
@@ -4198,36 +4204,29 @@ impl<'a> Checker<'a> {
 
         let scope = self.current_scope();
         let binding = if let Some(index) = scope.bindings.get(&name) {
-            if matches!(self.bindings[*index].kind, BindingKind::Builtin) {
-                // Avoid overriding builtins.
-                binding
-            } else if matches!(self.bindings[*index].kind, BindingKind::Global) {
-                // If the original binding was a global, and the new binding conflicts within
-                // the current scope, then the new binding is also a global.
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
-                    kind: BindingKind::Global,
-                    ..binding
+            let existing = &self.bindings[*index];
+            match &existing.kind {
+                BindingKind::Builtin => {
+                    // Avoid overriding builtins.
+                    binding
                 }
-            } else if matches!(self.bindings[*index].kind, BindingKind::Nonlocal) {
-                // If the original binding was a nonlocal, and the new binding conflicts within
-                // the current scope, then the new binding is also a nonlocal.
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
-                    kind: BindingKind::Nonlocal,
-                    ..binding
+                kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
+                    // If the original binding was a global or nonlocal, and the new binding conflicts within
+                    // the current scope, then the new binding is also as the same.
+                    Binding {
+                        runtime_usage: existing.runtime_usage,
+                        synthetic_usage: existing.synthetic_usage,
+                        typing_usage: existing.typing_usage,
+                        kind: kind.clone(),
+                        ..binding
+                    }
                 }
-            } else {
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
+                _ => Binding {
+                    runtime_usage: existing.runtime_usage,
+                    synthetic_usage: existing.synthetic_usage,
+                    typing_usage: existing.typing_usage,
                     ..binding
-                }
+                },
             }
         } else {
             binding
@@ -4236,7 +4235,7 @@ impl<'a> Checker<'a> {
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-        if !(matches!(binding.kind, BindingKind::Annotation) && scope.bindings.contains_key(name)) {
+        if !(binding.kind.is_annotation() && scope.bindings.contains_key(name)) {
             if let Some(rebound_index) = scope.bindings.insert(name, binding_index) {
                 scope
                     .rebounds
@@ -4275,7 +4274,7 @@ impl<'a> Checker<'a> {
                 let context = self.execution_context();
                 self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
 
-                if matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                if self.bindings[*index].kind.is_annotation()
                     && !self.in_deferred_string_type_definition
                     && !self.in_deferred_type_definition
                 {
@@ -4423,9 +4422,7 @@ impl<'a> Checker<'a> {
                     .current_scope()
                     .bindings
                     .get(id)
-                    .map_or(false, |index| {
-                        matches!(self.bindings[*index].kind, BindingKind::Global)
-                    })
+                    .map_or(false, |index| self.bindings[*index].kind.is_global())
                 {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
@@ -4928,7 +4925,7 @@ impl<'a> Checker<'a> {
             {
                 for (name, index) in &scope.bindings {
                     let binding = &self.bindings[*index];
-                    if matches!(binding.kind, BindingKind::Global) {
+                    if binding.kind.is_global() {
                         if let Some(stmt) = &binding.source {
                             if matches!(stmt.node, StmtKind::Global { .. }) {
                                 diagnostics.push(Diagnostic::new(

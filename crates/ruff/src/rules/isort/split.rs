@@ -46,10 +46,10 @@ pub fn split_by_forced_separate<'a>(
             .import_from
             .insert(imp, val);
     }
-    for ((imp, alias), comment_set) in import_from_as {
+    for ((imp, alias), val) in import_from_as {
         blocks[find_block_index(forced_separate, &imp)]
             .import_from_as
-            .insert((imp, alias), comment_set);
+            .insert((imp, alias), val);
     }
     for (imp, comment_set) in import_from_star {
         blocks[find_block_index(forced_separate, &imp)]

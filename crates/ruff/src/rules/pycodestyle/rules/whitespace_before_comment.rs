@@ -1,9 +1,8 @@
 #![allow(dead_code)]
 
-use rustpython_parser::ast::Location;
-use rustpython_parser::lexer::Tok;
-
 use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::ast::Location;
+use rustpython_parser::Tok;
 
 use crate::ast::types::Range;
 use crate::registry::DiagnosticKind;

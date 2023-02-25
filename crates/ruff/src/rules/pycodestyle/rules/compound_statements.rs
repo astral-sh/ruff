@@ -1,6 +1,6 @@
-use rustpython_parser::lexer::{LexResult, Tok};
-
 use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
@@ -105,9 +105,7 @@ pub fn compound_statements(
             Tok::Newline => {
                 if let Some((start, end)) = semi {
                     let mut diagnostic = Diagnostic::new(UselessSemicolon, Range::new(start, end));
-                    if matches!(autofix, flags::Autofix::Enabled)
-                        && settings.rules.should_fix(&Rule::UselessSemicolon)
-                    {
+                    if autofix.into() && settings.rules.should_fix(&Rule::UselessSemicolon) {
                         diagnostic.amend(Fix::deletion(start, end));
                     };
                     diagnostics.push(diagnostic);

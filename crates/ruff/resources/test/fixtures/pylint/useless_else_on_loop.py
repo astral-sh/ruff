@@ -124,3 +124,14 @@ def test_break_in_with():
     else:
         return True
     return False
+
+
+def test_break_in_match():
+    """no false positive for break in match"""
+    for name in ["demo"]:
+        match name:
+            case "demo":
+                break
+    else:
+        return True
+    return False

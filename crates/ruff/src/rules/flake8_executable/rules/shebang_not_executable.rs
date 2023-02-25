@@ -31,9 +31,7 @@ pub fn shebang_not_executable(
     shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
     if let ShebangDirective::Match(_, start, end, _) = shebang {
-        if is_executable(filepath) {
-            None
-        } else {
+        if let Ok(false) = is_executable(filepath) {
             let diagnostic = Diagnostic::new(
                 ShebangNotExecutable,
                 Range::new(
@@ -41,11 +39,10 @@ pub fn shebang_not_executable(
                     Location::new(lineno + 1, *end),
                 ),
             );
-            Some(diagnostic)
+            return Some(diagnostic);
         }
-    } else {
-        None
     }
+    None
 }
 
 #[cfg(not(target_family = "unix"))]

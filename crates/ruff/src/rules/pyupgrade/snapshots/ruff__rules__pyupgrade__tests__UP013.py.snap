@@ -4,204 +4,192 @@ expression: diagnostics
 ---
 - kind:
     ConvertTypedDictFunctionalToClass:
-      name: MyType1
+      name: MyType
+      fixable: true
   location:
     row: 5
     column: 0
   end_location:
     row: 5
-    column: 52
-  fix:
-    content: "class MyType1(TypedDict):\n    a: int\n    b: str"
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 5
-      column: 52
-  parent: ~
-- kind:
-    ConvertTypedDictFunctionalToClass:
-      name: MyType2
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
     column: 50
   fix:
-    content: "class MyType2(TypedDict):\n    a: int\n    b: str"
+    content: "class MyType(TypedDict):\n    a: int\n    b: str"
     location:
-      row: 8
+      row: 5
       column: 0
     end_location:
-      row: 8
+      row: 5
       column: 50
   parent: ~
 - kind:
     ConvertTypedDictFunctionalToClass:
-      name: MyType3
+      name: MyType
+      fixable: true
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 48
+  fix:
+    content: "class MyType(TypedDict):\n    a: int\n    b: str"
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 48
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType
+      fixable: true
   location:
     row: 11
     column: 0
   end_location:
     row: 11
-    column: 44
+    column: 42
   fix:
-    content: "class MyType3(TypedDict):\n    a: int\n    b: str"
+    content: "class MyType(TypedDict):\n    a: int\n    b: str"
     location:
       row: 11
       column: 0
     end_location:
       row: 11
+      column: 42
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType
+      fixable: true
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 28
+  fix:
+    content: "class MyType(TypedDict):\n    pass"
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 14
+      column: 28
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType
+      fixable: true
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 44
+  fix:
+    content: "class MyType(TypedDict):\n    a: \"hello\""
+    location:
+      row: 17
+      column: 0
+    end_location:
+      row: 17
       column: 44
   parent: ~
 - kind:
     ConvertTypedDictFunctionalToClass:
-      name: MyType4
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 30
-  fix:
-    content: "class MyType4(TypedDict):\n    pass"
-    location:
-      row: 14
-      column: 0
-    end_location:
-      row: 14
-      column: 30
-  parent: ~
-- kind:
-    ConvertTypedDictFunctionalToClass:
-      name: MyType5
-  location:
-    row: 17
-    column: 0
-  end_location:
-    row: 17
-    column: 46
-  fix:
-    content: "class MyType5(TypedDict):\n    a: \"hello\""
-    location:
-      row: 17
-      column: 0
-    end_location:
-      row: 17
-      column: 46
-  parent: ~
-- kind:
-    ConvertTypedDictFunctionalToClass:
-      name: MyType6
+      name: MyType
+      fixable: true
   location:
     row: 18
     column: 0
   end_location:
     row: 18
-    column: 41
+    column: 39
   fix:
-    content: "class MyType6(TypedDict):\n    a: \"hello\""
+    content: "class MyType(TypedDict):\n    a: \"hello\""
     location:
       row: 18
       column: 0
     end_location:
       row: 18
-      column: 41
+      column: 39
   parent: ~
 - kind:
     ConvertTypedDictFunctionalToClass:
-      name: MyType7
+      name: MyType
+      fixable: true
   location:
     row: 21
     column: 0
   end_location:
     row: 21
-    column: 56
+    column: 54
   fix:
-    content: "class MyType7(TypedDict):\n    a: NotRequired[dict]"
+    content: "class MyType(TypedDict):\n    a: NotRequired[dict]"
     location:
       row: 21
       column: 0
     end_location:
       row: 21
-      column: 56
+      column: 54
   parent: ~
 - kind:
     ConvertTypedDictFunctionalToClass:
-      name: MyType8
+      name: MyType
+      fixable: true
   location:
     row: 24
     column: 0
   end_location:
     row: 24
-    column: 65
+    column: 63
   fix:
-    content: "class MyType8(TypedDict, total=False):\n    x: int\n    y: int"
+    content: "class MyType(TypedDict, total=False):\n    x: int\n    y: int"
     location:
       row: 24
       column: 0
     end_location:
       row: 24
-      column: 65
+      column: 63
   parent: ~
 - kind:
     ConvertTypedDictFunctionalToClass:
-      name: MyType9
+      name: MyType
+      fixable: true
   location:
     row: 27
     column: 0
   end_location:
     row: 27
     column: 55
-  fix: ~
+  fix:
+    content: "class MyType(TypedDict):\n    key: Literal[\"value\"]"
+    location:
+      row: 27
+      column: 0
+    end_location:
+      row: 27
+      column: 55
   parent: ~
 - kind:
     ConvertTypedDictFunctionalToClass:
-      name: MyType10
+      name: MyType
+      fixable: true
   location:
     row: 30
     column: 0
   end_location:
     row: 30
-    column: 59
+    column: 49
   fix:
-    content: "class MyType10(TypedDict):\n    key: Literal[\"value\"]"
+    content: "class MyType(typing.TypedDict):\n    key: int"
     location:
       row: 30
       column: 0
     end_location:
       row: 30
-      column: 59
-  parent: ~
-- kind:
-    ConvertTypedDictFunctionalToClass:
-      name: MyType11
-  location:
-    row: 33
-    column: 0
-  end_location:
-    row: 33
-    column: 53
-  fix:
-    content: "class MyType11(typing.TypedDict):\n    key: int"
-    location:
-      row: 33
-      column: 0
-    end_location:
-      row: 33
-      column: 53
-  parent: ~
-- kind:
-    ConvertTypedDictFunctionalToClass:
-      name: MyType12
-  location:
-    row: 37
-    column: 0
-  end_location:
-    row: 37
-    column: 58
-  fix: ~
+      column: 49
   parent: ~
 

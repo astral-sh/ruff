@@ -72,7 +72,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E999") => Rule::SyntaxError,
 
         // pycodestyle warnings
+        (Pycodestyle, "W291") => Rule::TrailingWhitespace,
         (Pycodestyle, "W292") => Rule::NoNewLineAtEndOfFile,
+        (Pycodestyle, "W293") => Rule::BlankLineContainsWhitespace,
         (Pycodestyle, "W505") => Rule::DocLineTooLong,
         (Pycodestyle, "W605") => Rule::InvalidEscapeSequence,
 
@@ -517,6 +519,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pie, "794") => Rule::DupeClassFieldDefinitions,
         (Flake8Pie, "796") => Rule::PreferUniqueEnums,
         (Flake8Pie, "800") => Rule::UnnecessarySpread,
+        (Flake8Pie, "802") => Rule::UnnecessaryComprehensionAnyAll,
         (Flake8Pie, "804") => Rule::UnnecessaryDictKwargs,
         (Flake8Pie, "807") => Rule::PreferListBuiltin,
         (Flake8Pie, "810") => Rule::SingleStartsEndsWith,

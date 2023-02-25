@@ -2,10 +2,12 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::write;
 use ruff_text_size::TextSize;
 
+use crate::builders::literal;
 use crate::context::ASTFormatContext;
 use crate::cst::{Excepthandler, ExcepthandlerKind};
 use crate::format::builders::block;
 use crate::shared_traits::AsFormat;
+use crate::trivia::{Relationship, TriviaKind};
 
 pub struct FormatExcepthandler<'a> {
     item: &'a Excepthandler,
@@ -21,7 +23,8 @@ impl AsFormat<ASTFormatContext<'_>> for Excepthandler {
 
 impl Format<ASTFormatContext<'_>> for FormatExcepthandler<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
-        let ExcepthandlerKind::ExceptHandler { type_, name, body } = &self.item.node;
+        let excepthandler = self.item;
+        let ExcepthandlerKind::ExceptHandler { type_, name, body } = &excepthandler.node;
 
         write!(f, [text("except")])?;
         if let Some(type_) = &type_ {
@@ -39,6 +42,26 @@ impl Format<ASTFormatContext<'_>> for FormatExcepthandler<'_> {
             }
         }
         write!(f, [text(":")])?;
+
+        // Format any end-of-line comments.
+        let mut first = true;
+        for range in excepthandler.trivia.iter().filter_map(|trivia| {
+            if matches!(trivia.relationship, Relationship::Trailing) {
+                if let TriviaKind::EndOfLineComment(range) = trivia.kind {
+                    Some(range)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }) {
+            if std::mem::take(&mut first) {
+                write!(f, [line_suffix(&text("  "))])?;
+            }
+            write!(f, [line_suffix(&literal(range))])?;
+        }
+
         write!(f, [block_indent(&block(body))])?;
 
         Ok(())

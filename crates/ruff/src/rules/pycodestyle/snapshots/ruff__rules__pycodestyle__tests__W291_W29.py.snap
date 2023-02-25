@@ -1,0 +1,56 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    TrailingWhitespace: ~
+  location:
+    row: 4
+    column: 5
+  end_location:
+    row: 4
+    column: 6
+  fix:
+    content: ""
+    location:
+      row: 4
+      column: 5
+    end_location:
+      row: 4
+      column: 6
+  parent: ~
+- kind:
+    TrailingWhitespace: ~
+  location:
+    row: 11
+    column: 34
+  end_location:
+    row: 11
+    column: 37
+  fix:
+    content: ""
+    location:
+      row: 11
+      column: 34
+    end_location:
+      row: 11
+      column: 37
+  parent: ~
+- kind:
+    TrailingWhitespace: ~
+  location:
+    row: 13
+    column: 5
+  end_location:
+    row: 13
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 13
+      column: 5
+    end_location:
+      row: 13
+      column: 8
+  parent: ~
+

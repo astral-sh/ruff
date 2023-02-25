@@ -1,6 +1,7 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Alias, Stmt};
+use rustpython_parser::ast::{Alias, AliasData, Located, Stmt, StmtKind};
 
+use crate::ast::helpers::{create_stmt, unparse_stmt};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -24,14 +25,10 @@ impl Violation for ConsiderUsingFromImport {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let ConsiderUsingFromImport { fixable, .. } = self;
-        if *fixable {
-            Some(|ConsiderUsingFromImport { module, name, .. }| {
+        self.fixable
+            .then_some(|ConsiderUsingFromImport { module, name, .. }| {
                 format!("Replace with `from {module} import {name}`")
             })
-        } else {
-            None
-        }
     }
 }
 
@@ -58,7 +55,21 @@ pub fn use_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, names:
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
-            format!("from {module} import {asname}"),
+            unparse_stmt(
+                &create_stmt(StmtKind::ImportFrom {
+                    module: Some(module.to_string()),
+                    names: vec![Located::new(
+                        stmt.location,
+                        stmt.end_location.unwrap(),
+                        AliasData {
+                            name: asname.into(),
+                            asname: None,
+                        },
+                    )],
+                    level: Some(0),
+                }),
+                checker.stylist,
+            ),
             stmt.location,
             stmt.end_location.unwrap(),
         ));
