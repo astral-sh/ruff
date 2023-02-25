@@ -5349,6 +5349,14 @@ impl<'a> Checker<'a> {
 
             // pydocstyle
             if enforce_docstrings {
+                if pydocstyle::helpers::should_ignore_definition(
+                    self,
+                    &definition,
+                    &self.settings.pydocstyle.ignore_decorators,
+                ) {
+                    continue;
+                }
+
                 if definition.docstring.is_none() {
                     pydocstyle::rules::not_missing(self, &definition, &visibility);
                     continue;

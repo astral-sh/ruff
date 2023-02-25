@@ -73,23 +73,6 @@ expression: diagnostics
 - kind:
     EndsInPeriod: ~
   location:
-    row: 422
-    column: 34
-  end_location:
-    row: 422
-    column: 49
-  fix:
-    content: "."
-    location:
-      row: 422
-      column: 46
-    end_location:
-      row: 422
-      column: 46
-  parent: ~
-- kind:
-    EndsInPeriod: ~
-  location:
     row: 429
     column: 48
   end_location:
@@ -171,23 +154,6 @@ expression: diagnostics
     end_location:
       row: 487
       column: 21
-  parent: ~
-- kind:
-    EndsInPeriod: ~
-  location:
-    row: 509
-    column: 4
-  end_location:
-    row: 509
-    column: 34
-  fix:
-    content: "."
-    location:
-      row: 509
-      column: 31
-    end_location:
-      row: 509
-      column: 31
   parent: ~
 - kind:
     EndsInPeriod: ~

@@ -1,6 +1,13 @@
+use std::collections::BTreeSet;
+
 use ruff_python::str::{
     SINGLE_QUOTE_PREFIXES, SINGLE_QUOTE_SUFFIXES, TRIPLE_QUOTE_PREFIXES, TRIPLE_QUOTE_SUFFIXES,
 };
+
+use crate::ast::cast;
+use crate::ast::helpers::{compose_call_path, format_call_path, map_callable};
+use crate::checkers::ast::Checker;
+use crate::docstrings::definition::{Definition, DefinitionKind};
 
 /// Strip the leading and trailing quotes from a docstring.
 pub fn raw_contents(contents: &str) -> &str {
@@ -61,4 +68,37 @@ pub fn normalize_word(first_word: &str) -> String {
     first_word
         .replace(|c: char| !c.is_alphanumeric(), "")
         .to_lowercase()
+}
+
+/// Check decorator list to see if function should be ignored.
+pub fn should_ignore_definition(
+    checker: &Checker,
+    definition: &Definition,
+    ignore_decorators: &BTreeSet<String>,
+) -> bool {
+    if let DefinitionKind::Function(parent)
+    | DefinitionKind::NestedFunction(parent)
+    | DefinitionKind::Method(parent) = definition.kind
+    {
+        for decorator in cast::decorator_list(parent) {
+            let callable = map_callable(decorator);
+            if let Some(call_path) = compose_call_path(callable) {
+                // Check if decorator is in ignore list.
+                if ignore_decorators.contains(&call_path) {
+                    return true;
+                }
+            }
+
+            if let Some(call_path) = checker
+                .resolve_call_path(callable)
+                .map(|call_path| format_call_path(&call_path))
+            {
+                // Check if decorator is in ignore list.
+                if ignore_decorators.contains(&call_path) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
