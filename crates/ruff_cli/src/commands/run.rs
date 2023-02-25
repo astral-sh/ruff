@@ -114,6 +114,7 @@ pub fn run(
                             ),
                             format!("{}", path.display()),
                             None,
+                            1,
                         )])
                     } else {
                         Diagnostics::default()
