@@ -92,23 +92,25 @@ impl ContinueChecker {
         }
     }
 
-    fn handle_name(&mut self, id: &str) {
+    fn handle_name(&mut self, id: &str, if_stmt: &Stmt) {
         let assignment = self.assignments_from_calls.get(id);
         if let Some(clean_assign) = assignment {
             if let StmtKind::Assign { value, .. } = &clean_assign.node {
                 if let ExprKind::Call { func, .. } = &value.node {
                     if let ExprKind::Name { .. } = &func.node {
-                        self.violations
-                            .push(Diagnostic::new(CheckToContinue, Range::from_located(value)));
+                        self.violations.push(Diagnostic::new(
+                            CheckToContinue,
+                            Range::from_located(if_stmt),
+                        ));
                     }
                 }
             }
         }
     }
 
-    fn handle_unary(&mut self, operand: &Expr) {
+    fn handle_unary(&mut self, operand: &Expr, if_stmt: &Stmt) {
         if let ExprKind::Name { id, .. } = &operand.node {
-            self.handle_name(id);
+            self.handle_name(id, if_stmt);
         }
     }
 
@@ -159,8 +161,8 @@ impl ContinueChecker {
         for if_stmt in ifs_stmt {
             if let StmtKind::If { test, .. } = &if_stmt.node {
                 match &test.node {
-                    ExprKind::Name { id, .. } => self.handle_name(id),
-                    ExprKind::UnaryOp { operand, .. } => self.handle_unary(operand),
+                    ExprKind::Name { id, .. } => self.handle_name(id, &if_stmt),
+                    ExprKind::UnaryOp { operand, .. } => self.handle_unary(operand, &if_stmt),
                     _ => (),
                 }
             }
