@@ -62,25 +62,26 @@ pub fn useless_return(checker: &mut Checker, stmt: &Stmt) {
         None => true,
         Some(loc_expr) => is_const_none(loc_expr),
     };
-    if is_bare_return_or_none {
-        let mut diagnostic = Diagnostic::new(UselessReturn, Range::from_located(stmt));
-        if checker.patch(diagnostic.kind.rule()) {
-            match delete_stmt(
-                stmt,
-                None,
-                &[],
-                checker.locator,
-                checker.indexer,
-                checker.stylist,
-            ) {
-                Ok(fix) => {
-                    diagnostic.amend(fix);
-                }
-                Err(e) => {
-                    error!("Failed to delete `return` statement: {}", e);
-                }
-            };
-        }
-        checker.diagnostics.push(diagnostic);
+    if !is_bare_return_or_none {
+        return;
     }
+    let mut diagnostic = Diagnostic::new(UselessReturn, Range::from_located(stmt));
+    if !checker.patch(diagnostic.kind.rule()) {
+        match delete_stmt(
+            stmt,
+            None,
+            &[],
+            checker.locator,
+            checker.indexer,
+            checker.stylist,
+        ) {
+            Ok(fix) => {
+                diagnostic.amend(fix);
+            }
+            Err(e) => {
+                error!("Failed to delete `return` statement: {}", e);
+            }
+        };
+    }
+    checker.diagnostics.push(diagnostic);
 }
