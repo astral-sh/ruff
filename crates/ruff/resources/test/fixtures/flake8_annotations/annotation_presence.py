@@ -107,3 +107,7 @@ class Foo:
     # ANN101
     def foo(self, /, a: int, b: int) -> int:
         pass
+
+
+# OK
+def f(*args: *tuple[int]) -> None: ...

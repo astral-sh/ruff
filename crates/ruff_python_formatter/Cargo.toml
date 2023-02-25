@@ -6,17 +6,21 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ruff_formatter = { path = "../ruff_formatter" }
+ruff_python = { path = "../ruff_python" }
+ruff_rustpython = { path = "../ruff_rustpython" }
+ruff_text_size = { path = "../ruff_text_size" }
+
 anyhow = { workspace = true }
 clap = { workspace = true }
 once_cell = { workspace = true }
-ruff_formatter = { path = "../ruff_formatter" }
-ruff_text_size = { path = "../ruff_text_size" }
 rustc-hash = { workspace = true }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
 
 [dev-dependencies]
+ruff_testing_macros = { path = "../ruff_testing_macros" }
+
 insta = { version = "1.19.0", features = [] }
 test-case = { version = "2.2.2" }
-ruff_testing_macros = { path = "../ruff_testing_macros" }
-similar = "2.2.1"
+similar = { version = "2.2.1" }

@@ -100,7 +100,6 @@ def foo3(list_a, list_b):
         )
         .filter(User.xyz.is_(None))
     )
-
 ```
 
 ## Black Differences
@@ -108,17 +107,6 @@ def foo3(list_a, list_b):
 ```diff
 --- Black
 +++ Ruff
-@@ -1,8 +1,8 @@
- from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
--    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
-+    MyLovelyCompanyTeamProjectComponent,
- )
- from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
--    MyLovelyCompanyTeamProjectComponent as component,  # DRY
-+    MyLovelyCompanyTeamProjectComponent as component,
- )
- 
- 
 @@ -10,39 +10,50 @@
      @pytest.mark.parametrize(
          ("post_data", "message"),
@@ -240,22 +228,20 @@ def foo3(list_a, list_b):
 -        )
 -        .filter(User.xyz.is_(None))
 -    )
-\ No newline at end of file
 +    return # Standlone comment but weirdly placed.
 +    User.query.filter(User.foo == "bar").filter(
 +        db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
 +    ).filter(User.xyz.is_(None))
-
 ```
 
 ## Ruff Output
 
 ```py
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
-    MyLovelyCompanyTeamProjectComponent,
+    MyLovelyCompanyTeamProjectComponent,  # NOT DRY
 )
 from com.my_lovely_company.my_lovely_team.my_lovely_project.my_lovely_component import (
-    MyLovelyCompanyTeamProjectComponent as component,
+    MyLovelyCompanyTeamProjectComponent as component,  # DRY
 )
 
 
@@ -345,7 +331,6 @@ def foo3(list_a, list_b):
     User.query.filter(User.foo == "bar").filter(
         db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))
     ).filter(User.xyz.is_(None))
-
 ```
 
 ## Black Output

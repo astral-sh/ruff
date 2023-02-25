@@ -7,12 +7,12 @@ use anyhow::Result;
 use rustpython_parser::lexer::LexResult;
 
 use crate::autofix::fix_file;
+use crate::directives;
 use crate::linter::{check_path, LinterResult};
 use crate::packaging::detect_package_root;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-use crate::{directives, rustpython_helpers};
 
 pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
@@ -23,7 +23,7 @@ pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
-    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_contents(&contents, &locator);
     let indexer: Indexer = tokens.as_slice().into();
@@ -58,7 +58,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
         let mut iterations = 0;
 
         loop {
-            let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
+            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
             let locator = Locator::new(&contents);
             let stylist = Stylist::from_contents(&contents, &locator);
             let indexer: Indexer = tokens.as_slice().into();

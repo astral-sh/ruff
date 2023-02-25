@@ -10,7 +10,6 @@ a =     "this is some code"
 b =     5  #fmt:skip
 c = 9  #fmt: skip
 d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  #fmt:skip
-
 ```
 
 ## Black Differences
@@ -23,12 +22,9 @@ d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasu
 -b =     5  # fmt:skip
 -c = 9  # fmt: skip
 -d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  # fmt:skip
-\ No newline at end of file
 +b = 5  #fmt:skip
 +c = 9  #fmt: skip
 +d = "thisisasuperlongstringthisisasuperlongstringthisisasuperlongstringthisisasuperlongstring"  #fmt:skip
-\ No newline at end of file
-
 ```
 
 ## Ruff Output

@@ -1,11 +1,11 @@
 use anyhow::Result;
-use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
 use rustpython_parser::lexer::LexResult;
+
+use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
 
 use crate::attachment::attach;
 use crate::context::ASTFormatContext;
 use crate::core::locator::Locator;
-use crate::core::rustpython_helpers;
 use crate::cst::Stmt;
 use crate::newlines::normalize_newlines;
 use crate::parentheses::normalize_parentheses;
@@ -23,22 +23,28 @@ pub mod shared_traits;
 pub mod trivia;
 
 pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
+    // Create a reusable locator.
+    let locator = Locator::new(contents);
+
     // Tokenize once.
-    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
     // Extract trivia.
     let trivia = trivia::extract_trivia_tokens(&tokens);
 
     // Parse the AST.
-    let python_ast = rustpython_helpers::parse_program_tokens(tokens, "<filename>")?;
+    let python_ast = ruff_rustpython::parse_program_tokens(tokens, "<filename>")?;
 
     // Convert to a CST.
-    let mut python_cst: Vec<Stmt> = python_ast.into_iter().map(Into::into).collect();
+    let mut python_cst: Vec<Stmt> = python_ast
+        .into_iter()
+        .map(|stmt| (stmt, &locator).into())
+        .collect();
 
     // Attach trivia.
     attach(&mut python_cst, trivia);
     normalize_newlines(&mut python_cst);
-    normalize_parentheses(&mut python_cst);
+    normalize_parentheses(&mut python_cst, &locator);
 
     format!(
         ASTFormatContext::new(
@@ -46,7 +52,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
                 indent_style: IndentStyle::Space(4),
                 line_width: 88.try_into().unwrap(),
             },
-            Locator::new(contents)
+            locator,
         ),
         [format::builders::block(&python_cst)]
     )
@@ -55,15 +61,16 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::{Formatter, Write};
     use std::fs;
     use std::path::Path;
 
     use anyhow::Result;
+    use similar::TextDiff;
+
+    use ruff_testing_macros::fixture;
 
     use crate::fmt;
-    use ruff_testing_macros::fixture;
-    use similar::TextDiff;
-    use std::fmt::{Formatter, Write};
 
     #[fixture(
         pattern = "resources/test/fixtures/black/**/*.py",
@@ -208,7 +215,7 @@ mod tests {
     impl std::fmt::Display for CodeFrame<'_> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             writeln!(f, "```{}", self.language)?;
-            writeln!(f, "{}", self.code)?;
+            write!(f, "{}", self.code)?;
             writeln!(f, "```")?;
             writeln!(f)
         }

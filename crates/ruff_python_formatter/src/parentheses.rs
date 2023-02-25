@@ -1,7 +1,11 @@
+use crate::core::helpers::is_radix_literal;
+use crate::core::locator::Locator;
+use crate::core::types::Range;
 use crate::core::visitor;
 use crate::core::visitor::Visitor;
 use crate::cst::{Expr, ExprKind, Stmt, StmtKind};
 use crate::trivia::{Parenthesize, TriviaKind};
+use rustpython_parser::ast::Constant;
 
 /// Modify an [`Expr`] to infer parentheses, rather than respecting any user-provided trivia.
 fn use_inferred_parens(expr: &mut Expr) {
@@ -22,9 +26,11 @@ fn use_inferred_parens(expr: &mut Expr) {
     }
 }
 
-struct ParenthesesNormalizer {}
+struct ParenthesesNormalizer<'a> {
+    locator: &'a Locator<'a>,
+}
 
-impl<'a> Visitor<'a> for ParenthesesNormalizer {
+impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
     fn visit_stmt(&mut self, stmt: &'a mut Stmt) {
         // Always remove parentheses around statements, unless it's an expression statement,
         // in which case, remove parentheses around the expression.
@@ -68,7 +74,9 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer {
             }
             StmtKind::For { target, iter, .. } | StmtKind::AsyncFor { target, iter, .. } => {
                 use_inferred_parens(target);
-                use_inferred_parens(iter);
+                if !matches!(iter.node, ExprKind::Tuple { .. }) {
+                    use_inferred_parens(iter);
+                }
             }
             StmtKind::While { test, .. } => {
                 use_inferred_parens(test);
@@ -132,7 +140,29 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer {
             ExprKind::FormattedValue { .. } => {}
             ExprKind::JoinedStr { .. } => {}
             ExprKind::Constant { .. } => {}
-            ExprKind::Attribute { .. } => {}
+            ExprKind::Attribute { value, .. } => {
+                if matches!(
+                    value.node,
+                    ExprKind::Constant {
+                        value: Constant::Float(..),
+                        ..
+                    },
+                ) {
+                    value.parentheses = Parenthesize::Always;
+                } else if matches!(
+                    value.node,
+                    ExprKind::Constant {
+                        value: Constant::Int(..),
+                        ..
+                    },
+                ) {
+                    let (source, start, end) = self.locator.slice(Range::from_located(value));
+                    // TODO(charlie): Encode this in the AST via separate node types.
+                    if !is_radix_literal(&source[start..end]) {
+                        value.parentheses = Parenthesize::Always;
+                    }
+                }
+            }
             ExprKind::Subscript { value, slice, .. } => {
                 // If the slice isn't manually parenthesized, ensure that we _never_ parenthesize
                 // the value.
@@ -164,7 +194,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer {
 ///
 /// TODO(charlie): It's weird that we have both `TriviaKind::Parentheses` (which aren't used
 /// during formatting) and `Parenthesize` (which are used during formatting).
-pub fn normalize_parentheses(python_cst: &mut [Stmt]) {
-    let mut normalizer = ParenthesesNormalizer {};
+pub fn normalize_parentheses(python_cst: &mut [Stmt], locator: &Locator) {
+    let mut normalizer = ParenthesesNormalizer { locator };
     normalizer.visit_body(python_cst);
 }

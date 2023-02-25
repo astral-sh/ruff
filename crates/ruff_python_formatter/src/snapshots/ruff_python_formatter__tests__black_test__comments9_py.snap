@@ -145,7 +145,6 @@ def foo():
 # A standalone comment
 def bar():
     pass
-
 ```
 
 ## Black Differences
@@ -280,11 +279,8 @@ def bar():
  @decorator1
 -# A standalone comment
  def bar():
--    pass
-\ No newline at end of file
 +    # A standalone comment
-+    pass
-
+     pass
 ```
 
 ## Ruff Output
@@ -457,7 +453,6 @@ def foo():
 def bar():
     # A standalone comment
     pass
-
 ```
 
 ## Black Output

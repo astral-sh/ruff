@@ -14,7 +14,6 @@ if True:
                 + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
                 "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
             ) % {"reported_username": reported_username, "report_reason": report_reason}
-
 ```
 
 ## Black Differences
@@ -27,10 +26,8 @@ if True:
                  + "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwegqweasdzxcqweasdzxc.",
                  "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
 -            ) % {"reported_username": reported_username, "report_reason": report_reason}
-\ No newline at end of file
 +            )
 +            % {"reported_username": reported_username, "report_reason": report_reason}
-
 ```
 
 ## Ruff Output
@@ -45,7 +42,6 @@ if True:
                 "qweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqweasdzxcqwe",
             )
             % {"reported_username": reported_username, "report_reason": report_reason}
-
 ```
 
 ## Black Output

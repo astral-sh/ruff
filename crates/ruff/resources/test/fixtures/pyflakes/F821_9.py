@@ -20,7 +20,27 @@ def f(provided: int) -> int:
     match provided:
         case True:
             return captured  # F821
+
+
+def f(provided: int) -> int:
+    match provided:
+        case captured:
+            return captured
+
+
+def f(provided: int) -> int:
+    match provided:
         case [captured, *_]:
             return captured
-        case captured:
+
+
+def f(provided: int) -> int:
+    match provided:
+        case [*captured]:
+            return captured
+
+
+def f(provided: int) -> int:
+    match provided:
+        case {**captured}:
             return captured

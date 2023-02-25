@@ -43,6 +43,13 @@ impl Violation for InvalidModuleName {
 
 /// N999
 pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagnostic> {
+    if !path
+        .extension()
+        .map_or(false, |ext| ext == "py" || ext == "pyi")
+    {
+        return None;
+    }
+
     if let Some(package) = package {
         let module_name = if path.file_name().map_or(false, |file_name| {
             file_name == "__init__.py"

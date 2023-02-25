@@ -94,7 +94,6 @@ def foo() -> tuple[loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 # Magic trailing comma example
 def foo() -> tuple[int, int, int,]:
     return 2
-
 ```
 
 ## Black Differences
@@ -237,15 +236,12 @@ def foo() -> tuple[int, int, int,]:
 -        int,
 -    ]
 -):
--    return 2
-\ No newline at end of file
 +def foo() -> tuple[
 +    int,
 +    int,
 +    int,
 +]:
-+    return 2
-
+     return 2
 ```
 
 ## Ruff Output
@@ -366,7 +362,6 @@ def foo() -> tuple[
     int,
 ]:
     return 2
-
 ```
 
 ## Black Output

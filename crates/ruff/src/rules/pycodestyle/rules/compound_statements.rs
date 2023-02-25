@@ -105,9 +105,7 @@ pub fn compound_statements(
             Tok::Newline => {
                 if let Some((start, end)) = semi {
                     let mut diagnostic = Diagnostic::new(UselessSemicolon, Range::new(start, end));
-                    if matches!(autofix, flags::Autofix::Enabled)
-                        && settings.rules.should_fix(&Rule::UselessSemicolon)
-                    {
+                    if autofix.into() && settings.rules.should_fix(&Rule::UselessSemicolon) {
                         diagnostic.amend(Fix::deletion(start, end));
                     };
                     diagnostics.push(diagnostic);

@@ -90,7 +90,6 @@ if x:
 elif   unformatted:
 # fmt: on
     will_be_formatted  ()
-
 ```
 
 ## Black Differences
@@ -98,17 +97,20 @@ elif   unformatted:
 ```diff
 --- Black
 +++ Ruff
-@@ -5,8 +5,7 @@
+@@ -3,10 +3,8 @@
+     entry_points={
+         # fmt: off
          "console_scripts": [
-             "foo-bar"
-             "=foo.bar.:main",
+-            "foo-bar"
+-            "=foo.bar.:main",
 -        # fmt: on
 -            ]  # Includes an formatted indentation.
++            "foo-bar" "=foo.bar.:main",
 +        ],
      },
  )
  
-@@ -18,8 +17,8 @@
+@@ -18,8 +16,8 @@
          "ls",
          "-la",
      ]
@@ -119,7 +121,7 @@ elif   unformatted:
      check=True,
  )
  
-@@ -27,9 +26,8 @@
+@@ -27,9 +25,8 @@
  # Regression test for https://github.com/psf/black/issues/3026.
  def test_func():
      # yapf: disable
@@ -130,7 +132,7 @@ elif   unformatted:
      elif b:
          return True
  
-@@ -39,10 +37,10 @@
+@@ -39,10 +36,10 @@
  # Regression test for https://github.com/psf/black/issues/2567.
  if True:
      # fmt: off
@@ -145,7 +147,7 @@ elif   unformatted:
  else:
      print("This will be formatted")
  
-@@ -52,14 +50,11 @@
+@@ -52,14 +49,11 @@
      async def call(param):
          if param:
              # fmt: off
@@ -163,7 +165,7 @@ elif   unformatted:
  
          print("This will be formatted")
  
-@@ -68,20 +63,21 @@
+@@ -68,20 +62,21 @@
  class Named(t.Protocol):
      # fmt: off
      @property
@@ -188,10 +190,7 @@ elif   unformatted:
 -elif   unformatted:
 +elif unformatted:
      # fmt: on
--    will_be_formatted()
-\ No newline at end of file
-+    will_be_formatted()
-
+     will_be_formatted()
 ```
 
 ## Ruff Output
@@ -202,8 +201,7 @@ setup(
     entry_points={
         # fmt: off
         "console_scripts": [
-            "foo-bar"
-            "=foo.bar.:main",
+            "foo-bar" "=foo.bar.:main",
         ],
     },
 )
@@ -280,7 +278,6 @@ if x:
 elif unformatted:
     # fmt: on
     will_be_formatted()
-
 ```
 
 ## Black Output

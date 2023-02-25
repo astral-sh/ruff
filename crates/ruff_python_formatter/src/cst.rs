@@ -1,7 +1,10 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 use rustpython_parser::ast::{Constant, Location};
+use rustpython_parser::Mode;
 
+use crate::core::locator::Locator;
+use crate::core::types::Range;
 use crate::trivia::{Parenthesize, Trivia};
 
 type Ident = String;
@@ -393,9 +396,9 @@ pub enum ExprKind {
         ctx: ExprContext,
     },
     Slice {
-        lower: Option<Box<Expr>>,
-        upper: Option<Box<Expr>>,
-        step: Option<Box<Expr>>,
+        lower: SliceIndex,
+        upper: SliceIndex,
+        step: Option<SliceIndex>,
     },
 }
 
@@ -419,6 +422,16 @@ pub enum ExcepthandlerKind {
 }
 
 pub type Excepthandler = Located<ExcepthandlerKind>;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum SliceIndexKind {
+    /// The index slot exists, but is empty.
+    Empty,
+    /// The index slot contains an expression.
+    Index { value: Box<Expr> },
+}
+
+pub type SliceIndex = Located<SliceIndexKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments {
@@ -506,8 +519,8 @@ pub enum PatternKind {
 
 pub type Pattern = Located<PatternKind>;
 
-impl From<rustpython_parser::ast::Alias> for Alias {
-    fn from(alias: rustpython_parser::ast::Alias) -> Self {
+impl From<(rustpython_parser::ast::Alias, &Locator<'_>)> for Alias {
+    fn from((alias, _locator): (rustpython_parser::ast::Alias, &Locator)) -> Self {
         Alias {
             location: alias.location,
             end_location: alias.end_location,
@@ -521,26 +534,31 @@ impl From<rustpython_parser::ast::Alias> for Alias {
     }
 }
 
-impl From<rustpython_parser::ast::Withitem> for Withitem {
-    fn from(withitem: rustpython_parser::ast::Withitem) -> Self {
+impl From<(rustpython_parser::ast::Withitem, &Locator<'_>)> for Withitem {
+    fn from((withitem, locator): (rustpython_parser::ast::Withitem, &Locator)) -> Self {
         Withitem {
-            context_expr: withitem.context_expr.into(),
-            optional_vars: withitem.optional_vars.map(|v| Box::new((*v).into())),
+            context_expr: (withitem.context_expr, locator).into(),
+            optional_vars: withitem
+                .optional_vars
+                .map(|v| Box::new((*v, locator).into())),
         }
     }
 }
 
-impl From<rustpython_parser::ast::Excepthandler> for Excepthandler {
-    fn from(excepthandler: rustpython_parser::ast::Excepthandler) -> Self {
+impl From<(rustpython_parser::ast::Excepthandler, &Locator<'_>)> for Excepthandler {
+    fn from((excepthandler, locator): (rustpython_parser::ast::Excepthandler, &Locator)) -> Self {
         let rustpython_parser::ast::ExcepthandlerKind::ExceptHandler { type_, name, body } =
             excepthandler.node;
         Excepthandler {
             location: excepthandler.location,
             end_location: excepthandler.end_location,
             node: ExcepthandlerKind::ExceptHandler {
-                type_: type_.map(|type_| Box::new((*type_).into())),
+                type_: type_.map(|type_| Box::new((*type_, locator).into())),
                 name,
-                body: body.into_iter().map(Into::into).collect(),
+                body: body
+                    .into_iter()
+                    .map(|node| (node, locator).into())
+                    .collect(),
             },
             trivia: vec![],
             parentheses: Parenthesize::Never,
@@ -548,14 +566,14 @@ impl From<rustpython_parser::ast::Excepthandler> for Excepthandler {
     }
 }
 
-impl From<rustpython_parser::ast::Stmt> for Stmt {
-    fn from(stmt: rustpython_parser::ast::Stmt) -> Self {
+impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
+    fn from((stmt, locator): (rustpython_parser::ast::Stmt, &Locator)) -> Self {
         match stmt.node {
             rustpython_parser::ast::StmtKind::Expr { value } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Expr {
-                    value: Box::new((*value).into()),
+                    value: Box::new((*value, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -571,7 +589,7 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Return {
-                    value: value.map(|v| (*v).into()),
+                    value: value.map(|v| (*v, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -584,8 +602,11 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Assign {
-                    targets: targets.into_iter().map(Into::into).collect(),
-                    value: Box::new((*value).into()),
+                    targets: targets
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    value: Box::new((*value, locator).into()),
                     type_comment,
                 },
                 trivia: vec![],
@@ -602,10 +623,22 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 end_location: stmt.end_location,
                 node: StmtKind::ClassDef {
                     name,
-                    bases: bases.into_iter().map(Into::into).collect(),
-                    keywords: keywords.into_iter().map(Into::into).collect(),
-                    body: body.into_iter().map(Into::into).collect(),
-                    decorator_list: decorator_list.into_iter().map(Into::into).collect(),
+                    bases: bases
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    keywords: keywords
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    decorator_list: decorator_list
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -624,10 +657,16 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 end_location: stmt.end_location,
                 node: StmtKind::FunctionDef {
                     name,
-                    args: Box::new((*args).into()),
-                    body: body.into_iter().map(Into::into).collect(),
-                    decorator_list: decorator_list.into_iter().map(Into::into).collect(),
-                    returns: returns.map(|r| Box::new((*r).into())),
+                    args: Box::new((*args, locator).into()),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    decorator_list: decorator_list
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    returns: returns.map(|r| Box::new((*r, locator).into())),
                     type_comment,
                 },
                 trivia: vec![],
@@ -637,9 +676,15 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::If {
-                    test: Box::new((*test).into()),
-                    body: body.into_iter().map(Into::into).collect(),
-                    orelse: orelse.into_iter().map(Into::into).collect(),
+                    test: Box::new((*test, locator).into()),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    orelse: orelse
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -648,8 +693,8 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Assert {
-                    test: Box::new((*test).into()),
-                    msg: msg.map(|msg| Box::new((*msg).into())),
+                    test: Box::new((*test, locator).into()),
+                    msg: msg.map(|node| Box::new((*node, locator).into())),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -666,10 +711,16 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 end_location: stmt.end_location,
                 node: StmtKind::AsyncFunctionDef {
                     name,
-                    args: Box::new((*args).into()),
-                    body: body.into_iter().map(Into::into).collect(),
-                    decorator_list: decorator_list.into_iter().map(Into::into).collect(),
-                    returns: returns.map(|r| Box::new((*r).into())),
+                    args: Box::new((*args, locator).into()),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    decorator_list: decorator_list
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    returns: returns.map(|r| Box::new((*r, locator).into())),
                     type_comment,
                 },
                 trivia: vec![],
@@ -679,7 +730,10 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Delete {
-                    targets: targets.into_iter().map(Into::into).collect(),
+                    targets: targets
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -688,9 +742,9 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::AugAssign {
-                    target: Box::new((*target).into()),
+                    target: Box::new((*target, locator).into()),
                     op: op.into(),
-                    value: Box::new((*value).into()),
+                    value: Box::new((*value, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -704,9 +758,9 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::AnnAssign {
-                    target: Box::new((*target).into()),
-                    annotation: Box::new((*annotation).into()),
-                    value: value.map(|v| Box::new((*v).into())),
+                    target: Box::new((*target, locator).into()),
+                    annotation: Box::new((*annotation, locator).into()),
+                    value: value.map(|node| Box::new((*node, locator).into())),
                     simple,
                 },
                 trivia: vec![],
@@ -722,10 +776,16 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::For {
-                    target: Box::new((*target).into()),
-                    iter: Box::new((*iter).into()),
-                    body: body.into_iter().map(Into::into).collect(),
-                    orelse: orelse.into_iter().map(Into::into).collect(),
+                    target: Box::new((*target, locator).into()),
+                    iter: Box::new((*iter, locator).into()),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    orelse: orelse
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                     type_comment,
                 },
                 trivia: vec![],
@@ -741,10 +801,16 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::AsyncFor {
-                    target: Box::new((*target).into()),
-                    iter: Box::new((*iter).into()),
-                    body: body.into_iter().map(Into::into).collect(),
-                    orelse: orelse.into_iter().map(Into::into).collect(),
+                    target: Box::new((*target, locator).into()),
+                    iter: Box::new((*iter, locator).into()),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    orelse: orelse
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                     type_comment,
                 },
                 trivia: vec![],
@@ -754,9 +820,15 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::While {
-                    test: Box::new((*test).into()),
-                    body: body.into_iter().map(Into::into).collect(),
-                    orelse: orelse.into_iter().map(Into::into).collect(),
+                    test: Box::new((*test, locator).into()),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    orelse: orelse
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -769,8 +841,14 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::With {
-                    items: items.into_iter().map(Into::into).collect(),
-                    body: body.into_iter().map(Into::into).collect(),
+                    items: items
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                     type_comment,
                 },
                 trivia: vec![],
@@ -784,8 +862,14 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::AsyncWith {
-                    items: items.into_iter().map(Into::into).collect(),
-                    body: body.into_iter().map(Into::into).collect(),
+                    items: items
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                     type_comment,
                 },
                 trivia: vec![],
@@ -798,8 +882,8 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Raise {
-                    exc: exc.map(|exc| Box::new((*exc).into())),
-                    cause: cause.map(|cause| Box::new((*cause).into())),
+                    exc: exc.map(|exc| Box::new((*exc, locator).into())),
+                    cause: cause.map(|cause| Box::new((*cause, locator).into())),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -813,10 +897,22 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Try {
-                    body: body.into_iter().map(Into::into).collect(),
-                    handlers: handlers.into_iter().map(Into::into).collect(),
-                    orelse: orelse.into_iter().map(Into::into).collect(),
-                    finalbody: finalbody.into_iter().map(Into::into).collect(),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    handlers: handlers
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    orelse: orelse
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    finalbody: finalbody
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -830,10 +926,22 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::TryStar {
-                    body: body.into_iter().map(Into::into).collect(),
-                    handlers: handlers.into_iter().map(Into::into).collect(),
-                    orelse: orelse.into_iter().map(Into::into).collect(),
-                    finalbody: finalbody.into_iter().map(Into::into).collect(),
+                    body: body
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    handlers: handlers
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    orelse: orelse
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    finalbody: finalbody
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -842,7 +950,10 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::Import {
-                    names: names.into_iter().map(Into::into).collect(),
+                    names: names
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -856,7 +967,10 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
                 end_location: stmt.end_location,
                 node: StmtKind::ImportFrom {
                     module,
-                    names: names.into_iter().map(Into::into).collect(),
+                    names: names
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                     level,
                 },
                 trivia: vec![],
@@ -894,14 +1008,14 @@ impl From<rustpython_parser::ast::Stmt> for Stmt {
     }
 }
 
-impl From<rustpython_parser::ast::Keyword> for Keyword {
-    fn from(keyword: rustpython_parser::ast::Keyword) -> Self {
+impl From<(rustpython_parser::ast::Keyword, &Locator<'_>)> for Keyword {
+    fn from((keyword, locator): (rustpython_parser::ast::Keyword, &Locator)) -> Self {
         Keyword {
             location: keyword.location,
             end_location: keyword.end_location,
             node: KeywordData {
                 arg: keyword.node.arg,
-                value: keyword.node.value.into(),
+                value: (keyword.node.value, locator).into(),
             },
             trivia: vec![],
             parentheses: Parenthesize::Never,
@@ -909,14 +1023,17 @@ impl From<rustpython_parser::ast::Keyword> for Keyword {
     }
 }
 
-impl From<rustpython_parser::ast::Arg> for Arg {
-    fn from(arg: rustpython_parser::ast::Arg) -> Self {
+impl From<(rustpython_parser::ast::Arg, &Locator<'_>)> for Arg {
+    fn from((arg, locator): (rustpython_parser::ast::Arg, &Locator)) -> Self {
         Arg {
             location: arg.location,
             end_location: arg.end_location,
             node: ArgData {
                 arg: arg.node.arg,
-                annotation: arg.node.annotation.map(|a| Box::new((*a).into())),
+                annotation: arg
+                    .node
+                    .annotation
+                    .map(|node| Box::new((*node, locator).into())),
                 type_comment: arg.node.type_comment,
             },
             trivia: vec![],
@@ -925,33 +1042,61 @@ impl From<rustpython_parser::ast::Arg> for Arg {
     }
 }
 
-impl From<rustpython_parser::ast::Arguments> for Arguments {
-    fn from(arguments: rustpython_parser::ast::Arguments) -> Self {
+impl From<(rustpython_parser::ast::Arguments, &Locator<'_>)> for Arguments {
+    fn from((arguments, locator): (rustpython_parser::ast::Arguments, &Locator)) -> Self {
         Arguments {
-            posonlyargs: arguments.posonlyargs.into_iter().map(Into::into).collect(),
-            args: arguments.args.into_iter().map(Into::into).collect(),
-            vararg: arguments.vararg.map(|v| Box::new((*v).into())),
-            kwonlyargs: arguments.kwonlyargs.into_iter().map(Into::into).collect(),
-            kw_defaults: arguments.kw_defaults.into_iter().map(Into::into).collect(),
-            kwarg: arguments.kwarg.map(|k| Box::new((*k).into())),
-            defaults: arguments.defaults.into_iter().map(Into::into).collect(),
+            posonlyargs: arguments
+                .posonlyargs
+                .into_iter()
+                .map(|node| (node, locator).into())
+                .collect(),
+            args: arguments
+                .args
+                .into_iter()
+                .map(|node| (node, locator).into())
+                .collect(),
+            vararg: arguments
+                .vararg
+                .map(|node| Box::new((*node, locator).into())),
+            kwonlyargs: arguments
+                .kwonlyargs
+                .into_iter()
+                .map(|node| (node, locator).into())
+                .collect(),
+            kw_defaults: arguments
+                .kw_defaults
+                .into_iter()
+                .map(|node| (node, locator).into())
+                .collect(),
+            kwarg: arguments
+                .kwarg
+                .map(|node| Box::new((*node, locator).into())),
+            defaults: arguments
+                .defaults
+                .into_iter()
+                .map(|node| (node, locator).into())
+                .collect(),
         }
     }
 }
 
-impl From<rustpython_parser::ast::Comprehension> for Comprehension {
-    fn from(comprehension: rustpython_parser::ast::Comprehension) -> Self {
+impl From<(rustpython_parser::ast::Comprehension, &Locator<'_>)> for Comprehension {
+    fn from((comprehension, locator): (rustpython_parser::ast::Comprehension, &Locator)) -> Self {
         Comprehension {
-            target: comprehension.target.into(),
-            iter: comprehension.iter.into(),
-            ifs: comprehension.ifs.into_iter().map(Into::into).collect(),
+            target: (comprehension.target, locator).into(),
+            iter: (comprehension.iter, locator).into(),
+            ifs: comprehension
+                .ifs
+                .into_iter()
+                .map(|node| (node, locator).into())
+                .collect(),
             is_async: comprehension.is_async,
         }
     }
 }
 
-impl From<rustpython_parser::ast::Expr> for Expr {
-    fn from(expr: rustpython_parser::ast::Expr) -> Self {
+impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
+    fn from((expr, locator): (rustpython_parser::ast::Expr, &Locator)) -> Self {
         match expr.node {
             rustpython_parser::ast::ExprKind::Name { id, ctx } => Expr {
                 location: expr.location,
@@ -968,7 +1113,10 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 end_location: expr.end_location,
                 node: ExprKind::BoolOp {
                     op: op.into(),
-                    values: values.into_iter().map(Into::into).collect(),
+                    values: values
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -977,8 +1125,8 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::NamedExpr {
-                    target: Box::new((*target).into()),
-                    value: Box::new((*value).into()),
+                    target: Box::new((*target, locator).into()),
+                    value: Box::new((*value, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -987,9 +1135,9 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::BinOp {
-                    left: Box::new((*left).into()),
+                    left: Box::new((*left, locator).into()),
                     op: op.into(),
-                    right: Box::new((*right).into()),
+                    right: Box::new((*right, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -999,7 +1147,7 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 end_location: expr.end_location,
                 node: ExprKind::UnaryOp {
                     op: op.into(),
-                    operand: Box::new((*operand).into()),
+                    operand: Box::new((*operand, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1008,8 +1156,8 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Lambda {
-                    args: Box::new((*args).into()),
-                    body: Box::new((*body).into()),
+                    args: Box::new((*args, locator).into()),
+                    body: Box::new((*body, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1018,9 +1166,9 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::IfExp {
-                    test: Box::new((*test).into()),
-                    body: Box::new((*body).into()),
-                    orelse: Box::new((*orelse).into()),
+                    test: Box::new((*test, locator).into()),
+                    body: Box::new((*body, locator).into()),
+                    orelse: Box::new((*orelse, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1029,8 +1177,14 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Dict {
-                    keys: keys.into_iter().map(|key| key.map(Into::into)).collect(),
-                    values: values.into_iter().map(Into::into).collect(),
+                    keys: keys
+                        .into_iter()
+                        .map(|key| key.map(|node| (node, locator).into()))
+                        .collect(),
+                    values: values
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1039,7 +1193,10 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Set {
-                    elts: elts.into_iter().map(Into::into).collect(),
+                    elts: elts
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1048,8 +1205,11 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::ListComp {
-                    elt: Box::new((*elt).into()),
-                    generators: generators.into_iter().map(Into::into).collect(),
+                    elt: Box::new((*elt, locator).into()),
+                    generators: generators
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1058,8 +1218,11 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::SetComp {
-                    elt: Box::new((*elt).into()),
-                    generators: generators.into_iter().map(Into::into).collect(),
+                    elt: Box::new((*elt, locator).into()),
+                    generators: generators
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1072,9 +1235,12 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::DictComp {
-                    key: Box::new((*key).into()),
-                    value: Box::new((*value).into()),
-                    generators: generators.into_iter().map(Into::into).collect(),
+                    key: Box::new((*key, locator).into()),
+                    value: Box::new((*value, locator).into()),
+                    generators: generators
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1083,8 +1249,11 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::GeneratorExp {
-                    elt: Box::new((*elt).into()),
-                    generators: generators.into_iter().map(Into::into).collect(),
+                    elt: Box::new((*elt, locator).into()),
+                    generators: generators
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1093,7 +1262,7 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Await {
-                    value: Box::new((*value).into()),
+                    value: Box::new((*value, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1102,7 +1271,7 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Yield {
-                    value: value.map(|v| Box::new((*v).into())),
+                    value: value.map(|v| Box::new((*v, locator).into())),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1111,7 +1280,7 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::YieldFrom {
-                    value: Box::new((*value).into()),
+                    value: Box::new((*value, locator).into()),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1124,9 +1293,12 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Compare {
-                    left: Box::new((*left).into()),
+                    left: Box::new((*left, locator).into()),
                     ops: ops.into_iter().map(Into::into).collect(),
-                    comparators: comparators.into_iter().map(Into::into).collect(),
+                    comparators: comparators
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1139,9 +1311,15 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Call {
-                    func: Box::new((*func).into()),
-                    args: args.into_iter().map(Into::into).collect(),
-                    keywords: keywords.into_iter().map(Into::into).collect(),
+                    func: Box::new((*func, locator).into()),
+                    args: args
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                    keywords: keywords
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1154,9 +1332,9 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::FormattedValue {
-                    value: Box::new((*value).into()),
+                    value: Box::new((*value, locator).into()),
                     conversion,
-                    format_spec: format_spec.map(|f| Box::new((*f).into())),
+                    format_spec: format_spec.map(|f| Box::new((*f, locator).into())),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1165,7 +1343,10 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::JoinedStr {
-                    values: values.into_iter().map(Into::into).collect(),
+                    values: values
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
@@ -1181,7 +1362,7 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Attribute {
-                    value: Box::new((*value).into()),
+                    value: Box::new((*value, locator).into()),
                     attr,
                     ctx: ctx.into(),
                 },
@@ -1192,8 +1373,8 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Subscript {
-                    value: Box::new((*value).into()),
-                    slice: Box::new((*slice).into()),
+                    value: Box::new((*value, locator).into()),
+                    slice: Box::new((*slice, locator).into()),
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
@@ -1203,7 +1384,7 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Starred {
-                    value: Box::new((*value).into()),
+                    value: Box::new((*value, locator).into()),
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
@@ -1213,7 +1394,10 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::List {
-                    elts: elts.into_iter().map(Into::into).collect(),
+                    elts: elts
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
@@ -1223,23 +1407,88 @@ impl From<rustpython_parser::ast::Expr> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Tuple {
-                    elts: elts.into_iter().map(Into::into).collect(),
+                    elts: elts
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
                     ctx: ctx.into(),
                 },
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::ExprKind::Slice { lower, upper, step } => Expr {
-                location: expr.location,
-                end_location: expr.end_location,
-                node: ExprKind::Slice {
-                    lower: lower.map(|l| Box::new((*l).into())),
-                    upper: upper.map(|u| Box::new((*u).into())),
-                    step: step.map(|s| Box::new((*s).into())),
-                },
-                trivia: vec![],
-                parentheses: Parenthesize::Never,
-            },
+            rustpython_parser::ast::ExprKind::Slice { lower, upper, step } => {
+                // Locate the colon tokens, which indicate the number of index segments.
+                let (source, start, end) =
+                    locator.slice(Range::new(expr.location, expr.end_location.unwrap()));
+                let tokens = rustpython_parser::lexer::lex_located(
+                    &source[start..end],
+                    Mode::Module,
+                    expr.location,
+                );
+
+                // Find the first and (if it exists) second colon in the slice, avoiding any
+                // semicolons within nested slices, and any lambda expressions.
+                let mut first_colon = None;
+                let mut second_colon = None;
+                let mut lambda = 0;
+                let mut nesting = 0;
+                for (start, tok, ..) in tokens.flatten() {
+                    match tok {
+                        rustpython_parser::Tok::Lambda if nesting == 0 => lambda += 1,
+                        rustpython_parser::Tok::Colon if nesting == 0 => {
+                            if lambda > 0 {
+                                lambda -= 1;
+                            } else {
+                                if first_colon.is_none() {
+                                    first_colon = Some(start);
+                                } else {
+                                    second_colon = Some(start);
+                                    break;
+                                }
+                            }
+                        }
+                        rustpython_parser::Tok::Lpar
+                        | rustpython_parser::Tok::Lsqb
+                        | rustpython_parser::Tok::Lbrace => nesting += 1,
+                        rustpython_parser::Tok::Rpar
+                        | rustpython_parser::Tok::Rsqb
+                        | rustpython_parser::Tok::Rbrace => nesting -= 1,
+                        _ => {}
+                    }
+                }
+
+                let lower = SliceIndex::new(
+                    expr.location,
+                    first_colon.unwrap(),
+                    lower.map_or(SliceIndexKind::Empty, |node| SliceIndexKind::Index {
+                        value: Box::new((*node, locator).into()),
+                    }),
+                );
+                let upper = SliceIndex::new(
+                    first_colon.unwrap(),
+                    second_colon.unwrap_or(expr.end_location.unwrap()),
+                    upper.map_or(SliceIndexKind::Empty, |node| SliceIndexKind::Index {
+                        value: Box::new((*node, locator).into()),
+                    }),
+                );
+                let step = second_colon.map(|second_colon| {
+                    SliceIndex::new(
+                        second_colon,
+                        expr.end_location.unwrap(),
+                        step.map_or(SliceIndexKind::Empty, |node| SliceIndexKind::Index {
+                            value: Box::new((*node, locator).into()),
+                        }),
+                    )
+                });
+
+                Expr {
+                    location: expr.location,
+                    end_location: expr.end_location,
+                    node: ExprKind::Slice { lower, upper, step },
+                    trivia: vec![],
+                    parentheses: Parenthesize::Never,
+                }
+            }
         }
     }
 }

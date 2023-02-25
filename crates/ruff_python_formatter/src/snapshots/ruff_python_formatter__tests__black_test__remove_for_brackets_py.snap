@@ -25,7 +25,6 @@ for (k, v) in dfkasdjfldsjflkdsjflkdsjfdslkfjldsjfgkjdshgkljjdsfldgkhsdofudsfuds
 # Test deeply nested brackets
 for (((((k, v))))) in d.items():
     print(k, v)
-
 ```
 
 ## Black Differences
@@ -33,16 +32,7 @@ for (((((k, v))))) in d.items():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,7 +3,7 @@
-     print(k, v)
- 
- # Don't touch tuple brackets after `in`
--for module in (core, _unicodefun):
-+for module in core, _unicodefun:
-     if hasattr(module, "_verify_python3_env"):
-         module._verify_python3_env = lambda: None
- 
-@@ -17,11 +17,9 @@
+@@ -17,9 +17,7 @@
  for (
      k,
      v,
@@ -53,11 +43,6 @@ for (((((k, v))))) in d.items():
      print(k, v)
  
  # Test deeply nested brackets
- for k, v in d.items():
--    print(k, v)
-\ No newline at end of file
-+    print(k, v)
-
 ```
 
 ## Ruff Output
@@ -68,7 +53,7 @@ for k, v in d.items():
     print(k, v)
 
 # Don't touch tuple brackets after `in`
-for module in core, _unicodefun:
+for module in (core, _unicodefun):
     if hasattr(module, "_verify_python3_env"):
         module._verify_python3_env = lambda: None
 
@@ -88,7 +73,6 @@ for (
 # Test deeply nested brackets
 for k, v in d.items():
     print(k, v)
-
 ```
 
 ## Black Output

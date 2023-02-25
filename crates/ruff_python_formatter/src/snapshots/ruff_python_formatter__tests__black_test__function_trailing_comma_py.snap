@@ -67,7 +67,6 @@ some_module.some_function(
 some_module.some_function(
     argument1, (one, two,), argument4, argument5, argument6
 )
-
 ```
 
 ## Black Differences
@@ -75,35 +74,6 @@ some_module.some_function(
 ```diff
 --- Black
 +++ Ruff
-@@ -2,7 +2,7 @@
-     a,
- ):
-     d = {
--        "key": "value",
-+        'key': 'value',
-     }
-     tup = (1,)
- 
-@@ -12,8 +12,8 @@
-     b,
- ):
-     d = {
--        "key": "value",
--        "key2": "value2",
-+        'key': 'value',
-+        'key2': 'value2',
-     }
-     tup = (
-         1,
-@@ -26,7 +26,7 @@
- ):
-     call(
-         arg={
--            "explode": "this",
-+            'explode': 'this',
-         }
-     )
-     call2(
 @@ -52,53 +52,52 @@
          pass
  
@@ -176,7 +146,6 @@ some_module.some_function(
  )
  
  # Inner trailing comma causes outer to explode
-
 ```
 
 ## Ruff Output
@@ -186,7 +155,7 @@ def f(
     a,
 ):
     d = {
-        'key': 'value',
+        "key": "value",
     }
     tup = (1,)
 
@@ -196,8 +165,8 @@ def f2(
     b,
 ):
     d = {
-        'key': 'value',
-        'key2': 'value2',
+        "key": "value",
+        "key2": "value2",
     }
     tup = (
         1,
@@ -210,7 +179,7 @@ def f(
 ):
     call(
         arg={
-            'explode': 'this',
+            "explode": "this",
         }
     )
     call2(

@@ -9,7 +9,6 @@ input_file: crates/ruff_python_formatter/resources/test/fixtures/black/simple_ca
 if (e123456.get_tk_patchlevel() >= (8, 6, 0, 'final') or
     (8, 5, 8) <= get_tk_patchlevel() < (8, 6)):
     pass
-
 ```
 
 ## Black Differences
@@ -23,25 +22,21 @@ if (e123456.get_tk_patchlevel() >= (8, 6, 0, 'final') or
 -    5,
 -    8,
 -) <= get_tk_patchlevel() < (8, 6):
--    pass
-\ No newline at end of file
 +if (
-+    e123456.get_tk_patchlevel() >= (8, 6, 0, 'final')
++    e123456.get_tk_patchlevel() >= (8, 6, 0, "final")
 +    or (8, 5, 8) <= get_tk_patchlevel() < (8, 6)
 +):
-+    pass
-
+     pass
 ```
 
 ## Ruff Output
 
 ```py
 if (
-    e123456.get_tk_patchlevel() >= (8, 6, 0, 'final')
+    e123456.get_tk_patchlevel() >= (8, 6, 0, "final")
     or (8, 5, 8) <= get_tk_patchlevel() < (8, 6)
 ):
     pass
-
 ```
 
 ## Black Output

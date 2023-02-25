@@ -358,6 +358,7 @@ mod tests {
     use crate::test::{test_path, test_resource_path};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
+    #[test_case(Path::new("as_imports_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]
     #[test_case(Path::new("combine_import_from.py"))]
     #[test_case(Path::new("comments.py"))]

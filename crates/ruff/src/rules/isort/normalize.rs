@@ -1,5 +1,6 @@
-use super::types::{AliasData, ImportBlock, ImportFromData, TrailingComma};
+use super::types::{AliasData, ImportBlock, ImportFromData};
 use super::AnnotatedImport;
+use crate::rules::isort::types::TrailingComma;
 
 pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) -> ImportBlock {
     let mut block = ImportBlock::default();
@@ -12,7 +13,7 @@ pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool
             } => {
                 // Associate the comments with the first alias (best effort).
                 if let Some(name) = names.first() {
-                    let entry = block
+                    let comment_set = block
                         .import
                         .entry(AliasData {
                             name: name.name,
@@ -20,10 +21,10 @@ pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool
                         })
                         .or_default();
                     for comment in atop {
-                        entry.atop.push(comment.value);
+                        comment_set.atop.push(comment.value);
                     }
                     for comment in inline {
-                        entry.inline.push(comment.value);
+                        comment_set.inline.push(comment.value);
                     }
                 }
 
@@ -46,18 +47,18 @@ pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool
                 inline,
                 trailing_comma,
             } => {
+                // Insert comments on the statement itself.
                 if let Some(alias) = names.first() {
-                    let entry = if alias.name == "*" {
+                    let import_from = if alias.name == "*" {
                         block
                             .import_from_star
                             .entry(ImportFromData { module, level })
                             .or_default()
                     } else if alias.asname.is_none() || combine_as_imports {
-                        &mut block
+                        block
                             .import_from
                             .entry(ImportFromData { module, level })
                             .or_default()
-                            .0
                     } else {
                         block
                             .import_from_as
@@ -72,17 +73,17 @@ pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool
                     };
 
                     for comment in atop {
-                        entry.atop.push(comment.value);
+                        import_from.comments.atop.push(comment.value);
                     }
 
                     for comment in inline {
-                        entry.inline.push(comment.value);
+                        import_from.comments.inline.push(comment.value);
                     }
                 }
 
-                // Create an entry for every alias.
+                // Create an entry for every alias (import) within the statement.
                 for alias in names {
-                    let entry = if alias.name == "*" {
+                    let import_from = if alias.name == "*" {
                         block
                             .import_from_star
                             .entry(ImportFromData { module, level })
@@ -91,12 +92,6 @@ pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool
                         block
                             .import_from
                             .entry(ImportFromData { module, level })
-                            .or_default()
-                            .1
-                            .entry(AliasData {
-                                name: alias.name,
-                                asname: alias.asname,
-                            })
                             .or_default()
                     } else {
                         block
@@ -111,20 +106,24 @@ pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool
                             .or_default()
                     };
 
+                    let comment_set = import_from
+                        .aliases
+                        .entry(AliasData {
+                            name: alias.name,
+                            asname: alias.asname,
+                        })
+                        .or_default();
+
                     for comment in alias.atop {
-                        entry.atop.push(comment.value);
+                        comment_set.atop.push(comment.value);
                     }
                     for comment in alias.inline {
-                        entry.inline.push(comment.value);
+                        comment_set.inline.push(comment.value);
                     }
-                }
 
-                // Propagate trailing commas.
-                if matches!(trailing_comma, TrailingComma::Present) {
-                    if let Some(entry) =
-                        block.import_from.get_mut(&ImportFromData { module, level })
-                    {
-                        entry.2 = trailing_comma;
+                    // Propagate trailing commas.
+                    if matches!(trailing_comma, TrailingComma::Present) {
+                        import_from.trailing_comma = TrailingComma::Present;
                     }
                 }
             }

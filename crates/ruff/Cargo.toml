@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.251"
+version = "0.0.252"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -16,6 +16,10 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 
 [dependencies]
+ruff_macros = { path = "../ruff_macros" }
+ruff_python = { path = "../ruff_python" }
+ruff_rustpython = { path = "../ruff_rustpython" }
+
 anyhow = { workspace = true }
 bisection = { version = "0.1.0" }
 bitflags = { version = "1.3.2" }
@@ -23,12 +27,14 @@ cfg-if = { version = "1.0.0" }
 chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
 clap = { workspace = true, features = ["derive", "env", "string"] }
 colored = { version = "2.0.0" }
+derivative = { version = "2.2.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 glob = { version = "0.3.0" }
 globset = { version = "0.4.9" }
 ignore = { version = "0.4.18" }
 imperative = { version = "1.0.3" }
+is-macro = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
 log = { version = "0.4.17" }
@@ -39,8 +45,7 @@ num-traits = "0.2.15"
 once_cell = { workspace = true }
 path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
 regex = { workspace = true }
-ruff_macros = { path = "../ruff_macros" }
-ruff_python = { path = "../ruff_python" }
+result-like = "0.4.6"
 rustc-hash = { workspace = true }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }

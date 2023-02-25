@@ -257,9 +257,7 @@ pub fn trailing_commas(
                     end_location: comma.2,
                 },
             );
-            if matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(&Rule::TrailingCommaProhibited)
-            {
+            if autofix.into() && settings.rules.should_fix(&Rule::TrailingCommaProhibited) {
                 diagnostic.amend(Fix::deletion(comma.0, comma.2));
             }
             diagnostics.push(diagnostic);
@@ -303,9 +301,7 @@ pub fn trailing_commas(
                     end_location: missing_comma.2,
                 },
             );
-            if matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(&Rule::TrailingCommaMissing)
-            {
+            if autofix.into() && settings.rules.should_fix(&Rule::TrailingCommaMissing) {
                 diagnostic.amend(Fix::insertion(",".to_owned(), missing_comma.2));
             }
             diagnostics.push(diagnostic);

@@ -98,7 +98,6 @@ def g():
                 syms.argument,
             }:
                 return NO
-
 ```
 
 ## Black Differences
@@ -106,19 +105,6 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -3,9 +3,9 @@
- 
- # leading comment
- def f():
--    NO = ""
--    SPACE = " "
--    DOUBLESPACE = "  "
-+    NO = ''
-+    SPACE = ' '
-+    DOUBLESPACE = '  '
- 
-     t = leaf.type
-     p = leaf.parent  # trailing comment
 @@ -25,23 +25,30 @@
              return NO
  
@@ -165,21 +151,14 @@ def g():
                  return NO
  
  
-@@ -49,11 +56,10 @@
+@@ -49,7 +56,6 @@
  # SECTION BECAUSE SECTIONS
  ###############################################################################
  
 -
  def g():
--    NO = ""
--    SPACE = " "
--    DOUBLESPACE = "  "
-+    NO = ''
-+    SPACE = ' '
-+    DOUBLESPACE = '  '
- 
-     t = leaf.type
-     p = leaf.parent
+     NO = ""
+     SPACE = " "
 @@ -67,7 +73,7 @@
          return DOUBLESPACE
  
@@ -200,8 +179,6 @@ def g():
 -                syms.arglist,
 -                syms.argument,
 -            }:
--                return NO
-\ No newline at end of file
 +            if (
 +                prevp.parent
 +                and prevp.parent.type
@@ -213,8 +190,7 @@ def g():
 +                    syms.argument,
 +                }
 +            ):
-+                return NO
-
+                 return NO
 ```
 
 ## Ruff Output
@@ -225,9 +201,9 @@ def g():
 
 # leading comment
 def f():
-    NO = ''
-    SPACE = ' '
-    DOUBLESPACE = '  '
+    NO = ""
+    SPACE = " "
+    DOUBLESPACE = "  "
 
     t = leaf.type
     p = leaf.parent  # trailing comment
@@ -279,9 +255,9 @@ def f():
 ###############################################################################
 
 def g():
-    NO = ''
-    SPACE = ' '
-    DOUBLESPACE = '  '
+    NO = ""
+    SPACE = " "
+    DOUBLESPACE = "  "
 
     t = leaf.type
     p = leaf.parent
@@ -319,7 +295,6 @@ def g():
                 }
             ):
                 return NO
-
 ```
 
 ## Black Output

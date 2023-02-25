@@ -87,7 +87,6 @@ async def main():
 
 async def main():
     await (yield)
-
 ```
 
 ## Black Differences
@@ -183,7 +182,7 @@ async def main():
  
  
  # Keep brackets around non power operations and nested awaits
-@@ -82,12 +86,12 @@
+@@ -82,11 +86,11 @@
  
  
  async def main():
@@ -197,10 +196,6 @@ async def main():
  
  
  async def main():
--    await (yield)
-\ No newline at end of file
-+    await (yield)
-
 ```
 
 ## Ruff Output
@@ -303,7 +298,6 @@ async def main():
 
 async def main():
     await (yield)
-
 ```
 
 ## Black Output

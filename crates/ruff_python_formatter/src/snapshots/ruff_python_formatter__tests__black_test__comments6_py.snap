@@ -124,7 +124,6 @@ call_to_some_function_asdf(
 )
 
 aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-
 ```
 
 ## Black Differences
@@ -289,8 +288,6 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
  )
  
  aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
-\ No newline at end of file
-
 ```
 
 ## Ruff Output

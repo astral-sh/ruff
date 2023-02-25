@@ -59,7 +59,6 @@ else:
 
 with hmm_but_this_should_get_two_preceding_newlines():
     pass
-
 ```
 
 ## Black Differences
@@ -67,14 +66,16 @@ with hmm_but_this_should_get_two_preceding_newlines():
 ```diff
 --- Black
 +++ Ruff
-@@ -63,4 +63,4 @@
- 
- 
- with hmm_but_this_should_get_two_preceding_newlines():
--    pass
-\ No newline at end of file
-+    pass
-
+@@ -5,7 +5,8 @@
+     with cache_dir():
+         if something:
+             result = CliRunner().invoke(
+-                black.main, [str(src1), str(src2), "--diff", "--check"]
++                black.main,
++                [str(src1), str(src2), "--diff", "--check"],
+             )
+     limited.append(-limited.pop())  # negate top
+     return A(
 ```
 
 ## Ruff Output
@@ -146,7 +147,6 @@ else:
 
 with hmm_but_this_should_get_two_preceding_newlines():
     pass
-
 ```
 
 ## Black Output
@@ -159,8 +159,7 @@ def f(
     with cache_dir():
         if something:
             result = CliRunner().invoke(
-                black.main,
-                [str(src1), str(src2), "--diff", "--check"],
+                black.main, [str(src1), str(src2), "--diff", "--check"]
             )
     limited.append(-limited.pop())  # negate top
     return A(
