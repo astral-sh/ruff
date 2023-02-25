@@ -1,0 +1,93 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    GlobalStatement:
+      name: CONSTANT
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    GlobalStatement:
+      name: sys
+  location:
+    row: 21
+    column: 4
+  end_location:
+    row: 21
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    GlobalStatement:
+      name: namedtuple
+  location:
+    row: 27
+    column: 4
+  end_location:
+    row: 27
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    GlobalStatement:
+      name: CONSTANT
+  location:
+    row: 33
+    column: 4
+  end_location:
+    row: 33
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    GlobalStatement:
+      name: CONSTANT
+  location:
+    row: 40
+    column: 4
+  end_location:
+    row: 40
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    GlobalStatement:
+      name: CONSTANT
+  location:
+    row: 47
+    column: 4
+  end_location:
+    row: 47
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    GlobalStatement:
+      name: FUNC
+  location:
+    row: 57
+    column: 4
+  end_location:
+    row: 57
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    GlobalStatement:
+      name: CLASS
+  location:
+    row: 67
+    column: 4
+  end_location:
+    row: 67
+    column: 16
+  fix: ~
+  parent: ~
+

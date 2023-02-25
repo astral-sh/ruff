@@ -39,6 +39,7 @@ mod tests {
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
+    #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"); "PLW0603")]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
     #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]
