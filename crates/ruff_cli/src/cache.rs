@@ -11,23 +11,18 @@ use path_absolutize::Absolutize;
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use serde::{Deserialize, Serialize};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Serialize, Deserialize)]
-struct CacheMetadata {
-    mtime: i64,
-}
-
 #[derive(Serialize)]
 struct CheckResultRef<'a> {
-    metadata: &'a CacheMetadata,
     messages: &'a [Message],
 }
 
 #[derive(Deserialize)]
 struct CheckResult {
-    metadata: CacheMetadata,
     messages: Vec<Message>,
 }
 
@@ -38,6 +33,7 @@ fn content_dir() -> &'static Path {
 fn cache_key<P: AsRef<Path>>(
     path: P,
     package: Option<&P>,
+    metadata: &fs::Metadata,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> u64 {
@@ -48,6 +44,9 @@ fn cache_key<P: AsRef<Path>>(
         .as_ref()
         .map(|path| path.as_ref().absolutize().unwrap())
         .hash(&mut hasher);
+    FileTime::from_last_modification_time(metadata).hash(&mut hasher);
+    #[cfg(unix)]
+    metadata.permissions().mode().hash(&mut hasher);
     settings.hash(&mut hasher);
     autofix.hash(&mut hasher);
     hasher.finish()
@@ -99,23 +98,16 @@ pub fn get<P: AsRef<Path>>(
 ) -> Option<Vec<Message>> {
     let encoded = read_sync(
         &settings.cli.cache_dir,
-        cache_key(path, package, &settings.lib, autofix),
+        cache_key(path, package, metadata, &settings.lib, autofix),
     )
     .ok()?;
-    let (mtime, messages) = match bincode::deserialize::<CheckResult>(&encoded[..]) {
-        Ok(CheckResult {
-            metadata: CacheMetadata { mtime },
-            messages,
-        }) => (mtime, messages),
+    match bincode::deserialize::<CheckResult>(&encoded[..]) {
+        Ok(CheckResult { messages }) => Some(messages),
         Err(e) => {
             error!("Failed to deserialize encoded cache entry: {e:?}");
-            return None;
+            None
         }
-    };
-    if FileTime::from_last_modification_time(metadata).unix_seconds() != mtime {
-        return None;
     }
-    Some(messages)
 }
 
 /// Set a value in the cache.
@@ -127,15 +119,10 @@ pub fn set<P: AsRef<Path>>(
     autofix: flags::Autofix,
     messages: &[Message],
 ) {
-    let check_result = CheckResultRef {
-        metadata: &CacheMetadata {
-            mtime: FileTime::from_last_modification_time(metadata).unix_seconds(),
-        },
-        messages,
-    };
+    let check_result = CheckResultRef { messages };
     if let Err(e) = write_sync(
         &settings.cli.cache_dir,
-        cache_key(path, package, &settings.lib, autofix),
+        cache_key(path, package, metadata, &settings.lib, autofix),
         &bincode::serialize(&check_result).unwrap(),
     ) {
         error!("Failed to write to cache: {e:?}");
@@ -146,11 +133,12 @@ pub fn set<P: AsRef<Path>>(
 pub fn del<P: AsRef<Path>>(
     path: P,
     package: Option<&P>,
+    metadata: &fs::Metadata,
     settings: &AllSettings,
     autofix: flags::Autofix,
 ) {
     drop(del_sync(
         &settings.cli.cache_dir,
-        cache_key(path, package, &settings.lib, autofix),
+        cache_key(path, package, metadata, &settings.lib, autofix),
     ));
 }

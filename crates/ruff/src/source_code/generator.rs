@@ -4,11 +4,13 @@ use std::ops::Deref;
 
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Excepthandler,
-    ExcepthandlerKind, Expr, ExprKind, Operator, Stmt, StmtKind, Suite, Withitem,
+    ExcepthandlerKind, Expr, ExprKind, MatchCase, Operator, Pattern, PatternKind, Stmt, StmtKind,
+    Suite, Withitem,
 };
 
+use ruff_rustpython::vendor::{bytes, str};
+
 use crate::source_code::stylist::{Indentation, LineEnding, Quote, Stylist};
-use crate::vendor::{bytes, str};
 
 mod precedence {
     pub const ASSIGN: u8 = 3;
@@ -456,7 +458,20 @@ impl<'a> Generator<'a> {
                 });
                 self.body(body);
             }
-            StmtKind::Match { .. } => {}
+            StmtKind::Match { subject, cases } => {
+                statement!({
+                    self.p("match ");
+                    self.unparse_expr(subject, precedence::MAX);
+                    self.p(":");
+                });
+                for case in cases {
+                    self.indent_depth += 1;
+                    statement!({
+                        self.unparse_match_case(case);
+                    });
+                    self.indent_depth -= 1;
+                }
+            }
             StmtKind::Raise { exc, cause } => {
                 statement!({
                     self.p("raise");
@@ -483,7 +498,37 @@ impl<'a> Generator<'a> {
 
                 for handler in handlers {
                     statement!({
-                        self.unparse_excepthandler(handler);
+                        self.unparse_excepthandler(handler, false);
+                    });
+                }
+
+                if !orelse.is_empty() {
+                    statement!({
+                        self.p("else:");
+                    });
+                    self.body(orelse);
+                }
+                if !finalbody.is_empty() {
+                    statement!({
+                        self.p("finally:");
+                    });
+                    self.body(finalbody);
+                }
+            }
+            StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => {
+                statement!({
+                    self.p("try:");
+                });
+                self.body(body);
+
+                for handler in handlers {
+                    statement!({
+                        self.unparse_excepthandler(handler, true);
                     });
                 }
 
@@ -584,10 +629,13 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn unparse_excepthandler<U>(&mut self, ast: &Excepthandler<U>) {
+    fn unparse_excepthandler<U>(&mut self, ast: &Excepthandler<U>, star: bool) {
         match &ast.node {
             ExcepthandlerKind::ExceptHandler { type_, name, body } => {
                 self.p("except");
+                if star {
+                    self.p("*");
+                }
                 if let Some(type_) = type_ {
                     self.p(" ");
                     self.unparse_expr(type_, precedence::MAX);
@@ -600,6 +648,84 @@ impl<'a> Generator<'a> {
                 self.body(body);
             }
         }
+    }
+
+    fn unparse_pattern<U>(&mut self, ast: &Pattern<U>) {
+        match &ast.node {
+            PatternKind::MatchValue { value } => {
+                self.unparse_expr(value, precedence::MAX);
+            }
+            PatternKind::MatchSingleton { value } => {
+                self.unparse_constant(value);
+            }
+            PatternKind::MatchSequence { patterns } => {
+                self.p("[");
+                let mut first = true;
+                for pattern in patterns {
+                    self.p_delim(&mut first, ", ");
+                    self.unparse_pattern(pattern);
+                }
+                self.p("]");
+            }
+            PatternKind::MatchMapping {
+                keys,
+                patterns,
+                rest,
+            } => {
+                self.p("{");
+                let mut first = true;
+                for (key, pattern) in keys.iter().zip(patterns) {
+                    self.p_delim(&mut first, ", ");
+                    self.unparse_expr(key, precedence::MAX);
+                    self.p(": ");
+                    self.unparse_pattern(pattern);
+                }
+                if let Some(rest) = rest {
+                    self.p_delim(&mut first, ", ");
+                    self.p("**");
+                    self.p(rest);
+                }
+                self.p("}");
+            }
+            PatternKind::MatchClass { .. } => {}
+            PatternKind::MatchStar { name } => {
+                self.p("*");
+                if let Some(name) = name {
+                    self.p(name);
+                } else {
+                    self.p("_");
+                }
+            }
+            PatternKind::MatchAs { pattern, name } => {
+                if let Some(pattern) = pattern {
+                    self.unparse_pattern(pattern);
+                    self.p(" as ");
+                }
+                if let Some(name) = name {
+                    self.p(name);
+                } else {
+                    self.p("_");
+                }
+            }
+            PatternKind::MatchOr { patterns } => {
+                let mut first = true;
+                for pattern in patterns {
+                    self.p_delim(&mut first, " | ");
+                    self.unparse_pattern(pattern);
+                }
+            }
+        }
+    }
+
+    fn unparse_match_case<U>(&mut self, ast: &MatchCase<U>) {
+        self.p("case ");
+        self.unparse_pattern(&ast.pattern);
+        if let Some(guard) = &ast.guard {
+            self.p(" if ");
+            self.unparse_expr(guard, precedence::MAX);
+        }
+        self.p(":");
+        self.body(&ast.body);
     }
 
     pub fn unparse_expr<U>(&mut self, ast: &Expr<U>, level: u8) {
@@ -1133,7 +1259,7 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::parser;
+    use rustpython_parser as parser;
 
     use crate::source_code::stylist::{Indentation, LineEnding, Quote};
     use crate::source_code::Generator;
@@ -1265,6 +1391,25 @@ mod tests {
             r#"@functools.lru_cache(maxsize=None)
 def f(x: int, y: int) -> int:
     return x + y"#
+        );
+        assert_round_trip!(
+            r#"try:
+    pass
+except Exception as e:
+    pass"#
+        );
+        assert_round_trip!(
+            r#"try:
+    pass
+except* Exception as e:
+    pass"#
+        );
+        assert_round_trip!(
+            r#"match x:
+    case [1, 2, 3]:
+        return 2
+    case 4 as y:
+        return y"#
         );
         assert_eq!(round_trip(r#"x = (1, 2, 3)"#), r#"x = 1, 2, 3"#);
         assert_eq!(round_trip(r#"-(1) + ~(2) + +(3)"#), r#"-1 + ~2 + +3"#);

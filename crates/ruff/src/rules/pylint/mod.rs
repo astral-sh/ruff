@@ -17,6 +17,8 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
+    #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"); "PLE1205")]
+    #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"); "PLE1206")]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"); "PLE0101")]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
@@ -47,6 +49,7 @@ mod tests {
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"); "PLE2502")]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"); "PLE0100")]
+    #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"); "PLW2901")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -322,7 +322,7 @@ fn format_for(
     target: &Expr,
     iter: &Expr,
     body: &[Stmt],
-    _orelse: &[Stmt],
+    orelse: &[Stmt],
     _type_comment: Option<&str>,
 ) -> FormatResult<()> {
     write!(
@@ -338,7 +338,11 @@ fn format_for(
             text(":"),
             block_indent(&block(body))
         ]
-    )
+    )?;
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    Ok(())
 }
 
 fn format_while(
@@ -461,6 +465,28 @@ fn format_try(
 ) -> FormatResult<()> {
     write!(f, [text("try:"), block_indent(&block(body))])?;
     for handler in handlers {
+        write!(f, [handler.format()])?;
+    }
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    if !finalbody.is_empty() {
+        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
+    }
+    Ok(())
+}
+
+fn format_try_star(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    body: &[Stmt],
+    handlers: &[Excepthandler],
+    orelse: &[Stmt],
+    finalbody: &[Stmt],
+) -> FormatResult<()> {
+    write!(f, [text("try:"), block_indent(&block(body))])?;
+    for handler in handlers {
+        // TODO(charlie): Include `except*`.
         write!(f, [handler.format()])?;
     }
     if !orelse.is_empty() {
@@ -828,6 +854,12 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 orelse,
                 finalbody,
             } => format_try(f, self.item, body, handlers, orelse, finalbody),
+            StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => format_try_star(f, self.item, body, handlers, orelse, finalbody),
             StmtKind::Assert { test, msg } => {
                 format_assert(f, self.item, test, msg.as_ref().map(|expr| &**expr))
             }
@@ -849,6 +881,8 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 unimplemented!("Implement StmtKind: {:?}", self.item.node)
             }
         }?;
+
+        write!(f, [hard_line_break()])?;
 
         // Any trailing comments come on the lines after.
         for trivia in &self.item.trivia {

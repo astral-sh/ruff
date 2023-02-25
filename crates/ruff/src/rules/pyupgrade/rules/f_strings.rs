@@ -4,8 +4,7 @@ use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -129,7 +128,7 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
     let contents = checker.locator.slice(&Range::from_located(value));
 
     // Tokenize: we need to avoid trying to fix implicit string concatenations.
-    if lexer::make_tokenizer(contents)
+    if lexer::lex(contents, Mode::Module)
         .flatten()
         .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
         .count()

@@ -28,7 +28,6 @@ fn num_branches(stmts: &[Stmt]) -> usize {
     stmts
         .iter()
         .map(|stmt| {
-            // TODO(charlie): Account for pattern match statement.
             match &stmt.node {
                 StmtKind::If { body, orelse, .. } => {
                     1 + num_branches(body)
@@ -41,6 +40,12 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                         })
                         + num_branches(orelse)
                 }
+                StmtKind::Match { cases, .. } => {
+                    1 + cases
+                        .iter()
+                        .map(|case| num_branches(&case.body))
+                        .sum::<usize>()
+                }
                 StmtKind::For { body, orelse, .. }
                 | StmtKind::AsyncFor { body, orelse, .. }
                 | StmtKind::While { body, orelse, .. } => {
@@ -52,6 +57,12 @@ fn num_branches(stmts: &[Stmt]) -> usize {
                         })
                 }
                 StmtKind::Try {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                }
+                | StmtKind::TryStar {
                     body,
                     handlers,
                     orelse,
@@ -109,7 +120,7 @@ pub fn too_many_branches(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::parser;
+    use rustpython_parser as parser;
 
     use super::num_branches;
 

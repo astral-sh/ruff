@@ -179,6 +179,8 @@ const NORETURN_FUNCS: &[&[&str]] = &[
     &["posix", "_exit"],
     &["posix", "abort"],
     &["sys", "exit"],
+    &["typing", "assert_never"],
+    &["typing_extensions", "assert_never"],
     &["_thread", "exit"],
     &["_winapi", "ExitProcess"],
     // third-party modules
@@ -255,12 +257,22 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 checker.diagnostics.push(diagnostic);
             }
         }
+        StmtKind::Match { cases, .. } => {
+            for case in cases {
+                if let Some(last_stmt) = case.body.last() {
+                    implicit_return(checker, last_stmt);
+                }
+            }
+        }
         StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => {
             if let Some(last_stmt) = body.last() {
                 implicit_return(checker, last_stmt);
             }
         }
-        StmtKind::Return { .. } | StmtKind::Raise { .. } | StmtKind::Try { .. } => {}
+        StmtKind::Return { .. }
+        | StmtKind::Raise { .. }
+        | StmtKind::Try { .. }
+        | StmtKind::TryStar { .. } => {}
         StmtKind::Expr { value, .. }
             if matches!(
                 &value.node,

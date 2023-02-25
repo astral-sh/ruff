@@ -48,12 +48,8 @@ impl Violation for CollapsibleIf {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let CollapsibleIf { fixable, .. } = self;
-        if *fixable {
-            Some(|_| format!("Combine `if` statements using `and`"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|_| format!("Combine `if` statements using `and`"))
     }
 }
 
@@ -73,12 +69,9 @@ impl Violation for NeedlessBool {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let NeedlessBool { fixable, .. } = self;
-        if *fixable {
-            Some(|NeedlessBool { condition, .. }| format!("Replace with `return {condition}`"))
-        } else {
-            None
-        }
+        self.fixable.then_some(|NeedlessBool { condition, .. }| {
+            format!("Replace with `return {condition}`")
+        })
     }
 }
 
@@ -91,9 +84,9 @@ define_violation!(
     ///
     /// ### Example
     /// ```python
-    /// if x = 1:
+    /// if x == 1:
     ///     return "Hello"
-    /// elif x = 2:
+    /// elif x == 2:
     ///     return "Goodbye"
     /// else:
     ///    return "Goodnight"
@@ -124,18 +117,14 @@ impl Violation for UseTernaryOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UseTernaryOperator { contents, .. } = self;
-        format!("Use ternary operator `{contents}` instead of if-else-block")
+        format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UseTernaryOperator { fixable, .. } = self;
-        if *fixable {
-            Some(|UseTernaryOperator { contents, .. }| {
-                format!("Replace if-else-block with `{contents}`")
+        self.fixable
+            .then_some(|UseTernaryOperator { contents, .. }| {
+                format!("Replace `if`-`else`-block with `{contents}`")
             })
-        } else {
-            None
-        }
     }
 }
 
@@ -185,12 +174,8 @@ impl Violation for DictGetWithDefault {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let DictGetWithDefault { fixable, .. } = self;
-        if *fixable {
-            Some(|DictGetWithDefault { contents, .. }| format!("Replace with `{contents}`"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|DictGetWithDefault { contents, .. }| format!("Replace with `{contents}`"))
     }
 }
 

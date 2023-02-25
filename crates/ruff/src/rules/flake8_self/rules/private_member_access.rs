@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::helpers::collect_call_path;
-use crate::ast::types::{BindingKind, Range, ScopeKind};
+use crate::ast::types::{Range, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
@@ -101,7 +101,7 @@ pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
                                 .map_or(false, |binding| {
                                     // TODO(charlie): Could the name ever be bound to a _different_
                                     // class here?
-                                    matches!(binding.kind, BindingKind::ClassDefinition)
+                                    binding.kind.is_class_definition()
                                 })
                         } else {
                             false

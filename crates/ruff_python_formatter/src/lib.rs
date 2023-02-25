@@ -1,11 +1,11 @@
 use anyhow::Result;
-use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
 use rustpython_parser::lexer::LexResult;
+
+use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
 
 use crate::attachment::attach;
 use crate::context::ASTFormatContext;
 use crate::core::locator::Locator;
-use crate::core::rustpython_helpers;
 use crate::cst::Stmt;
 use crate::newlines::normalize_newlines;
 use crate::parentheses::normalize_parentheses;
@@ -20,27 +20,31 @@ mod format;
 mod newlines;
 mod parentheses;
 pub mod shared_traits;
-#[cfg(test)]
-mod test;
 pub mod trivia;
 
 pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
+    // Create a reusable locator.
+    let locator = Locator::new(contents);
+
     // Tokenize once.
-    let tokens: Vec<LexResult> = rustpython_helpers::tokenize(contents);
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
     // Extract trivia.
     let trivia = trivia::extract_trivia_tokens(&tokens);
 
     // Parse the AST.
-    let python_ast = rustpython_helpers::parse_program_tokens(tokens, "<filename>")?;
+    let python_ast = ruff_rustpython::parse_program_tokens(tokens, "<filename>")?;
 
     // Convert to a CST.
-    let mut python_cst: Vec<Stmt> = python_ast.into_iter().map(Into::into).collect();
+    let mut python_cst: Vec<Stmt> = python_ast
+        .into_iter()
+        .map(|stmt| (stmt, &locator).into())
+        .collect();
 
     // Attach trivia.
     attach(&mut python_cst, trivia);
     normalize_newlines(&mut python_cst);
-    normalize_parentheses(&mut python_cst);
+    normalize_parentheses(&mut python_cst, &locator);
 
     format!(
         ASTFormatContext::new(
@@ -48,7 +52,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
                 indent_style: IndentStyle::Space(4),
                 line_width: 88.try_into().unwrap(),
             },
-            Locator::new(contents)
+            locator,
         ),
         [format::builders::block(&python_cst)]
     )
@@ -57,69 +61,99 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::{Formatter, Write};
+    use std::fs;
     use std::path::Path;
 
     use anyhow::Result;
-    use test_case::test_case;
+    use similar::TextDiff;
+
+    use ruff_testing_macros::fixture;
 
     use crate::fmt;
-    use crate::test::test_resource_path;
 
-    #[test_case(Path::new("simple_cases/beginning_backslash.py"); "beginning_backslash")]
-    #[test_case(Path::new("simple_cases/class_blank_parentheses.py"); "class_blank_parentheses")]
-    #[test_case(Path::new("simple_cases/class_methods_new_line.py"); "class_methods_new_line")]
-    #[test_case(Path::new("simple_cases/import_spacing.py"); "import_spacing")]
-    #[test_case(Path::new("simple_cases/one_element_subscript.py"); "one_element_subscript")]
-    #[test_case(Path::new("simple_cases/power_op_spacing.py"); "power_op_spacing")]
-    #[test_case(Path::new("simple_cases/remove_newline_after_code_block_open.py"); "remove_newline_after_code_block_open")]
-    #[test_case(Path::new("simple_cases/slices.py"); "slices")]
-    #[test_case(Path::new("simple_cases/tricky_unicode_symbols.py"); "tricky_unicode_symbols")]
-    // Passing except that `1, 2, 3,` should be `(1, 2, 3)`.
-    #[test_case(Path::new("simple_cases/tupleassign.py"); "tupleassign")]
-    fn passing(path: &Path) -> Result<()> {
-        let snapshot = format!("{}", path.display());
-        let content = std::fs::read_to_string(test_resource_path(
-            Path::new("fixtures/black").join(path).as_path(),
-        ))?;
+    #[fixture(
+        pattern = "resources/test/fixtures/black/**/*.py",
+        // Excluded tests because they reach unreachable when attaching tokens
+        exclude = [
+            "*comments.py",
+            "*comments[3,5,8].py",
+            "*comments_non_breaking_space.py",
+            "*docstring_preview.py",
+            "*docstring.py",
+            "*fmtonoff.py",
+            "*fmtskip8.py",
+        ])
+    ]
+    #[test]
+    fn black_test(input_path: &Path) -> Result<()> {
+        let content = fs::read_to_string(input_path)?;
+
         let formatted = fmt(&content)?;
-        insta::assert_display_snapshot!(snapshot, formatted.print()?.as_code());
-        Ok(())
-    }
 
-    #[test_case(Path::new("simple_cases/collections.py"); "collections")]
-    #[test_case(Path::new("simple_cases/bracketmatch.py"); "bracketmatch")]
-    fn passing_modulo_string_normalization(path: &Path) -> Result<()> {
-        fn adjust_quotes(contents: &str) -> String {
-            // Replace all single quotes with double quotes.
-            contents.replace('\'', "\"")
+        let expected_path = input_path.with_extension("py.expect");
+        let expected_output = fs::read_to_string(&expected_path)
+            .unwrap_or_else(|_| panic!("Expected Black output file '{expected_path:?}' to exist"));
+
+        let printed = formatted.print()?;
+        let formatted_code = printed.as_code();
+
+        if formatted_code == expected_output {
+            // Black and Ruff formatting matches. Delete any existing snapshot files because the Black output
+            // already perfectly captures the expected output.
+            // The following code mimics insta's logic generating the snapshot name for a test.
+            let workspace_path = std::env::var("CARGO_MANIFEST_DIR").unwrap();
+            let snapshot_name = insta::_function_name!()
+                .strip_prefix(&format!("{}::", module_path!()))
+                .unwrap();
+            let module_path = module_path!().replace("::", "__");
+
+            let snapshot_path = Path::new(&workspace_path)
+                .join("src/snapshots")
+                .join(format!(
+                    "{module_path}__{}.snap",
+                    snapshot_name.replace(&['/', '\\'][..], "__")
+                ));
+
+            if snapshot_path.exists() && snapshot_path.is_file() {
+                // SAFETY: This is a convenience feature. That's why we don't want to abort
+                // when deleting a no longer needed snapshot fails.
+                fs::remove_file(&snapshot_path).ok();
+            }
+
+            let new_snapshot_path = snapshot_path.with_extension("snap.new");
+            if new_snapshot_path.exists() && new_snapshot_path.is_file() {
+                // SAFETY: This is a convenience feature. That's why we don't want to abort
+                // when deleting a no longer needed snapshot fails.
+                fs::remove_file(&new_snapshot_path).ok();
+            }
+        } else {
+            // Black and Ruff have different formatting. Write out a snapshot that covers the differences
+            // today.
+            let mut snapshot = String::new();
+            write!(snapshot, "{}", Header::new("Input"))?;
+            write!(snapshot, "{}", CodeFrame::new("py", &content))?;
+
+            write!(snapshot, "{}", Header::new("Black Differences"))?;
+
+            let diff = TextDiff::from_lines(expected_output.as_str(), formatted_code)
+                .unified_diff()
+                .header("Black", "Ruff")
+                .to_string();
+
+            write!(snapshot, "{}", CodeFrame::new("diff", &diff))?;
+
+            write!(snapshot, "{}", Header::new("Ruff Output"))?;
+            write!(snapshot, "{}", CodeFrame::new("py", formatted_code))?;
+
+            write!(snapshot, "{}", Header::new("Black Output"))?;
+            write!(snapshot, "{}", CodeFrame::new("py", &expected_output))?;
+
+            insta::with_settings!({ omit_expression => false, input_file => input_path }, {
+                insta::assert_snapshot!(snapshot);
+            });
         }
 
-        let snapshot = format!("{}", path.display());
-        let content = std::fs::read_to_string(test_resource_path(
-            Path::new("fixtures/black").join(path).as_path(),
-        ))?;
-        let formatted = fmt(&content)?;
-        insta::assert_display_snapshot!(snapshot, adjust_quotes(formatted.print()?.as_code()));
-        Ok(())
-    }
-
-    #[ignore]
-    // Lots of deviations, _mostly_ related to string normalization and wrapping.
-    #[test_case(Path::new("simple_cases/expression.py"); "expression")]
-    // Passing apart from a trailing end-of-line comment within an if statement, which is being
-    // inappropriately associated with the if statement rather than the line it's on.
-    #[test_case(Path::new("simple_cases/comments.py"); "comments")]
-    #[test_case(Path::new("simple_cases/function.py"); "function")]
-    #[test_case(Path::new("simple_cases/function2.py"); "function2")]
-    #[test_case(Path::new("simple_cases/function_trailing_comma.py"); "function_trailing_comma")]
-    #[test_case(Path::new("simple_cases/composition.py"); "composition")]
-    fn failing(path: &Path) -> Result<()> {
-        let snapshot = format!("{}", path.display());
-        let content = std::fs::read_to_string(test_resource_path(
-            Path::new("fixtures/black").join(path).as_path(),
-        ))?;
-        let formatted = fmt(&content)?;
-        insta::assert_display_snapshot!(snapshot, formatted.print()?.as_code());
         Ok(())
     }
 
@@ -148,5 +182,42 @@ mod tests {
     for k, v in a_very_long_variable_name_that_exceeds_the_line_length_by_far_keep_going
 }"#
         );
+    }
+
+    struct Header<'a> {
+        title: &'a str,
+    }
+
+    impl<'a> Header<'a> {
+        fn new(title: &'a str) -> Self {
+            Self { title }
+        }
+    }
+
+    impl std::fmt::Display for Header<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            writeln!(f, "## {}", self.title)?;
+            writeln!(f)
+        }
+    }
+
+    struct CodeFrame<'a> {
+        language: &'a str,
+        code: &'a str,
+    }
+
+    impl<'a> CodeFrame<'a> {
+        fn new(language: &'a str, code: &'a str) -> Self {
+            Self { language, code }
+        }
+    }
+
+    impl std::fmt::Display for CodeFrame<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            writeln!(f, "```{}", self.language)?;
+            write!(f, "{}", self.code)?;
+            writeln!(f, "```")?;
+            writeln!(f)
+        }
     }
 }

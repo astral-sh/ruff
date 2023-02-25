@@ -132,4 +132,14 @@ expression: diagnostics
     column: 8
   fix: ~
   parent: ~
+- kind:
+    MultipleStatementsOnOneLineColon: ~
+  location:
+    row: 59
+    column: 11
+  end_location:
+    row: 59
+    column: 12
+  fix: ~
+  parent: ~
 

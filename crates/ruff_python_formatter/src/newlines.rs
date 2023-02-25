@@ -2,10 +2,10 @@ use rustpython_parser::ast::Constant;
 
 use crate::core::visitor;
 use crate::core::visitor::Visitor;
-use crate::cst::{Expr, ExprKind, Stmt, StmtKind};
+use crate::cst::{ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind};
 use crate::trivia::{Relationship, Trivia, TriviaKind};
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 enum Depth {
     TopLevel,
     Nested,
@@ -20,7 +20,7 @@ impl Depth {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 enum Scope {
     Module,
     Class,
@@ -35,6 +35,7 @@ enum Trailer {
     Import,
     Docstring,
     Generic,
+    CompoundStatement,
 }
 
 struct NewlineNormalizer {
@@ -60,10 +61,18 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
             }
         });
 
-        if matches!(self.trailer, Trailer::None) {
-            // If this is the first statement in the block, remove any leading empty lines.
-            // TODO(charlie): If we have a function or class definition within a non-scoped block,
-            // like an if-statement, retain a line before and after.
+        if matches!(self.trailer, Trailer::None)
+            || (matches!(self.trailer, Trailer::CompoundStatement)
+                && !matches!(
+                    stmt.node,
+                    StmtKind::FunctionDef { .. }
+                        | StmtKind::AsyncFunctionDef { .. }
+                        | StmtKind::ClassDef { .. }
+                ))
+        {
+            // If this is the first statement in the block, remove any leading empty lines, with the
+            // exception being functions and classes defined within compound statements (e.g., as
+            // the first statement in an `if` body).
             let mut seen_non_empty = false;
             stmt.trivia.retain(|c| {
                 if seen_non_empty {
@@ -145,57 +154,166 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
             }
         }
 
-        self.trailer = match &stmt.node {
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                Trailer::FunctionDef
+        let prev_scope = self.scope;
+        let prev_depth = self.depth;
+
+        match &mut stmt.node {
+            StmtKind::FunctionDef { body, .. } | StmtKind::AsyncFunctionDef { body, .. } => {
+                self.depth = Depth::Nested;
+                self.scope = Scope::Function;
+                self.trailer = Trailer::None;
+                self.visit_body(body);
+                self.trailer = Trailer::FunctionDef;
             }
-            // TODO(charlie): This needs to be the first statement in a class or function.
-            StmtKind::Expr { value, .. } => {
-                if let ExprKind::Constant {
-                    value: Constant::Str(..),
-                    ..
-                } = &value.node
-                {
-                    Trailer::Docstring
-                } else {
-                    Trailer::Generic
+            StmtKind::ClassDef { body, .. } => {
+                self.depth = Depth::Nested;
+                self.scope = Scope::Class;
+                self.trailer = Trailer::None;
+                self.visit_body(body);
+                self.trailer = Trailer::ClassDef;
+            }
+            StmtKind::While { body, orelse, .. }
+            | StmtKind::For { body, orelse, .. }
+            | StmtKind::AsyncFor { body, orelse, .. } => {
+                self.depth = Depth::Nested;
+                self.trailer = Trailer::CompoundStatement;
+                self.visit_body(body);
+
+                if !orelse.is_empty() {
+                    // If the previous body ended with a function or class definition, we need to
+                    // insert an empty line before the else block. Since the `else` itself isn't
+                    // a statement, we need to insert it into the last statement of the body.
+                    if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
+                        let stmt = body.last_mut().unwrap();
+                        stmt.trivia.push(Trivia {
+                            kind: TriviaKind::EmptyLine,
+                            relationship: Relationship::Trailing,
+                        });
+                    }
+
+                    self.depth = Depth::Nested;
+                    self.trailer = Trailer::CompoundStatement;
+                    self.visit_body(orelse);
                 }
             }
-            StmtKind::ClassDef { .. } => Trailer::ClassDef,
-            StmtKind::Import { .. } | StmtKind::ImportFrom { .. } => Trailer::Import,
-            _ => Trailer::Generic,
-        };
+            StmtKind::If { body, orelse, .. } => {
+                self.depth = Depth::Nested;
+                self.trailer = Trailer::CompoundStatement;
+                self.visit_body(body);
 
-        let prev_scope = self.scope;
-        self.scope = match &stmt.node {
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => Scope::Function,
-            StmtKind::ClassDef { .. } => Scope::Class,
-            _ => prev_scope,
-        };
+                if !orelse.is_empty() {
+                    if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
+                        let stmt = body.last_mut().unwrap();
+                        stmt.trivia.push(Trivia {
+                            kind: TriviaKind::EmptyLine,
+                            relationship: Relationship::Trailing,
+                        });
+                    }
 
-        visitor::walk_stmt(self, stmt);
+                    self.depth = Depth::Nested;
+                    self.trailer = Trailer::CompoundStatement;
+                    self.visit_body(orelse);
+                }
+            }
+            StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => {
+                self.depth = Depth::Nested;
+                self.trailer = Trailer::CompoundStatement;
+                self.visit_body(body);
+            }
+            // StmtKind::Match { .. } => {}
+            StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            }
+            | StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => {
+                self.depth = Depth::Nested;
+                self.trailer = Trailer::CompoundStatement;
+                self.visit_body(body);
+                let mut last = body.last_mut();
 
+                for handler in handlers {
+                    if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
+                        if let Some(stmt) = last.as_mut() {
+                            stmt.trivia.push(Trivia {
+                                kind: TriviaKind::EmptyLine,
+                                relationship: Relationship::Trailing,
+                            });
+                        }
+                    }
+
+                    self.depth = Depth::Nested;
+                    self.trailer = Trailer::CompoundStatement;
+                    let ExcepthandlerKind::ExceptHandler { body, .. } = &mut handler.node;
+                    self.visit_body(body);
+                    last = body.last_mut();
+                }
+
+                if !orelse.is_empty() {
+                    if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
+                        if let Some(stmt) = last.as_mut() {
+                            stmt.trivia.push(Trivia {
+                                kind: TriviaKind::EmptyLine,
+                                relationship: Relationship::Trailing,
+                            });
+                        }
+                    }
+
+                    self.depth = Depth::Nested;
+                    self.trailer = Trailer::CompoundStatement;
+                    self.visit_body(orelse);
+                    last = body.last_mut();
+                }
+
+                if !finalbody.is_empty() {
+                    if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
+                        if let Some(stmt) = last.as_mut() {
+                            stmt.trivia.push(Trivia {
+                                kind: TriviaKind::EmptyLine,
+                                relationship: Relationship::Trailing,
+                            });
+                        }
+                    }
+
+                    self.depth = Depth::Nested;
+                    self.trailer = Trailer::CompoundStatement;
+                    self.visit_body(finalbody);
+                }
+            }
+            _ => {
+                self.trailer = match &stmt.node {
+                    StmtKind::Expr { value, .. }
+                        if matches!(self.scope, Scope::Class | Scope::Function)
+                            && matches!(self.trailer, Trailer::None) =>
+                    {
+                        if let ExprKind::Constant {
+                            value: Constant::Str(..),
+                            ..
+                        } = &value.node
+                        {
+                            Trailer::Docstring
+                        } else {
+                            Trailer::Generic
+                        }
+                    }
+                    StmtKind::Import { .. } | StmtKind::ImportFrom { .. } => Trailer::Import,
+                    _ => Trailer::Generic,
+                };
+                visitor::walk_stmt(self, stmt);
+            }
+        }
+
+        self.depth = prev_depth;
         self.scope = prev_scope;
     }
 
-    fn visit_expr(&mut self, expr: &'a mut Expr) {
-        expr.trivia
-            .retain(|c| !matches!(c.kind, TriviaKind::EmptyLine));
-        visitor::walk_expr(self, expr);
-    }
-
-    fn visit_body(&mut self, body: &'a mut [Stmt]) {
-        let prev_depth = self.depth;
-        let prev_trailer = self.trailer;
-
-        self.depth = Depth::Nested;
-        self.trailer = Trailer::None;
-
-        visitor::walk_body(self, body);
-
-        self.trailer = prev_trailer;
-        self.depth = prev_depth;
-    }
+    fn visit_expr(&mut self, _expr: &'a mut Expr) {}
 }
 
 pub fn normalize_newlines(python_cst: &mut [Stmt]) {

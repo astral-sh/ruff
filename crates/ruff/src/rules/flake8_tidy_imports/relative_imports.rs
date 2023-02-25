@@ -108,8 +108,8 @@ fn fix_banned_relative_import(
             }
             call_path.as_slice().join(".")
         } else if parts.len() > 1 {
-            let module = parts.last().unwrap();
-            let call_path = from_relative_import(&parts, module);
+            let module = parts.pop().unwrap();
+            let call_path = from_relative_import(&parts, &module);
             // Require import to be a valid PEP 8 module:
             // https://python.org/dev/peps/pep-0008/#package-and-module-names
             if !call_path.iter().all(|part| is_module_name(part)) {

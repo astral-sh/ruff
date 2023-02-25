@@ -14,7 +14,6 @@ use crate::rules::{
     flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
     isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
-use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
 use crate::settings::{defaults, flags, Settings};
@@ -175,7 +174,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         Settings::from_configuration(configuration, Path::new(".")).map_err(|e| e.to_string())?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(contents);
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);

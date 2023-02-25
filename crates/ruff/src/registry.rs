@@ -77,7 +77,9 @@ ruff_macros::register_rules!(
     rules::pycodestyle::rules::IOError,
     rules::pycodestyle::rules::SyntaxError,
     // pycodestyle warnings
+    rules::pycodestyle::rules::TrailingWhitespace,
     rules::pycodestyle::rules::NoNewLineAtEndOfFile,
+    rules::pycodestyle::rules::BlankLineContainsWhitespace,
     rules::pycodestyle::rules::DocLineTooLong,
     rules::pycodestyle::rules::InvalidEscapeSequence,
     // pyflakes
@@ -149,6 +151,9 @@ ruff_macros::register_rules!(
     rules::pylint::rules::TooManyArguments,
     rules::pylint::rules::TooManyBranches,
     rules::pylint::rules::TooManyStatements,
+    rules::pylint::rules::RedefinedLoopName,
+    rules::pylint::rules::LoggingTooFewArgs,
+    rules::pylint::rules::LoggingTooManyArgs,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -183,6 +188,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
     rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
+    rules::flake8_bugbear::rules::UnintentionalTypeAnnotation,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
     // flake8-comprehensions
@@ -487,6 +493,7 @@ ruff_macros::register_rules!(
     rules::flake8_pie::rules::UnnecessaryDictKwargs,
     rules::flake8_pie::rules::PreferListBuiltin,
     rules::flake8_pie::rules::SingleStartsEndsWith,
+    rules::flake8_pie::rules::UnnecessaryComprehensionAnyAll,
     // flake8-commas
     rules::flake8_commas::rules::TrailingCommaMissing,
     rules::flake8_commas::rules::TrailingCommaOnBareTupleProhibited,
@@ -753,6 +760,7 @@ impl Linter {
     }
 }
 
+#[derive(is_macro::Is)]
 pub enum LintSource {
     Ast,
     Io,
@@ -760,7 +768,7 @@ pub enum LintSource {
     LogicalLines,
     Tokens,
     Imports,
-    NoQa,
+    Noqa,
     Filesystem,
 }
 
@@ -769,7 +777,7 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> &'static LintSource {
         match self {
-            Rule::UnusedNOQA => &LintSource::NoQa,
+            Rule::UnusedNOQA => &LintSource::Noqa,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::DocLineTooLong
@@ -782,7 +790,9 @@ impl Rule {
             | Rule::ShebangNewline
             | Rule::BidirectionalUnicode
             | Rule::ShebangPython
-            | Rule::ShebangWhitespace => &LintSource::PhysicalLines,
+            | Rule::ShebangWhitespace
+            | Rule::TrailingWhitespace
+            | Rule::BlankLineContainsWhitespace => &LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString

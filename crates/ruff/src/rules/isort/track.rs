@@ -216,12 +216,19 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::Match { cases, .. } => {
+            StmtKind::Match { subject, cases } => {
+                self.visit_expr(subject);
                 for match_case in cases {
                     self.visit_match_case(match_case);
                 }
             }
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,

@@ -148,9 +148,7 @@ pub fn check_noqa(
                             UnusedNOQA { codes: None },
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
-                        if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(diagnostic.kind.rule())
-                        {
+                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::deletion(
                                 Location::new(row + 1, start - spaces),
                                 Location::new(row + 1, lines[row].chars().count()),
@@ -217,9 +215,7 @@ pub fn check_noqa(
                             },
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
-                        if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(diagnostic.kind.rule())
-                        {
+                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
                                 diagnostic.amend(Fix::deletion(
                                     Location::new(row + 1, start - spaces),

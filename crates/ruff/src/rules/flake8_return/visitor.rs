@@ -136,7 +136,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 visitor::walk_stmt(self, stmt);
                 self.parents.pop();
             }
-            StmtKind::Try { .. } => {
+            StmtKind::Try { .. } | StmtKind::TryStar { .. } => {
                 self.stack
                     .tries
                     .push((stmt.location, stmt.end_location.unwrap()));

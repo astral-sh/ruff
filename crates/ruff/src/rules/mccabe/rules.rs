@@ -10,10 +10,11 @@ define_violation!(
     /// ## What it does
     /// Checks for functions with a high `McCabe` complexity.
     ///
-    /// The `McCabe` complexity of a function is a measure of the complexity of the
-    /// control flow graph of the function. It is calculated by adding one to the
-    /// number of decision points in the function. A decision point is a place in
-    /// the code where the program has a choice of two or more paths to follow.
+    /// The `McCabe` complexity of a function is a measure of the complexity of
+    /// the control flow graph of the function. It is calculated by adding
+    /// one to the number of decision points in the function. A decision
+    /// point is a place in the code where the program has a choice of two
+    /// or more paths to follow.
     ///
     /// ## Why is this bad?
     /// Functions with a high complexity are hard to understand and maintain.
@@ -82,7 +83,19 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += 1;
                 }
             }
+            StmtKind::Match { cases, .. } => {
+                complexity += 1;
+                for case in cases {
+                    complexity += get_complexity_number(&case.body);
+                }
+            }
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,
@@ -135,7 +148,7 @@ pub fn function_is_too_complex(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::parser;
+    use rustpython_parser as parser;
 
     use super::get_complexity_number;
 

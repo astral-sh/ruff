@@ -43,6 +43,7 @@ mod tests {
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__main__.py"); "N999_10")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/0001_initial.py"); "N999_11")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__setup__.py"); "N999_12")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes"); "N999_13")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
