@@ -12,7 +12,7 @@ use crate::packaging::detect_package_root;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-use crate::{directives, fs, rustpython_helpers};
+use crate::{directives, rustpython_helpers};
 
 pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
@@ -22,7 +22,7 @@ pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 /// asserts that autofixes converge after 10 iterations.
 pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
-    let contents = fs::read_file(&path)?;
+    let contents = std::fs::read_to_string(&path)?;
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_contents(&contents, &locator);

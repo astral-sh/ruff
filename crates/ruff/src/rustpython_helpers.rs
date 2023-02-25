@@ -1,13 +1,12 @@
+use rustpython_parser as parser;
 use rustpython_parser::ast::{Mod, Suite};
-use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
-use rustpython_parser::mode::Mode;
-use rustpython_parser::{lexer, parser};
+use rustpython_parser::{lexer, Mode, ParseError};
 
 /// Collect tokens up to and including the first error.
 pub fn tokenize(contents: &str) -> Vec<LexResult> {
     let mut tokens: Vec<LexResult> = vec![];
-    for tok in lexer::make_tokenizer(contents) {
+    for tok in lexer::lex(contents, Mode::Module) {
         let is_err = tok.is_err();
         tokens.push(tok);
         if is_err {

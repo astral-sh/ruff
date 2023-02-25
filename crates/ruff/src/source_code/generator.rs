@@ -1258,7 +1258,7 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::parser;
+    use rustpython_parser as parser;
 
     use crate::source_code::stylist::{Indentation, LineEnding, Quote};
     use crate::source_code::Generator;

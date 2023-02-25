@@ -7,8 +7,7 @@ use rustpython_common::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
@@ -319,8 +318,9 @@ pub(crate) fn printf_string_formatting(
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<(Location, Location)> = vec![];
     let mut extension = None;
-    for (start, tok, end) in lexer::make_tokenizer_located(
+    for (start, tok, end) in lexer::lex_located(
         checker.locator.slice(&Range::from_located(expr)),
+        Mode::Module,
         expr.location,
     )
     .flatten()

@@ -12,6 +12,7 @@ use normalize::normalize_imports;
 use order::order_imports;
 use settings::RelativeImportsOrder;
 use sorting::cmp_either_import;
+use strum::IntoEnumIterator;
 use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingComma};
@@ -232,7 +233,7 @@ fn format_import_block(
     target_version: PythonVersion,
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
-    let block_by_type = categorize_imports(
+    let mut block_by_type = categorize_imports(
         block,
         src,
         package,
@@ -247,7 +248,17 @@ fn format_import_block(
 
     // Generate replacement source code.
     let mut is_first_block = true;
-    for (import_type, import_block) in block_by_type {
+    let mut pending_lines_before = false;
+    for import_type in ImportType::iter() {
+        let import_block = block_by_type.remove(&import_type);
+
+        if !no_lines_before.contains(&import_type) {
+            pending_lines_before = true;
+        }
+        let Some(import_block) = import_block else {
+            continue;
+        };
+
         let mut imports = order_imports(
             import_block,
             order_by_type,
@@ -280,8 +291,10 @@ fn format_import_block(
         // Add a blank line between every section.
         if is_first_block {
             is_first_block = false;
-        } else if !no_lines_before.contains(&import_type) {
+            pending_lines_before = false;
+        } else if pending_lines_before {
             output.push_str(stylist.line_ending());
+            pending_lines_before = false;
         }
 
         let mut lines_inserted = false;
@@ -778,6 +791,31 @@ mod tests {
                         ImportType::StandardLibrary,
                         ImportType::ThirdParty,
                         ImportType::FirstParty,
+                        ImportType::LocalFolder,
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_lines_before_with_empty_sections.py"))]
+    fn no_lines_before_with_empty_sections(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "no_lines_before_with_empty_sections.py_{}",
+            path.to_string_lossy()
+        );
+        let mut diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    no_lines_before: BTreeSet::from([
+                        ImportType::StandardLibrary,
                         ImportType::LocalFolder,
                     ]),
                     ..super::settings::Settings::default()

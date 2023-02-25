@@ -5,8 +5,8 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::error;
 use rustc_hash::FxHashMap;
-use rustpython_parser::error::ParseError;
 use rustpython_parser::lexer::LexResult;
+use rustpython_parser::ParseError;
 
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
@@ -223,7 +223,7 @@ const MAX_ITERATIONS: usize = 100;
 /// Add any missing `# noqa` pragmas to the source code at the given `Path`.
 pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings) -> Result<usize> {
     // Read the file from disk.
-    let contents = fs::read_file(path)?;
+    let contents = std::fs::read_to_string(path)?;
 
     // Tokenize once.
     let tokens: Vec<LexResult> = rustpython_helpers::tokenize(&contents);

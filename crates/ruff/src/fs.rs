@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::{BufReader, Read};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
@@ -87,13 +85,4 @@ pub fn relativize_path(path: impl AsRef<Path>) -> String {
         return format!("{}", path.display());
     }
     format!("{}", path.display())
-}
-
-/// Read a file's contents from disk.
-pub fn read_file<P: AsRef<Path>>(path: P) -> Result<String> {
-    let file = File::open(path)?;
-    let mut buf_reader = BufReader::new(file);
-    let mut contents = String::new();
-    buf_reader.read_to_string(&mut contents)?;
-    Ok(contents)
 }

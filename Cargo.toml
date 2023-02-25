@@ -3,7 +3,7 @@ members = ["crates/*"]
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.65.0"
+rust-version = "1.67.0"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.66" }
@@ -13,8 +13,8 @@ libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "f2f0b7a487a87
 once_cell = { version = "1.16.0" }
 regex = { version = "1.6.0" }
 rustc-hash = { version = "1.1.0" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "ddf497623ae56d21aa4166ff1c0725a7db67e955" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "ddf497623ae56d21aa4166ff1c0725a7db67e955" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "edf5995a1e4c366976304ca05432dd27c913054e" }
+rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "edf5995a1e4c366976304ca05432dd27c913054e" }
 schemars = { version = "0.8.11" }
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }

@@ -1,5 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::error::ParseError;
+use rustpython_parser::ParseError;
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;

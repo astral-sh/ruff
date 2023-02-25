@@ -91,9 +91,9 @@ define_violation!(
     ///
     /// ### Example
     /// ```python
-    /// if x = 1:
+    /// if x == 1:
     ///     return "Hello"
-    /// elif x = 2:
+    /// elif x == 2:
     ///     return "Goodbye"
     /// else:
     ///    return "Goodnight"

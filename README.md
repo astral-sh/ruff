@@ -742,6 +742,7 @@ Ruff is used in a number of major open-source projects, including:
 * [featuretools](https://github.com/alteryx/featuretools)
 * [meson-python](https://github.com/mesonbuild/meson-python)
 * [ZenML](https://github.com/zenml-io/zenml)
+* [delta-rs](https://github.com/delta-io/delta-rs)
 
 ## License
 

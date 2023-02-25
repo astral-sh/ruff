@@ -55,7 +55,7 @@ pub fn too_many_return_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::parser;
+    use rustpython_parser as parser;
 
     use super::num_returns;
 
