@@ -114,22 +114,22 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
 
                         let message_args = call_args.args.len() - 1;
 
-                        if checker.settings.rules.enabled(&Rule::LoggingTooManyArgs)
-                            && summary.num_positional < message_args
-                        {
-                            checker.diagnostics.push(Diagnostic::new(
-                                LoggingTooManyArgs,
-                                Range::from_located(func),
-                            ));
+                        if checker.settings.rules.enabled(&Rule::LoggingTooManyArgs) {
+                            if summary.num_positional < message_args {
+                                checker.diagnostics.push(Diagnostic::new(
+                                    LoggingTooManyArgs,
+                                    Range::from_located(func),
+                                ));
+                            }
                         }
 
-                        if checker.settings.rules.enabled(&Rule::LoggingTooFewArgs)
-                            && summary.num_positional > message_args
-                        {
-                            checker.diagnostics.push(Diagnostic::new(
-                                LoggingTooFewArgs,
-                                Range::from_located(func),
-                            ));
+                        if checker.settings.rules.enabled(&Rule::LoggingTooFewArgs) {
+                            if message_args > 0 && summary.num_positional > message_args {
+                                checker.diagnostics.push(Diagnostic::new(
+                                    LoggingTooFewArgs,
+                                    Range::from_located(func),
+                                ));
+                            }
                         }
                     }
                 }
