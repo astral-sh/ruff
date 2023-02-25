@@ -569,6 +569,10 @@ where
                     flake8_bugbear::rules::cached_instance_method(self, decorator_list);
                 }
 
+                if self.settings.rules.enabled(&Rule::TooManyTryStatements) {
+                    tryceratops::rules::too_many_try_statements(self, body);
+                }
+
                 if self.settings.rules.enabled(&Rule::UnnecessaryReturnNone)
                     || self.settings.rules.enabled(&Rule::ImplicitReturnValue)
                     || self.settings.rules.enabled(&Rule::ImplicitReturn)

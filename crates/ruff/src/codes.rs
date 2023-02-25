@@ -549,6 +549,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Tryceratops, "002") => Rule::RaiseVanillaClass,
         (Tryceratops, "003") => Rule::RaiseVanillaArgs,
         (Tryceratops, "004") => Rule::PreferTypeError,
+        (Tryceratops, "101") => Rule::TooManyTryStatements,
         (Tryceratops, "200") => Rule::ReraiseNoCause,
         (Tryceratops, "201") => Rule::VerboseRaise,
         (Tryceratops, "300") => Rule::TryConsiderElse,
