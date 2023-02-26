@@ -27,10 +27,10 @@ log = { workspace = true }
 num-bigint = { workspace = true }
 num-traits = { workspace = true }
 thiserror = { workspace = true }
+unicode_names2 = { workspace = true }
 
 unic-emoji-char = "0.9.0"
 unic-ucd-ident  = "0.9.0"
-unicode_names2 = "0.5.0"
 lalrpop-util = "0.19.8"
 phf = "0.11.1"
 rustc-hash = "1.1.0"
