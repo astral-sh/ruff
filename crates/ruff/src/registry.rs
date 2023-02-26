@@ -459,6 +459,9 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::PrefixTypeParams,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
+    rules::flake8_pyi::rules::PassStatementStubBody,
+    rules::flake8_pyi::rules::NonEmptyStubBody,
+    rules::flake8_pyi::rules::DocstringInStub,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     rules::flake8_pytest_style::rules::FixturePositionalArgs,
