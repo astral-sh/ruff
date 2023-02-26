@@ -29,6 +29,23 @@ impl Violation for ArgumentSimpleDefaults {
     }
 }
 
+const ALLOWED_ATTRIBUTES_IN_DEFAULTS: &[&[&str]] = &[
+    &["sys", "stdin"],
+    &["sys", "stdout"],
+    &["sys", "stderr"],
+    &["sys", "version"],
+    &["sys", "version_info"],
+    &["sys", "platform"],
+    &["sys", "executable"],
+    &["sys", "prefix"],
+    &["sys", "exec_prefix"],
+    &["sys", "base_prefix"],
+    &["sys", "byteorder"],
+    &["sys", "maxsize"],
+    &["sys", "hexversion"],
+    &["sys", "winver"],
+];
+
 fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> bool {
     match &default.node {
         ExprKind::Constant {
@@ -107,24 +124,9 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
             if checker
                 .resolve_call_path(default)
                 .map_or(false, |call_path| {
-                    [
-                        ["sys", "stdin"],
-                        ["sys", "stdout"],
-                        ["sys", "stderr"],
-                        ["sys", "version"],
-                        ["sys", "version_info"],
-                        ["sys", "platform"],
-                        ["sys", "executable"],
-                        ["sys", "prefix"],
-                        ["sys", "exec_prefix"],
-                        ["sys", "base_prefix"],
-                        ["sys", "byteorder"],
-                        ["sys", "maxsize"],
-                        ["sys", "hexversion"],
-                        ["sys", "winver"],
-                    ]
-                    .iter()
-                    .any(|target| call_path.as_slice() == target)
+                    ALLOWED_ATTRIBUTES_IN_DEFAULTS
+                        .iter()
+                        .any(|target| call_path.as_slice() == *target)
                 })
             {
                 return true;
