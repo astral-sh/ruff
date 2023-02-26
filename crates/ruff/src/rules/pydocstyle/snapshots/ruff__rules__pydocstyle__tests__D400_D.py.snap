@@ -73,6 +73,23 @@ expression: diagnostics
 - kind:
     EndsInPeriod: ~
   location:
+    row: 422
+    column: 34
+  end_location:
+    row: 422
+    column: 49
+  fix:
+    content: "."
+    location:
+      row: 422
+      column: 46
+    end_location:
+      row: 422
+      column: 46
+  parent: ~
+- kind:
+    EndsInPeriod: ~
+  location:
     row: 429
     column: 48
   end_location:

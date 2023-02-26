@@ -76,10 +76,7 @@ mod tests {
             &settings::Settings {
                 pydocstyle: Settings {
                     convention: None,
-                    ignore_decorators: BTreeSet::from_iter([
-                        "functools.wraps".to_string(),
-                        "ignored_decorator".to_string(),
-                    ]),
+                    ignore_decorators: BTreeSet::from_iter(["functools.wraps".to_string()]),
                 },
                 ..settings::Settings::for_rule(rule_code)
             },

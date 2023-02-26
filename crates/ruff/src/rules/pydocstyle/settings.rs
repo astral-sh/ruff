@@ -90,7 +90,7 @@ pub struct Options {
         default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
-            ignore-decorators = ["foo.bar.baz"]
+            ignore-decorators = ["typing.overload"]
         "#
     )]
     /// Ignore docstrings for functions or methods decorated with the
