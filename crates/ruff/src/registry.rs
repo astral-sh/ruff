@@ -462,6 +462,8 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::PassStatementStubBody,
     rules::flake8_pyi::rules::NonEmptyStubBody,
     rules::flake8_pyi::rules::DocstringInStub,
+    rules::flake8_pyi::rules::TypedArgumentSimpleDefaults,
+    rules::flake8_pyi::rules::ArgumentSimpleDefaults,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     rules::flake8_pytest_style::rules::FixturePositionalArgs,
