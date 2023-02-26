@@ -536,6 +536,15 @@ where
                     }
                 }
 
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                        flake8_pyi::rules::pass_statement_stub_body(self, body);
+                    }
+                    if self.settings.rules.enabled(&Rule::NonEmptyStubBody) {
+                        flake8_pyi::rules::non_empty_stub_body(self, body);
+                    }
+                }
+
                 if self.settings.rules.enabled(&Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
                         self.current_scope(),
@@ -803,6 +812,21 @@ where
                             self, body,
                         ));
                 }
+
+                if self.settings.rules.enabled(&Rule::ExcludeWithModelForm) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::exclude_with_model_form(self, bases, body)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+                if self.settings.rules.enabled(&Rule::AllWithModelForm) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::all_with_model_form(self, bases, body)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
                     if let Some(diagnostic) =
                         flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
@@ -862,6 +886,11 @@ where
                         flake8_bugbear::rules::abstract_base_class(
                             self, stmt, name, bases, keywords, body,
                         );
+                    }
+                }
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                        flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
                 }
 
@@ -2934,6 +2963,11 @@ where
                 {
                     pylint::rules::logging_call(self, func, args, keywords);
                 }
+
+                // flake8-django
+                if self.settings.rules.enabled(&Rule::LocalsInRenderFunction) {
+                    flake8_django::rules::locals_in_render_function(self, func, args, keywords);
+                }
             }
             ExprKind::Dict { keys, values } => {
                 if self
@@ -3921,6 +3955,21 @@ where
             .enabled(&Rule::FunctionCallArgumentDefault)
         {
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
+        }
+
+        if self.is_interface_definition {
+            if self
+                .settings
+                .rules
+                .enabled(&Rule::TypedArgumentSimpleDefaults)
+            {
+                flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
+            }
+        }
+        if self.is_interface_definition {
+            if self.settings.rules.enabled(&Rule::ArgumentSimpleDefaults) {
+                flake8_pyi::rules::argument_simple_defaults(self, arguments);
+            }
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
@@ -5353,9 +5402,22 @@ impl<'a> Checker<'a> {
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
+            if self.is_interface_definition {
+                if self.settings.rules.enabled(&Rule::DocstringInStub) {
+                    flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
+                }
+            }
 
             // pydocstyle
             if enforce_docstrings {
+                if pydocstyle::helpers::should_ignore_definition(
+                    self,
+                    &definition,
+                    &self.settings.pydocstyle.ignore_decorators,
+                ) {
+                    continue;
+                }
+
                 if definition.docstring.is_none() {
                     pydocstyle::rules::not_missing(self, &definition, &visibility);
                     continue;

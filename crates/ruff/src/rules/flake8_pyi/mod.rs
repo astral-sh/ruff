@@ -19,6 +19,16 @@ mod tests {
     #[test_case(Rule::UnrecognizedPlatformCheck, Path::new("PYI007.py"))]
     #[test_case(Rule::UnrecognizedPlatformName, Path::new("PYI008.pyi"))]
     #[test_case(Rule::UnrecognizedPlatformName, Path::new("PYI008.py"))]
+    #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.py"))]
+    #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.pyi"))]
+    #[test_case(Rule::PassStatementStubBody, Path::new("PYI009.py"))]
+    #[test_case(Rule::PassStatementStubBody, Path::new("PYI009.pyi"))]
+    #[test_case(Rule::TypedArgumentSimpleDefaults, Path::new("PYI011.py"))]
+    #[test_case(Rule::TypedArgumentSimpleDefaults, Path::new("PYI011.pyi"))]
+    #[test_case(Rule::ArgumentSimpleDefaults, Path::new("PYI014.py"))]
+    #[test_case(Rule::ArgumentSimpleDefaults, Path::new("PYI014.pyi"))]
+    #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
+    #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

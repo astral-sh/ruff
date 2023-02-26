@@ -1,3 +1,5 @@
+use rustpython_parser::ast::Constant;
+
 use crate::core::helpers::is_radix_literal;
 use crate::core::locator::Locator;
 use crate::core::types::Range;
@@ -5,7 +7,6 @@ use crate::core::visitor;
 use crate::core::visitor::Visitor;
 use crate::cst::{Expr, ExprKind, Stmt, StmtKind};
 use crate::trivia::Parenthesize;
-use rustpython_parser::ast::Constant;
 
 /// Modify an [`Expr`] to infer parentheses, rather than respecting any user-provided trivia.
 fn use_inferred_parens(expr: &mut Expr) {

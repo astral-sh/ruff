@@ -5,8 +5,8 @@ use rustpython_parser::Tok;
 
 use crate::core::types::Range;
 use crate::cst::{
-    Alias, Excepthandler, ExcepthandlerKind, Expr, ExprKind, SliceIndex, SliceIndexKind, Stmt,
-    StmtKind,
+    Alias, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Pattern, PatternKind, SliceIndex,
+    SliceIndexKind, Stmt, StmtKind,
 };
 
 #[derive(Clone, Debug)]
@@ -17,6 +17,7 @@ pub enum Node<'a> {
     Alias(&'a Alias),
     Excepthandler(&'a Excepthandler),
     SliceIndex(&'a SliceIndex),
+    Pattern(&'a Pattern),
 }
 
 impl Node<'_> {
@@ -28,6 +29,7 @@ impl Node<'_> {
             Node::Alias(node) => node.id(),
             Node::Excepthandler(node) => node.id(),
             Node::SliceIndex(node) => node.id(),
+            Node::Pattern(node) => node.id(),
         }
     }
 }
@@ -389,8 +391,17 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     result.push(Node::Stmt(stmt));
                 }
             }
-            StmtKind::Match { .. } => {
-                todo!("Support match statements");
+            StmtKind::Match { subject, cases } => {
+                result.push(Node::Expr(subject));
+                for case in cases {
+                    result.push(Node::Pattern(&case.pattern));
+                    if let Some(expr) = &case.guard {
+                        result.push(Node::Expr(expr));
+                    }
+                    for stmt in &case.body {
+                        result.push(Node::Stmt(stmt));
+                    }
+                }
             }
             StmtKind::Raise { exc, cause } => {
                 if let Some(exc) = exc {
@@ -615,7 +626,6 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
         },
         Node::Alias(..) => {}
         Node::Excepthandler(excepthandler) => {
-            // TODO(charlie): Ident.
             let ExcepthandlerKind::ExceptHandler { type_, body, .. } = &excepthandler.node;
             if let Some(type_) = type_ {
                 result.push(Node::Expr(type_));
@@ -629,6 +639,48 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 result.push(Node::Expr(value));
             }
         }
+        Node::Pattern(pattern) => match &pattern.node {
+            PatternKind::MatchValue { value } => {
+                result.push(Node::Expr(value));
+            }
+            PatternKind::MatchSingleton { .. } => {}
+            PatternKind::MatchSequence { patterns } => {
+                for pattern in patterns {
+                    result.push(Node::Pattern(pattern));
+                }
+            }
+            PatternKind::MatchMapping { keys, patterns, .. } => {
+                for (key, pattern) in keys.iter().zip(patterns.iter()) {
+                    result.push(Node::Expr(key));
+                    result.push(Node::Pattern(pattern));
+                }
+            }
+            PatternKind::MatchClass {
+                cls,
+                patterns,
+                kwd_patterns,
+                ..
+            } => {
+                result.push(Node::Expr(cls));
+                for pattern in patterns {
+                    result.push(Node::Pattern(pattern));
+                }
+                for pattern in kwd_patterns {
+                    result.push(Node::Pattern(pattern));
+                }
+            }
+            PatternKind::MatchStar { .. } => {}
+            PatternKind::MatchAs { pattern, .. } => {
+                if let Some(pattern) = pattern {
+                    result.push(Node::Pattern(pattern));
+                }
+            }
+            PatternKind::MatchOr { patterns } => {
+                for pattern in patterns {
+                    result.push(Node::Pattern(pattern));
+                }
+            }
+        },
     }
 }
 
@@ -670,6 +722,7 @@ pub fn decorate_token<'a>(
             Node::Alias(node) => node.location,
             Node::Excepthandler(node) => node.location,
             Node::SliceIndex(node) => node.location,
+            Node::Pattern(node) => node.location,
             Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
         };
         let end = match &child {
@@ -678,6 +731,7 @@ pub fn decorate_token<'a>(
             Node::Alias(node) => node.end_location.unwrap(),
             Node::Excepthandler(node) => node.end_location.unwrap(),
             Node::SliceIndex(node) => node.end_location.unwrap(),
+            Node::Pattern(node) => node.end_location.unwrap(),
             Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
         };
 
@@ -690,6 +744,7 @@ pub fn decorate_token<'a>(
                 Node::Alias(node) => node.location,
                 Node::Excepthandler(node) => node.location,
                 Node::SliceIndex(node) => node.location,
+                Node::Pattern(node) => node.location,
                 Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
             };
             let existing_end = match &existing {
@@ -698,6 +753,7 @@ pub fn decorate_token<'a>(
                 Node::Alias(node) => node.end_location.unwrap(),
                 Node::Excepthandler(node) => node.end_location.unwrap(),
                 Node::SliceIndex(node) => node.end_location.unwrap(),
+                Node::Pattern(node) => node.end_location.unwrap(),
                 Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
             };
             if start == existing_start && end == existing_end {
@@ -758,6 +814,7 @@ pub struct TriviaIndex {
     pub alias: FxHashMap<usize, Vec<Trivia>>,
     pub excepthandler: FxHashMap<usize, Vec<Trivia>>,
     pub slice_index: FxHashMap<usize, Vec<Trivia>>,
+    pub pattern: FxHashMap<usize, Vec<Trivia>>,
 }
 
 fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
@@ -794,6 +851,13 @@ fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
         Node::SliceIndex(node) => {
             trivia
                 .slice_index
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::Pattern(node) => {
+            trivia
+                .pattern
                 .entry(node.id())
                 .or_insert_with(Vec::new)
                 .push(comment);

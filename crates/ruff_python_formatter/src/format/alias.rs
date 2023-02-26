@@ -2,9 +2,9 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::write;
 use ruff_text_size::TextSize;
 
-use crate::builders::literal;
 use crate::context::ASTFormatContext;
 use crate::cst::Alias;
+use crate::format::comments::end_of_line_comments;
 use crate::shared_traits::AsFormat;
 
 pub struct FormatAlias<'a> {
@@ -29,20 +29,7 @@ impl Format<ASTFormatContext<'_>> for FormatAlias<'_> {
             write!(f, [dynamic_text(asname, TextSize::default())])?;
         }
 
-        // Format any end-of-line comments.
-        let mut first = true;
-        for range in alias.trivia.iter().filter_map(|trivia| {
-            if trivia.relationship.is_trailing() {
-                trivia.kind.end_of_line_comment()
-            } else {
-                None
-            }
-        }) {
-            if std::mem::take(&mut first) {
-                write!(f, [line_suffix(&text("  "))])?;
-            }
-            write!(f, [line_suffix(&literal(range))])?;
-        }
+        write!(f, [end_of_line_comments(alias)])?;
 
         Ok(())
     }

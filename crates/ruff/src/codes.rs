@@ -52,6 +52,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E273") => Rule::TabAfterKeyword,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E274") => Rule::TabBeforeKeyword,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E275") => Rule::MissingWhitespaceAfterKeyword,
         (Pycodestyle, "E401") => Rule::MultipleImportsOnOneLine,
         (Pycodestyle, "E402") => Rule::ModuleImportNotAtTopOfFile,
         (Pycodestyle, "E501") => Rule::LineTooLong,
@@ -486,6 +488,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "001") => Rule::PrefixTypeParams,
         (Flake8Pyi, "007") => Rule::UnrecognizedPlatformCheck,
         (Flake8Pyi, "008") => Rule::UnrecognizedPlatformName,
+        (Flake8Pyi, "009") => Rule::PassStatementStubBody,
+        (Flake8Pyi, "010") => Rule::NonEmptyStubBody,
+        (Flake8Pyi, "011") => Rule::TypedArgumentSimpleDefaults,
+        (Flake8Pyi, "014") => Rule::ArgumentSimpleDefaults,
+        (Flake8Pyi, "021") => Rule::DocstringInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::IncorrectFixtureParenthesesStyle,
@@ -615,6 +622,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-django
         (Flake8Django, "001") => Rule::NullableModelStringField,
+        (Flake8Django, "003") => Rule::LocalsInRenderFunction,
+        (Flake8Django, "006") => Rule::ExcludeWithModelForm,
+        (Flake8Django, "007") => Rule::AllWithModelForm,
         (Flake8Django, "008") => Rule::ModelWithoutDunderStr,
         (Flake8Django, "013") => Rule::NonLeadingReceiverDecorator,
 
