@@ -6,10 +6,10 @@ expression: diagnostics
     GlobalStatement:
       name: CONSTANT
   location:
-    row: 14
+    row: 17
     column: 4
   end_location:
-    row: 14
+    row: 17
     column: 19
   fix: ~
   parent: ~
@@ -17,10 +17,10 @@ expression: diagnostics
     GlobalStatement:
       name: sys
   location:
-    row: 21
+    row: 24
     column: 4
   end_location:
-    row: 21
+    row: 24
     column: 14
   fix: ~
   parent: ~
@@ -28,10 +28,10 @@ expression: diagnostics
     GlobalStatement:
       name: namedtuple
   location:
-    row: 27
+    row: 30
     column: 4
   end_location:
-    row: 27
+    row: 30
     column: 21
   fix: ~
   parent: ~
@@ -39,10 +39,10 @@ expression: diagnostics
     GlobalStatement:
       name: CONSTANT
   location:
-    row: 33
+    row: 36
     column: 4
   end_location:
-    row: 33
+    row: 36
     column: 19
   fix: ~
   parent: ~
@@ -50,10 +50,10 @@ expression: diagnostics
     GlobalStatement:
       name: CONSTANT
   location:
-    row: 40
+    row: 43
     column: 4
   end_location:
-    row: 40
+    row: 43
     column: 19
   fix: ~
   parent: ~
@@ -61,10 +61,10 @@ expression: diagnostics
     GlobalStatement:
       name: CONSTANT
   location:
-    row: 47
+    row: 50
     column: 4
   end_location:
-    row: 47
+    row: 50
     column: 19
   fix: ~
   parent: ~
@@ -72,10 +72,10 @@ expression: diagnostics
     GlobalStatement:
       name: FUNC
   location:
-    row: 57
+    row: 60
     column: 4
   end_location:
-    row: 57
+    row: 60
     column: 15
   fix: ~
   parent: ~
@@ -83,10 +83,10 @@ expression: diagnostics
     GlobalStatement:
       name: CLASS
   location:
-    row: 67
+    row: 70
     column: 4
   end_location:
-    row: 67
+    row: 70
     column: 16
   fix: ~
   parent: ~

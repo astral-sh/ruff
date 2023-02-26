@@ -1,5 +1,8 @@
-# # Adapted from: https://github.com/PyCQA/pylint/blob/b70d2abd7fabe9bfd735a30b593b9cd5eaa36194/tests/functional/g/globals.py
+# Adapted from:
+#   https://github.com/PyCQA/pylint/blob/b70d2abd7fabe9bfd735a30b593b9cd5eaa36194/tests/functional/g/globals.py
+
 CONSTANT = 1
+
 
 def FUNC():
     pass
@@ -54,7 +57,7 @@ def global_function_assign():
 
 def override_func():
     """Overriding a function should only throw a global statement error"""
-    global FUNC # [global-statement]
+    global FUNC  # [global-statement]
 
     def FUNC():
         pass
@@ -66,7 +69,7 @@ def override_class():
     """Overriding a class should only throw a global statement error"""
     global CLASS  # [global-statement]
 
-    class CLASS():
+    class CLASS:
         pass
 
     CLASS()

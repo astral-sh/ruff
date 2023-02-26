@@ -1,6 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::types::BindingKind;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
@@ -8,22 +7,20 @@ use crate::Range;
 
 define_violation!(
     /// ## What it does
-    /// Checks for usage of the `global` statement to update a global identifier.
+    /// Checks for the use of `global` statements to update identifiers.
     ///
     /// ## Why is this bad?
-    /// Global variables should be avoided unless very necessary because of these non-exhaustive
-    /// list of reasons: it breaks encapsulation and makes tracing program flow very difficult.
+    /// Pylint discourages the use of `global` variables as global mutable
+    /// state is a common source of bugs and confusing behavior.
     ///
     /// ## Example
     /// ```python
     /// var = 1
     ///
-    ///
     /// def foo():
     ///     global var  # [global-statement]
     ///     var = 10
     ///     print(var)
-    ///
     ///
     /// foo()
     /// print(var)
@@ -33,11 +30,9 @@ define_violation!(
     /// ```python
     /// var = 1
     ///
-    ///
     /// def foo():
     ///     print(var)
     ///     return 10
-    ///
     ///
     /// var = foo()
     /// print(var)
@@ -54,27 +49,26 @@ impl Violation for GlobalStatement {
     }
 }
 
-// PLW0603
+/// PLW0603
 pub fn global_statement(checker: &mut Checker, name: &str) {
-    let scope = &checker.scopes[*checker.scope_stack.last().expect("No current scope found")];
-
-    if let Some(&bidx) = scope.bindings.get(name) {
-        let binding = &checker.bindings[bidx];
-        if BindingKind::is_global(&binding.kind) {
-            let diag = Diagnostic::new(
+    let scope = checker.current_scope();
+    if let Some(index) = scope.bindings.get(name) {
+        let binding = &checker.bindings[*index];
+        if binding.kind.is_global() {
+            let diagnostic = Diagnostic::new(
                 GlobalStatement {
                     name: name.to_string(),
                 },
+                // Match Pylint's behavior by reporting on the `global` statement`, rather
+                // than the variable usage.
                 Range::from_located(
-                    // NOTE: This could've been `binding.range` except pylint wants to report the
-                    // location of the `global` keyword instead of the identifier.
                     binding
                         .source
                         .as_ref()
-                        .expect("Global statements should always have `source`"),
+                        .expect("`global` bindings should always have a `source`"),
                 ),
             );
-            checker.diagnostics.push(diag);
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
