@@ -15,6 +15,7 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
+    #[test_case(Rule::BlacklistCall, Path::new("S001.py"); "S001")]
     #[test_case(Rule::Assert, Path::new("S101.py"); "S101")]
     #[test_case(Rule::ExecBuiltin, Path::new("S102.py"); "S102")]
     #[test_case(Rule::BadFilePermissions, Path::new("S103.py"); "S103")]
