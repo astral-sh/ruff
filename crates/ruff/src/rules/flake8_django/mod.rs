@@ -15,6 +15,8 @@ mod tests {
 
     #[test_case(Rule::NullableModelStringField, Path::new("DJ001.py"); "DJ001")]
     #[test_case(Rule::LocalsInRenderFunction, Path::new("DJ003.py"); "DJ003")]
+    #[test_case(Rule::ExcludeWithModelForm, Path::new("DJ006.py"); "DJ006")]
+    #[test_case(Rule::AllWithModelForm, Path::new("DJ007.py"); "DJ007")]
     #[test_case(Rule::ModelWithoutDunderStr, Path::new("DJ008.py"); "DJ008")]
     #[test_case(Rule::NonLeadingReceiverDecorator, Path::new("DJ013.py"); "DJ013")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

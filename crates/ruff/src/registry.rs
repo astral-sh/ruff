@@ -578,6 +578,8 @@ ruff_macros::register_rules!(
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
     rules::flake8_django::rules::LocalsInRenderFunction,
+    rules::flake8_django::rules::ExcludeWithModelForm,
+    rules::flake8_django::rules::AllWithModelForm,
     rules::flake8_django::rules::ModelWithoutDunderStr,
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );

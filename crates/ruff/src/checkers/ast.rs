@@ -812,6 +812,15 @@ where
                             self, body,
                         ));
                 }
+                if self.settings.rules.enabled(&Rule::ExcludeWithModelForm)
+                    || self.settings.rules.enabled(&Rule::AllWithModelForm)
+                {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::check_model_form(self, bases, body, stmt)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
                     if let Some(diagnostic) =
                         flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
