@@ -5,116 +5,239 @@ expression: diagnostics
 - kind:
     ImplicitReturn: ~
   location:
-    row: 18
+    row: 20
     column: 4
   end_location:
-    row: 19
+    row: 21
     column: 16
-  fix: ~
+  fix:
+    content: "\n    return None"
+    location:
+      row: 21
+      column: 16
+    end_location:
+      row: 21
+      column: 16
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 25
+    row: 27
     column: 8
   end_location:
-    row: 25
+    row: 27
     column: 15
   fix:
-    content:
-      - "        return None"
-      - ""
+    content: "\n        return None"
     location:
-      row: 26
-      column: 0
+      row: 27
+      column: 15
     end_location:
-      row: 26
-      column: 0
+      row: 27
+      column: 15
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 34
+    row: 36
     column: 4
   end_location:
-    row: 34
+    row: 36
     column: 11
   fix:
-    content:
-      - "    return None"
-      - ""
+    content: "\n    return None"
     location:
-      row: 35
-      column: 0
+      row: 36
+      column: 11
     end_location:
-      row: 35
-      column: 0
+      row: 36
+      column: 11
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 40
-    column: 8
-  end_location:
     row: 41
+    column: 4
+  end_location:
+    row: 43
     column: 20
-  fix: ~
+  fix:
+    content: "\n    return None"
+    location:
+      row: 43
+      column: 20
+    end_location:
+      row: 43
+      column: 20
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 50
+    row: 52
     column: 8
   end_location:
-    row: 50
+    row: 52
     column: 15
   fix:
-    content:
-      - "        return None"
-      - ""
+    content: "\n        return None"
     location:
-      row: 51
-      column: 0
+      row: 52
+      column: 15
     end_location:
-      row: 51
-      column: 0
+      row: 52
+      column: 15
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 57
+    row: 59
     column: 4
   end_location:
-    row: 57
+    row: 59
     column: 22
   fix:
-    content:
-      - "    return None"
-      - ""
+    content: "\n    return None"
     location:
-      row: 58
-      column: 0
+      row: 59
+      column: 22
     end_location:
-      row: 58
-      column: 0
+      row: 59
+      column: 22
   parent: ~
 - kind:
     ImplicitReturn: ~
   location:
-    row: 64
+    row: 66
     column: 4
   end_location:
-    row: 64
+    row: 66
     column: 21
   fix:
-    content:
-      - "    return None"
-      - ""
+    content: "\n    return None"
     location:
-      row: 65
-      column: 0
+      row: 66
+      column: 21
     end_location:
-      row: 65
-      column: 0
+      row: 66
+      column: 21
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 82
+    column: 4
+  end_location:
+    row: 85
+    column: 14
+  fix:
+    content: "\n    return None"
+    location:
+      row: 85
+      column: 14
+    end_location:
+      row: 85
+      column: 14
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 113
+    column: 4
+  end_location:
+    row: 116
+    column: 16
+  fix:
+    content: "\n    return None"
+    location:
+      row: 116
+      column: 16
+    end_location:
+      row: 116
+      column: 16
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 120
+    column: 4
+  end_location:
+    row: 126
+    column: 19
+  fix:
+    content: "\n    return None"
+    location:
+      row: 126
+      column: 19
+    end_location:
+      row: 126
+      column: 19
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 130
+    column: 4
+  end_location:
+    row: 133
+    column: 16
+  fix:
+    content: "\n    return None"
+    location:
+      row: 133
+      column: 16
+    end_location:
+      row: 133
+      column: 16
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 137
+    column: 4
+  end_location:
+    row: 143
+    column: 19
+  fix:
+    content: "\n    return None"
+    location:
+      row: 143
+      column: 19
+    end_location:
+      row: 143
+      column: 19
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 274
+    column: 4
+  end_location:
+    row: 275
+    column: 20
+  fix:
+    content: "\n    return None"
+    location:
+      row: 275
+      column: 20
+    end_location:
+      row: 275
+      column: 20
+  parent: ~
+- kind:
+    ImplicitReturn: ~
+  location:
+    row: 291
+    column: 12
+  end_location:
+    row: 291
+    column: 19
+  fix:
+    content: "\n            return None"
+    location:
+      row: 291
+      column: 19
+    end_location:
+      row: 291
+      column: 19
   parent: ~
 

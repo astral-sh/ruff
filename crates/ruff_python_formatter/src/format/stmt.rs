@@ -4,70 +4,69 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{format_args, write};
 use ruff_text_size::TextSize;
 
-use crate::builders::literal;
 use crate::context::ASTFormatContext;
-use crate::cst::{Alias, Arguments, Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem};
+use crate::cst::{
+    Alias, Arguments, Excepthandler, Expr, ExprKind, Keyword, MatchCase, Operator, Stmt, StmtKind,
+    Withitem,
+};
 use crate::format::builders::{block, join_names};
+use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
 use crate::format::helpers::is_self_closing;
 use crate::shared_traits::AsFormat;
-use crate::trivia::{Parenthesize, Relationship, TriviaKind};
 
-fn format_break(f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-    write!(f, [text("break")])
-}
-
-fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
-    // Write the statement body.
-    write!(f, [text("pass")])?;
-
-    // Apply any inline comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
-        }
-        write!(f, [literal(range)])?;
-    }
-
+fn format_break(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
+    write!(f, [text("break")])?;
+    write!(f, [end_of_line_comments(stmt)])?;
     Ok(())
 }
 
-fn format_continue(f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-    write!(f, [text("continue")])
+fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
+    write!(f, [text("pass")])?;
+    write!(f, [end_of_line_comments(stmt)])?;
+    Ok(())
 }
 
-fn format_global(f: &mut Formatter<ASTFormatContext<'_>>, names: &[String]) -> FormatResult<()> {
+fn format_continue(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
+    write!(f, [text("continue")])?;
+    write!(f, [end_of_line_comments(stmt)])?;
+    Ok(())
+}
+
+fn format_global(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    names: &[String],
+) -> FormatResult<()> {
     write!(f, [text("global")])?;
     if !names.is_empty() {
         write!(f, [space(), join_names(names)])?;
     }
+    write!(f, [end_of_line_comments(stmt)])?;
     Ok(())
 }
 
-fn format_nonlocal(f: &mut Formatter<ASTFormatContext<'_>>, names: &[String]) -> FormatResult<()> {
+fn format_nonlocal(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    names: &[String],
+) -> FormatResult<()> {
     write!(f, [text("nonlocal")])?;
     if !names.is_empty() {
         write!(f, [space(), join_names(names)])?;
     }
+    write!(f, [end_of_line_comments(stmt)])?;
     Ok(())
 }
 
-fn format_delete(f: &mut Formatter<ASTFormatContext<'_>>, targets: &[Expr]) -> FormatResult<()> {
+fn format_delete(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    targets: &[Expr],
+) -> FormatResult<()> {
     write!(f, [text("del")])?;
-
     match targets.len() {
-        0 => Ok(()),
-        1 => write!(f, [space(), targets[0].format()]),
+        0 => {}
+        1 => write!(f, [space(), targets[0].format()])?,
         _ => {
             write!(
                 f,
@@ -90,9 +89,11 @@ fn format_delete(f: &mut Formatter<ASTFormatContext<'_>>, targets: &[Expr]) -> F
                         if_group_breaks(&text(")")),
                     ])
                 ]
-            )
+            )?;
         }
     }
+    write!(f, [end_of_line_comments(stmt)])?;
+    Ok(())
 }
 
 fn format_class_def(
@@ -187,11 +188,7 @@ fn format_func_def(
             dynamic_text(name, TextSize::default()),
             text("("),
             group(&soft_block_indent(&format_with(|f| {
-                if stmt
-                    .trivia
-                    .iter()
-                    .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma))
-                {
+                if stmt.trivia.iter().any(|c| c.kind.is_magic_trailing_comma()) {
                     write!(f, [expand_parent()])?;
                 }
                 write!(f, [args.format()])
@@ -206,24 +203,7 @@ fn format_func_def(
 
     write!(f, [text(":")])?;
 
-    // Apply any inline comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
-        }
-        write!(f, [literal(range)])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
     write!(f, [block_indent(&format_args![block(body)])])
 }
@@ -255,25 +235,36 @@ fn format_assign(
         )?;
     }
 
-    // Apply any inline comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
-        }
-        write!(f, [literal(range)])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
+    Ok(())
+}
+
+fn format_aug_assign(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    target: &Expr,
+    op: &Operator,
+    value: &Expr,
+) -> FormatResult<()> {
+    write!(f, [target.format()])?;
+    write!(f, [text(" "), op.format(), text("=")])?;
+    if is_self_closing(value) {
+        write!(f, [space(), group(&value.format())])?;
+    } else {
+        write!(
+            f,
+            [
+                space(),
+                group(&format_args![
+                    if_group_breaks(&text("(")),
+                    soft_block_indent(&value.format()),
+                    if_group_breaks(&text(")")),
+                ])
+            ]
+        )?;
+    }
+    write!(f, [end_of_line_comments(stmt)])?;
     Ok(())
 }
 
@@ -320,9 +311,13 @@ fn format_for(
     target: &Expr,
     iter: &Expr,
     body: &[Stmt],
-    _orelse: &[Stmt],
+    orelse: &[Stmt],
     _type_comment: Option<&str>,
+    async_: bool,
 ) -> FormatResult<()> {
+    if async_ {
+        write!(f, [text("async"), space()])?;
+    }
     write!(
         f,
         [
@@ -336,7 +331,11 @@ fn format_for(
             text(":"),
             block_indent(&block(body))
         ]
-    )
+    )?;
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    Ok(())
 }
 
 fn format_while(
@@ -401,6 +400,19 @@ fn format_if(
     Ok(())
 }
 
+fn format_match(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    subject: &Expr,
+    cases: &[MatchCase],
+) -> FormatResult<()> {
+    write!(f, [text("match"), space(), subject.format(), text(":")])?;
+    for case in cases {
+        write!(f, [block_indent(&case.format())])?;
+    }
+    Ok(())
+}
+
 fn format_raise(
     f: &mut Formatter<ASTFormatContext<'_>>,
     stmt: &Stmt,
@@ -419,11 +431,58 @@ fn format_raise(
 
 fn format_return(
     f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
     value: Option<&Expr>,
 ) -> FormatResult<()> {
     write!(f, [text("return")])?;
     if let Some(value) = value {
         write!(f, [space(), value.format()])?;
+    }
+
+    write!(f, [end_of_line_comments(stmt)])?;
+
+    Ok(())
+}
+
+fn format_try(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    body: &[Stmt],
+    handlers: &[Excepthandler],
+    orelse: &[Stmt],
+    finalbody: &[Stmt],
+) -> FormatResult<()> {
+    write!(f, [text("try:"), block_indent(&block(body))])?;
+    for handler in handlers {
+        write!(f, [handler.format()])?;
+    }
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    if !finalbody.is_empty() {
+        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
+    }
+    Ok(())
+}
+
+fn format_try_star(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    body: &[Stmt],
+    handlers: &[Excepthandler],
+    orelse: &[Stmt],
+    finalbody: &[Stmt],
+) -> FormatResult<()> {
+    write!(f, [text("try:"), block_indent(&block(body))])?;
+    for handler in handlers {
+        // TODO(charlie): Include `except*`.
+        write!(f, [handler.format()])?;
+    }
+    if !orelse.is_empty() {
+        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    }
+    if !finalbody.is_empty() {
+        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
     }
     Ok(())
 }
@@ -515,10 +574,7 @@ fn format_import_from(
     if names.iter().any(|name| name.node.name == "*") {
         write!(f, [text("*")])?;
     } else {
-        let magic_trailing_comma = stmt
-            .trivia
-            .iter()
-            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+        let magic_trailing_comma = stmt.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
             f,
             [group(&format_args![
@@ -543,24 +599,7 @@ fn format_import_from(
         )?;
     }
 
-    // Apply any inline comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
-        }
-        write!(f, [literal(range)])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
     Ok(())
 }
@@ -570,7 +609,7 @@ fn format_expr(
     stmt: &Stmt,
     expr: &Expr,
 ) -> FormatResult<()> {
-    if matches!(stmt.parentheses, Parenthesize::Always) {
+    if stmt.parentheses.is_always() {
         write!(
             f,
             [group(&format_args![
@@ -592,24 +631,7 @@ fn format_expr(
         )?;
     }
 
-    // Apply any inline comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::InlineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [text("  ")])?;
-        }
-        write!(f, [literal(range)])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
     Ok(())
 }
@@ -625,7 +647,6 @@ fn format_with_(
     if async_ {
         write!(f, [text("async"), space()])?;
     }
-
     write!(
         f,
         [
@@ -649,7 +670,8 @@ fn format_with_(
             text(":"),
             block_indent(&block(body))
         ]
-    )
+    )?;
+    Ok(())
 }
 
 pub struct FormatStmt<'a> {
@@ -658,27 +680,14 @@ pub struct FormatStmt<'a> {
 
 impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        // Any leading comments come on the line before.
-        for trivia in &self.item.trivia {
-            if matches!(trivia.relationship, Relationship::Leading) {
-                match trivia.kind {
-                    TriviaKind::EmptyLine => {
-                        write!(f, [empty_line()])?;
-                    }
-                    TriviaKind::StandaloneComment(range) => {
-                        write!(f, [literal(range), hard_line_break()])?;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        write!(f, [leading_comments(self.item)])?;
 
         match &self.item.node {
             StmtKind::Pass => format_pass(f, self.item),
-            StmtKind::Break => format_break(f),
-            StmtKind::Continue => format_continue(f),
-            StmtKind::Global { names } => format_global(f, names),
-            StmtKind::Nonlocal { names } => format_nonlocal(f, names),
+            StmtKind::Break => format_break(f, self.item),
+            StmtKind::Continue => format_continue(f, self.item),
+            StmtKind::Global { names } => format_global(f, self.item, names),
+            StmtKind::Nonlocal { names } => format_nonlocal(f, self.item, names),
             StmtKind::FunctionDef {
                 name,
                 args,
@@ -720,10 +729,12 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 body,
                 decorator_list,
             } => format_class_def(f, name, bases, keywords, body, decorator_list),
-            StmtKind::Return { value } => format_return(f, value.as_ref()),
-            StmtKind::Delete { targets } => format_delete(f, targets),
+            StmtKind::Return { value } => format_return(f, self.item, value.as_ref()),
+            StmtKind::Delete { targets } => format_delete(f, self.item, targets),
             StmtKind::Assign { targets, value, .. } => format_assign(f, self.item, targets, value),
-            // StmtKind::AugAssign { .. } => {}
+            StmtKind::AugAssign { target, op, value } => {
+                format_aug_assign(f, self.item, target, op, value)
+            }
             StmtKind::AnnAssign {
                 target,
                 annotation,
@@ -744,8 +755,24 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 body,
                 orelse,
                 type_comment.as_deref(),
+                false,
             ),
-            // StmtKind::AsyncFor { .. } => {}
+            StmtKind::AsyncFor {
+                target,
+                iter,
+                body,
+                orelse,
+                type_comment,
+            } => format_for(
+                f,
+                self.item,
+                target,
+                iter,
+                body,
+                orelse,
+                type_comment.as_deref(),
+                true,
+            ),
             StmtKind::While { test, body, orelse } => {
                 format_while(f, self.item, test, body, orelse)
             }
@@ -774,11 +801,22 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 type_comment.as_ref().map(String::as_str),
                 true,
             ),
-            // StmtKind::Match { .. } => {}
+            StmtKind::Match { subject, cases } => format_match(f, self.item, subject, cases),
             StmtKind::Raise { exc, cause } => {
                 format_raise(f, self.item, exc.as_deref(), cause.as_deref())
             }
-            // StmtKind::Try { .. } => {}
+            StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => format_try(f, self.item, body, handlers, orelse, finalbody),
+            StmtKind::TryStar {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            } => format_try_star(f, self.item, body, handlers, orelse, finalbody),
             StmtKind::Assert { test, msg } => {
                 format_assert(f, self.item, test, msg.as_ref().map(|expr| &**expr))
             }
@@ -794,27 +832,11 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 names,
                 level.as_ref(),
             ),
-            // StmtKind::Nonlocal { .. } => {}
             StmtKind::Expr { value } => format_expr(f, self.item, value),
-            _ => {
-                unimplemented!("Implement StmtKind: {:?}", self.item.node)
-            }
         }?;
 
-        // Any trailing comments come on the lines after.
-        for trivia in &self.item.trivia {
-            if matches!(trivia.relationship, Relationship::Trailing) {
-                match trivia.kind {
-                    TriviaKind::EmptyLine => {
-                        write!(f, [empty_line()])?;
-                    }
-                    TriviaKind::StandaloneComment(range) => {
-                        write!(f, [literal(range), hard_line_break()])?;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        write!(f, [hard_line_break()])?;
+        write!(f, [trailing_comments(self.item)])?;
 
         Ok(())
     }

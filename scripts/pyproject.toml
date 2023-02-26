@@ -3,18 +3,15 @@ name = "scripts"
 version = "0.0.1"
 dependencies = ["sphinx"]
 
+[tool.black]
+line-length = 88
+
 [tool.ruff]
+line-length = 88
 select = ["ALL"]
 ignore = [
-  "E501",   # line-too-long
-  "INP001", # implicit-namespace-package
-  "PL",     # pylint
-  "S101",   # assert-used
-  "EM",     # errmgs
-  "D202",   # no-blank-line-after-function
-]
-unfixable = [
-  "RUF100", # unused-noqa
+    "PL",  # pylint
+    "S",  # bandit
 ]
 
 [tool.ruff.pydocstyle]

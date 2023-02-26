@@ -50,6 +50,7 @@ struct ExpandedMessage<'a> {
     location: Location,
     end_location: Location,
     filename: &'a str,
+    noqa_row: usize,
 }
 
 #[derive(Serialize)]
@@ -197,6 +198,7 @@ impl Printer {
                                 location: message.location,
                                 end_location: message.end_location,
                                 filename: &message.filename,
+                                noqa_row: message.noqa_row,
                             })
                             .collect::<Vec<_>>()
                     )?
@@ -639,7 +641,7 @@ fn print_fixed<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) ->
     );
 
     let s = if total == 1 { "" } else { "s" };
-    let label = format!("Fixed {total} error{s}:", total = total, s = s);
+    let label = format!("Fixed {total} error{s}:");
     writeln!(stdout, "{}", label.bold().green())?;
 
     for (filename, table) in fixed

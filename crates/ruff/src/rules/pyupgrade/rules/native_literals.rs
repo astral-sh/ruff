@@ -2,8 +2,7 @@ use std::fmt;
 
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 use serde::{Deserialize, Serialize};
 
 use crate::ast::types::Range;
@@ -117,10 +116,8 @@ pub fn native_literals(
         // rust-python merges adjacent string/bytes literals into one node, but we can't
         // safely remove the outer call in this situation. We're following pyupgrade
         // here and skip.
-        let arg_code = checker
-            .locator
-            .slice_source_code_range(&Range::from_located(arg));
-        if lexer::make_tokenizer(arg_code)
+        let arg_code = checker.locator.slice(&Range::from_located(arg));
+        if lexer::lex_located(arg_code, Mode::Module, arg.location)
             .flatten()
             .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
             .count()

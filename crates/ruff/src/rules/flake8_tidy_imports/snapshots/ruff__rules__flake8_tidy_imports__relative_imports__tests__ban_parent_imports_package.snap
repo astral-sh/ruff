@@ -12,8 +12,7 @@ expression: diagnostics
     row: 5
     column: 55
   fix:
-    content:
-      - "from my_package.sublib.protocol import commands, definitions, responses"
+    content: "from my_package.sublib.protocol import commands, definitions, responses"
     location:
       row: 5
       column: 0
@@ -31,8 +30,7 @@ expression: diagnostics
     row: 5
     column: 55
   fix:
-    content:
-      - "from my_package.sublib.protocol import commands, definitions, responses"
+    content: "from my_package.sublib.protocol import commands, definitions, responses"
     location:
       row: 5
       column: 0
@@ -50,8 +48,7 @@ expression: diagnostics
     row: 5
     column: 55
   fix:
-    content:
-      - "from my_package.sublib.protocol import commands, definitions, responses"
+    content: "from my_package.sublib.protocol import commands, definitions, responses"
     location:
       row: 5
       column: 0
@@ -69,13 +66,30 @@ expression: diagnostics
     row: 6
     column: 28
   fix:
-    content:
-      - from my_package.sublib.server import example
+    content: from my_package.sublib.server import example
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 28
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 21
+  fix:
+    content: from my_package.sublib import server
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 21
   parent: ~
 

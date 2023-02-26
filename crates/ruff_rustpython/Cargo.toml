@@ -1,0 +1,14 @@
+[package]
+name = "ruff_rustpython"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[lib]
+
+[dependencies]
+anyhow = { workspace = true }
+once_cell = { workspace = true }
+rustpython-common = { workspace = true }
+rustpython-parser = { workspace = true }

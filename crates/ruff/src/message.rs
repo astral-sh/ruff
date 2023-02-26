@@ -16,6 +16,7 @@ pub struct Message {
     pub fix: Option<Fix>,
     pub filename: String,
     pub source: Option<Source>,
+    pub noqa_row: usize,
 }
 
 impl Message {
@@ -23,6 +24,7 @@ impl Message {
         diagnostic: Diagnostic,
         filename: String,
         source: Option<Source>,
+        noqa_row: usize,
     ) -> Self {
         Self {
             kind: diagnostic.kind,
@@ -34,6 +36,7 @@ impl Message {
             fix: diagnostic.fix,
             filename,
             source,
+            noqa_row,
         }
     }
 }
@@ -71,9 +74,9 @@ impl Source {
         } else {
             Location::new(diagnostic.end_location.row() + 1, 0)
         };
-        let source = locator.slice_source_code_range(&Range::new(location, end_location));
+        let source = locator.slice(&Range::new(location, end_location));
         let num_chars_in_range = locator
-            .slice_source_code_range(&Range::new(diagnostic.location, diagnostic.end_location))
+            .slice(&Range::new(diagnostic.location, diagnostic.end_location))
             .chars()
             .count();
         Source {

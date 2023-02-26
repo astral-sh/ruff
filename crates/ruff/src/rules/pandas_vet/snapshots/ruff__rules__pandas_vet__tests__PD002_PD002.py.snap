@@ -1,5 +1,5 @@
 ---
-source: src/rules/pandas_vet/mod.rs
+source: crates/ruff/src/rules/pandas_vet/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,8 +11,7 @@ expression: diagnostics
     row: 5
     column: 34
   fix:
-    content:
-      - "x = x.drop([\"a\"], axis=1)"
+    content: "x = x.drop([\"a\"], axis=1)"
     location:
       row: 5
       column: 0
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 7
     column: 34
   fix:
-    content:
-      - "x = x.drop([\"a\"], axis=1)"
+    content: "x = x.drop([\"a\"], axis=1)"
     location:
       row: 7
       column: 0
@@ -47,11 +45,7 @@ expression: diagnostics
     row: 10
     column: 16
   fix:
-    content:
-      - x = x.drop(
-      - "    columns=[\"a\"],"
-      - "    axis=1,"
-      - )
+    content: "x = x.drop(\n    columns=[\"a\"],\n    axis=1,\n)"
     location:
       row: 9
       column: 0
@@ -68,11 +62,7 @@ expression: diagnostics
     row: 17
     column: 20
   fix:
-    content:
-      - x = x.drop(
-      - "        columns=[\"a\"],"
-      - "        axis=1,"
-      - "    )"
+    content: "x = x.drop(\n        columns=[\"a\"],\n        axis=1,\n    )"
     location:
       row: 16
       column: 4

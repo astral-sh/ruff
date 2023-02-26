@@ -1,9 +1,8 @@
 use anyhow::{bail, Result};
 use libcst_native::{Call, Codegen, CodegenState, Dict, DictElement, Expression};
-use ruff_python::string::strip_quotes_and_prefixes;
+use ruff_python::str::strip_quotes_and_prefixes;
 use rustpython_parser::ast::{Excepthandler, Expr};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::cst::matchers::{match_expr, match_module};
@@ -17,7 +16,7 @@ pub fn remove_unused_format_arguments_from_dict(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+    let module_text = locator.slice(&Range::from_located(stmt));
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
 
@@ -68,7 +67,7 @@ pub fn remove_unused_keyword_arguments_from_format_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&location);
+    let module_text = locator.slice(&location);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
 
@@ -115,14 +114,14 @@ pub fn remove_exception_handler_assignment(
     excepthandler: &Excepthandler,
     locator: &Locator,
 ) -> Result<Fix> {
-    let contents = locator.slice_source_code_range(&Range::from_located(excepthandler));
+    let contents = locator.slice(&Range::from_located(excepthandler));
     let mut fix_start = None;
     let mut fix_end = None;
 
     // End of the token just before the `as` to the semicolon.
     let mut prev = None;
     for (start, tok, end) in
-        lexer::make_tokenizer_located(contents, excepthandler.location).flatten()
+        lexer::lex_located(contents, Mode::Module, excepthandler.location).flatten()
     {
         if matches!(tok, Tok::As) {
             fix_start = prev;

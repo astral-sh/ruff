@@ -1,5 +1,6 @@
+use rustpython_parser::ast::{Expr, ExprKind};
+
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{ExprKind, Located};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
@@ -47,12 +48,7 @@ impl Violation for UseOfDotValues {
     }
 }
 
-pub fn check_attr(
-    checker: &mut Checker,
-    attr: &str,
-    value: &Located<ExprKind>,
-    attr_expr: &Located<ExprKind>,
-) {
+pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &Expr) {
     let rules = &checker.settings.rules;
     let violation: DiagnosticKind = match attr {
         "ix" if rules.enabled(&Rule::UseOfDotIx) => UseOfDotIx.into(),

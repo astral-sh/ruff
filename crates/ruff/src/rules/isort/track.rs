@@ -9,6 +9,7 @@ use rustpython_parser::ast::{
 use super::helpers;
 use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
+use crate::resolver::is_interface_definition_path;
 use crate::source_code::Locator;
 
 #[derive(Debug)]
@@ -39,7 +40,7 @@ impl<'a> ImportTracker<'a> {
         Self {
             locator,
             directives,
-            pyi: path.extension().map_or(false, |ext| ext == "pyi"),
+            pyi: is_interface_definition_path(path),
             blocks: vec![Block::default()],
             split_index: 0,
             nested: false,
@@ -215,12 +216,19 @@ where
                 }
                 self.finalize(None);
             }
-            StmtKind::Match { cases, .. } => {
+            StmtKind::Match { subject, cases } => {
+                self.visit_expr(subject);
                 for match_case in cases {
                     self.visit_match_case(match_case);
                 }
             }
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,

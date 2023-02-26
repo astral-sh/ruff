@@ -5,15 +5,17 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use super::settings::{Convention, Settings};
     use crate::registry::Rule;
+    use crate::settings;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::BlankLineAfterLastSection, Path::new("sections.py"); "D413")]
     #[test_case(Rule::BlankLineAfterSection, Path::new("sections.py"); "D410")]
@@ -71,7 +73,13 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pydocstyle").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::Settings {
+                pydocstyle: Settings {
+                    convention: None,
+                    ignore_decorators: BTreeSet::from_iter(["functools.wraps".to_string()]),
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
@@ -84,7 +92,10 @@ mod tests {
             &settings::Settings {
                 // When inferring the convention, we'll see a few false negatives.
                 // See: https://github.com/PyCQA/pydocstyle/issues/459.
-                pydocstyle: Settings { convention: None },
+                pydocstyle: Settings {
+                    convention: None,
+                    ignore_decorators: BTreeSet::new(),
+                },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -100,6 +111,7 @@ mod tests {
                 // With explicit Google convention, we should flag every function.
                 pydocstyle: Settings {
                     convention: Some(Convention::Google),
+                    ignore_decorators: BTreeSet::new(),
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
@@ -116,6 +128,7 @@ mod tests {
                 // With explicit Google convention, we shouldn't flag anything.
                 pydocstyle: Settings {
                     convention: Some(Convention::Numpy),
+                    ignore_decorators: BTreeSet::new(),
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },

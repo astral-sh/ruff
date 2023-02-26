@@ -1,6 +1,6 @@
 use crate::core::visitor;
 use crate::core::visitor::Visitor;
-use crate::cst::{Expr, Stmt};
+use crate::cst::{Alias, Excepthandler, Expr, Pattern, SliceIndex, Stmt};
 use crate::trivia::{decorate_trivia, TriviaIndex, TriviaToken};
 
 struct AttachmentVisitor {
@@ -22,6 +22,38 @@ impl<'a> Visitor<'a> for AttachmentVisitor {
             expr.trivia.extend(comments);
         }
         visitor::walk_expr(self, expr);
+    }
+
+    fn visit_alias(&mut self, alias: &'a mut Alias) {
+        let trivia = self.index.alias.remove(&alias.id());
+        if let Some(comments) = trivia {
+            alias.trivia.extend(comments);
+        }
+        visitor::walk_alias(self, alias);
+    }
+
+    fn visit_excepthandler(&mut self, excepthandler: &'a mut Excepthandler) {
+        let trivia = self.index.excepthandler.remove(&excepthandler.id());
+        if let Some(comments) = trivia {
+            excepthandler.trivia.extend(comments);
+        }
+        visitor::walk_excepthandler(self, excepthandler);
+    }
+
+    fn visit_slice_index(&mut self, slice_index: &'a mut SliceIndex) {
+        let trivia = self.index.slice_index.remove(&slice_index.id());
+        if let Some(comments) = trivia {
+            slice_index.trivia.extend(comments);
+        }
+        visitor::walk_slice_index(self, slice_index);
+    }
+
+    fn visit_pattern(&mut self, pattern: &'a mut Pattern) {
+        let trivia = self.index.pattern.remove(&pattern.id());
+        if let Some(comments) = trivia {
+            pattern.trivia.extend(comments);
+        }
+        visitor::walk_pattern(self, pattern);
     }
 }
 

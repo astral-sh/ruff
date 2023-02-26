@@ -15,10 +15,10 @@ use shellexpand::LookupError;
 use crate::fs;
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
-    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
+    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
+    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
+    isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::options::Options;
 use crate::settings::types::{
@@ -68,11 +68,13 @@ pub struct Configuration {
     pub flake8_bandit: Option<flake8_bandit::settings::Options>,
     pub flake8_bugbear: Option<flake8_bugbear::settings::Options>,
     pub flake8_builtins: Option<flake8_builtins::settings::Options>,
+    pub flake8_comprehensions: Option<flake8_comprehensions::settings::Options>,
     pub flake8_errmsg: Option<flake8_errmsg::settings::Options>,
     pub flake8_implicit_str_concat: Option<flake8_implicit_str_concat::settings::Options>,
     pub flake8_import_conventions: Option<flake8_import_conventions::settings::Options>,
     pub flake8_pytest_style: Option<flake8_pytest_style::settings::Options>,
     pub flake8_quotes: Option<flake8_quotes::settings::Options>,
+    pub flake8_self: Option<flake8_self::settings::Options>,
     pub flake8_tidy_imports: Option<flake8_tidy_imports::options::Options>,
     pub flake8_type_checking: Option<flake8_type_checking::settings::Options>,
     pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
@@ -180,11 +182,13 @@ impl Configuration {
             flake8_bandit: options.flake8_bandit,
             flake8_bugbear: options.flake8_bugbear,
             flake8_builtins: options.flake8_builtins,
+            flake8_comprehensions: options.flake8_comprehensions,
             flake8_errmsg: options.flake8_errmsg,
             flake8_implicit_str_concat: options.flake8_implicit_str_concat,
             flake8_import_conventions: options.flake8_import_conventions,
             flake8_pytest_style: options.flake8_pytest_style,
             flake8_quotes: options.flake8_quotes,
+            flake8_self: options.flake8_self,
             flake8_tidy_imports: options.flake8_tidy_imports,
             flake8_type_checking: options.flake8_type_checking,
             flake8_unused_arguments: options.flake8_unused_arguments,
@@ -242,6 +246,7 @@ impl Configuration {
             flake8_bandit: self.flake8_bandit.or(config.flake8_bandit),
             flake8_bugbear: self.flake8_bugbear.or(config.flake8_bugbear),
             flake8_builtins: self.flake8_builtins.or(config.flake8_builtins),
+            flake8_comprehensions: self.flake8_comprehensions.or(config.flake8_comprehensions),
             flake8_errmsg: self.flake8_errmsg.or(config.flake8_errmsg),
             flake8_implicit_str_concat: self
                 .flake8_implicit_str_concat
@@ -251,6 +256,7 @@ impl Configuration {
                 .or(config.flake8_import_conventions),
             flake8_pytest_style: self.flake8_pytest_style.or(config.flake8_pytest_style),
             flake8_quotes: self.flake8_quotes.or(config.flake8_quotes),
+            flake8_self: self.flake8_self.or(config.flake8_self),
             flake8_tidy_imports: self.flake8_tidy_imports.or(config.flake8_tidy_imports),
             flake8_type_checking: self.flake8_type_checking.or(config.flake8_type_checking),
             flake8_unused_arguments: self

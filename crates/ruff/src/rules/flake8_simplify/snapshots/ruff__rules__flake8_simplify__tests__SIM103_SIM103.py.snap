@@ -13,8 +13,7 @@ expression: diagnostics
     row: 6
     column: 20
   fix:
-    content:
-      - return bool(a)
+    content: return bool(a)
     location:
       row: 3
       column: 4
@@ -33,8 +32,7 @@ expression: diagnostics
     row: 14
     column: 20
   fix:
-    content:
-      - return a == b
+    content: return a == b
     location:
       row: 11
       column: 4
@@ -53,8 +51,7 @@ expression: diagnostics
     row: 24
     column: 20
   fix:
-    content:
-      - return bool(b)
+    content: return bool(b)
     location:
       row: 21
       column: 4
@@ -73,8 +70,7 @@ expression: diagnostics
     row: 35
     column: 24
   fix:
-    content:
-      - return bool(b)
+    content: return bool(b)
     location:
       row: 32
       column: 8

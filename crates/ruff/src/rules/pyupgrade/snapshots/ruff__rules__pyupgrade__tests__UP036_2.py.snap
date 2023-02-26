@@ -11,8 +11,7 @@ expression: diagnostics
     row: 7
     column: 7
   fix:
-    content:
-      - 3+6
+    content: 3+6
     location:
       row: 4
       column: 0
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 12
     column: 7
   fix:
-    content:
-      - 3+6
+    content: 3+6
     location:
       row: 9
       column: 0
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 17
     column: 7
   fix:
-    content:
-      - 3+6
+    content: 3+6
     location:
       row: 14
       column: 0
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 22
     column: 7
   fix:
-    content:
-      - 3+6
+    content: 3+6
     location:
       row: 19
       column: 0
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 27
     column: 7
   fix:
-    content:
-      - 3+6
+    content: 3+6
     location:
       row: 24
       column: 0
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 32
     column: 7
   fix:
-    content:
-      - 3+6
+    content: 3+6
     location:
       row: 29
       column: 0
@@ -119,8 +113,7 @@ expression: diagnostics
     row: 37
     column: 7
   fix:
-    content:
-      - 3+6
+    content: 3+6
     location:
       row: 34
       column: 0
@@ -137,8 +130,7 @@ expression: diagnostics
     row: 40
     column: 8
   fix:
-    content:
-      - pass
+    content: pass
     location:
       row: 39
       column: 0
@@ -155,8 +147,7 @@ expression: diagnostics
     row: 43
     column: 8
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 42
       column: 0
@@ -173,8 +164,7 @@ expression: diagnostics
     row: 47
     column: 12
   fix:
-    content:
-      - pass
+    content: pass
     location:
       row: 46
       column: 4
@@ -191,8 +181,7 @@ expression: diagnostics
     row: 52
     column: 8
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 49
       column: 0
@@ -209,8 +198,7 @@ expression: diagnostics
     row: 57
     column: 8
   fix:
-    content:
-      - pass
+    content: pass
     location:
       row: 54
       column: 0

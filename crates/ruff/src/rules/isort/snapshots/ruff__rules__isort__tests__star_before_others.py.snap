@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,11 +11,7 @@ expression: diagnostics
     row: 4
     column: 0
   fix:
-    content:
-      - from .logging import config_logging
-      - from .settings import *
-      - from .settings import ENV
-      - ""
+    content: "from .logging import config_logging\nfrom .settings import *\nfrom .settings import ENV\n"
     location:
       row: 1
       column: 0

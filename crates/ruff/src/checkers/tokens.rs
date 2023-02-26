@@ -1,6 +1,7 @@
 //! Lint rules based on token traversal.
 
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};
@@ -107,8 +108,7 @@ pub fn check_tokens(
                     locator,
                     *start,
                     *end,
-                    matches!(autofix, flags::Autofix::Enabled)
-                        && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
+                    autofix.into() && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
                 ));
             }
         }
@@ -117,7 +117,7 @@ pub fn check_tokens(
     // E701, E702, E703
     if enforce_compound_statements {
         diagnostics.extend(
-            pycodestyle::rules::compound_statements(tokens)
+            pycodestyle::rules::compound_statements(tokens, settings, autofix)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );

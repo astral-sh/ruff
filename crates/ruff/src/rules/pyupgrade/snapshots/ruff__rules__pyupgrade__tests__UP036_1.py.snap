@@ -11,8 +11,7 @@ expression: diagnostics
     row: 6
     column: 5
   fix:
-    content:
-      - "3"
+    content: "3"
     location:
       row: 3
       column: 0
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 11
     column: 5
   fix:
-    content:
-      - "3"
+    content: "3"
     location:
       row: 8
       column: 0
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 16
     column: 5
   fix:
-    content:
-      - "3"
+    content: "3"
     location:
       row: 13
       column: 0
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 21
     column: 5
   fix:
-    content:
-      - "3"
+    content: "3"
     location:
       row: 18
       column: 0
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 26
     column: 5
   fix:
-    content:
-      - "3"
+    content: "3"
     location:
       row: 23
       column: 0
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 31
     column: 5
   fix:
-    content:
-      - "3"
+    content: "3"
     location:
       row: 28
       column: 0
@@ -119,8 +113,7 @@ expression: diagnostics
     row: 38
     column: 5
   fix:
-    content:
-      - "3"
+    content: "3"
     location:
       row: 35
       column: 0
@@ -137,8 +130,7 @@ expression: diagnostics
     row: 45
     column: 12
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 42
       column: 0
@@ -155,9 +147,7 @@ expression: diagnostics
     row: 52
     column: 12
   fix:
-    content:
-      - "else:"
-      - "    print(3)"
+    content: "else:\n    print(3)"
     location:
       row: 49
       column: 0
@@ -174,9 +164,7 @@ expression: diagnostics
     row: 57
     column: 12
   fix:
-    content:
-      - "else:"
-      - "    print(3)"
+    content: "else:\n    print(3)"
     location:
       row: 56
       column: 0
@@ -193,9 +181,7 @@ expression: diagnostics
     row: 63
     column: 16
   fix:
-    content:
-      - "else:"
-      - "        print(3)"
+    content: "else:\n        print(3)"
     location:
       row: 62
       column: 4
@@ -212,8 +198,7 @@ expression: diagnostics
     row: 70
     column: 12
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 67
       column: 0
@@ -230,9 +215,7 @@ expression: diagnostics
     row: 76
     column: 16
   fix:
-    content:
-      - "else:"
-      - "        print(3)"
+    content: "else:\n        print(3)"
     location:
       row: 75
       column: 4

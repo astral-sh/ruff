@@ -7,17 +7,19 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::settings;
     use crate::settings::resolve_per_file_ignores;
     use crate::settings::types::PerFileIgnore;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::KeywordArgumentBeforeStarArgument, Path::new("RUF004.py"); "RUF004")]
     #[test_case(Rule::UnpackInsteadOfConcatenatingToCollectionLiteral, Path::new("RUF005.py"); "RUF005")]
+    #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"); "RUF006")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -101,6 +103,16 @@ mod tests {
     fn ruff_noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_noqa.py"),
+            &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_targeted_noqa() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/ruff_targeted_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
         assert_yaml_snapshot!(diagnostics);

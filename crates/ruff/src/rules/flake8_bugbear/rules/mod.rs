@@ -10,6 +10,7 @@ pub use cannot_raise_literal::{cannot_raise_literal, CannotRaiseLiteral};
 pub use duplicate_exceptions::{
     duplicate_exceptions, DuplicateHandlerException, DuplicateTryBlockException,
 };
+pub use except_with_empty_tuple::{except_with_empty_tuple, ExceptWithEmptyTuple};
 pub use f_string_docstring::{f_string_docstring, FStringDocstring};
 pub use function_call_argument_default::{
     function_call_argument_default, FunctionCallArgumentDefault,
@@ -40,6 +41,10 @@ pub use useless_contextlib_suppress::{useless_contextlib_suppress, UselessContex
 pub use useless_expression::{useless_expression, UselessExpression};
 pub use zip_without_explicit_strict::{zip_without_explicit_strict, ZipWithoutExplicitStrict};
 
+pub use unintentional_type_annotation::{
+    unintentional_type_annotation, UnintentionalTypeAnnotation,
+};
+
 mod abstract_base_class;
 mod assert_false;
 mod assert_raises_exception;
@@ -47,6 +52,7 @@ mod assignment_to_os_environ;
 mod cached_instance_method;
 mod cannot_raise_literal;
 mod duplicate_exceptions;
+mod except_with_empty_tuple;
 mod f_string_docstring;
 mod function_call_argument_default;
 mod function_uses_loop_variable;
@@ -60,6 +66,7 @@ mod setattr_with_constant;
 mod star_arg_unpacking_after_keyword_arg;
 mod strip_with_multi_characters;
 mod unary_prefix_increment;
+mod unintentional_type_annotation;
 mod unreliable_callable_check;
 mod unused_loop_control_variable;
 mod useless_comparison;

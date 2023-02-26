@@ -1,6 +1,7 @@
 /// See: [eradicate.py](https://github.com/myint/eradicate/blob/98f199940979c94447a461d50d27862b118b282d/eradicate.py)
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rustpython_parser as parser;
 
 static ALLOWLIST_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -77,7 +78,7 @@ pub fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
     }
 
     // Finally, compile the source code.
-    rustpython_parser::parser::parse_program(&line, "<filename>").is_ok()
+    parser::parse_program(&line, "<filename>").is_ok()
 }
 
 /// Returns `true` if a line is probably part of some multiline code.

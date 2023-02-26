@@ -3,6 +3,8 @@ import os
 import posix
 from posix import abort
 import sys as std_sys
+import typing
+import typing_extensions
 import _thread
 import _winapi
 
@@ -77,7 +79,7 @@ def x(y):
 
 # last line in while loop
 def x(y):
-    while True:
+    while i > 0:
         if y > 0:
             return 1
         y += 1
@@ -211,6 +213,18 @@ def noreturn_sys_exit():
     std_sys.exit(0)
 
 
+def noreturn_typing_assert_never():
+    if x > 0:
+        return 1
+    typing.assert_never(0)
+
+
+def noreturn_typing_extensions_assert_never():
+    if x > 0:
+        return 1
+    typing_extensions.assert_never(0)
+
+
 def noreturn__thread_exit():
     if x > 0:
         return 1
@@ -251,3 +265,31 @@ def noreturn_pytest_xfail_2():
     if x > 0:
         return 1
     py_xfail("oof")
+
+
+def nested(values):
+    if not values:
+        return False
+
+    for value in values:
+        print(value)
+
+
+def while_true():
+    while True:
+        if y > 0:
+            return 1
+        y += 1
+
+
+# match
+def x(y):
+    match y:
+        case 0:
+            return 1
+        case 1:
+            print()  # error
+
+
+def foo(baz: str) -> str:
+    return baz

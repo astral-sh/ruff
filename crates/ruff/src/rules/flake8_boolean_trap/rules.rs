@@ -1,6 +1,8 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
+use ruff_macros::{define_violation, derive_message_formats};
+
+use crate::ast::helpers::collect_call_path;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, DiagnosticKind};
@@ -50,6 +52,13 @@ const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "pop",
     "setattr",
     "setdefault",
+    "str",
+    "bytes",
+    "int",
+    "float",
+    "getint",
+    "getfloat",
+    "getboolean",
 ];
 
 const FUNC_DEF_NAME_ALLOWLIST: &[&str] = &["__setitem__"];
@@ -87,10 +96,23 @@ fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
     }
 }
 
-pub fn check_positional_boolean_in_def(checker: &mut Checker, name: &str, arguments: &Arguments) {
+pub fn check_positional_boolean_in_def(
+    checker: &mut Checker,
+    name: &str,
+    decorator_list: &[Expr],
+    arguments: &Arguments,
+) {
     if FUNC_DEF_NAME_ALLOWLIST.contains(&name) {
         return;
     }
+
+    if decorator_list.iter().any(|expr| {
+        let call_path = collect_call_path(expr);
+        call_path.as_slice() == [name, "setter"]
+    }) {
+        return;
+    }
+
     for arg in arguments.posonlyargs.iter().chain(arguments.args.iter()) {
         if arg.node.annotation.is_none() {
             continue;
@@ -121,11 +143,20 @@ pub fn check_positional_boolean_in_def(checker: &mut Checker, name: &str, argume
 pub fn check_boolean_default_value_in_function_definition(
     checker: &mut Checker,
     name: &str,
+    decorator_list: &[Expr],
     arguments: &Arguments,
 ) {
     if FUNC_DEF_NAME_ALLOWLIST.contains(&name) {
         return;
     }
+
+    if decorator_list.iter().any(|expr| {
+        let call_path = collect_call_path(expr);
+        call_path.as_slice() == [name, "setter"]
+    }) {
+        return;
+    }
+
     for arg in &arguments.defaults {
         add_if_boolean(checker, arg, BooleanDefaultValueInFunctionDefinition.into());
     }

@@ -11,8 +11,7 @@ expression: diagnostics
     row: 2
     column: 13
   fix:
-    content:
-      - "\"foo\""
+    content: "\"foo\""
     location:
       row: 2
       column: 6
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 5
     column: 26
   fix:
-    content:
-      - "\"hell((goodybe))o\""
+    content: "\"hell((goodybe))o\""
     location:
       row: 5
       column: 6
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 8
     column: 15
   fix:
-    content:
-      - "(\"foo\")"
+    content: "(\"foo\")"
     location:
       row: 8
       column: 6
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 11
     column: 13
   fix:
-    content:
-      - ((1))
+    content: ((1))
     location:
       row: 11
       column: 6
@@ -83,8 +79,7 @@ expression: diagnostics
     row: 14
     column: 25
   fix:
-    content:
-      - "\"foo{}\".format(1)"
+    content: "\"foo{}\".format(1)"
     location:
       row: 14
       column: 6
@@ -101,8 +96,7 @@ expression: diagnostics
     row: 18
     column: 23
   fix:
-    content:
-      - "\"foo{}\".format(1)"
+    content: "\"foo{}\".format(1)"
     location:
       row: 18
       column: 4
@@ -119,10 +113,7 @@ expression: diagnostics
     row: 25
     column: 5
   fix:
-    content:
-      - ""
-      - "        \"foo\""
-      - "    "
+    content: "\n        \"foo\"\n    "
     location:
       row: 23
       column: 4
@@ -139,8 +130,7 @@ expression: diagnostics
     row: 30
     column: 23
   fix:
-    content:
-      - (yield 1)
+    content: (yield 1)
     location:
       row: 30
       column: 12
@@ -157,8 +147,7 @@ expression: diagnostics
     row: 35
     column: 27
   fix:
-    content:
-      - "\"foo{}\".format(1)"
+    content: "\"foo{}\".format(1)"
     location:
       row: 35
       column: 8
@@ -175,8 +164,7 @@ expression: diagnostics
     row: 39
     column: 27
   fix:
-    content:
-      - x for x in range(3)
+    content: x for x in range(3)
     location:
       row: 39
       column: 6

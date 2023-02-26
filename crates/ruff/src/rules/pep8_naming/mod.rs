@@ -8,12 +8,13 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
+    use crate::settings;
     use crate::test::test_path;
-    use crate::{assert_yaml_snapshot, settings};
 
     #[test_case(Rule::InvalidClassName, Path::new("N801.py"); "N801")]
     #[test_case(Rule::InvalidFunctionName, Path::new("N802.py"); "N802")]
@@ -30,11 +31,26 @@ mod tests {
     #[test_case(Rule::MixedCaseVariableInGlobalScope, Path::new("N816.py"); "N816")]
     #[test_case(Rule::CamelcaseImportedAsAcronym, Path::new("N817.py"); "N817")]
     #[test_case(Rule::ErrorSuffixOnExceptionName, Path::new("N818.py"); "N818")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/mod with spaces/__init__.py"); "N999_1")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/mod with spaces/file.py"); "N999_2")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/flake9/__init__.py"); "N999_3")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/MODULE/__init__.py"); "N999_4")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/MODULE/file.py"); "N999_5")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/mod-with-dashes/__init__.py"); "N999_6")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__init__.py"); "N999_7")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/no_module/test.txt"); "N999_8")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes.py"); "N999_9")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__main__.py"); "N999_10")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/0001_initial.py"); "N999_11")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__setup__.py"); "N999_12")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes"); "N999_13")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pep8_naming").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::Settings {
+                ..settings::Settings::for_rule(rule_code)
+            },
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())

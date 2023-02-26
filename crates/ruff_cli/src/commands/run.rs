@@ -10,10 +10,10 @@ use log::{debug, error};
 use rayon::prelude::*;
 
 use ruff::message::{Location, Message};
-use ruff::registry::Rule;
+use ruff::registry::{Diagnostic, Rule};
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
-use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError};
+use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError, Range};
 
 use crate::args::Overrides;
 use crate::cache;
@@ -40,24 +40,23 @@ pub fn run(
     }
 
     // Initialize the cache.
-    if matches!(cache, flags::Cache::Enabled) {
+    if cache.into() {
+        fn init_cache(path: &std::path::Path) {
+            if let Err(e) = cache::init(path) {
+                error!(
+                    "Failed to initialize cache at {}: {e:?}",
+                    path.to_string_lossy()
+                );
+            }
+        }
+
         match &pyproject_strategy {
             PyprojectDiscovery::Fixed(settings) => {
-                if let Err(e) = cache::init(&settings.cli.cache_dir) {
-                    error!(
-                        "Failed to initialize cache at {}: {e:?}",
-                        settings.cli.cache_dir.to_string_lossy()
-                    );
-                }
+                init_cache(&settings.cli.cache_dir);
             }
             PyprojectDiscovery::Hierarchical(default) => {
                 for settings in std::iter::once(default).chain(resolver.iter()) {
-                    if let Err(e) = cache::init(&settings.cli.cache_dir) {
-                        error!(
-                            "Failed to initialize cache at {}: {e:?}",
-                            settings.cli.cache_dir.to_string_lossy()
-                        );
-                    }
+                    init_cache(&settings.cli.cache_dir);
                 }
             }
         }
@@ -108,14 +107,15 @@ pub fn run(
                     );
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(&Rule::IOError) {
-                        Diagnostics::new(vec![Message {
-                            kind: IOError { message }.into(),
-                            location: Location::default(),
-                            end_location: Location::default(),
-                            fix: None,
-                            filename: format!("{}", path.display()),
-                            source: None,
-                        }])
+                        Diagnostics::new(vec![Message::from_diagnostic(
+                            Diagnostic::new(
+                                IOError { message },
+                                Range::new(Location::default(), Location::default()),
+                            ),
+                            format!("{}", path.display()),
+                            None,
+                            1,
+                        )])
                     } else {
                         Diagnostics::default()
                     }

@@ -1,9 +1,9 @@
 use ruff_macros::{define_violation, derive_message_formats};
+use ruff_python::str::TRIPLE_QUOTE_PREFIXES;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
-use crate::docstrings::constants;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;
 use crate::message::Location;
@@ -54,7 +54,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     {
         return;
     };
-    if constants::TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
+    if TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
         if checker
             .settings
             .rules
@@ -105,11 +105,10 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                     | DefinitionKind::NestedFunction(parent)
                     | DefinitionKind::Method(parent) = &docstring.kind
                     {
-                        let parent_indentation =
-                            checker.locator.slice_source_code_range(&Range::new(
-                                Location::new(parent.location.row(), 0),
-                                Location::new(parent.location.row(), parent.location.column()),
-                            ));
+                        let parent_indentation = checker.locator.slice(&Range::new(
+                            Location::new(parent.location.row(), 0),
+                            Location::new(parent.location.row(), parent.location.column()),
+                        ));
                         if parent_indentation.chars().all(char::is_whitespace) {
                             indentation.clear();
                             indentation.push_str(parent_indentation);

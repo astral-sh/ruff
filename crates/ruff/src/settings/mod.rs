@@ -15,10 +15,10 @@ use crate::cache::cache_dir;
 use crate::registry::{Rule, RuleNamespace, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
-    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
+    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
+    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
+    isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat};
@@ -110,11 +110,13 @@ pub struct Settings {
     pub flake8_bandit: flake8_bandit::settings::Settings,
     pub flake8_bugbear: flake8_bugbear::settings::Settings,
     pub flake8_builtins: flake8_builtins::settings::Settings,
+    pub flake8_comprehensions: flake8_comprehensions::settings::Settings,
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
     pub flake8_implicit_str_concat: flake8_implicit_str_concat::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
+    pub flake8_self: flake8_self::settings::Settings,
     pub flake8_tidy_imports: flake8_tidy_imports::Settings,
     pub flake8_type_checking: flake8_type_checking::settings::Settings,
     pub flake8_unused_arguments: flake8_unused_arguments::settings::Settings,
@@ -187,6 +189,10 @@ impl Settings {
             flake8_bandit: config.flake8_bandit.map(Into::into).unwrap_or_default(),
             flake8_bugbear: config.flake8_bugbear.map(Into::into).unwrap_or_default(),
             flake8_builtins: config.flake8_builtins.map(Into::into).unwrap_or_default(),
+            flake8_comprehensions: config
+                .flake8_comprehensions
+                .map(Into::into)
+                .unwrap_or_default(),
             flake8_errmsg: config.flake8_errmsg.map(Into::into).unwrap_or_default(),
             flake8_implicit_str_concat: config
                 .flake8_implicit_str_concat
@@ -201,6 +207,7 @@ impl Settings {
                 .map(Into::into)
                 .unwrap_or_default(),
             flake8_quotes: config.flake8_quotes.map(Into::into).unwrap_or_default(),
+            flake8_self: config.flake8_self.map(Into::into).unwrap_or_default(),
             flake8_tidy_imports: config
                 .flake8_tidy_imports
                 .map(Into::into)
@@ -458,7 +465,9 @@ mod tests {
         }]);
 
         let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
             Rule::NoNewLineAtEndOfFile,
+            Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
         ]);
@@ -476,7 +485,12 @@ mod tests {
             ignore: vec![codes::Pycodestyle::W292.into()],
             ..RuleSelection::default()
         }]);
-        let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
+        let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
+            Rule::BlankLineContainsWhitespace,
+            Rule::DocLineTooLong,
+            Rule::InvalidEscapeSequence,
+        ]);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([RuleSelection {
@@ -507,7 +521,9 @@ mod tests {
             },
         ]);
         let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
             Rule::NoNewLineAtEndOfFile,
+            Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
         ]);
@@ -542,7 +558,12 @@ mod tests {
                 ..RuleSelection::default()
             },
         ]);
-        let expected = FxHashSet::from_iter([Rule::DocLineTooLong, Rule::InvalidEscapeSequence]);
+        let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
+            Rule::BlankLineContainsWhitespace,
+            Rule::DocLineTooLong,
+            Rule::InvalidEscapeSequence,
+        ]);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([
@@ -557,7 +578,11 @@ mod tests {
                 ..RuleSelection::default()
             },
         ]);
-        let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
+        let expected = FxHashSet::from_iter([
+            Rule::TrailingWhitespace,
+            Rule::BlankLineContainsWhitespace,
+            Rule::InvalidEscapeSequence,
+        ]);
         assert_eq!(actual, expected);
     }
 }

@@ -4,8 +4,7 @@ use anyhow::{anyhow, Result};
 use log::error;
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
-use rustpython_parser::lexer;
-use rustpython_parser::token::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
@@ -135,15 +134,14 @@ fn create_check(
 }
 
 fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Fix> {
-    let content =
-        locator.slice_source_code_range(&Range::new(expr.location, expr.end_location.unwrap()));
+    let content = locator.slice(&Range::new(expr.location, expr.end_location.unwrap()));
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
     let mut fix_start: Option<Location> = None;
     let mut fix_end: Option<Location> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (start, tok, end) in lexer::make_tokenizer_located(content, expr.location).flatten() {
+    for (start, tok, end) in lexer::lex_located(content, Mode::Module, expr.location).flatten() {
         if start == mode_param.location {
             if is_first_arg {
                 delete_first_arg = true;

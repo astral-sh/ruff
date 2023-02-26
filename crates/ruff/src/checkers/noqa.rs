@@ -1,5 +1,6 @@
 //! `NoQA` enforcement and validation.
 
+use log::warn;
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
@@ -7,7 +8,7 @@ use crate::ast::types::Range;
 use crate::codes::NoqaCode;
 use crate::fix::Fix;
 use crate::noqa;
-use crate::noqa::{is_file_exempt, Directive};
+use crate::noqa::{extract_file_exemption, Directive, Exemption};
 use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
@@ -21,17 +22,38 @@ pub fn check_noqa(
     settings: &Settings,
     autofix: flags::Autofix,
 ) {
-    let mut noqa_directives: IntMap<usize, (Directive, Vec<NoqaCode>)> = IntMap::default();
-    let mut ignored = vec![];
-
     let enforce_noqa = settings.rules.enabled(&Rule::UnusedNOQA);
+
+    // Whether the file is exempted from all checks.
+    let mut file_exempted = false;
+
+    // Codes that are globally exempted (within the current file).
+    let mut file_exemptions: Vec<NoqaCode> = vec![];
+
+    // Map from line number to `noqa` directive on that line, along with any codes
+    // that were matched by the directive.
+    let mut noqa_directives: IntMap<usize, (Directive, Vec<NoqaCode>)> = IntMap::default();
+
+    // Indices of diagnostics that were ignored by a `noqa` directive.
+    let mut ignored_diagnostics = vec![];
 
     let lines: Vec<&str> = contents.lines().collect();
     for lineno in commented_lines {
-        // If we hit an exemption for the entire file, bail.
-        if is_file_exempt(lines[lineno - 1]) {
-            diagnostics.drain(..);
-            return;
+        match extract_file_exemption(lines[lineno - 1]) {
+            Exemption::All => {
+                file_exempted = true;
+            }
+            Exemption::Codes(codes) => {
+                file_exemptions.extend(codes.into_iter().filter_map(|code| {
+                    if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code)) {
+                        Some(rule.noqa_code())
+                    } else {
+                        warn!("Invalid code provided to `# ruff: noqa`: {}", code);
+                        None
+                    }
+                }));
+            }
+            Exemption::None => {}
         }
 
         if enforce_noqa {
@@ -47,6 +69,20 @@ pub fn check_noqa(
             continue;
         }
 
+        // If the file is exempted, ignore all diagnostics.
+        if file_exempted {
+            ignored_diagnostics.push(index);
+            continue;
+        }
+
+        // If the diagnostic is ignored by a global exemption, ignore it.
+        if !file_exemptions.is_empty() {
+            if file_exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
+                ignored_diagnostics.push(index);
+                continue;
+            }
+        }
+
         // Is the violation ignored by a `noqa` directive on the parent line?
         if let Some(parent_lineno) = diagnostic.parent.map(|location| location.row()) {
             let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
@@ -57,13 +93,13 @@ pub fn check_noqa(
                 match noqa {
                     (Directive::All(..), matches) => {
                         matches.push(diagnostic.kind.rule().noqa_code());
-                        ignored.push(index);
+                        ignored_diagnostics.push(index);
                         continue;
                     }
                     (Directive::Codes(.., codes), matches) => {
                         if noqa::includes(diagnostic.kind.rule(), codes) {
                             matches.push(diagnostic.kind.rule().noqa_code());
-                            ignored.push(index);
+                            ignored_diagnostics.push(index);
                             continue;
                         }
                     }
@@ -84,12 +120,14 @@ pub fn check_noqa(
             match noqa {
                 (Directive::All(..), matches) => {
                     matches.push(diagnostic.kind.rule().noqa_code());
-                    ignored.push(index);
+                    ignored_diagnostics.push(index);
+                    continue;
                 }
                 (Directive::Codes(.., codes), matches) => {
                     if noqa::includes(diagnostic.kind.rule(), codes) {
                         matches.push(diagnostic.kind.rule().noqa_code());
-                        ignored.push(index);
+                        ignored_diagnostics.push(index);
+                        continue;
                     }
                 }
                 (Directive::None, ..) => {}
@@ -110,9 +148,7 @@ pub fn check_noqa(
                             UnusedNOQA { codes: None },
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
-                        if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(diagnostic.kind.rule())
-                        {
+                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::deletion(
                                 Location::new(row + 1, start - spaces),
                                 Location::new(row + 1, lines[row].chars().count()),
@@ -179,9 +215,7 @@ pub fn check_noqa(
                             },
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
-                        if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(diagnostic.kind.rule())
-                        {
+                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
                                 diagnostic.amend(Fix::deletion(
                                     Location::new(row + 1, start - spaces),
@@ -203,8 +237,8 @@ pub fn check_noqa(
         }
     }
 
-    ignored.sort_unstable();
-    for index in ignored.iter().rev() {
+    ignored_diagnostics.sort_unstable();
+    for index in ignored_diagnostics.iter().rev() {
         diagnostics.swap_remove(*index);
     }
 }

@@ -7,11 +7,9 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
     Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
-    Located, Location, Stmt, StmtKind,
+    Located, Location, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
 };
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
-use rustpython_parser::token::StringKind;
+use rustpython_parser::{lexer, Mode, StringKind, Tok};
 use smallvec::{smallvec, SmallVec};
 
 use crate::ast::types::{Binding, BindingKind, CallPath, Range};
@@ -249,6 +247,46 @@ where
     }
 }
 
+pub fn any_over_pattern<F>(pattern: &Pattern, func: &F) -> bool
+where
+    F: Fn(&Expr) -> bool,
+{
+    match &pattern.node {
+        PatternKind::MatchValue { value } => any_over_expr(value, func),
+        PatternKind::MatchSingleton { .. } => false,
+        PatternKind::MatchSequence { patterns } => patterns
+            .iter()
+            .any(|pattern| any_over_pattern(pattern, func)),
+        PatternKind::MatchMapping { keys, patterns, .. } => {
+            keys.iter().any(|key| any_over_expr(key, func))
+                || patterns
+                    .iter()
+                    .any(|pattern| any_over_pattern(pattern, func))
+        }
+        PatternKind::MatchClass {
+            cls,
+            patterns,
+            kwd_patterns,
+            ..
+        } => {
+            any_over_expr(cls, func)
+                || patterns
+                    .iter()
+                    .any(|pattern| any_over_pattern(pattern, func))
+                || kwd_patterns
+                    .iter()
+                    .any(|pattern| any_over_pattern(pattern, func))
+        }
+        PatternKind::MatchStar { .. } => false,
+        PatternKind::MatchAs { pattern, .. } => pattern
+            .as_ref()
+            .map_or(false, |pattern| any_over_pattern(pattern, func)),
+        PatternKind::MatchOr { patterns } => patterns
+            .iter()
+            .any(|pattern| any_over_pattern(pattern, func)),
+    }
+}
+
 pub fn any_over_stmt<F>(stmt: &Stmt, func: &F) -> bool
 where
     F: Fn(&Expr) -> bool,
@@ -391,6 +429,12 @@ where
             handlers,
             orelse,
             finalbody,
+        }
+        | StmtKind::TryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
         } => {
             any_over_body(body, func)
                 || handlers.iter().any(|handler| {
@@ -409,8 +453,21 @@ where
                     .as_ref()
                     .map_or(false, |value| any_over_expr(value, func))
         }
-        // TODO(charlie): Handle match statements.
-        StmtKind::Match { .. } => false,
+        StmtKind::Match { subject, cases } => {
+            any_over_expr(subject, func)
+                || cases.iter().any(|case| {
+                    let MatchCase {
+                        pattern,
+                        guard,
+                        body,
+                    } = case;
+                    any_over_pattern(pattern, func)
+                        || guard
+                            .as_ref()
+                            .map_or(false, |expr| any_over_expr(expr, func))
+                        || any_over_body(body, func)
+                })
+        }
         StmtKind::Import { .. } => false,
         StmtKind::ImportFrom { .. } => false,
         StmtKind::Global { .. } => false,
@@ -596,7 +653,7 @@ pub fn has_comments<T>(located: &Located<T>, locator: &Locator) -> bool {
 
 /// Returns `true` if a [`Range`] includes at least one comment.
 pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
-    for tok in lexer::make_tokenizer(locator.slice_source_code_range(&range)) {
+    for tok in lexer::lex_located(locator.slice(&range), Mode::Module, range.location) {
         match tok {
             Ok((_, tok, _)) => {
                 if matches!(tok, Tok::Comment(..)) {
@@ -756,7 +813,7 @@ pub fn to_relative(absolute: Location, base: Location) -> Location {
 /// Return `true` if a [`Located`] has leading content.
 pub fn match_leading_content<T>(located: &Located<T>, locator: &Locator) -> bool {
     let range = Range::new(Location::new(located.location.row(), 0), located.location);
-    let prefix = locator.slice_source_code_range(&range);
+    let prefix = locator.slice(&range);
     prefix.chars().any(|char| !char.is_whitespace())
 }
 
@@ -766,7 +823,7 @@ pub fn match_trailing_content<T>(located: &Located<T>, locator: &Locator) -> boo
         located.end_location.unwrap(),
         Location::new(located.end_location.unwrap().row() + 1, 0),
     );
-    let suffix = locator.slice_source_code_range(&range);
+    let suffix = locator.slice(&range);
     for char in suffix.chars() {
         if char == '#' {
             return false;
@@ -784,7 +841,7 @@ pub fn match_trailing_comment<T>(located: &Located<T>, locator: &Locator) -> Opt
         located.end_location.unwrap(),
         Location::new(located.end_location.unwrap().row() + 1, 0),
     );
-    let suffix = locator.slice_source_code_range(&range);
+    let suffix = locator.slice(&range);
     for (i, char) in suffix.chars().enumerate() {
         if char == '#' {
             return Some(i);
@@ -798,8 +855,7 @@ pub fn match_trailing_comment<T>(located: &Located<T>, locator: &Locator) -> Opt
 
 /// Return the number of trailing empty lines following a statement.
 pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
-    let suffix =
-        locator.slice_source_code_at(Location::new(stmt.end_location.unwrap().row() + 1, 0));
+    let suffix = locator.skip(Location::new(stmt.end_location.unwrap().row() + 1, 0));
     suffix
         .lines()
         .take_while(|line| line.trim().is_empty())
@@ -808,11 +864,11 @@ pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
 
 /// Return the range of the first parenthesis pair after a given [`Location`].
 pub fn match_parens(start: Location, locator: &Locator) -> Option<Range> {
-    let contents = locator.slice_source_code_at(start);
+    let contents = locator.skip(start);
     let mut fix_start = None;
     let mut fix_end = None;
     let mut count: usize = 0;
-    for (start, tok, end) in lexer::make_tokenizer_located(contents, start).flatten() {
+    for (start, tok, end) in lexer::lex_located(contents, Mode::Module, start).flatten() {
         if matches!(tok, Tok::Lpar) {
             if count == 0 {
                 fix_start = Some(start);
@@ -843,8 +899,9 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> Range {
             | StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }
     ) {
-        let contents = locator.slice_source_code_range(&Range::from_located(stmt));
-        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt.location).flatten() {
+        let contents = locator.slice(&Range::from_located(stmt));
+        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, stmt.location).flatten()
+        {
             if matches!(tok, Tok::Name { .. }) {
                 return Range::new(start, end);
             }
@@ -870,16 +927,18 @@ pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
 }
 
 // Return the ranges of `Name` tokens within a specified node.
-pub fn find_names<T>(located: &Located<T>, locator: &Locator) -> Vec<Range> {
-    let contents = locator.slice_source_code_range(&Range::from_located(located));
-    lexer::make_tokenizer_located(contents, located.location)
+pub fn find_names<'a, T, U>(
+    located: &'a Located<T, U>,
+    locator: &'a Locator,
+) -> impl Iterator<Item = Range> + 'a {
+    let contents = locator.slice(&Range::from_located(located));
+    lexer::lex_located(contents, Mode::Module, located.location)
         .flatten()
         .filter(|(_, tok, _)| matches!(tok, Tok::Name { .. }))
         .map(|(start, _, end)| Range {
             location: start,
             end_location: end,
         })
-        .collect()
 }
 
 /// Return the `Range` of `name` in `Excepthandler`.
@@ -890,9 +949,8 @@ pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> O
     match (name, type_) {
         (Some(_), Some(type_)) => {
             let type_end_location = type_.end_location.unwrap();
-            let contents =
-                locator.slice_source_code_range(&Range::new(type_end_location, body[0].location));
-            let range = lexer::make_tokenizer_located(contents, type_end_location)
+            let contents = locator.slice(&Range::new(type_end_location, body[0].location));
+            let range = lexer::lex_located(contents, Mode::Module, type_end_location)
                 .flatten()
                 .tuple_windows()
                 .find(|(tok, next_tok)| {
@@ -915,11 +973,11 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
             .expect("Expected body to be non-empty")
             .location
     };
-    let contents = locator.slice_source_code_range(&Range {
+    let contents = locator.slice(&Range {
         location: handler.location,
         end_location: end,
     });
-    let range = lexer::make_tokenizer_located(contents, handler.location)
+    let range = lexer::lex_located(contents, Mode::Module, handler.location)
         .flatten()
         .find(|(_, kind, _)| matches!(kind, Tok::Except { .. }))
         .map(|(location, _, end_location)| Range {
@@ -932,15 +990,15 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
 
 /// Find f-strings that don't contain any formatted values in a `JoinedStr`.
 pub fn find_useless_f_strings(expr: &Expr, locator: &Locator) -> Vec<(Range, Range)> {
-    let contents = locator.slice_source_code_range(&Range::from_located(expr));
-    lexer::make_tokenizer_located(contents, expr.location)
+    let contents = locator.slice(&Range::from_located(expr));
+    lexer::lex_located(contents, Mode::Module, expr.location)
         .flatten()
         .filter_map(|(location, tok, end_location)| match tok {
             Tok::String {
                 kind: StringKind::FString | StringKind::RawFString,
                 ..
             } => {
-                let first_char = locator.slice_source_code_range(&Range {
+                let first_char = locator.slice(&Range {
                     location,
                     end_location: Location::new(location.row(), location.column() + 1),
                 });
@@ -980,14 +1038,14 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
                 .expect("Expected body to be non-empty")
                 .end_location
                 .unwrap();
-            let contents = locator.slice_source_code_range(&Range {
+            let contents = locator.slice(&Range {
                 location: body_end,
                 end_location: orelse
                     .first()
                     .expect("Expected orelse to be non-empty")
                     .location,
             });
-            let range = lexer::make_tokenizer_located(contents, body_end)
+            let range = lexer::lex_located(contents, Mode::Module, body_end)
                 .flatten()
                 .find(|(_, kind, _)| matches!(kind, Tok::Else))
                 .map(|(location, _, end_location)| Range {
@@ -1002,8 +1060,8 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
 
 /// Return the `Range` of the first `Tok::Colon` token in a `Range`.
 pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
-    let contents = locator.slice_source_code_range(&range);
-    let range = lexer::make_tokenizer_located(contents, range.location)
+    let contents = locator.slice(&range);
+    let range = lexer::lex_located(contents, Mode::Module, range.location)
         .flatten()
         .find(|(_, kind, _)| matches!(kind, Tok::Colon))
         .map(|(location, _, end_location)| Range {
@@ -1032,8 +1090,8 @@ pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<Range> {
         [stmt, ..] => stmt.location,
         _ => return None,
     };
-    let contents = locator.slice_source_code_range(&Range::new(start, end));
-    let range = lexer::make_tokenizer_located(contents, start)
+    let contents = locator.slice(&Range::new(start, end));
+    let range = lexer::lex_located(contents, Mode::Module, start)
         .flatten()
         .find(|(_, kind, _)| matches!(kind, Tok::Elif | Tok::Else))
         .map(|(location, _, end_location)| Range {
@@ -1149,8 +1207,8 @@ pub fn is_logger_candidate(func: &Expr) -> bool {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use rustpython_parser as parser;
     use rustpython_parser::ast::Location;
-    use rustpython_parser::parser;
 
     use crate::ast::helpers::{
         elif_else_range, else_range, first_colon_range, identifier_range, match_trailing_content,

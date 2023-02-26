@@ -2,6 +2,7 @@ use std::fmt;
 
 use log::error;
 use ruff_macros::{define_violation, derive_message_formats};
+use rustpython_parser as parser;
 use rustpython_parser::ast::{Location, StmtKind, Suite};
 
 use super::super::helpers;
@@ -16,13 +17,15 @@ use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     /// ## What it does
-    /// Adds any required imports, as specified by the user, to the top of the file.
+    /// Adds any required imports, as specified by the user, to the top of the
+    /// file.
     ///
     /// ## Why is this bad?
-    /// In some projects, certain imports are required to be present in all files. For
-    /// example, some projects assume that `from __future__ import annotations` is enabled,
-    /// and thus require that import to be present in all files. Omitting a "required" import
-    /// (as specified by the user) can cause errors or unexpected behavior.
+    /// In some projects, certain imports are required to be present in all
+    /// files. For example, some projects assume that `from __future__
+    /// import annotations` is enabled, and thus require that import to be
+    /// present in all files. Omitting a "required" import (as specified by
+    /// the user) can cause errors or unexpected behavior.
     ///
     /// ## Example
     /// ```python
@@ -163,9 +166,7 @@ fn add_required_import(
         MissingRequiredImport(required_import.clone()),
         Range::new(Location::default(), Location::default()),
     );
-    if matches!(autofix, flags::Autofix::Enabled)
-        && settings.rules.should_fix(&Rule::MissingRequiredImport)
-    {
+    if autofix.into() && settings.rules.should_fix(&Rule::MissingRequiredImport) {
         // Determine the location at which the import should be inserted.
         let splice = helpers::find_splice_location(python_ast, locator);
 
@@ -210,18 +211,26 @@ pub fn add_required_imports(
         .required_imports
         .iter()
         .flat_map(|required_import| {
-            let Ok(body) = rustpython_parser::parser::parse_program(required_import, "<filename>") else {
+            let Ok(body) = parser::parse_program(required_import, "<filename>") else {
                 error!("Failed to parse required import: `{}`", required_import);
                 return vec![];
             };
             if body.is_empty() || body.len() > 1 {
-                error!("Expected require import to contain a single statement: `{}`", required_import);
+                error!(
+                    "Expected require import to contain a single statement: `{}`",
+                    required_import
+                );
                 return vec![];
             }
 
             match &body[0].node {
-                StmtKind::ImportFrom { module, names, level } => {
-                    names.iter().filter_map(|name| {
+                StmtKind::ImportFrom {
+                    module,
+                    names,
+                    level,
+                } => names
+                    .iter()
+                    .filter_map(|name| {
                         add_required_import(
                             &AnyImport::ImportFrom(ImportFrom {
                                 module: module.as_ref().map(String::as_str),
@@ -238,10 +247,11 @@ pub fn add_required_imports(
                             settings,
                             autofix,
                         )
-                    }).collect()
-                }
-                StmtKind::Import { names } => {
-                    names.iter().filter_map(|name| {
+                    })
+                    .collect(),
+                StmtKind::Import { names } => names
+                    .iter()
+                    .filter_map(|name| {
                         add_required_import(
                             &AnyImport::Import(Import {
                                 name: Alias {
@@ -256,10 +266,13 @@ pub fn add_required_imports(
                             settings,
                             autofix,
                         )
-                    }).collect()
-                }
+                    })
+                    .collect(),
                 _ => {
-                    error!("Expected required import to be in import-from style: `{}`", required_import);
+                    error!(
+                        "Expected required import to be in import-from style: `{}`",
+                        required_import
+                    );
                     vec![]
                 }
             }

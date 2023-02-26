@@ -8,7 +8,7 @@ use crate::source_code::Locator;
 /// Extract the leading indentation from a line.
 pub fn indentation<'a, T>(locator: &'a Locator, located: &'a Located<T>) -> Option<&'a str> {
     let range = Range::from_located(located);
-    let indentation = locator.slice_source_code_range(&Range::new(
+    let indentation = locator.slice(&Range::new(
         Location::new(range.location.row(), 0),
         Location::new(range.location.row(), range.location.column()),
     ));

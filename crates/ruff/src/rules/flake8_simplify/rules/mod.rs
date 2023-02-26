@@ -4,10 +4,10 @@ pub use ast_bool_op::{
     ExprAndNotExpr, ExprOrNotExpr, ExprOrTrue,
 };
 pub use ast_expr::{use_capital_environment_variables, UseCapitalEnvironmentVariables};
-pub use ast_for::{convert_for_loop_to_any_all, ConvertLoopToAll, ConvertLoopToAny};
 pub use ast_if::{
-    if_with_same_arms, nested_if_statements, unnecessary_bool_call, use_dict_get_with_default,
-    use_ternary_operator, CollapsibleIf, DictGetWithDefault, IfWithSameArms, UnnecessaryBoolCall,
+    if_with_same_arms, manual_dict_lookup, needless_bool, nested_if_statements,
+    return_bool_condition_directly, use_dict_get_with_default, use_ternary_operator, CollapsibleIf,
+    DictGetWithDefault, IfWithSameArms, ManualDictLookup, NeedlessBool, NeedlessBool,
     UseTernaryOperator,
 };
 pub use ast_ifexp::{
@@ -23,13 +23,13 @@ pub use key_in_dict::{key_in_dict_compare, key_in_dict_for, KeyInDict};
 pub use open_file_with_context_handler::{
     open_file_with_context_handler, OpenFileWithContextHandler,
 };
+pub use reimplemented_builtin::{convert_for_loop_to_any_all, ReimplementedBuiltin};
 pub use return_in_try_except_finally::{return_in_try_except_finally, ReturnInTryExceptFinally};
 pub use use_contextlib_suppress::{use_contextlib_suppress, UseContextlibSuppress};
 pub use yoda_conditions::{yoda_conditions, YodaConditions};
 
 mod ast_bool_op;
 mod ast_expr;
-mod ast_for;
 mod ast_if;
 mod ast_ifexp;
 mod ast_unary_op;
@@ -38,6 +38,7 @@ mod fix_if;
 mod fix_with;
 mod key_in_dict;
 mod open_file_with_context_handler;
+mod reimplemented_builtin;
 mod return_in_try_except_finally;
 mod use_contextlib_suppress;
 mod yoda_conditions;

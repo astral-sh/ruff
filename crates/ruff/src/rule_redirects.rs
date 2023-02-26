@@ -15,6 +15,9 @@ pub(crate) fn get_redirect(code: &str) -> Option<(&'static str, &'static str)> {
 
 static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     HashMap::from_iter([
+        // The following are here because we don't yet have the many-to-one mapping enabled.
+        ("SIM111", "SIM110"),
+        // The following are deprecated.
         ("C", "C4"),
         ("C9", "C90"),
         ("T", "T10"),

@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,11 +11,7 @@ expression: diagnostics
     row: 5
     column: 0
   fix:
-    content:
-      - "from module import CONSTANT, function"
-      - from module import Class as C
-      - from module import function as f
-      - ""
+    content: "from module import CONSTANT, function\nfrom module import Class as C\nfrom module import function as f\n"
     location:
       row: 1
       column: 0

@@ -1,0 +1,225 @@
+---
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    ReimplementedBuiltin:
+      repl: return any(check(x) for x in iterable)
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 5
+    column: 23
+  fix:
+    content: return any(check(x) for x in iterable)
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 6
+      column: 16
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(not check(x) for x in iterable)
+  location:
+    row: 25
+    column: 4
+  end_location:
+    row: 27
+    column: 24
+  fix:
+    content: return all(not check(x) for x in iterable)
+    location:
+      row: 25
+      column: 4
+    end_location:
+      row: 28
+      column: 15
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(x.is_empty() for x in iterable)
+  location:
+    row: 33
+    column: 4
+  end_location:
+    row: 35
+    column: 24
+  fix:
+    content: return all(x.is_empty() for x in iterable)
+    location:
+      row: 33
+      column: 4
+    end_location:
+      row: 36
+      column: 15
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return any(check(x) for x in iterable)
+  location:
+    row: 55
+    column: 4
+  end_location:
+    row: 59
+    column: 20
+  fix:
+    content: return any(check(x) for x in iterable)
+    location:
+      row: 55
+      column: 4
+    end_location:
+      row: 59
+      column: 20
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(not check(x) for x in iterable)
+  location:
+    row: 64
+    column: 4
+  end_location:
+    row: 68
+    column: 19
+  fix:
+    content: return all(not check(x) for x in iterable)
+    location:
+      row: 64
+      column: 4
+    end_location:
+      row: 68
+      column: 19
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return any(check(x) for x in iterable)
+  location:
+    row: 73
+    column: 4
+  end_location:
+    row: 77
+    column: 20
+  fix:
+    content: return any(check(x) for x in iterable)
+    location:
+      row: 73
+      column: 4
+    end_location:
+      row: 77
+      column: 20
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(not check(x) for x in iterable)
+  location:
+    row: 83
+    column: 4
+  end_location:
+    row: 87
+    column: 19
+  fix:
+    content: return all(not check(x) for x in iterable)
+    location:
+      row: 83
+      column: 4
+    end_location:
+      row: 87
+      column: 19
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return any(check(x) for x in iterable)
+  location:
+    row: 124
+    column: 4
+  end_location:
+    row: 126
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(not check(x) for x in iterable)
+  location:
+    row: 134
+    column: 4
+  end_location:
+    row: 136
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return any(check(x) for x in iterable)
+  location:
+    row: 144
+    column: 4
+  end_location:
+    row: 146
+    column: 23
+  fix:
+    content: return any(check(x) for x in iterable)
+    location:
+      row: 144
+      column: 4
+    end_location:
+      row: 147
+      column: 16
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(not check(x) for x in iterable)
+  location:
+    row: 154
+    column: 4
+  end_location:
+    row: 156
+    column: 24
+  fix:
+    content: return all(not check(x) for x in iterable)
+    location:
+      row: 154
+      column: 4
+    end_location:
+      row: 157
+      column: 15
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(x in y for x in iterable)
+  location:
+    row: 162
+    column: 4
+  end_location:
+    row: 164
+    column: 24
+  fix:
+    content: return all(x in y for x in iterable)
+    location:
+      row: 162
+      column: 4
+    end_location:
+      row: 165
+      column: 15
+  parent: ~
+- kind:
+    ReimplementedBuiltin:
+      repl: return all(x <= y for x in iterable)
+  location:
+    row: 170
+    column: 4
+  end_location:
+    row: 172
+    column: 24
+  fix:
+    content: return all(x <= y for x in iterable)
+    location:
+      row: 170
+      column: 4
+    end_location:
+      row: 173
+      column: 15
+  parent: ~
+

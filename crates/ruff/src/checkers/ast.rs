@@ -6,17 +6,17 @@ use std::path::Path;
 use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
-use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_common::cformat::{CFormatError, CFormatErrorType};
-use rustpython_parser::ast::{
-    Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
-    ExprKind, KeywordData, Located, Location, Operator, Stmt, StmtKind, Suite,
-};
-use rustpython_parser::parser;
-use smallvec::smallvec;
-
 use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python::typing::TYPING_EXTENSIONS;
+use rustc_hash::{FxHashMap, FxHashSet};
+use rustpython_common::cformat::{CFormatError, CFormatErrorType};
+use rustpython_parser as parser;
+use rustpython_parser::ast::{
+    Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
+    ExprKind, KeywordData, Located, Location, Operator, Pattern, PatternKind, Stmt, StmtKind,
+    Suite,
+};
+use smallvec::smallvec;
 
 use crate::ast::helpers::{
     binding_range, collect_call_path, extract_handler_names, from_relative_import, to_module_path,
@@ -28,10 +28,11 @@ use crate::ast::types::{
     RefEquality, Scope, ScopeKind,
 };
 use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
-use crate::ast::visitor::{walk_excepthandler, Visitor};
+use crate::ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::registry::{Diagnostic, Rule};
+use crate::resolver::is_interface_definition_path;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
@@ -58,6 +59,7 @@ pub struct Checker<'a> {
     pub(crate) path: &'a Path,
     module_path: Option<Vec<String>>,
     package: Option<&'a Path>,
+    is_interface_definition: bool,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     pub(crate) settings: &'a Settings,
@@ -126,6 +128,7 @@ impl<'a> Checker<'a> {
         style: &'a Stylist,
         indexer: &'a Indexer,
     ) -> Checker<'a> {
+        let is_interface_definition = is_interface_definition_path(path);
         Checker {
             settings,
             noqa_line_for,
@@ -134,6 +137,7 @@ impl<'a> Checker<'a> {
             path,
             package,
             module_path,
+            is_interface_definition,
             locator,
             stylist: style,
             indexer,
@@ -173,7 +177,7 @@ impl<'a> Checker<'a> {
             in_type_checking_block: false,
             seen_import_boundary: false,
             futures_allowed: true,
-            annotations_future_enabled: path.extension().map_or(false, |ext| ext == "pyi"),
+            annotations_future_enabled: is_interface_definition,
             except_handlers: vec![],
             // Check-specific state.
             flake8_bugbear_seen: vec![],
@@ -183,7 +187,7 @@ impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self, code: &Rule) -> bool {
-        matches!(self.autofix, flags::Autofix::Enabled) && self.settings.rules.should_fix(code)
+        self.autofix.into() && self.settings.rules.should_fix(code)
     }
 
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
@@ -225,9 +229,8 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if `member` is bound as a builtin.
     pub fn is_builtin(&self, member: &str) -> bool {
-        self.find_binding(member).map_or(false, |binding| {
-            matches!(binding.kind, BindingKind::Builtin)
-        })
+        self.find_binding(member)
+            .map_or(false, |binding| binding.kind.is_builtin())
     }
 
     pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
@@ -235,51 +238,51 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         let call_path = collect_call_path(value);
-        if let Some(head) = call_path.first() {
-            if let Some(binding) = self.find_binding(head) {
-                match &binding.kind {
-                    BindingKind::Importation(.., name)
-                    | BindingKind::SubmoduleImportation(name, ..) => {
-                        return if name.starts_with('.') {
-                            if let Some(module) = &self.module_path {
-                                let mut source_path = from_relative_import(module, name);
-                                source_path.extend(call_path.into_iter().skip(1));
-                                Some(source_path)
-                            } else {
-                                None
-                            }
-                        } else {
-                            let mut source_path: CallPath = name.split('.').collect();
-                            source_path.extend(call_path.into_iter().skip(1));
-                            Some(source_path)
-                        };
+        let Some(head) = call_path.first() else {
+            return None;
+        };
+        let Some(binding) = self.find_binding(head) else {
+            return None;
+        };
+        match &binding.kind {
+            BindingKind::Importation(.., name) | BindingKind::SubmoduleImportation(name, ..) => {
+                if name.starts_with('.') {
+                    if let Some(module) = &self.module_path {
+                        let mut source_path = from_relative_import(module, name);
+                        source_path.extend(call_path.into_iter().skip(1));
+                        Some(source_path)
+                    } else {
+                        None
                     }
-                    BindingKind::FromImportation(.., name) => {
-                        return if name.starts_with('.') {
-                            if let Some(module) = &self.module_path {
-                                let mut source_path = from_relative_import(module, name);
-                                source_path.extend(call_path.into_iter().skip(1));
-                                Some(source_path)
-                            } else {
-                                None
-                            }
-                        } else {
-                            let mut source_path: CallPath = name.split('.').collect();
-                            source_path.extend(call_path.into_iter().skip(1));
-                            Some(source_path)
-                        };
-                    }
-                    BindingKind::Builtin => {
-                        let mut source_path: CallPath = smallvec![];
-                        source_path.push("");
-                        source_path.extend(call_path);
-                        return Some(source_path);
-                    }
-                    _ => {}
+                } else {
+                    let mut source_path: CallPath = name.split('.').collect();
+                    source_path.extend(call_path.into_iter().skip(1));
+                    Some(source_path)
                 }
             }
+            BindingKind::FromImportation(.., name) => {
+                if name.starts_with('.') {
+                    if let Some(module) = &self.module_path {
+                        let mut source_path = from_relative_import(module, name);
+                        source_path.extend(call_path.into_iter().skip(1));
+                        Some(source_path)
+                    } else {
+                        None
+                    }
+                } else {
+                    let mut source_path: CallPath = name.split('.').collect();
+                    source_path.extend(call_path.into_iter().skip(1));
+                    Some(source_path)
+                }
+            }
+            BindingKind::Builtin => {
+                let mut source_path: CallPath = smallvec![];
+                source_path.push("");
+                source_path.extend(call_path);
+                Some(source_path)
+            }
+            _ => None,
         }
-        None
     }
 
     /// Return `true` if a `Rule` is disabled by a `noqa` directive.
@@ -291,7 +294,7 @@ impl<'a> Checker<'a> {
         // members from the fix that will eventually be excluded by a `noqa`.
         // Unfortunately, we _do_ want to register a `Diagnostic` for each
         // eventually-ignored import, so that our `noqa` counts are accurate.
-        if matches!(self.noqa, flags::Noqa::Disabled) {
+        if !self.noqa.to_bool() {
             return false;
         }
         noqa::rule_is_ignored(code, lineno, self.noqa_line_for, self.locator)
@@ -337,7 +340,7 @@ where
         match &stmt.node {
             StmtKind::Global { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
-                let ranges = helpers::find_names(stmt, self.locator);
+                let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     // Add the binding to the current scope.
                     let context = self.execution_context();
@@ -367,7 +370,7 @@ where
             }
             StmtKind::Nonlocal { names } => {
                 let scope_index = *self.scope_stack.last().expect("No current scope found");
-                let ranges = helpers::find_names(stmt, self.locator);
+                let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     let context = self.execution_context();
                     let scope = &mut self.scopes[scope_index];
@@ -530,6 +533,15 @@ where
                         )
                     {
                         self.diagnostics.push(diagnostic);
+                    }
+                }
+
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                        flake8_pyi::rules::pass_statement_stub_body(self, body);
+                    }
+                    if self.settings.rules.enabled(&Rule::NonEmptyStubBody) {
+                        flake8_pyi::rules::non_empty_stub_body(self, body);
                     }
                 }
 
@@ -702,7 +714,12 @@ where
                     .rules
                     .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
                 {
-                    flake8_boolean_trap::rules::check_positional_boolean_in_def(self, name, args);
+                    flake8_boolean_trap::rules::check_positional_boolean_in_def(
+                        self,
+                        name,
+                        decorator_list,
+                        args,
+                    );
                 }
 
                 if self
@@ -711,7 +728,10 @@ where
                     .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
                 {
                     flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
-                        self, name, args,
+                        self,
+                        name,
+                        decorator_list,
+                        args,
                     );
                 }
 
@@ -775,6 +795,9 @@ where
                 if self.settings.rules.enabled(&Rule::ReturnOutsideFunction) {
                     pyflakes::rules::return_outside_function(self, stmt);
                 }
+                if self.settings.rules.enabled(&Rule::ReturnInInit) {
+                    pylint::rules::return_in_init(self, stmt);
+                }
             }
             StmtKind::ClassDef {
                 name,
@@ -786,7 +809,7 @@ where
                 if self.settings.rules.enabled(&Rule::NullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
-                            self, bases, body,
+                            self, body,
                         ));
                 }
                 if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
@@ -835,18 +858,25 @@ where
                     flake8_bugbear::rules::useless_expression(self, body);
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::AbstractBaseClassWithoutAbstractMethod)
-                    || self
+                if !self.is_interface_definition {
+                    if self
                         .settings
                         .rules
-                        .enabled(&Rule::EmptyMethodWithoutAbstractDecorator)
-                {
-                    flake8_bugbear::rules::abstract_base_class(
-                        self, stmt, name, bases, keywords, body,
-                    );
+                        .enabled(&Rule::AbstractBaseClassWithoutAbstractMethod)
+                        || self
+                            .settings
+                            .rules
+                            .enabled(&Rule::EmptyMethodWithoutAbstractDecorator)
+                    {
+                        flake8_bugbear::rules::abstract_base_class(
+                            self, stmt, name, bases, keywords, body,
+                        );
+                    }
+                }
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                        flake8_pyi::rules::pass_statement_stub_body(self, body);
+                    }
                 }
 
                 if self
@@ -900,7 +930,38 @@ where
                 }
 
                 for alias in names {
-                    if alias.node.name.contains('.') && alias.node.asname.is_none() {
+                    if alias.node.name == "__future__" {
+                        let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
+                        self.add_binding(
+                            name,
+                            Binding {
+                                kind: BindingKind::FutureImportation,
+                                runtime_usage: None,
+                                // Always mark `__future__` imports as used.
+                                synthetic_usage: Some((
+                                    self.scopes[*(self
+                                        .scope_stack
+                                        .last()
+                                        .expect("No current scope found"))]
+                                    .id,
+                                    Range::from_located(alias),
+                                )),
+                                typing_usage: None,
+                                range: Range::from_located(alias),
+                                source: Some(self.current_stmt().clone()),
+                                context: self.execution_context(),
+                            },
+                        );
+
+                        if self.settings.rules.enabled(&Rule::LateFutureImport)
+                            && !self.futures_allowed
+                        {
+                            self.diagnostics.push(Diagnostic::new(
+                                pyflakes::rules::LateFutureImport,
+                                Range::from_located(stmt),
+                            ));
+                        }
+                    } else if alias.node.name.contains('.') && alias.node.asname.is_none() {
                         // Given `import foo.bar`, `name` would be "foo", and `full_name` would be
                         // "foo.bar".
                         let name = alias.node.name.split('.').next().unwrap();
@@ -918,10 +979,6 @@ where
                             },
                         );
                     } else {
-                        if let Some(asname) = &alias.node.asname {
-                            self.check_builtin_shadowing(asname, stmt, false);
-                        }
-
                         // Given `import foo`, `name` and `full_name` would both be `foo`.
                         // Given `import foo as bar`, `name` would be `bar` and `full_name` would
                         // be `foo`.
@@ -957,6 +1014,10 @@ where
                                 context: self.execution_context(),
                             },
                         );
+
+                        if let Some(asname) = &alias.node.asname {
+                            self.check_builtin_shadowing(asname, stmt, false);
+                        }
                     }
 
                     // flake8-debugger
@@ -1522,8 +1583,11 @@ where
                         self.current_stmt_parent().map(std::convert::Into::into),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UnnecessaryBoolCall) {
-                    flake8_simplify::rules::unnecessary_bool_call(self, stmt);
+                if self.settings.rules.enabled(&Rule::NeedlessBool) {
+                    flake8_simplify::rules::needless_bool(self, stmt);
+                }
+                if self.settings.rules.enabled(&Rule::ManualDictLookup) {
+                    flake8_simplify::rules::manual_dict_lookup(self, stmt, test, body, orelse);
                 }
                 if self.settings.rules.enabled(&Rule::UseTernaryOperator) {
                     flake8_simplify::rules::use_ternary_operator(
@@ -1572,11 +1636,12 @@ where
                     }
                 }
                 if self.settings.rules.enabled(&Rule::CompositeAssertion) {
-                    if let Some(diagnostic) =
-                        flake8_pytest_style::rules::composite_condition(stmt, test)
-                    {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_pytest_style::rules::composite_condition(
+                        self,
+                        stmt,
+                        test,
+                        msg.as_deref(),
+                    );
                 }
             }
             StmtKind::With { items, body, .. } => {
@@ -1597,6 +1662,9 @@ where
                         body,
                         self.current_stmt_parent().map(Into::into),
                     );
+                }
+                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
             }
             StmtKind::While { body, orelse, .. } => {
@@ -1642,10 +1710,11 @@ where
                 if self.settings.rules.enabled(&Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
+                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                    pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
+                }
                 if matches!(stmt.node, StmtKind::For { .. }) {
-                    if self.settings.rules.enabled(&Rule::ConvertLoopToAny)
-                        || self.settings.rules.enabled(&Rule::ConvertLoopToAll)
-                    {
+                    if self.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
@@ -1658,6 +1727,13 @@ where
                 }
             }
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,
@@ -1713,6 +1789,9 @@ where
                 if self.settings.rules.enabled(&Rule::VerboseRaise) {
                     tryceratops::rules::verbose_raise(self, handlers);
                 }
+                if self.settings.rules.enabled(&Rule::VerboseLogMessage) {
+                    tryceratops::rules::verbose_log_message(self, handlers);
+                }
                 if self.settings.rules.enabled(&Rule::RaiseWithinTry) {
                     tryceratops::rules::raise_within_try(self, body);
                 }
@@ -1739,8 +1818,8 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::PrefixTypeParams) {
-                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PrefixTypeParams) {
                         flake8_pyi::rules::prefix_type_params(self, value, targets);
                     }
                 }
@@ -1782,6 +1861,18 @@ where
                         pycodestyle::rules::lambda_assignment(self, target, value, stmt);
                     }
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnintentionalTypeAnnotation)
+                {
+                    flake8_bugbear::rules::unintentional_type_annotation(
+                        self,
+                        target,
+                        value.as_deref(),
+                        stmt,
+                    );
+                }
             }
             StmtKind::Delete { .. } => {}
             StmtKind::Expr { value, .. } => {
@@ -1794,6 +1885,13 @@ where
                     .enabled(&Rule::UseCapitalEnvironmentVariables)
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, value);
+                }
+                if self.settings.rules.enabled(&Rule::AsyncioDanglingTask) {
+                    if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
+                        self.resolve_call_path(expr)
+                    }) {
+                        self.diagnostics.push(diagnostic);
+                    }
                 }
             }
             _ => {}
@@ -1843,9 +1941,7 @@ where
                     if self.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| {
-                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        })
+                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
                     {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
@@ -1907,9 +2003,7 @@ where
                     if self.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| {
-                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        })
+                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
                     {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
@@ -1936,6 +2030,12 @@ where
                 self.visit_body(body);
             }
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,
@@ -1968,8 +2068,8 @@ where
                 value,
                 ..
             } => {
-                // If we're in a class or module scope, then the annotation needs to be available
-                // at runtime.
+                // If we're in a class or module scope, then the annotation needs to be
+                // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 if !self.annotations_future_enabled
                     && matches!(
@@ -2086,8 +2186,9 @@ where
         // Pre-visit.
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
-                // Ex) Optional[...]
-                if !self.in_deferred_string_type_definition
+                // Ex) Optional[...], Union[...]
+                if self.in_type_definition
+                    && !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(&Rule::TypingUnion)
                     && (self.settings.target_version >= PythonVersion::Py310
@@ -2399,6 +2500,13 @@ where
                 if self.settings.rules.enabled(&Rule::UnnecessaryDictKwargs) {
                     flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::UnnecessaryComprehensionAnyAll)
+                {
+                    flake8_pie::rules::unnecessary_comprehension_any_all(self, expr, func, args);
+                }
 
                 // flake8-bandit
                 if self.settings.rules.enabled(&Rule::ExecBuiltin) {
@@ -2519,7 +2627,12 @@ where
                     .enabled(&Rule::UnnecessaryCollectionCall)
                 {
                     flake8_comprehensions::rules::unnecessary_collection_call(
-                        self, expr, func, args, keywords,
+                        self,
+                        expr,
+                        func,
+                        args,
+                        keywords,
+                        &self.settings.flake8_comprehensions,
                     );
                 }
                 if self
@@ -2804,6 +2917,11 @@ where
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
                 }
 
+                // numpy
+                if self.settings.rules.enabled(&Rule::NumpyLegacyRandom) {
+                    numpy::rules::numpy_legacy_random(self, func);
+                }
+
                 // flake8-logging-format
                 if self.settings.rules.enabled(&Rule::LoggingStringFormat)
                     || self.settings.rules.enabled(&Rule::LoggingPercentFormat)
@@ -2815,6 +2933,13 @@ where
                     || self.settings.rules.enabled(&Rule::LoggingRedundantExcInfo)
                 {
                     flake8_logging_format::rules::logging_call(self, func, args, keywords);
+                }
+
+                // pylint logging checker
+                if self.settings.rules.enabled(&Rule::LoggingTooFewArgs)
+                    || self.settings.rules.enabled(&Rule::LoggingTooManyArgs)
+                {
+                    pylint::rules::logging_call(self, func, args, keywords);
                 }
             }
             ExprKind::Dict { keys, values } => {
@@ -3167,13 +3292,13 @@ where
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::UnrecognizedPlatformCheck)
-                    || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
-                {
-                    if self.path.extension().map_or(false, |ext| ext == "pyi") {
+                if self.is_interface_definition {
+                    if self
+                        .settings
+                        .rules
+                        .enabled(&Rule::UnrecognizedPlatformCheck)
+                        || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
+                    {
                         flake8_pyi::rules::unrecognized_platform(
                             self,
                             expr,
@@ -3646,6 +3771,9 @@ where
                         self.settings.flake8_bandit.check_typed_exception,
                     );
                 }
+                if self.settings.rules.enabled(&Rule::ExceptWithEmptyTuple) {
+                    flake8_bugbear::rules::except_with_empty_tuple(self, excepthandler);
+                }
                 if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
@@ -3742,6 +3870,32 @@ where
         }
     }
 
+    fn visit_pattern(&mut self, pattern: &'b Pattern) {
+        if let PatternKind::MatchAs {
+            name: Some(name), ..
+        }
+        | PatternKind::MatchStar { name: Some(name) }
+        | PatternKind::MatchMapping {
+            rest: Some(name), ..
+        } = &pattern.node
+        {
+            self.add_binding(
+                name,
+                Binding {
+                    kind: BindingKind::Assignment,
+                    runtime_usage: None,
+                    synthetic_usage: None,
+                    typing_usage: None,
+                    range: Range::from_located(pattern),
+                    source: Some(self.current_stmt().clone()),
+                    context: self.execution_context(),
+                },
+            );
+        }
+
+        walk_pattern(self, pattern);
+    }
+
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
         match &format_spec.node {
             ExprKind::JoinedStr { values } => {
@@ -3774,6 +3928,21 @@ where
             .enabled(&Rule::FunctionCallArgumentDefault)
         {
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
+        }
+
+        if self.is_interface_definition {
+            if self
+                .settings
+                .rules
+                .enabled(&Rule::TypedArgumentSimpleDefaults)
+            {
+                flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
+            }
+        }
+        if self.is_interface_definition {
+            if self.settings.rules.enabled(&Rule::ArgumentSimpleDefaults) {
+                flake8_pyi::rules::argument_simple_defaults(self, arguments);
+            }
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
@@ -3992,7 +4161,7 @@ impl<'a> Checker<'a> {
             let existing_binding_index = self.scopes[*scope_index].bindings.get(&name).unwrap();
             let existing = &self.bindings[*existing_binding_index];
             let in_current_scope = stack_index == 0;
-            if !matches!(existing.kind, BindingKind::Builtin)
+            if !existing.kind.is_builtin()
                 && existing.source.as_ref().map_or(true, |left| {
                     binding.source.as_ref().map_or(true, |right| {
                         !branch_detection::different_forks(
@@ -4012,7 +4181,7 @@ impl<'a> Checker<'a> {
                         | BindingKind::StarImportation(..)
                         | BindingKind::FutureImportation
                 );
-                if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
+                if binding.kind.is_loop_var() && existing_is_import {
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::ImportShadowedByLoopVar {
@@ -4026,7 +4195,7 @@ impl<'a> Checker<'a> {
                     if !existing.used()
                         && binding.redefines(existing)
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
-                        && !(matches!(existing.kind, BindingKind::FunctionDefinition)
+                        && !(existing.kind.is_function_definition()
                             && visibility::is_overload(
                                 self,
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
@@ -4061,36 +4230,29 @@ impl<'a> Checker<'a> {
 
         let scope = self.current_scope();
         let binding = if let Some(index) = scope.bindings.get(&name) {
-            if matches!(self.bindings[*index].kind, BindingKind::Builtin) {
-                // Avoid overriding builtins.
-                binding
-            } else if matches!(self.bindings[*index].kind, BindingKind::Global) {
-                // If the original binding was a global, and the new binding conflicts within
-                // the current scope, then the new binding is also a global.
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
-                    kind: BindingKind::Global,
-                    ..binding
+            let existing = &self.bindings[*index];
+            match &existing.kind {
+                BindingKind::Builtin => {
+                    // Avoid overriding builtins.
+                    binding
                 }
-            } else if matches!(self.bindings[*index].kind, BindingKind::Nonlocal) {
-                // If the original binding was a nonlocal, and the new binding conflicts within
-                // the current scope, then the new binding is also a nonlocal.
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
-                    kind: BindingKind::Nonlocal,
-                    ..binding
+                kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
+                    // If the original binding was a global or nonlocal, and the new binding conflicts within
+                    // the current scope, then the new binding is also as the same.
+                    Binding {
+                        runtime_usage: existing.runtime_usage,
+                        synthetic_usage: existing.synthetic_usage,
+                        typing_usage: existing.typing_usage,
+                        kind: kind.clone(),
+                        ..binding
+                    }
                 }
-            } else {
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
+                _ => Binding {
+                    runtime_usage: existing.runtime_usage,
+                    synthetic_usage: existing.synthetic_usage,
+                    typing_usage: existing.typing_usage,
                     ..binding
-                }
+                },
             }
         } else {
             binding
@@ -4099,7 +4261,7 @@ impl<'a> Checker<'a> {
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-        if !(matches!(binding.kind, BindingKind::Annotation) && scope.bindings.contains_key(name)) {
+        if !(binding.kind.is_annotation() && scope.bindings.contains_key(name)) {
             if let Some(rebound_index) = scope.bindings.insert(name, binding_index) {
                 scope
                     .rebounds
@@ -4113,146 +4275,147 @@ impl<'a> Checker<'a> {
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
-        if let ExprKind::Name { id, .. } = &expr.node {
-            let scope_id = self.current_scope().id;
+        let ExprKind::Name { id, .. } = &expr.node else {
+            return;
+        };
+        let scope_id = self.current_scope().id;
 
-            let mut first_iter = true;
-            let mut in_generator = false;
-            let mut import_starred = false;
+        let mut first_iter = true;
+        let mut in_generator = false;
+        let mut import_starred = false;
 
-            for scope_index in self.scope_stack.iter().rev() {
-                let scope = &self.scopes[*scope_index];
+        for scope_index in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[*scope_index];
 
-                if matches!(scope.kind, ScopeKind::Class(_)) {
-                    if id == "__class__" {
-                        return;
-                    } else if !first_iter && !in_generator {
-                        continue;
-                    }
-                }
-
-                if let Some(index) = scope.bindings.get(&id.as_str()) {
-                    // Mark the binding as used.
-                    let context = self.execution_context();
-                    self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
-
-                    if matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        && !self.in_deferred_string_type_definition
-                        && !self.in_deferred_type_definition
-                    {
-                        continue;
-                    }
-
-                    // If the name of the sub-importation is the same as an alias of another
-                    // importation and the alias is used, that sub-importation should be
-                    // marked as used too.
-                    //
-                    // This handles code like:
-                    //   import pyarrow as pa
-                    //   import pyarrow.csv
-                    //   print(pa.csv.read_csv("test.csv"))
-                    match &self.bindings[*index].kind {
-                        BindingKind::Importation(name, full_name)
-                        | BindingKind::SubmoduleImportation(name, full_name) => {
-                            let has_alias = full_name
-                                .split('.')
-                                .last()
-                                .map(|segment| &segment != name)
-                                .unwrap_or_default();
-                            if has_alias {
-                                // Mark the sub-importation as used.
-                                if let Some(index) = scope.bindings.get(full_name) {
-                                    self.bindings[*index].mark_used(
-                                        scope_id,
-                                        Range::from_located(expr),
-                                        context,
-                                    );
-                                }
-                            }
-                        }
-                        BindingKind::FromImportation(name, full_name) => {
-                            let has_alias = full_name
-                                .split('.')
-                                .last()
-                                .map(|segment| &segment != name)
-                                .unwrap_or_default();
-                            if has_alias {
-                                // Mark the sub-importation as used.
-                                if let Some(index) = scope.bindings.get(full_name.as_str()) {
-                                    self.bindings[*index].mark_used(
-                                        scope_id,
-                                        Range::from_located(expr),
-                                        context,
-                                    );
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-
+            if matches!(scope.kind, ScopeKind::Class(_)) {
+                if id == "__class__" {
                     return;
+                } else if !first_iter && !in_generator {
+                    continue;
                 }
-
-                first_iter = false;
-                in_generator = matches!(scope.kind, ScopeKind::Generator);
-                import_starred = import_starred || scope.import_starred;
             }
 
-            if import_starred {
-                if self.settings.rules.enabled(&Rule::ImportStarUsage) {
-                    let mut from_list = vec![];
-                    for scope_index in self.scope_stack.iter().rev() {
-                        let scope = &self.scopes[*scope_index];
-                        for binding in scope.bindings.values().map(|index| &self.bindings[*index]) {
-                            if let BindingKind::StarImportation(level, module) = &binding.kind {
-                                from_list.push(helpers::format_import_from(
-                                    level.as_ref(),
-                                    module.as_deref(),
-                                ));
+            if let Some(index) = scope.bindings.get(&id.as_str()) {
+                // Mark the binding as used.
+                let context = self.execution_context();
+                self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
+
+                if self.bindings[*index].kind.is_annotation()
+                    && !self.in_deferred_string_type_definition
+                    && !self.in_deferred_type_definition
+                {
+                    continue;
+                }
+
+                // If the name of the sub-importation is the same as an alias of another
+                // importation and the alias is used, that sub-importation should be
+                // marked as used too.
+                //
+                // This handles code like:
+                //   import pyarrow as pa
+                //   import pyarrow.csv
+                //   print(pa.csv.read_csv("test.csv"))
+                match &self.bindings[*index].kind {
+                    BindingKind::Importation(name, full_name)
+                    | BindingKind::SubmoduleImportation(name, full_name) => {
+                        let has_alias = full_name
+                            .split('.')
+                            .last()
+                            .map(|segment| &segment != name)
+                            .unwrap_or_default();
+                        if has_alias {
+                            // Mark the sub-importation as used.
+                            if let Some(index) = scope.bindings.get(full_name) {
+                                self.bindings[*index].mark_used(
+                                    scope_id,
+                                    Range::from_located(expr),
+                                    context,
+                                );
                             }
                         }
                     }
-                    from_list.sort();
-
-                    self.diagnostics.push(Diagnostic::new(
-                        pyflakes::rules::ImportStarUsage {
-                            name: id.to_string(),
-                            sources: from_list,
-                        },
-                        Range::from_located(expr),
-                    ));
+                    BindingKind::FromImportation(name, full_name) => {
+                        let has_alias = full_name
+                            .split('.')
+                            .last()
+                            .map(|segment| &segment != name)
+                            .unwrap_or_default();
+                        if has_alias {
+                            // Mark the sub-importation as used.
+                            if let Some(index) = scope.bindings.get(full_name.as_str()) {
+                                self.bindings[*index].mark_used(
+                                    scope_id,
+                                    Range::from_located(expr),
+                                    context,
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
                 }
+
                 return;
             }
 
-            if self.settings.rules.enabled(&Rule::UndefinedName) {
-                // Allow __path__.
-                if self.path.ends_with("__init__.py") && id == "__path__" {
-                    return;
-                }
+            first_iter = false;
+            in_generator = matches!(scope.kind, ScopeKind::Generator);
+            import_starred = import_starred || scope.import_starred;
+        }
 
-                // Allow "__module__" and "__qualname__" in class scopes.
-                if (id == "__module__" || id == "__qualname__")
-                    && matches!(self.current_scope().kind, ScopeKind::Class(..))
-                {
-                    return;
-                }
-
-                // Avoid flagging if NameError is handled.
-                if let Some(handler_names) = self.except_handlers.last() {
-                    if handler_names
-                        .iter()
-                        .any(|call_path| call_path.as_slice() == ["NameError"])
-                    {
-                        return;
+        if import_starred {
+            if self.settings.rules.enabled(&Rule::ImportStarUsage) {
+                let mut from_list = vec![];
+                for scope_index in self.scope_stack.iter().rev() {
+                    let scope = &self.scopes[*scope_index];
+                    for binding in scope.bindings.values().map(|index| &self.bindings[*index]) {
+                        if let BindingKind::StarImportation(level, module) = &binding.kind {
+                            from_list.push(helpers::format_import_from(
+                                level.as_ref(),
+                                module.as_deref(),
+                            ));
+                        }
                     }
                 }
+                from_list.sort();
 
                 self.diagnostics.push(Diagnostic::new(
-                    pyflakes::rules::UndefinedName { name: id.clone() },
+                    pyflakes::rules::ImportStarUsage {
+                        name: id.to_string(),
+                        sources: from_list,
+                    },
                     Range::from_located(expr),
                 ));
             }
+            return;
+        }
+
+        if self.settings.rules.enabled(&Rule::UndefinedName) {
+            // Allow __path__.
+            if self.path.ends_with("__init__.py") && id == "__path__" {
+                return;
+            }
+
+            // Allow "__module__" and "__qualname__" in class scopes.
+            if (id == "__module__" || id == "__qualname__")
+                && matches!(self.current_scope().kind, ScopeKind::Class(..))
+            {
+                return;
+            }
+
+            // Avoid flagging if NameError is handled.
+            if let Some(handler_names) = self.except_handlers.last() {
+                if handler_names
+                    .iter()
+                    .any(|call_path| call_path.as_slice() == ["NameError"])
+                {
+                    return;
+                }
+            }
+
+            self.diagnostics.push(Diagnostic::new(
+                pyflakes::rules::UndefinedName { name: id.clone() },
+                Range::from_located(expr),
+            ));
         }
     }
 
@@ -4285,9 +4448,7 @@ impl<'a> Checker<'a> {
                     .current_scope()
                     .bindings
                     .get(id)
-                    .map_or(false, |index| {
-                        matches!(self.bindings[*index].kind, BindingKind::Global)
-                    })
+                    .map_or(false, |index| self.bindings[*index].kind.is_global())
                 {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
@@ -4450,26 +4611,29 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        if let ExprKind::Name { id, .. } = &expr.node {
-            if operations::on_conditional_branch(
-                &mut self.parents.iter().rev().map(std::convert::Into::into),
-            ) {
-                return;
-            }
-
-            let scope =
-                &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-            if scope.bindings.remove(&id.as_str()).is_none()
-                && self.settings.rules.enabled(&Rule::UndefinedName)
-            {
-                self.diagnostics.push(Diagnostic::new(
-                    pyflakes::rules::UndefinedName {
-                        name: id.to_string(),
-                    },
-                    Range::from_located(expr),
-                ));
-            }
+        let ExprKind::Name { id, .. } = &expr.node else {
+            return;
+        };
+        if operations::on_conditional_branch(
+            &mut self.parents.iter().rev().map(std::convert::Into::into),
+        ) {
+            return;
         }
+
+        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
+        if scope.bindings.remove(&id.as_str()).is_some() {
+            return;
+        }
+        if !self.settings.rules.enabled(&Rule::UndefinedName) {
+            return;
+        }
+
+        self.diagnostics.push(Diagnostic::new(
+            pyflakes::rules::UndefinedName {
+                name: id.to_string(),
+            },
+            Range::from_located(expr),
+        ));
     }
 
     fn visit_docstring<'b>(&mut self, python_ast: &'b Suite) -> bool
@@ -4787,7 +4951,7 @@ impl<'a> Checker<'a> {
             {
                 for (name, index) in &scope.bindings {
                     let binding = &self.bindings[*index];
-                    if matches!(binding.kind, BindingKind::Global) {
+                    if binding.kind.is_global() {
                         if let Some(stmt) = &binding.source {
                             if matches!(stmt.node, StmtKind::Global { .. }) {
                                 diagnostics.push(Diagnostic::new(
@@ -5211,9 +5375,22 @@ impl<'a> Checker<'a> {
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
+            if self.is_interface_definition {
+                if self.settings.rules.enabled(&Rule::DocstringInStub) {
+                    flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
+                }
+            }
 
             // pydocstyle
             if enforce_docstrings {
+                if pydocstyle::helpers::should_ignore_definition(
+                    self,
+                    &definition,
+                    &self.settings.pydocstyle.ignore_decorators,
+                ) {
+                    continue;
+                }
+
                 if definition.docstring.is_none() {
                     pydocstyle::rules::not_missing(self, &definition, &visibility);
                     continue;
@@ -5221,10 +5398,8 @@ impl<'a> Checker<'a> {
 
                 // Extract a `Docstring` from a `Definition`.
                 let expr = definition.docstring.unwrap();
-                let contents = self
-                    .locator
-                    .slice_source_code_range(&Range::from_located(expr));
-                let indentation = self.locator.slice_source_code_range(&Range::new(
+                let contents = self.locator.slice(&Range::from_located(expr));
+                let indentation = self.locator.slice(&Range::new(
                     Location::new(expr.location.row(), 0),
                     Location::new(expr.location.row(), expr.location.column()),
                 ));

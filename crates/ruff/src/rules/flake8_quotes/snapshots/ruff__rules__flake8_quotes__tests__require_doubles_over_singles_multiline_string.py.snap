@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_quotes/mod.rs
+source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,10 +12,7 @@ expression: diagnostics
     row: 3
     column: 12
   fix:
-    content:
-      - "\"\"\" This 'should'"
-      - be
-      - "'linted' \"\"\""
+    content: "\"\"\" This 'should'\nbe\n'linted' \"\"\""
     location:
       row: 1
       column: 4

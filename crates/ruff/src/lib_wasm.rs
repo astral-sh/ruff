@@ -9,12 +9,11 @@ use crate::directives;
 use crate::linter::{check_path, LinterResult};
 use crate::registry::Rule;
 use crate::rules::{
-    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_errmsg,
-    flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style, flake8_quotes,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, isort, mccabe, pep8_naming,
-    pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
+    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
+    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
+    isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
-use crate::rustpython_helpers::tokenize;
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
 use crate::settings::{defaults, flags, Settings};
@@ -139,9 +138,11 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_bandit: Some(flake8_bandit::settings::Settings::default().into()),
         flake8_bugbear: Some(flake8_bugbear::settings::Settings::default().into()),
         flake8_builtins: Some(flake8_builtins::settings::Settings::default().into()),
+        flake8_comprehensions: Some(flake8_comprehensions::settings::Settings::default().into()),
         flake8_errmsg: Some(flake8_errmsg::settings::Settings::default().into()),
         flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
         flake8_quotes: Some(flake8_quotes::settings::Settings::default().into()),
+        flake8_self: Some(flake8_self::settings::Settings::default().into()),
         flake8_implicit_str_concat: Some(
             flake8_implicit_str_concat::settings::Settings::default().into(),
         ),
@@ -173,7 +174,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         Settings::from_configuration(configuration, Path::new(".")).map_err(|e| e.to_string())?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = tokenize(contents);
+    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);

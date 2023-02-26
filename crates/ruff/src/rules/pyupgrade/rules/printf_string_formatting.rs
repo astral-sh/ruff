@@ -7,8 +7,7 @@ use rustpython_common::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
@@ -142,7 +141,7 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 fn clean_params_tuple(checker: &mut Checker, right: &Expr) -> String {
     let mut contents = checker
         .locator
-        .slice_source_code_range(&Range::from_located(right))
+        .slice(&Range::from_located(right))
         .to_string();
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
@@ -196,9 +195,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                             }
                         }
 
-                        let value_string = checker
-                            .locator
-                            .slice_source_code_range(&Range::from_located(value));
+                        let value_string = checker.locator.slice(&Range::from_located(value));
                         arguments.push(format!("{key_string}={value_string}"));
                     } else {
                         // If there are any non-string keys, abort.
@@ -206,9 +203,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                     }
                 }
                 None => {
-                    let value_string = checker
-                        .locator
-                        .slice_source_code_range(&Range::from_located(value));
+                    let value_string = checker.locator.slice(&Range::from_located(value));
                     arguments.push(format!("**{value_string}"));
                 }
             }
@@ -323,10 +318,9 @@ pub(crate) fn printf_string_formatting(
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<(Location, Location)> = vec![];
     let mut extension = None;
-    for (start, tok, end) in lexer::make_tokenizer_located(
-        checker
-            .locator
-            .slice_source_code_range(&Range::from_located(expr)),
+    for (start, tok, end) in lexer::lex_located(
+        checker.locator.slice(&Range::from_located(expr)),
+        Mode::Module,
         expr.location,
     )
     .flatten()
@@ -350,9 +344,7 @@ pub(crate) fn printf_string_formatting(
     // Parse each string segment.
     let mut format_strings = vec![];
     for (start, end) in &strings {
-        let string = checker
-            .locator
-            .slice_source_code_range(&Range::new(*start, *end));
+        let string = checker.locator.slice(&Range::new(*start, *end));
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
@@ -390,18 +382,10 @@ pub(crate) fn printf_string_formatting(
         // Add the content before the string segment.
         match prev {
             None => {
-                contents.push_str(
-                    checker
-                        .locator
-                        .slice_source_code_range(&Range::new(expr.location, *start)),
-                );
+                contents.push_str(checker.locator.slice(&Range::new(expr.location, *start)));
             }
             Some(prev) => {
-                contents.push_str(
-                    checker
-                        .locator
-                        .slice_source_code_range(&Range::new(prev, *start)),
-                );
+                contents.push_str(checker.locator.slice(&Range::new(prev, *start)));
             }
         }
         // Add the string itself.
@@ -410,11 +394,7 @@ pub(crate) fn printf_string_formatting(
     }
 
     if let Some((.., end)) = extension {
-        contents.push_str(
-            checker
-                .locator
-                .slice_source_code_range(&Range::new(prev.unwrap(), end)),
-        );
+        contents.push_str(checker.locator.slice(&Range::new(prev.unwrap(), end)));
     }
 
     // Add the `.format` call.

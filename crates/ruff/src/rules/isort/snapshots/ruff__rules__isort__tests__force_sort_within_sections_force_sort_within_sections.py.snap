@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,19 +11,7 @@ expression: diagnostics
     row: 12
     column: 0
   fix:
-    content:
-      - "import a  # import"
-      - "from a import a1  # import_from"
-      - "import b as b1  # import_as"
-      - "from c import *  # import_from_star"
-      - import c.d
-      - ""
-      - from ...grandparent import fn3
-      - from ..parent import *
-      - from . import my
-      - from .my import fn
-      - from .my.nested import fn2
-      - ""
+    content: "import a  # import\nfrom a import a1  # import_from\nimport b as b1  # import_as\nfrom c import *  # import_from_star\nimport c.d\n\nfrom ...grandparent import fn3\nfrom ..parent import *\nfrom . import my\nfrom .my import fn\nfrom .my.nested import fn2\n"
     location:
       row: 1
       column: 0

@@ -1,9 +1,10 @@
 use log::error;
+use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::comparable::{ComparableExpr, ComparableStmt};
+use crate::ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use crate::ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
@@ -47,39 +48,60 @@ impl Violation for CollapsibleIf {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let CollapsibleIf { fixable, .. } = self;
-        if *fixable {
-            Some(|_| format!("Combine `if` statements using `and`"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|_| format!("Combine `if` statements using `and`"))
     }
 }
 
 define_violation!(
-    pub struct UnnecessaryBoolCall {
+    pub struct NeedlessBool {
         pub condition: String,
         pub fixable: bool,
     }
 );
-impl Violation for UnnecessaryBoolCall {
+impl Violation for NeedlessBool {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnnecessaryBoolCall { condition, .. } = self;
+        let NeedlessBool { condition, .. } = self;
         format!("Return the condition `{condition}` directly")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnnecessaryBoolCall { fixable, .. } = self;
-        if *fixable {
-            Some(|UnnecessaryBoolCall { condition, .. }| {
-                format!("Replace with `return {condition}`")
-            })
-        } else {
-            None
-        }
+        self.fixable.then_some(|NeedlessBool { condition, .. }| {
+            format!("Replace with `return {condition}`")
+        })
+    }
+}
+
+define_violation!(
+    /// ### What it does
+    /// Checks for three or more consecutive if-statements with direct returns
+    ///
+    /// ### Why is this bad?
+    /// These can be simplified by using a dictionary
+    ///
+    /// ### Example
+    /// ```python
+    /// if x == 1:
+    ///     return "Hello"
+    /// elif x == 2:
+    ///     return "Goodbye"
+    /// else:
+    ///    return "Goodnight"
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
+    /// ```
+    pub struct ManualDictLookup;
+);
+impl Violation for ManualDictLookup {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Use a dictionary instead of consecutive `if` statements")
     }
 }
 
@@ -95,18 +117,14 @@ impl Violation for UseTernaryOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UseTernaryOperator { contents, .. } = self;
-        format!("Use ternary operator `{contents}` instead of if-else-block")
+        format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UseTernaryOperator { fixable, .. } = self;
-        if *fixable {
-            Some(|UseTernaryOperator { contents, .. }| {
-                format!("Replace if-else-block with `{contents}`")
+        self.fixable
+            .then_some(|UseTernaryOperator { contents, .. }| {
+                format!("Replace `if`-`else`-block with `{contents}`")
             })
-        } else {
-            None
-        }
     }
 }
 
@@ -156,12 +174,8 @@ impl Violation for DictGetWithDefault {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let DictGetWithDefault { fixable, .. } = self;
-        if *fixable {
-            Some(|DictGetWithDefault { contents, .. }| format!("Replace with `{contents}`"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|DictGetWithDefault { contents, .. }| format!("Replace with `{contents}`"))
     }
 }
 
@@ -315,7 +329,7 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
 }
 
 /// SIM103
-pub fn unnecessary_bool_call(checker: &mut Checker, stmt: &Stmt) {
+pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let StmtKind::If { test, body, orelse } = &stmt.node else {
         return;
     };
@@ -336,7 +350,7 @@ pub fn unnecessary_bool_call(checker: &mut Checker, stmt: &Stmt) {
         && (matches!(test.node, ExprKind::Compare { .. }) || checker.is_builtin("bool"));
 
     let mut diagnostic = Diagnostic::new(
-        UnnecessaryBoolCall { condition, fixable },
+        NeedlessBool { condition, fixable },
         Range::from_located(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
@@ -569,6 +583,122 @@ pub fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stm
             ));
         }
     }
+}
+
+/// SIM116
+pub fn manual_dict_lookup(
+    checker: &mut Checker,
+    stmt: &Stmt,
+    test: &Expr,
+    body: &[Stmt],
+    orelse: &[Stmt],
+) {
+    // Throughout this rule:
+    // * Each if-statement's test must consist of a constant equality check with the same variable.
+    // * Each if-statement's body must consist of a single `return`.
+    // * Each if-statement's orelse must be either another if-statement or empty.
+    // * The final if-statement's orelse must be empty, or a single `return`.
+    let ExprKind::Compare {
+        left,
+        ops,
+        comparators,
+    } = &test.node else {
+        return;
+    };
+    let ExprKind::Name { id: target, .. } = &left.node else {
+        return;
+    };
+    if body.len() != 1 {
+        return;
+    }
+    if orelse.len() != 1 {
+        return;
+    }
+    if !(ops.len() == 1 && ops[0] == Cmpop::Eq) {
+        return;
+    }
+    if comparators.len() != 1 {
+        return;
+    }
+    let ExprKind::Constant { value: constant, .. } = &comparators[0].node else {
+        return;
+    };
+    let StmtKind::Return { value, .. } = &body[0].node else {
+        return;
+    };
+    if value
+        .as_ref()
+        .map_or(false, |value| contains_effect(checker, value))
+    {
+        return;
+    }
+
+    let mut constants: FxHashSet<ComparableConstant> = FxHashSet::default();
+    constants.insert(constant.into());
+
+    let mut child: Option<&Stmt> = orelse.get(0);
+    while let Some(current) = child.take() {
+        let StmtKind::If { test, body, orelse } = &current.node else {
+            return;
+        };
+        if body.len() != 1 {
+            return;
+        }
+        if orelse.len() > 1 {
+            return;
+        }
+        let ExprKind::Compare {
+            left,
+            ops,
+            comparators,
+        } = &test.node else {
+            return;
+        };
+        let ExprKind::Name { id, .. } = &left.node else {
+            return;
+        };
+        if !(id == target && ops.len() == 1 && ops[0] == Cmpop::Eq) {
+            return;
+        }
+        if comparators.len() != 1 {
+            return;
+        }
+        let ExprKind::Constant { value: constant, .. } = &comparators[0].node else {
+            return;
+        };
+        let StmtKind::Return { value, .. } = &body[0].node else {
+            return;
+        };
+        if value
+            .as_ref()
+            .map_or(false, |value| contains_effect(checker, value))
+        {
+            return;
+        };
+
+        constants.insert(constant.into());
+        if let Some(orelse) = orelse.first() {
+            match &orelse.node {
+                StmtKind::If { .. } => {
+                    child = Some(orelse);
+                }
+                StmtKind::Return { .. } => {
+                    child = None;
+                }
+                _ => return,
+            }
+        } else {
+            child = None;
+        }
+    }
+
+    if constants.len() < 3 {
+        return;
+    }
+
+    checker
+        .diagnostics
+        .push(Diagnostic::new(ManualDictLookup, Range::from_located(stmt)));
 }
 
 /// SIM401

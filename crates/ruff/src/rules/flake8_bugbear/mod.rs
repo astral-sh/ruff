@@ -7,9 +7,9 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use crate::assert_yaml_snapshot;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
@@ -40,6 +40,9 @@ mod tests {
     #[test_case(Rule::DuplicateTryBlockException, Path::new("B025.py"); "B025")]
     #[test_case(Rule::StarArgUnpackingAfterKeywordArg, Path::new("B026.py"); "B026")]
     #[test_case(Rule::EmptyMethodWithoutAbstractDecorator, Path::new("B027.py"); "B027")]
+    #[test_case(Rule::EmptyMethodWithoutAbstractDecorator, Path::new("B027.pyi"); "B027_pyi")]
+    #[test_case(Rule::ExceptWithEmptyTuple, Path::new("B029.py"); "B029")]
+    #[test_case(Rule::UnintentionalTypeAnnotation, Path::new("B032.py"); "B032")]
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"); "B904")]
     #[test_case(Rule::ZipWithoutExplicitStrict, Path::new("B905.py"); "B905")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

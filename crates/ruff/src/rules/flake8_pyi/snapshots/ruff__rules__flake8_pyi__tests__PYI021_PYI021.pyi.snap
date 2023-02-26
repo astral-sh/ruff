@@ -1,0 +1,35 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    DocstringInStub: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    DocstringInStub: ~
+  location:
+    row: 4
+    column: 4
+  end_location:
+    row: 4
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    DocstringInStub: ~
+  location:
+    row: 7
+    column: 4
+  end_location:
+    row: 7
+    column: 13
+  fix: ~
+  parent: ~
+

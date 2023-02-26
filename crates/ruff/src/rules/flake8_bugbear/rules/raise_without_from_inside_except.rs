@@ -1,5 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::string::is_lower;
+use ruff_python::str::is_lower;
 use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::Range;
@@ -44,7 +44,8 @@ impl<'a> Visitor<'a> for RaiseVisitor {
             StmtKind::ClassDef { .. }
             | StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }
-            | StmtKind::Try { .. } => {}
+            | StmtKind::Try { .. }
+            | StmtKind::TryStar { .. } => {}
             StmtKind::If { body, orelse, .. } => {
                 visitor::walk_body(self, body);
                 visitor::walk_body(self, orelse);
@@ -56,11 +57,17 @@ impl<'a> Visitor<'a> for RaiseVisitor {
             | StmtKind::AsyncFor { body, .. } => {
                 visitor::walk_body(self, body);
             }
+            StmtKind::Match { cases, .. } => {
+                for case in cases {
+                    visitor::walk_body(self, &case.body);
+                }
+            }
             _ => {}
         }
     }
 }
 
+/// B904
 pub fn raise_without_from_inside_except(checker: &mut Checker, body: &[Stmt]) {
     let mut visitor = RaiseVisitor {
         diagnostics: vec![],

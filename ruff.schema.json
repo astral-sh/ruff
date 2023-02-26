@@ -154,6 +154,17 @@
         }
       ]
     },
+    "flake8-comprehensions": {
+      "description": "Options for the `flake8-comprehensions` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8ComprehensionsOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-errmsg": {
       "description": "Options for the `flake8-errmsg` plugin.",
       "anyOf": [
@@ -203,6 +214,17 @@
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8QuotesOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "flake8-self": {
+      "description": "Options for the `flake8_self` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8SelfOptions"
         },
         {
           "type": "null"
@@ -644,6 +666,19 @@
       },
       "additionalProperties": false
     },
+    "Flake8ComprehensionsOptions": {
+      "type": "object",
+      "properties": {
+        "allow-dict-calls-with-keyword-arguments": {
+          "description": "Allow `dict` calls that make use of keyword arguments (e.g., `dict(a=1, b=2)`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "Flake8ErrMsgOptions": {
       "type": "object",
       "properties": {
@@ -775,7 +810,7 @@
       "type": "object",
       "properties": {
         "avoid-escape": {
-          "description": "Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.",
+          "description": "Whether to avoid using single quotes if a string contains single quotes, or vice-versa with double quotes, as per [PEP 8](https://peps.python.org/pep-0008/#string-quotes). This minimizes the need to escape quotation marks within strings.",
           "type": [
             "boolean",
             "null"
@@ -813,6 +848,22 @@
               "type": "null"
             }
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8SelfOptions": {
+      "type": "object",
+      "properties": {
+        "ignore-names": {
+          "description": "A list of names to ignore when considering `flake8-self` violations.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -943,6 +994,16 @@
             "boolean",
             "null"
           ]
+        },
+        "force-to-top": {
+          "description": "Force specific imports to the top of their appropriate section.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         },
         "force-wrap-aliases": {
           "description": "Force `import from` statements with multiple members and at least one alias (e.g., `import A as B`) to wrap such that every line contains exactly one member. For example, this formatting would be retained, rather than condensing to a single line:\n\n```python from .utils import ( test_directory as test_directory, test_id as test_id ) ```\n\nNote that this setting is only effective when combined with `combine-as-imports = true`. When `combine-as-imports` isn't enabled, every aliased `import from` will be given its own line, in which case, wrapping is not necessary.",
@@ -1197,6 +1258,16 @@
               "type": "null"
             }
           ]
+        },
+        "ignore-decorators": {
+          "description": "Ignore docstrings for functions or methods decorated with the specified decorators. Unlike the `pydocstyle`, Ruff accepts an array of fully-qualified module identifiers, instead of a regular expression.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -1368,6 +1439,9 @@
         "B025",
         "B026",
         "B027",
+        "B029",
+        "B03",
+        "B032",
         "B9",
         "B90",
         "B904",
@@ -1656,10 +1730,14 @@
         "N816",
         "N817",
         "N818",
+        "N9",
+        "N99",
+        "N999",
         "NPY",
         "NPY0",
         "NPY00",
         "NPY001",
+        "NPY002",
         "PD",
         "PD0",
         "PD00",
@@ -1694,6 +1772,7 @@
         "PIE8",
         "PIE80",
         "PIE800",
+        "PIE802",
         "PIE804",
         "PIE807",
         "PIE81",
@@ -1713,6 +1792,7 @@
         "PLE01",
         "PLE010",
         "PLE0100",
+        "PLE0101",
         "PLE011",
         "PLE0117",
         "PLE0118",
@@ -1724,6 +1804,10 @@
         "PLE11",
         "PLE114",
         "PLE1142",
+        "PLE12",
+        "PLE120",
+        "PLE1205",
+        "PLE1206",
         "PLE13",
         "PLE130",
         "PLE1307",
@@ -1768,6 +1852,10 @@
         "PLW06",
         "PLW060",
         "PLW0602",
+        "PLW2",
+        "PLW29",
+        "PLW290",
+        "PLW2901",
         "PT",
         "PT0",
         "PT00",
@@ -1834,6 +1922,13 @@
         "PYI001",
         "PYI007",
         "PYI008",
+        "PYI009",
+        "PYI01",
+        "PYI010",
+        "PYI011",
+        "PYI014",
+        "PYI02",
+        "PYI021",
         "Q",
         "Q0",
         "Q00",
@@ -1864,6 +1959,7 @@
         "RUF003",
         "RUF004",
         "RUF005",
+        "RUF006",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -1911,10 +2007,10 @@
         "SIM109",
         "SIM11",
         "SIM110",
-        "SIM111",
         "SIM112",
         "SIM114",
         "SIM115",
+        "SIM116",
         "SIM117",
         "SIM118",
         "SIM2",
@@ -1976,6 +2072,7 @@
         "TRY4",
         "TRY40",
         "TRY400",
+        "TRY401",
         "UP",
         "UP0",
         "UP00",
@@ -2020,7 +2117,9 @@
         "W",
         "W2",
         "W29",
+        "W291",
         "W292",
+        "W293",
         "W5",
         "W50",
         "W505",

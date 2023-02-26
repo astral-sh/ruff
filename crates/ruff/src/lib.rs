@@ -5,12 +5,12 @@
 //!
 //! [Ruff]: https://github.com/charliermarsh/ruff
 
+pub use ast::types::Range;
 use cfg_if::cfg_if;
 pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;
 pub use violation::{AutofixKind, Availability as AutofixAvailability};
 
-mod assert_yaml_snapshot;
 mod ast;
 mod autofix;
 pub mod cache;
@@ -33,10 +33,8 @@ pub mod resolver;
 mod rule_redirects;
 mod rule_selector;
 mod rules;
-mod rustpython_helpers;
 pub mod settings;
 pub mod source_code;
-mod vendor;
 mod violation;
 mod visibility;
 

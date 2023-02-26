@@ -1,5 +1,5 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -49,8 +49,7 @@ expression: diagnostics
     row: 13
     column: 5
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 12
       column: 8
@@ -93,8 +92,7 @@ expression: diagnostics
     row: 20
     column: 5
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 19
       column: 8
@@ -125,8 +123,7 @@ expression: diagnostics
     row: 26
     column: 5
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 25
       column: 8
@@ -181,8 +178,7 @@ expression: diagnostics
     row: 35
     column: 5
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 34
       column: 10
@@ -237,8 +233,7 @@ expression: diagnostics
     row: 44
     column: 12
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 44
       column: 9
@@ -257,8 +252,7 @@ expression: diagnostics
     row: 45
     column: 18
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 45
       column: 15

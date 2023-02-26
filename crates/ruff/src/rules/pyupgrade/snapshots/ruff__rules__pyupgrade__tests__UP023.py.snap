@@ -11,8 +11,7 @@ expression: diagnostics
     row: 2
     column: 59
   fix:
-    content:
-      - "from xml.etree.ElementTree import XML, Element, SubElement"
+    content: "from xml.etree.ElementTree import XML, Element, SubElement"
     location:
       row: 2
       column: 0
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 3
     column: 35
   fix:
-    content:
-      - xml.etree.ElementTree as ET
+    content: xml.etree.ElementTree as ET
     location:
       row: 3
       column: 7
@@ -47,8 +45,7 @@ expression: diagnostics
     row: 6
     column: 44
   fix:
-    content:
-      - from   xml.etree.ElementTree    import  XML
+    content: from   xml.etree.ElementTree    import  XML
     location:
       row: 6
       column: 0
@@ -65,8 +62,7 @@ expression: diagnostics
     row: 7
     column: 49
   fix:
-    content:
-      - xml.etree.ElementTree       as      ET
+    content: xml.etree.ElementTree       as      ET
     location:
       row: 7
       column: 10
@@ -83,12 +79,7 @@ expression: diagnostics
     row: 14
     column: 1
   fix:
-    content:
-      - from xml.etree.ElementTree import (
-      - "    XML,"
-      - "    Element,"
-      - "    SubElement,"
-      - )
+    content: "from xml.etree.ElementTree import (\n    XML,\n    Element,\n    SubElement,\n)"
     location:
       row: 10
       column: 0
@@ -105,8 +96,7 @@ expression: diagnostics
     row: 16
     column: 39
   fix:
-    content:
-      - xml.etree.ElementTree as ET
+    content: xml.etree.ElementTree as ET
     location:
       row: 16
       column: 11
@@ -123,8 +113,7 @@ expression: diagnostics
     row: 17
     column: 45
   fix:
-    content:
-      - ElementTree as CET
+    content: ElementTree as CET
     location:
       row: 17
       column: 26
@@ -141,8 +130,7 @@ expression: diagnostics
     row: 19
     column: 40
   fix:
-    content:
-      - ElementTree as ET
+    content: ElementTree as ET
     location:
       row: 19
       column: 22
@@ -159,8 +147,7 @@ expression: diagnostics
     row: 21
     column: 47
   fix:
-    content:
-      - xml.etree.ElementTree as ET
+    content: xml.etree.ElementTree as ET
     location:
       row: 21
       column: 19
@@ -177,8 +164,7 @@ expression: diagnostics
     row: 24
     column: 59
   fix:
-    content:
-      - xml.etree.ElementTree as ET
+    content: xml.etree.ElementTree as ET
     location:
       row: 24
       column: 31

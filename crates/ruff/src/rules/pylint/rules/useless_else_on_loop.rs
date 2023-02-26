@@ -1,5 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{ExcepthandlerKind, Stmt, StmtKind};
+use rustpython_parser::ast::{ExcepthandlerKind, MatchCase, Stmt, StmtKind};
 
 use crate::ast::helpers;
 use crate::checkers::ast::Checker;
@@ -22,7 +22,18 @@ impl Violation for UselessElseOnLoop {
 fn loop_exits_early(body: &[Stmt]) -> bool {
     body.iter().any(|stmt| match &stmt.node {
         StmtKind::If { body, orelse, .. } => loop_exits_early(body) || loop_exits_early(orelse),
+        StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => loop_exits_early(body),
+        StmtKind::Match { cases, .. } => cases
+            .iter()
+            .any(|MatchCase { body, .. }| loop_exits_early(body)),
         StmtKind::Try {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }
+        | StmtKind::TryStar {
             body,
             handlers,
             orelse,

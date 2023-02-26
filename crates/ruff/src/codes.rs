@@ -52,6 +52,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E273") => Rule::TabAfterKeyword,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E274") => Rule::TabBeforeKeyword,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E275") => Rule::MissingWhitespaceAfterKeyword,
         (Pycodestyle, "E401") => Rule::MultipleImportsOnOneLine,
         (Pycodestyle, "E402") => Rule::ModuleImportNotAtTopOfFile,
         (Pycodestyle, "E501") => Rule::LineTooLong,
@@ -72,7 +74,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E999") => Rule::SyntaxError,
 
         // pycodestyle warnings
+        (Pycodestyle, "W291") => Rule::TrailingWhitespace,
         (Pycodestyle, "W292") => Rule::NoNewLineAtEndOfFile,
+        (Pycodestyle, "W293") => Rule::BlankLineContainsWhitespace,
         (Pycodestyle, "W505") => Rule::DocLineTooLong,
         (Pycodestyle, "W605") => Rule::InvalidEscapeSequence,
 
@@ -123,8 +127,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // pylint
         (Pylint, "E0100") => Rule::YieldInInit,
+        (Pylint, "E0101") => Rule::ReturnInInit,
         (Pylint, "E0604") => Rule::InvalidAllObject,
         (Pylint, "E0605") => Rule::InvalidAllFormat,
+        (Pylint, "E1205") => Rule::LoggingTooManyArgs,
+        (Pylint, "E1206") => Rule::LoggingTooFewArgs,
         (Pylint, "E1307") => Rule::BadStringFormatType,
         (Pylint, "E2502") => Rule::BidirectionalUnicode,
         (Pylint, "E1310") => Rule::BadStrStripCall,
@@ -145,6 +152,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R0913") => Rule::TooManyArguments,
         (Pylint, "R0912") => Rule::TooManyBranches,
         (Pylint, "R0915") => Rule::TooManyStatements,
+        (Pylint, "W2901") => Rule::RedefinedLoopName,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
@@ -178,6 +186,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bugbear, "025") => Rule::DuplicateTryBlockException,
         (Flake8Bugbear, "026") => Rule::StarArgUnpackingAfterKeywordArg,
         (Flake8Bugbear, "027") => Rule::EmptyMethodWithoutAbstractDecorator,
+        (Flake8Bugbear, "029") => Rule::ExceptWithEmptyTuple,
+        (Flake8Bugbear, "032") => Rule::UnintentionalTypeAnnotation,
         (Flake8Bugbear, "904") => Rule::RaiseWithoutFromInsideExcept,
         (Flake8Bugbear, "905") => Rule::ZipWithoutExplicitStrict,
 
@@ -265,16 +275,17 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         // flake8-simplify
         (Flake8Simplify, "101") => Rule::DuplicateIsinstanceCall,
         (Flake8Simplify, "102") => Rule::CollapsibleIf,
-        (Flake8Simplify, "103") => Rule::UnnecessaryBoolCall,
+        (Flake8Simplify, "103") => Rule::NeedlessBool,
         (Flake8Simplify, "105") => Rule::UseContextlibSuppress,
         (Flake8Simplify, "107") => Rule::ReturnInTryExceptFinally,
         (Flake8Simplify, "108") => Rule::UseTernaryOperator,
         (Flake8Simplify, "109") => Rule::CompareWithTuple,
-        (Flake8Simplify, "110") => Rule::ConvertLoopToAny,
-        (Flake8Simplify, "111") => Rule::ConvertLoopToAll,
+        (Flake8Simplify, "110") => Rule::ReimplementedBuiltin,
+        // (Flake8Simplify, "111") => Rule::ReimplementedBuiltin,
         (Flake8Simplify, "112") => Rule::UseCapitalEnvironmentVariables,
         (Flake8Simplify, "114") => Rule::IfWithSameArms,
         (Flake8Simplify, "115") => Rule::OpenFileWithContextHandler,
+        (Flake8Simplify, "116") => Rule::ManualDictLookup,
         (Flake8Simplify, "117") => Rule::MultipleWithStatements,
         (Flake8Simplify, "118") => Rule::KeyInDict,
         (Flake8Simplify, "201") => Rule::NegateEqualOp,
@@ -391,6 +402,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (PEP8Naming, "816") => Rule::MixedCaseVariableInGlobalScope,
         (PEP8Naming, "817") => Rule::CamelcaseImportedAsAcronym,
         (PEP8Naming, "818") => Rule::ErrorSuffixOnExceptionName,
+        (PEP8Naming, "999") => Rule::InvalidModuleName,
 
         // isort
         (Isort, "001") => Rule::UnsortedImports,
@@ -475,6 +487,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "001") => Rule::PrefixTypeParams,
         (Flake8Pyi, "007") => Rule::UnrecognizedPlatformCheck,
         (Flake8Pyi, "008") => Rule::UnrecognizedPlatformName,
+        (Flake8Pyi, "009") => Rule::PassStatementStubBody,
+        (Flake8Pyi, "010") => Rule::NonEmptyStubBody,
+        (Flake8Pyi, "011") => Rule::TypedArgumentSimpleDefaults,
+        (Flake8Pyi, "014") => Rule::ArgumentSimpleDefaults,
+        (Flake8Pyi, "021") => Rule::DocstringInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::IncorrectFixtureParenthesesStyle,
@@ -508,6 +525,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pie, "794") => Rule::DupeClassFieldDefinitions,
         (Flake8Pie, "796") => Rule::PreferUniqueEnums,
         (Flake8Pie, "800") => Rule::UnnecessarySpread,
+        (Flake8Pie, "802") => Rule::UnnecessaryComprehensionAnyAll,
         (Flake8Pie, "804") => Rule::UnnecessaryDictKwargs,
         (Flake8Pie, "807") => Rule::PreferListBuiltin,
         (Flake8Pie, "810") => Rule::SingleStartsEndsWith,
@@ -543,6 +561,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Tryceratops, "300") => Rule::TryConsiderElse,
         (Tryceratops, "301") => Rule::RaiseWithinTry,
         (Tryceratops, "400") => Rule::ErrorInsteadOfException,
+        (Tryceratops, "401") => Rule::VerboseLogMessage,
 
         // flake8-use-pathlib
         (Flake8UsePathlib, "100") => Rule::PathlibAbspath,
@@ -589,6 +608,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // numpy
         (Numpy, "001") => Rule::NumpyDeprecatedTypeAlias,
+        (Numpy, "002") => Rule::NumpyLegacyRandom,
 
         // ruff
         (Ruff, "001") => Rule::AmbiguousUnicodeCharacterString,
@@ -596,6 +616,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "003") => Rule::AmbiguousUnicodeCharacterComment,
         (Ruff, "004") => Rule::KeywordArgumentBeforeStarArgument,
         (Ruff, "005") => Rule::UnpackInsteadOfConcatenatingToCollectionLiteral,
+        (Ruff, "006") => Rule::AsyncioDanglingTask,
         (Ruff, "100") => Rule::UnusedNOQA,
 
         // flake8-django

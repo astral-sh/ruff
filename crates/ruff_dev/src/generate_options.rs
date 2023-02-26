@@ -1,25 +1,10 @@
 //! Generate a Markdown-compatible listing of configuration options.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
-
-use anyhow::Result;
 use itertools::Itertools;
 use ruff::settings::options::Options;
 use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionField};
 
-use crate::utils::replace_readme_section;
-
-const BEGIN_PRAGMA: &str = "<!-- Begin auto-generated options sections. -->\n";
-const END_PRAGMA: &str = "<!-- End auto-generated options sections. -->";
-
-#[derive(clap::Args)]
-pub struct Args {
-    /// Write the generated table to stdout (rather than to `README.md`).
-    #[arg(long)]
-    pub(crate) dry_run: bool,
-}
-
 fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
-    output.push_str(&format!("#### [`{0}`](#{0})\n", name));
+    output.push_str(&format!("#### [`{name}`](#{name})\n"));
     output.push('\n');
     output.push_str(field.doc);
     output.push_str("\n\n");
@@ -39,8 +24,8 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: 
     output.push('\n');
 }
 
-pub fn main(args: &Args) -> Result<()> {
-    let mut output = String::new();
+pub fn generate() -> String {
+    let mut output: String = "### Top-level\n\n".into();
 
     let mut sorted_options = Options::get_available_options();
     sorted_options.sort_by_key(|(name, _)| *name);
@@ -55,7 +40,7 @@ pub fn main(args: &Args) -> Result<()> {
     // Generate all the sub-groups.
     for (group_name, entry) in &sorted_options {
         let OptionEntry::Group(fields) = entry else { continue; };
-        output.push_str(&format!("### `{}`\n", group_name));
+        output.push_str(&format!("### `{group_name}`\n"));
         output.push('\n');
         for (name, entry) in fields.iter().sorted_by_key(|(name, _)| name) {
             let OptionEntry::Field(field) = entry else { continue; };
@@ -64,11 +49,5 @@ pub fn main(args: &Args) -> Result<()> {
         }
     }
 
-    if args.dry_run {
-        print!("{output}");
-    } else {
-        replace_readme_section(&output, BEGIN_PRAGMA, END_PRAGMA)?;
-    }
-
-    Ok(())
+    output
 }

@@ -1,5 +1,5 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,8 +11,7 @@ expression: diagnostics
     row: 2
     column: 13
   fix:
-    content:
-      - X is not Y
+    content: X is not Y
     location:
       row: 2
       column: 3
@@ -29,8 +28,7 @@ expression: diagnostics
     row: 5
     column: 15
   fix:
-    content:
-      - X.B is not Y
+    content: X.B is not Y
     location:
       row: 5
       column: 3

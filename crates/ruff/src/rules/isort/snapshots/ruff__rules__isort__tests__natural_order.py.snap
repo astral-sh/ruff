@@ -1,5 +1,5 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -11,24 +11,7 @@ expression: diagnostics
     row: 17
     column: 0
   fix:
-    content:
-      - import numpy1
-      - import numpy2
-      - import numpy10
-      - from numpy import (
-      - "    cos,"
-      - "    int8,"
-      - "    int16,"
-      - "    int32,"
-      - "    int64,"
-      - "    sin,"
-      - "    tan,"
-      - "    uint8,"
-      - "    uint16,"
-      - "    uint32,"
-      - "    uint64,"
-      - )
-      - ""
+    content: "import numpy1\nimport numpy2\nimport numpy10\nfrom numpy import (\n    cos,\n    int8,\n    int16,\n    int32,\n    int64,\n    sin,\n    tan,\n    uint8,\n    uint16,\n    uint32,\n    uint64,\n)\n"
     location:
       row: 1
       column: 0

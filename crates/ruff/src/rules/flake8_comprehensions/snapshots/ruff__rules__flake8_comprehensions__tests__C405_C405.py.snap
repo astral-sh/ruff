@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_comprehensions/mod.rs
+source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 1
     column: 11
   fix:
-    content:
-      - "{1, 2}"
+    content: "{1, 2}"
     location:
       row: 1
       column: 0
@@ -31,8 +30,7 @@ expression: diagnostics
     row: 2
     column: 11
   fix:
-    content:
-      - "{1, 2}"
+    content: "{1, 2}"
     location:
       row: 2
       column: 0
@@ -50,8 +48,7 @@ expression: diagnostics
     row: 3
     column: 7
   fix:
-    content:
-      - set()
+    content: set()
     location:
       row: 3
       column: 0
@@ -69,8 +66,7 @@ expression: diagnostics
     row: 4
     column: 7
   fix:
-    content:
-      - set()
+    content: set()
     location:
       row: 4
       column: 0
@@ -88,8 +84,7 @@ expression: diagnostics
     row: 6
     column: 9
   fix:
-    content:
-      - "{1}"
+    content: "{1}"
     location:
       row: 6
       column: 0
@@ -107,10 +102,7 @@ expression: diagnostics
     row: 9
     column: 2
   fix:
-    content:
-      - "{"
-      - "    1,"
-      - "}"
+    content: "{\n    1,\n}"
     location:
       row: 7
       column: 0
@@ -128,10 +120,7 @@ expression: diagnostics
     row: 12
     column: 2
   fix:
-    content:
-      - "{"
-      - "    1,"
-      - "}"
+    content: "{\n    1,\n}"
     location:
       row: 10
       column: 0
@@ -149,8 +138,7 @@ expression: diagnostics
     row: 15
     column: 1
   fix:
-    content:
-      - "{1}"
+    content: "{1}"
     location:
       row: 13
       column: 0
@@ -168,8 +156,7 @@ expression: diagnostics
     row: 18
     column: 1
   fix:
-    content:
-      - "{1,}"
+    content: "{1,}"
     location:
       row: 16
       column: 0

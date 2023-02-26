@@ -1,0 +1,23 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    UnusedVariable:
+      name: x
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 5
+  fix:
+    content: pass
+    location:
+      row: 8
+      column: 4
+    end_location:
+      row: 8
+      column: 9
+  parent: ~
+

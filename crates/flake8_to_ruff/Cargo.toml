@@ -1,7 +1,8 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.246"
-edition = "2021"
+version = "0.0.252"
+edition = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }

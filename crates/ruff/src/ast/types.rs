@@ -29,7 +29,7 @@ impl Range {
         }
     }
 
-    pub fn from_located<T>(located: &Located<T>) -> Self {
+    pub fn from_located<T, U>(located: &Located<T, U>) -> Self {
         Range::new(located.location, located.end_location.unwrap())
     }
 
@@ -124,7 +124,7 @@ impl<'a> Scope<'a> {
 //        StarImportation
 //        FutureImportation
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, is_macro::Is)]
 pub enum BindingKind<'a> {
     Annotation,
     Argument,

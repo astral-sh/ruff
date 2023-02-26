@@ -101,7 +101,7 @@ impl std::fmt::Display for IndentStyle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IndentStyle::Tab => std::write!(f, "Tab"),
-            IndentStyle::Space(size) => std::write!(f, "Spaces, size: {}", size),
+            IndentStyle::Space(size) => std::write!(f, "Spaces, size: {size}"),
         }
     }
 }

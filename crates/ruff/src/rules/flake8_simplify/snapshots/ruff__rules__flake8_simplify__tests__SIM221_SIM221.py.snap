@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_simplify/mod.rs
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 1
     column: 13
   fix:
-    content:
-      - "True"
+    content: "True"
     location:
       row: 1
       column: 3
@@ -31,8 +30,7 @@ expression: diagnostics
     row: 4
     column: 14
   fix:
-    content:
-      - "True"
+    content: "True"
     location:
       row: 4
       column: 4
@@ -50,8 +48,7 @@ expression: diagnostics
     row: 7
     column: 14
   fix:
-    content:
-      - "True"
+    content: "True"
     location:
       row: 7
       column: 4

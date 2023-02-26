@@ -1,9 +1,10 @@
 use anyhow::{bail, Result};
 use log::debug;
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
+
 use ruff_macros::{define_violation, derive_message_formats};
 use ruff_python::identifiers::is_identifier;
 use ruff_python::keyword::KWLIST;
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
@@ -11,23 +12,29 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::violation::{Availability, Violation};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct ConvertTypedDictFunctionalToClass {
         pub name: String,
+        pub fixable: bool,
     }
 );
-impl AlwaysAutofixableViolation for ConvertTypedDictFunctionalToClass {
+impl Violation for ConvertTypedDictFunctionalToClass {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertTypedDictFunctionalToClass { name } = self;
+        let ConvertTypedDictFunctionalToClass { name, .. } = self;
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
-    fn autofix_title(&self) -> String {
-        let ConvertTypedDictFunctionalToClass { name } = self;
-        format!("Convert `{name}` to class syntax")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable
+            .then_some(|ConvertTypedDictFunctionalToClass { name, .. }| {
+                format!("Convert `{name}` to class syntax")
+            })
     }
 }
 
@@ -219,27 +226,31 @@ pub fn convert_typed_dict_functional_to_class(
         return;
     };
 
+    let (body, total_keyword) = match match_properties_and_total(args, keywords) {
+        Ok((body, total_keyword)) => (body, total_keyword),
+        Err(err) => {
+            debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}");
+            return;
+        }
+    };
+    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+    let fixable = stmt.location.column() == 0;
     let mut diagnostic = Diagnostic::new(
         ConvertTypedDictFunctionalToClass {
             name: class_name.to_string(),
+            fixable,
         },
         Range::from_located(stmt),
     );
-    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-    if checker.patch(diagnostic.kind.rule()) && stmt.location.column() == 0 {
-        match match_properties_and_total(args, keywords) {
-            Ok((body, total_keyword)) => {
-                diagnostic.amend(convert_to_class(
-                    stmt,
-                    class_name,
-                    body,
-                    total_keyword,
-                    base_class,
-                    checker.stylist,
-                ));
-            }
-            Err(err) => debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}"),
-        };
+    if fixable && checker.patch(diagnostic.kind.rule()) {
+        diagnostic.amend(convert_to_class(
+            stmt,
+            class_name,
+            body,
+            total_keyword,
+            base_class,
+            checker.stylist,
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_boolean_trap/mod.rs
+source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -80,6 +80,16 @@ expression: diagnostics
   end_location:
     row: 19
     column: 45
+  fix: ~
+  parent: ~
+- kind:
+    BooleanPositionalArgInFunctionDefinition: ~
+  location:
+    row: 81
+    column: 18
+  end_location:
+    row: 81
+    column: 29
   fix: ~
   parent: ~
 

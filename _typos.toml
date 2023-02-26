@@ -4,3 +4,4 @@ extend-exclude = ["snapshots", "black"]
 [default.extend-words]
 trivias = "trivias"
 hel = "hel"
+whos = "whos"

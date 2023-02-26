@@ -4,8 +4,7 @@ use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
 use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, StmtKind};
-use rustpython_parser::lexer;
-use rustpython_parser::lexer::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers;
 use crate::ast::helpers::to_absolute;
@@ -53,6 +52,12 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
             handlers,
             orelse,
             finalbody,
+        }
+        | StmtKind::TryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
         } => {
             if body.iter().contains(child) {
                 Ok(has_single_child(body, deleted))
@@ -74,6 +79,19 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
                 bail!("Unable to find child in parent body")
             }
         }
+        StmtKind::Match { cases, .. } => {
+            if let Some(body) = cases.iter().find_map(|case| {
+                if case.body.iter().contains(child) {
+                    Some(&case.body)
+                } else {
+                    None
+                }
+            }) {
+                Ok(has_single_child(body, deleted))
+            } else {
+                bail!("Unable to find child in parent body")
+            }
+        }
         _ => bail!("Unable to find child in parent body"),
     }
 }
@@ -81,7 +99,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
 /// Return the location of a trailing semicolon following a `Stmt`, if it's part
 /// of a multi-statement line.
 fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
-    let contents = locator.slice_source_code_at(stmt.end_location.unwrap());
+    let contents = locator.skip(stmt.end_location.unwrap());
     for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         if trimmed.starts_with(';') {
@@ -104,7 +122,7 @@ fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
 /// Find the next valid break for a `Stmt` after a semicolon.
 fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
     let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
-    let contents = locator.slice_source_code_at(start_location);
+    let contents = locator.skip(start_location);
     for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         // Skip past any continuations.
@@ -136,7 +154,7 @@ fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
 
 /// Return `true` if a `Stmt` occurs at the end of a file.
 fn is_end_of_file(stmt: &Stmt, locator: &Locator) -> bool {
-    let contents = locator.slice_source_code_at(stmt.end_location.unwrap());
+    let contents = locator.skip(stmt.end_location.unwrap());
     contents.is_empty()
 }
 
@@ -209,7 +227,7 @@ pub fn remove_unused_imports<'a>(
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let module_text = locator.slice_source_code_range(&Range::from_located(stmt));
+    let module_text = locator.slice(&Range::from_located(stmt));
     let mut tree = match_module(module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {
@@ -339,7 +357,7 @@ pub fn remove_argument(
     remove_parentheses: bool,
 ) -> Result<Fix> {
     // TODO(sbrugman): Preserve trailing comments.
-    let contents = locator.slice_source_code_at(stmt_at);
+    let contents = locator.skip(stmt_at);
 
     let mut fix_start = None;
     let mut fix_end = None;
@@ -352,7 +370,7 @@ pub fn remove_argument(
     if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count: usize = 0;
-        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
+        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, stmt_at).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
@@ -384,7 +402,7 @@ pub fn remove_argument(
     {
         // Case 2: argument or keyword is _not_ the last node.
         let mut seen_comma = false;
-        for (start, tok, end) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
+        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, stmt_at).flatten() {
             if seen_comma {
                 if matches!(tok, Tok::NonLogicalNewline) {
                     // Also delete any non-logical newlines after the comma.
@@ -407,7 +425,7 @@ pub fn remove_argument(
     } else {
         // Case 3: argument or keyword is the last node, so we have to find the last
         // comma in the stmt.
-        for (start, tok, _) in lexer::make_tokenizer_located(contents, stmt_at).flatten() {
+        for (start, tok, _) in lexer::lex_located(contents, Mode::Module, stmt_at).flatten() {
             if start == expr_at {
                 fix_end = Some(expr_end);
                 break;
@@ -429,8 +447,8 @@ pub fn remove_argument(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use rustpython_parser as parser;
     use rustpython_parser::ast::Location;
-    use rustpython_parser::parser;
 
     use crate::autofix::helpers::{next_stmt_break, trailing_semicolon};
     use crate::source_code::Locator;

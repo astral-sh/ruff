@@ -1,4 +1,7 @@
-"""Vendored from [scripts/mkstdlibs.py in PyCQA/isort](https://github.com/PyCQA/isort/blob/e321a670d0fefdea0e04ed9d8d696434cf49bdec/scripts/mkstdlibs.py).
+"""Vendored from scripts/mkstdlibs.py in PyCQA/isort.
+
+Source:
+    https://github.com/PyCQA/isort/blob/e321a670d0fefdea0e04ed9d8d696434cf49bdec/scripts/mkstdlibs.py
 
 Only the generation of the file has been modified for use in this project.
 """
@@ -40,14 +43,13 @@ use rustc_hash::{FxHashMap, FxHashSet};
 pub static KNOWN_STANDARD_LIBRARY: Lazy<FxHashMap<(u32, u32), FxHashSet<&'static str>>> =
     Lazy::new(|| {
         FxHashMap::from_iter([
-""",
+""",  # noqa: E501
     )
-    for (major, minor) in VERSIONS:
+    for major, minor in VERSIONS:
         version = f"{major}.{minor}"
         url = URL.format(version)
         invdata = fetch_inventory(FakeApp(), "", url)
 
-        # Any modules we want to enforce across Python versions stdlib can be included in set init
         modules = {
             "_ast",
             "posixpath",

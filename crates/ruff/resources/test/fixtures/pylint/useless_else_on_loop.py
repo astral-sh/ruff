@@ -113,3 +113,25 @@ def test_break_in_if_orelse():
     else:
         return True
     return False
+
+
+def test_break_in_with():
+    """no false positive for break in with"""
+    for name in ["demo"]:
+        with open(__file__) as f:
+            if name in f.read():
+                break
+    else:
+        return True
+    return False
+
+
+def test_break_in_match():
+    """no false positive for break in match"""
+    for name in ["demo"]:
+        match name:
+            case "demo":
+                break
+    else:
+        return True
+    return False

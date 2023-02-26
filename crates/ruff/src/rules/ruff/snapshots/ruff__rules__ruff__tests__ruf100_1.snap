@@ -1,5 +1,5 @@
 ---
-source: src/rules/ruff/mod.rs
+source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -14,10 +14,7 @@ expression: diagnostics
     row: 37
     column: 13
   fix:
-    content:
-      - from typing import (
-      - "        Mapping,  # noqa: F401"
-      - "        )"
+    content: "from typing import (\n        Mapping,  # noqa: F401\n        )"
     location:
       row: 35
       column: 4
@@ -41,8 +38,7 @@ expression: diagnostics
     row: 52
     column: 31
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 52
       column: 17
@@ -64,8 +60,7 @@ expression: diagnostics
     row: 59
     column: 31
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 59
       column: 17
@@ -87,8 +82,7 @@ expression: diagnostics
     row: 66
     column: 27
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 66
       column: 13
@@ -110,8 +104,7 @@ expression: diagnostics
     row: 72
     column: 38
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 72
       column: 24
@@ -131,8 +124,7 @@ expression: diagnostics
     row: 89
     column: 32
   fix:
-    content:
-      - pass
+    content: pass
     location:
       row: 89
       column: 4
@@ -152,8 +144,7 @@ expression: diagnostics
     row: 89
     column: 52
   fix:
-    content:
-      - pass
+    content: pass
     location:
       row: 89
       column: 4
@@ -175,8 +166,7 @@ expression: diagnostics
     row: 89
     column: 66
   fix:
-    content:
-      - ""
+    content: ""
     location:
       row: 89
       column: 52

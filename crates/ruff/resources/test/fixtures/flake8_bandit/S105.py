@@ -61,3 +61,13 @@ if token == "3\t4":
 
 if token == "5\r6":
     pass
+
+
+# These should not be flagged
+passed_msg = "You have passed!"
+compassion = "Please don't match!"
+impassable = "You shall not pass!"
+passwords = ""
+passphrases = ""
+tokens = ""
+secrets = ""

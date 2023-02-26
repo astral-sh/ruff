@@ -12,6 +12,7 @@ use normalize::normalize_imports;
 use order::order_imports;
 use settings::RelativeImportsOrder;
 use sorting::cmp_either_import;
+use strum::IntoEnumIterator;
 use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingComma};
@@ -120,6 +121,7 @@ pub fn format_imports(
     force_single_line: bool,
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
+    force_to_top: &BTreeSet<String>,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     known_local_folder: &BTreeSet<String>,
@@ -155,6 +157,7 @@ pub fn format_imports(
             force_single_line,
             force_sort_within_sections,
             force_wrap_aliases,
+            force_to_top,
             known_first_party,
             known_third_party,
             known_local_folder,
@@ -214,6 +217,7 @@ fn format_import_block(
     force_single_line: bool,
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
+    force_to_top: &BTreeSet<String>,
     known_first_party: &BTreeSet<String>,
     known_third_party: &BTreeSet<String>,
     known_local_folder: &BTreeSet<String>,
@@ -229,7 +233,7 @@ fn format_import_block(
     target_version: PythonVersion,
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
-    let block_by_type = categorize_imports(
+    let mut block_by_type = categorize_imports(
         block,
         src,
         package,
@@ -244,7 +248,17 @@ fn format_import_block(
 
     // Generate replacement source code.
     let mut is_first_block = true;
-    for (import_type, import_block) in block_by_type {
+    let mut pending_lines_before = false;
+    for import_type in ImportType::iter() {
+        let import_block = block_by_type.remove(&import_type);
+
+        if !no_lines_before.contains(&import_type) {
+            pending_lines_before = true;
+        }
+        let Some(import_block) = import_block else {
+            continue;
+        };
+
         let mut imports = order_imports(
             import_block,
             order_by_type,
@@ -252,6 +266,7 @@ fn format_import_block(
             classes,
             constants,
             variables,
+            force_to_top,
         );
 
         if force_single_line {
@@ -267,7 +282,7 @@ fn format_import_block(
                 .collect::<Vec<EitherImport>>();
             if force_sort_within_sections {
                 imports.sort_by(|import1, import2| {
-                    cmp_either_import(import1, import2, relative_imports_order)
+                    cmp_either_import(import1, import2, relative_imports_order, force_to_top)
                 });
             };
             imports
@@ -276,8 +291,10 @@ fn format_import_block(
         // Add a blank line between every section.
         if is_first_block {
             is_first_block = false;
-        } else if !no_lines_before.contains(&import_type) {
+            pending_lines_before = false;
+        } else if pending_lines_before {
             output.push_str(stylist.line_ending());
+            pending_lines_before = false;
         }
 
         let mut lines_inserted = false;
@@ -330,16 +347,18 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use super::categorize::ImportType;
     use super::settings::RelativeImportsOrder;
-    use crate::assert_yaml_snapshot;
+
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
+    #[test_case(Path::new("as_imports_comments.py"))]
     #[test_case(Path::new("combine_as_imports.py"))]
     #[test_case(Path::new("combine_import_from.py"))]
     #[test_case(Path::new("comments.py"))]
@@ -347,6 +366,7 @@ mod tests {
     #[test_case(Path::new("fit_line_length.py"))]
     #[test_case(Path::new("fit_line_length_comment.py"))]
     #[test_case(Path::new("force_sort_within_sections.py"))]
+    #[test_case(Path::new("force_to_top.py"))]
     #[test_case(Path::new("force_wrap_aliases.py"))]
     #[test_case(Path::new("import_from_after_import.py"))]
     #[test_case(Path::new("inline_comments.py"))]
@@ -387,12 +407,6 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &Settings {
                 src: vec![test_resource_path("fixtures/isort")],
-                isort: super::settings::Settings {
-                    known_local_folder: vec!["ruff".to_string()]
-                        .into_iter()
-                        .collect::<BTreeSet<_>>(),
-                    ..super::settings::Settings::default()
-                },
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
@@ -417,6 +431,48 @@ mod tests {
     //     insta::assert_yaml_snapshot!(snapshot, diagnostics);
     //     Ok(())
     // }
+
+    #[test_case(Path::new("separate_local_folder_imports.py"))]
+    fn known_local_folder(path: &Path) -> Result<()> {
+        let snapshot = format!("known_local_folder_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_local_folder: BTreeSet::from(["ruff".to_string()]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("force_to_top.py"))]
+    fn force_to_top(path: &Path) -> Result<()> {
+        let snapshot = format!("force_to_top_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    force_to_top: BTreeSet::from([
+                        "z".to_string(),
+                        "lib1".to_string(),
+                        "lib3".to_string(),
+                        "lib5".to_string(),
+                        "lib3.lib4".to_string(),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
 
     #[test_case(Path::new("combine_as_imports.py"))]
     fn combine_as_imports(path: &Path) -> Result<()> {
@@ -620,6 +676,7 @@ mod tests {
 
     #[test_case(Path::new("docstring.py"))]
     #[test_case(Path::new("docstring_only.py"))]
+    #[test_case(Path::new("multiline_docstring.py"))]
     #[test_case(Path::new("empty.py"))]
     fn required_import(path: &Path) -> Result<()> {
         let snapshot = format!("required_import_{}", path.to_string_lossy());
@@ -735,6 +792,31 @@ mod tests {
                         ImportType::StandardLibrary,
                         ImportType::ThirdParty,
                         ImportType::FirstParty,
+                        ImportType::LocalFolder,
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("no_lines_before_with_empty_sections.py"))]
+    fn no_lines_before_with_empty_sections(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "no_lines_before_with_empty_sections.py_{}",
+            path.to_string_lossy()
+        );
+        let mut diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    no_lines_before: BTreeSet::from([
+                        ImportType::StandardLibrary,
                         ImportType::LocalFolder,
                     ]),
                     ..super::settings::Settings::default()

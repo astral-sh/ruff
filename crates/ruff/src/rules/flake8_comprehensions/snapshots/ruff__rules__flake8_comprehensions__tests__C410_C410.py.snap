@@ -1,5 +1,5 @@
 ---
-source: src/rules/flake8_comprehensions/mod.rs
+source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -12,8 +12,7 @@ expression: diagnostics
     row: 1
     column: 17
   fix:
-    content:
-      - "[1, 2]"
+    content: "[1, 2]"
     location:
       row: 1
       column: 5
@@ -31,8 +30,7 @@ expression: diagnostics
     row: 2
     column: 17
   fix:
-    content:
-      - "[1, 2]"
+    content: "[1, 2]"
     location:
       row: 2
       column: 5
@@ -50,8 +48,7 @@ expression: diagnostics
     row: 3
     column: 13
   fix:
-    content:
-      - "[]"
+    content: "[]"
     location:
       row: 3
       column: 5
@@ -69,8 +66,7 @@ expression: diagnostics
     row: 4
     column: 13
   fix:
-    content:
-      - "[]"
+    content: "[]"
     location:
       row: 4
       column: 5

@@ -32,12 +32,8 @@ impl Violation for ImportReplacements {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let ImportReplacements { fixable, .. } = self;
-        if *fixable {
-            Some(|ImportReplacements { module, .. }| format!("Import from `{module}`"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|ImportReplacements { module, .. }| format!("Import from `{module}`"))
     }
 }
 
@@ -354,8 +350,7 @@ impl<'a> ImportReplacer<'a> {
 
             let matched = ImportReplacer::format_import_from(&matched_names, target);
             let unmatched = fixes::remove_import_members(
-                self.locator
-                    .slice_source_code_range(&Range::from_located(self.stmt)),
+                self.locator.slice(&Range::from_located(self.stmt)),
                 &matched_names
                     .iter()
                     .map(|name| name.name.as_str())
