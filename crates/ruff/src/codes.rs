@@ -621,6 +621,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-django
         (Flake8Django, "001") => Rule::NullableModelStringField,
+        (Flake8Django, "003") => Rule::LocalsInRenderFunction,
+        (Flake8Django, "006") => Rule::ExcludeWithModelForm,
+        (Flake8Django, "007") => Rule::AllWithModelForm,
         (Flake8Django, "008") => Rule::ModelWithoutDunderStr,
         (Flake8Django, "013") => Rule::NonLeadingReceiverDecorator,
 

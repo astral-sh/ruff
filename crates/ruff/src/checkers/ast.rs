@@ -812,6 +812,21 @@ where
                             self, body,
                         ));
                 }
+
+                if self.settings.rules.enabled(&Rule::ExcludeWithModelForm) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::exclude_with_model_form(self, bases, body)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+                if self.settings.rules.enabled(&Rule::AllWithModelForm) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::all_with_model_form(self, bases, body)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
                     if let Some(diagnostic) =
                         flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
@@ -2940,6 +2955,11 @@ where
                     || self.settings.rules.enabled(&Rule::LoggingTooManyArgs)
                 {
                     pylint::rules::logging_call(self, func, args, keywords);
+                }
+
+                // flake8-django
+                if self.settings.rules.enabled(&Rule::LocalsInRenderFunction) {
+                    flake8_django::rules::locals_in_render_function(self, func, args, keywords);
                 }
             }
             ExprKind::Dict { keys, values } => {
