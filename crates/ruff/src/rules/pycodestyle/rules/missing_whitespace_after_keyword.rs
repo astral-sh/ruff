@@ -1,14 +1,13 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports)]
+
+use rustpython_parser::ast::Location;
+use rustpython_parser::Tok;
 
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::registry::DiagnosticKind;
-use crate::violation::Violation;
-
 use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
-
-use rustpython_parser::ast::Location;
-use rustpython_parser::Tok;
+use crate::violation::Violation;
 
 define_violation!(
     pub struct MissingWhitespaceAfterKeyword;

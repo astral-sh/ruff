@@ -1,14 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
+
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::{checkers::ast::Checker, registry::Diagnostic, violation::Violation, Range};
 
 define_violation!(
     /// ## What it does
-    /// Checks for use of `locals()` in `render` functions.
+    /// Checks for the use of `locals()` in `render` functions.
     ///
     /// ## Why is this bad?
-    /// It could potentially expose variables that you don't want to expose.
+    /// Using `locals()` can expose internal variables or other unintentional
+    /// data to the rendered template.
     ///
     /// ## Example
     /// ```python
@@ -44,45 +46,43 @@ pub fn locals_in_render_function(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let diagnostic = {
-        let call_path = checker.resolve_call_path(func);
-        if call_path.as_ref().map_or(false, |call_path| {
-            *call_path.as_slice() == ["django", "shortcuts", "render"]
-        }) {
-            let locals = if args.len() >= 3 {
-                if !is_locals_call(checker, &args[2]) {
-                    return;
-                }
-                &args[2]
-            } else if let Some(keyword) = keywords.iter().find(|keyword| {
-                keyword
-                    .node
-                    .arg
-                    .as_ref()
-                    .map_or(false, |arg| arg == "context")
-            }) {
-                if !is_locals_call(checker, &keyword.node.value) {
-                    return;
-                }
-                &keyword.node.value
-            } else {
-                return;
-            };
-            Diagnostic::new(LocalsInRenderFunction, Range::from_located(locals))
-        } else {
+    if !checker.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["django", "shortcuts", "render"]
+    }) {
+        return;
+    }
+
+    let locals = if args.len() >= 3 {
+        if !is_locals_call(checker, &args[2]) {
             return;
         }
+        &args[2]
+    } else if let Some(keyword) = keywords.iter().find(|keyword| {
+        keyword
+            .node
+            .arg
+            .as_ref()
+            .map_or(false, |arg| arg == "context")
+    }) {
+        if !is_locals_call(checker, &keyword.node.value) {
+            return;
+        }
+        &keyword.node.value
+    } else {
+        return;
     };
 
-    checker.diagnostics.push(diagnostic);
+    checker.diagnostics.push(Diagnostic::new(
+        LocalsInRenderFunction,
+        Range::from_located(locals),
+    ));
 }
 
 fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {
     let ExprKind::Call { func, .. } = &expr.node else {
         return false
     };
-    let call_path = checker.resolve_call_path(func);
-    call_path
-        .as_ref()
-        .map_or(false, |call_path| *call_path.as_slice() == ["", "locals"])
+    checker
+        .resolve_call_path(func)
+        .map_or(false, |call_path| call_path.as_slice() == ["", "locals"])
 }
