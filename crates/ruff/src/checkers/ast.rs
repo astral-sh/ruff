@@ -1919,11 +1919,6 @@ where
                 if self.settings.rules.enabled(&Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
-                if self.is_interface_definition {
-                    if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
-                        flake8_pyi::rules::ban_doc_strings_in_stubs(self, body);
-                    }
-                }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
                     stmt,
@@ -1988,11 +1983,6 @@ where
             } => {
                 if self.settings.rules.enabled(&Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
-                }
-                if self.is_interface_definition {
-                    if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
-                        flake8_pyi::rules::ban_doc_strings_in_stubs(self, body);
-                    }
                 }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
@@ -4639,11 +4629,6 @@ impl<'a> Checker<'a> {
         if self.settings.rules.enabled(&Rule::FStringDocstring) {
             flake8_bugbear::rules::f_string_docstring(self, python_ast);
         }
-        if self.is_interface_definition {
-            if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
-                flake8_pyi::rules::ban_doc_strings_in_stubs(self, python_ast);
-            }
-        }
         let docstring = docstrings::extraction::docstring_from(python_ast);
         self.definitions.push((
             Definition {
@@ -5375,6 +5360,11 @@ impl<'a> Checker<'a> {
                         ));
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
+            }
+            if self.is_interface_definition {
+                if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
+                    flake8_pyi::rules::ban_doc_strings_in_stubs(self, &definition.docstring);
+                }
             }
 
             // pydocstyle
