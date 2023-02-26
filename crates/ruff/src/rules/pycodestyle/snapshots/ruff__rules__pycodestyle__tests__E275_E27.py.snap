@@ -5,76 +5,6 @@ expression: diagnostics
 - kind:
     MissingWhitespaceAfterKeyword: ~
   location:
-    row: 2
-    column: 14
-  end_location:
-    row: 2
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 4
-    column: 15
-  end_location:
-    row: 4
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 6
-    column: 15
-  end_location:
-    row: 6
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 10
-    column: 15
-  end_location:
-    row: 10
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 12
-    column: 15
-  end_location:
-    row: 12
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 24
-    column: 15
-  end_location:
-    row: 24
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 30
-    column: 15
-  end_location:
-    row: 30
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
     row: 37
     column: 13
   end_location:
@@ -95,31 +25,11 @@ expression: diagnostics
 - kind:
     MissingWhitespaceAfterKeyword: ~
   location:
-    row: 41
-    column: 3
-  end_location:
-    row: 41
-    column: 3
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
     row: 42
     column: 33
   end_location:
     row: 42
     column: 33
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 44
-    column: 8
-  end_location:
-    row: 44
-    column: 8
   fix: ~
   parent: ~
 - kind:
@@ -135,91 +45,11 @@ expression: diagnostics
 - kind:
     MissingWhitespaceAfterKeyword: ~
   location:
-    row: 47
-    column: 8
-  end_location:
-    row: 47
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 48
-    column: 4
-  end_location:
-    row: 48
-    column: 4
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 49
-    column: 8
-  end_location:
-    row: 49
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 51
-    column: 23
-  end_location:
-    row: 51
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 51
-    column: 39
-  end_location:
-    row: 51
-    column: 39
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 53
-    column: 7
-  end_location:
-    row: 53
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
     row: 54
     column: 10
   end_location:
     row: 54
     column: 10
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 57
-    column: 16
-  end_location:
-    row: 57
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    MissingWhitespaceAfterKeyword: ~
-  location:
-    row: 58
-    column: 14
-  end_location:
-    row: 58
-    column: 14
   fix: ~
   parent: ~
 
