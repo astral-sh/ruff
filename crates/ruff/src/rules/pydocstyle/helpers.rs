@@ -76,6 +76,10 @@ pub fn should_ignore_definition(
     definition: &Definition,
     ignore_decorators: &BTreeSet<String>,
 ) -> bool {
+    if ignore_decorators.is_empty() {
+        return false;
+    }
+
     if let DefinitionKind::Function(parent)
     | DefinitionKind::NestedFunction(parent)
     | DefinitionKind::Method(parent) = definition.kind
