@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PreferEllipsisOverPass: ~
+    PassStatementStubBody: ~
   location:
     row: 3
     column: 4
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferEllipsisOverPass: ~
+    PassStatementStubBody: ~
   location:
     row: 8
     column: 4

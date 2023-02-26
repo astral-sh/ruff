@@ -537,12 +537,11 @@ where
                 }
 
                 if self.is_interface_definition {
-                    if self.settings.rules.enabled(&Rule::PreferEllipsisOverPass) {
-                        flake8_pyi::rules::prefer_ellipsis_over_pass(self, body);
+                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                        flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
-
-                    if self.settings.rules.enabled(&Rule::PreferOnlyEllipsis) {
-                        flake8_pyi::rules::prefer_only_ellipsis(self, body);
+                    if self.settings.rules.enabled(&Rule::NonEmptyStubBody) {
+                        flake8_pyi::rules::non_empty_stub_body(self, body);
                     }
                 }
 
@@ -875,8 +874,8 @@ where
                     }
                 }
                 if self.is_interface_definition {
-                    if self.settings.rules.enabled(&Rule::PreferEllipsisOverPass) {
-                        flake8_pyi::rules::prefer_ellipsis_over_pass(self, body);
+                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                        flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
                 }
 
