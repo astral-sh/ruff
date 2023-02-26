@@ -22,13 +22,11 @@ impl Violation for MissingWhitespaceAfterKeyword {
 
 /// E275
 pub fn missing_whitespace_after_keyword(
-    tokens: &Vec<(Location, &Tok, Location)>,
+    tokens: &[(Location, &Tok, Location)],
 ) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    let mut tokens_clone = tokens.clone();
-    tokens_clone.remove(0);
 
-    for (tok0, tok1) in tokens.iter().zip(tokens_clone.iter()) {
+    for (tok0, tok1) in tokens.iter().zip(&tokens[1..]) {
         if tok0.2 == tok1.0
             && is_keyword_token(tok0.1)
             && !is_singleton_token(tok0.1)
