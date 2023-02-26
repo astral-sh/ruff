@@ -489,6 +489,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "008") => Rule::UnrecognizedPlatformName,
         (Flake8Pyi, "009") => Rule::PassStatementStubBody,
         (Flake8Pyi, "010") => Rule::NonEmptyStubBody,
+        (Flake8Pyi, "011") => Rule::TypedArgumentSimpleDefaults,
+        (Flake8Pyi, "014") => Rule::ArgumentSimpleDefaults,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
 
         // flake8-pytest-style

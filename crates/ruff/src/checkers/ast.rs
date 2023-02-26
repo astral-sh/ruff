@@ -3930,6 +3930,21 @@ where
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
         }
 
+        if self.is_interface_definition {
+            if self
+                .settings
+                .rules
+                .enabled(&Rule::TypedArgumentSimpleDefaults)
+            {
+                flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
+            }
+        }
+        if self.is_interface_definition {
+            if self.settings.rules.enabled(&Rule::ArgumentSimpleDefaults) {
+                flake8_pyi::rules::argument_simple_defaults(self, arguments);
+            }
+        }
+
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for arg in &arguments.posonlyargs {
