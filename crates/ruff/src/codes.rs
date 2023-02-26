@@ -145,6 +145,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R0133") => Rule::ComparisonOfConstant,
         (Pylint, "R1701") => Rule::ConsiderMergingIsinstance,
         (Pylint, "R1722") => Rule::ConsiderUsingSysExit,
+        (Pylint, "R5501") => Rule::CollapsibleElseIf,
         (Pylint, "R2004") => Rule::MagicValueComparison,
         (Pylint, "W0120") => Rule::UselessElseOnLoop,
         (Pylint, "W0602") => Rule::GlobalVariableNotAssigned,
