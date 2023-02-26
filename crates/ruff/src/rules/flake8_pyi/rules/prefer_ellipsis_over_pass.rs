@@ -1,7 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Expr, ExprKind, Located, StmtKind};
-use serde::{Deserialize, Serialize};
-use std::fmt;
+use rustpython_parser::ast::{Located, StmtKind};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -23,7 +21,7 @@ pub fn prefer_ellipsis_over_pass(checker: &mut Checker, body: &Vec<Located<StmtK
     if body.len() != 1 {
         return;
     }
-    if &body[0].node == &StmtKind::Pass {
+    if body[0].node == StmtKind::Pass {
         checker.diagnostics.push(Diagnostic::new(
             PreferEllipsisOverPass,
             Range::from_located(&body[0]),

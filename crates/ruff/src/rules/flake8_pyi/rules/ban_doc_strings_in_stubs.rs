@@ -1,7 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Located, StmtKind};
-use serde::{Deserialize, Serialize};
-use std::fmt;
+use rustpython_parser::ast::{Constant, ExprKind, Located};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -27,7 +25,7 @@ pub fn ban_doc_strings_in_stubs(checker: &mut Checker, expr: &Located<ExprKind>)
     {
         checker.diagnostics.push(Diagnostic::new(
             BanDocStringsInStubs,
-            Range::from_located(&expr),
+            Range::from_located(expr),
         ));
     }
 }
