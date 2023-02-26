@@ -77,5 +77,5 @@ wasm-bindgen-test = { version = "0.3.33" }
 criterion = { version = "0.4.0" }
 
 [features]
-default = ["logical_lines"]
+default = []
 logical_lines = []
