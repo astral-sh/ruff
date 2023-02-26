@@ -132,18 +132,18 @@ pub fn check_path(
                     ));
                 }
                 if use_imports {
-                    diagnostics.extend(
-                        check_imports(
-                            &python_ast,
-                            locator,
-                            indexer,
-                            &directives.isort,
-                            settings,
-                            stylist,
-                            autofix,
-                            path,
-                            package,
-                        ));
+                    let (import_diagnostics, _imports) = check_imports(
+                        &python_ast,
+                        locator,
+                        indexer,
+                        &directives.isort,
+                        settings,
+                        stylist,
+                        autofix,
+                        path,
+                        package,
+                    );
+                    diagnostics.extend(import_diagnostics);
                 }
                 if use_doc_lines {
                     doc_lines.extend(doc_lines_from_ast(&python_ast));
