@@ -34,12 +34,16 @@ pub use space_around_operator::{
 };
 pub use type_comparison::{type_comparison, TypeComparison};
 pub use whitespace_around_keywords::{
-    whitespace_around_keywords, MissingWhitespaceAfterKeyword, MultipleSpacesAfterKeyword,
-    MultipleSpacesBeforeKeyword, TabAfterKeyword, TabBeforeKeyword,
+    whitespace_around_keywords, MultipleSpacesAfterKeyword, MultipleSpacesBeforeKeyword,
+    TabAfterKeyword, TabBeforeKeyword,
 };
 pub use whitespace_before_comment::{
     whitespace_before_comment, MultipleLeadingHashesForBlockComment, NoSpaceAfterBlockComment,
     NoSpaceAfterInlineComment, TooFewSpacesBeforeInlineComment,
+};
+
+pub use missing_whitespace_after_keyword::{
+    missing_whitespace_after_keyword, MissingWhitespaceAfterKeyword,
 };
 
 mod ambiguous_class_name;
@@ -56,6 +60,7 @@ mod invalid_escape_sequence;
 mod lambda_assignment;
 mod line_too_long;
 mod literal_comparisons;
+mod missing_whitespace_after_keyword;
 mod mixed_spaces_and_tabs;
 mod no_newline_at_end_of_file;
 mod not_tests;

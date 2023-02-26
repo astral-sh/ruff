@@ -58,7 +58,7 @@ pub fn is_overlong(
     true
 }
 
-pub fn is_keyword(token: &Tok) -> bool {
+pub fn is_keyword_token(token: &Tok) -> bool {
     match token {
         Tok::False { .. } => true,
         Tok::True { .. } => true,
@@ -98,7 +98,7 @@ pub fn is_keyword(token: &Tok) -> bool {
     }
 }
 
-pub fn is_singleton(token: &Tok) -> bool {
+pub fn is_singleton_token(token: &Tok) -> bool {
     match token {
         Tok::False { .. } => true,
         Tok::True { .. } => true,
