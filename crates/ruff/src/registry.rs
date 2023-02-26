@@ -53,6 +53,8 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
@@ -824,6 +826,7 @@ impl Rule {
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
+            | Rule::MissingWhitespaceAfterKeyword
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
             | Rule::NoSpaceAfterBlockComment

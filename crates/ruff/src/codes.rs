@@ -52,6 +52,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E273") => Rule::TabAfterKeyword,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E274") => Rule::TabBeforeKeyword,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E275") => Rule::MissingWhitespaceAfterKeyword,
         (Pycodestyle, "E401") => Rule::MultipleImportsOnOneLine,
         (Pycodestyle, "E402") => Rule::ModuleImportNotAtTopOfFile,
         (Pycodestyle, "E501") => Rule::LineTooLong,
