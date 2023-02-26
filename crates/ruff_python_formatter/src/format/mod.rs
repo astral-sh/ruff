@@ -4,6 +4,7 @@ mod arguments;
 mod boolop;
 pub mod builders;
 mod cmpop;
+mod comments;
 mod comprehension;
 mod excepthandler;
 mod expr;

@@ -4,15 +4,14 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{format_args, write};
 use ruff_text_size::TextSize;
 
-use crate::builders::literal;
 use crate::context::ASTFormatContext;
 use crate::cst::{
     Alias, Arguments, Excepthandler, Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem,
 };
 use crate::format::builders::{block, join_names};
+use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
 use crate::format::helpers::is_self_closing;
 use crate::shared_traits::AsFormat;
-use crate::trivia::TriviaKind;
 
 fn format_break(f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
     write!(f, [text("break")])
@@ -22,20 +21,7 @@ fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatRe
     // Write the statement body.
     write!(f, [text("pass")])?;
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
     Ok(())
 }
@@ -200,20 +186,7 @@ fn format_func_def(
 
     write!(f, [text(":")])?;
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
     write!(f, [block_indent(&format_args![block(body)])])
 }
@@ -245,20 +218,7 @@ fn format_assign(
         )?;
     }
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
     Ok(())
 }
@@ -417,20 +377,7 @@ fn format_return(
         write!(f, [space(), value.format()])?;
     }
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
     Ok(())
 }
@@ -590,20 +537,7 @@ fn format_import_from(
         )?;
     }
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
     Ok(())
 }
@@ -635,20 +569,7 @@ fn format_expr(
         )?;
     }
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in stmt.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(stmt)])?;
 
     Ok(())
 }
@@ -697,20 +618,7 @@ pub struct FormatStmt<'a> {
 
 impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        // Any leading comments come on the line before.
-        for trivia in &self.item.trivia {
-            if trivia.relationship.is_leading() {
-                match trivia.kind {
-                    TriviaKind::EmptyLine => {
-                        write!(f, [empty_line()])?;
-                    }
-                    TriviaKind::OwnLineComment(range) => {
-                        write!(f, [literal(range), hard_line_break()])?;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        write!(f, [leading_comments(self.item)])?;
 
         match &self.item.node {
             StmtKind::Pass => format_pass(f, self.item),
@@ -852,21 +760,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
         }?;
 
         write!(f, [hard_line_break()])?;
-
-        // Any trailing comments come on the lines after.
-        for trivia in &self.item.trivia {
-            if trivia.relationship.is_trailing() {
-                match trivia.kind {
-                    TriviaKind::EmptyLine => {
-                        write!(f, [empty_line()])?;
-                    }
-                    TriviaKind::OwnLineComment(range) => {
-                        write!(f, [literal(range), hard_line_break()])?;
-                    }
-                    _ => {}
-                }
-            }
-        }
+        write!(f, [trailing_comments(self.item)])?;
 
         Ok(())
     }

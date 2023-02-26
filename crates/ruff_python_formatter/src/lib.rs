@@ -11,7 +11,6 @@ use crate::newlines::normalize_newlines;
 use crate::parentheses::normalize_parentheses;
 
 mod attachment;
-pub mod builders;
 pub mod cli;
 pub mod context;
 mod core;
