@@ -556,6 +556,10 @@ where
                     }
                 }
 
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    pylint::rules::global_statement(self, name);
+                }
+
                 if self
                     .settings
                     .rules
@@ -834,6 +838,9 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    pylint::rules::global_statement(self, name);
+                }
                 if self.settings.rules.enabled(&Rule::UselessObjectInheritance) {
                     pyupgrade::rules::useless_object_inheritance(self, stmt, name, bases, keywords);
                 }
@@ -937,6 +944,17 @@ where
                 {
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt);
                 }
+
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    for name in names.iter() {
+                        if let Some(asname) = name.node.asname.as_ref() {
+                            pylint::rules::global_statement(self, asname);
+                        } else {
+                            pylint::rules::global_statement(self, &name.node.name);
+                        }
+                    }
+                }
+
                 if self.settings.rules.enabled(&Rule::RewriteCElementTree) {
                     pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
@@ -1192,6 +1210,16 @@ where
                     .enabled(&Rule::ModuleImportNotAtTopOfFile)
                 {
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt);
+                }
+
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    for name in names.iter() {
+                        if let Some(asname) = name.node.asname.as_ref() {
+                            pylint::rules::global_statement(self, asname);
+                        } else {
+                            pylint::rules::global_statement(self, &name.node.name);
+                        }
+                    }
                 }
 
                 if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport)
@@ -1576,6 +1604,12 @@ where
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
+
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    if let ExprKind::Name { id, .. } = &target.node {
+                        pylint::rules::global_statement(self, id);
+                    }
+                }
             }
             StmtKind::If { test, body, orelse } => {
                 if self.settings.rules.enabled(&Rule::IfTuple) {
@@ -1846,6 +1880,14 @@ where
                     }
                 }
 
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    for target in targets.iter() {
+                        if let ExprKind::Name { id, .. } = &target.node {
+                            pylint::rules::global_statement(self, id);
+                        }
+                    }
+                }
+
                 if self.settings.rules.enabled(&Rule::UselessMetaclassType) {
                     pyupgrade::rules::useless_metaclass_type(self, stmt, value, targets);
                 }
@@ -1896,7 +1938,15 @@ where
                     );
                 }
             }
-            StmtKind::Delete { .. } => {}
+            StmtKind::Delete { targets } => {
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    for target in targets.iter() {
+                        if let ExprKind::Name { id, .. } = &target.node {
+                            pylint::rules::global_statement(self, id);
+                        }
+                    }
+                }
+            }
             StmtKind::Expr { value, .. } => {
                 if self.settings.rules.enabled(&Rule::UselessComparison) {
                     flake8_bugbear::rules::useless_comparison(self, value);

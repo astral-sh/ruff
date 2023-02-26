@@ -149,6 +149,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::ConsiderUsingSysExit,
     rules::pylint::rules::MagicValueComparison,
     rules::pylint::rules::UselessElseOnLoop,
+    rules::pylint::rules::GlobalStatement,
     rules::pylint::rules::GlobalVariableNotAssigned,
     rules::pylint::rules::TooManyReturnStatements,
     rules::pylint::rules::TooManyArguments,
