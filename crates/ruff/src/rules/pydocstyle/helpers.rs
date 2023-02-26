@@ -5,7 +5,7 @@ use ruff_python::str::{
 };
 
 use crate::ast::cast;
-use crate::ast::helpers::{format_call_path, map_callable};
+use crate::ast::helpers::{map_callable, to_call_path};
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 
@@ -85,12 +85,11 @@ pub fn should_ignore_definition(
     | DefinitionKind::Method(parent) = definition.kind
     {
         for decorator in cast::decorator_list(parent) {
-            if let Some(call_path) = checker
-                .resolve_call_path(map_callable(decorator))
-                .map(|call_path| format_call_path(&call_path))
-            {
-                // Check if decorator is in ignore list.
-                if ignore_decorators.contains(&call_path) {
+            if let Some(call_path) = checker.resolve_call_path(map_callable(decorator)) {
+                if ignore_decorators
+                    .iter()
+                    .any(|decorator| to_call_path(decorator) == call_path)
+                {
                     return true;
                 }
             }
