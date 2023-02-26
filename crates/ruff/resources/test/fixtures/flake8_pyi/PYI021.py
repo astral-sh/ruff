@@ -7,3 +7,8 @@ def foo():
 
 class Bar:
     """bar"""  # OK, doc strings are allowed in non-stubs
+
+
+def bar():
+    x = 1
+    """foo"""  # OK, not a doc string

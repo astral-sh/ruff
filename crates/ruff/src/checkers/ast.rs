@@ -1919,6 +1919,11 @@ where
                 if self.settings.rules.enabled(&Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
+                        flake8_pyi::rules::ban_doc_strings_in_stubs(self, body);
+                    }
+                }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
                     stmt,
@@ -1983,6 +1988,11 @@ where
             } => {
                 if self.settings.rules.enabled(&Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
+                }
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
+                        flake8_pyi::rules::ban_doc_strings_in_stubs(self, body);
+                    }
                 }
                 let definition = docstrings::extraction::extract(
                     &self.visible_scope,
@@ -3346,12 +3356,6 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteUnicodeLiteral) {
                     pyupgrade::rules::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
-
-                if self.is_interface_definition {
-                    if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
-                        flake8_pyi::rules::ban_doc_strings_in_stubs(self, expr);
-                    }
-                }
             }
             ExprKind::Lambda { args, body, .. } => {
                 if self.settings.rules.enabled(&Rule::PreferListBuiltin) {
@@ -4637,11 +4641,7 @@ impl<'a> Checker<'a> {
         }
         if self.is_interface_definition {
             if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
-                if let Some(stmt) = python_ast.first() {
-                    if let StmtKind::Expr { value } = &stmt.node {
-                        flake8_pyi::rules::ban_doc_strings_in_stubs(self, value);
-                    }
-                }
+                flake8_pyi::rules::ban_doc_strings_in_stubs(self, python_ast);
             }
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);

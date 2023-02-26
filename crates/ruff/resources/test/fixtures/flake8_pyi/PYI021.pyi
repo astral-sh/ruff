@@ -5,3 +5,7 @@ def foo():
 
 class Bar:
     """bar"""  # ERROR PYI021
+
+def bar():
+    x = 1
+    """foo"""  # OK, not a doc string
