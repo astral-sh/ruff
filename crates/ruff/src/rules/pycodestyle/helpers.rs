@@ -59,50 +59,48 @@ pub fn is_overlong(
 }
 
 pub fn is_keyword_token(token: &Tok) -> bool {
-    match token {
-        Tok::False { .. } => true,
-        Tok::True { .. } => true,
-        Tok::None { .. } => true,
-        Tok::And { .. } => true,
-        Tok::As { .. } => true,
-        Tok::Assert { .. } => true,
-        Tok::Await { .. } => true,
-        Tok::Break { .. } => true,
-        Tok::Class { .. } => true,
-        Tok::Continue { .. } => true,
-        Tok::Def { .. } => true,
-        Tok::Del { .. } => true,
-        Tok::Elif { .. } => true,
-        Tok::Else { .. } => true,
-        Tok::Except { .. } => true,
-        Tok::Finally { .. } => true,
-        Tok::For { .. } => true,
-        Tok::From { .. } => true,
-        Tok::Global { .. } => true,
-        Tok::If { .. } => true,
-        Tok::Import { .. } => true,
-        Tok::In { .. } => true,
-        Tok::Is { .. } => true,
-        Tok::Lambda { .. } => true,
-        Tok::Nonlocal { .. } => true,
-        Tok::Not { .. } => true,
-        Tok::Or { .. } => true,
-        Tok::Pass { .. } => true,
-        Tok::Raise { .. } => true,
-        Tok::Return { .. } => true,
-        Tok::Try { .. } => true,
-        Tok::While { .. } => true,
-        Tok::With { .. } => true,
-        Tok::Yield { .. } => true,
-        _ => false,
-    }
+    matches!(
+        token,
+        Tok::False { .. }
+            | Tok::True { .. }
+            | Tok::None { .. }
+            | Tok::And { .. }
+            | Tok::As { .. }
+            | Tok::Assert { .. }
+            | Tok::Await { .. }
+            | Tok::Break { .. }
+            | Tok::Class { .. }
+            | Tok::Continue { .. }
+            | Tok::Def { .. }
+            | Tok::Del { .. }
+            | Tok::Elif { .. }
+            | Tok::Else { .. }
+            | Tok::Except { .. }
+            | Tok::Finally { .. }
+            | Tok::For { .. }
+            | Tok::From { .. }
+            | Tok::Global { .. }
+            | Tok::If { .. }
+            | Tok::Import { .. }
+            | Tok::In { .. }
+            | Tok::Is { .. }
+            | Tok::Lambda { .. }
+            | Tok::Nonlocal { .. }
+            | Tok::Not { .. }
+            | Tok::Or { .. }
+            | Tok::Pass { .. }
+            | Tok::Raise { .. }
+            | Tok::Return { .. }
+            | Tok::Try { .. }
+            | Tok::While { .. }
+            | Tok::With { .. }
+            | Tok::Yield { .. }
+    )
 }
 
 pub fn is_singleton_token(token: &Tok) -> bool {
-    match token {
-        Tok::False { .. } => true,
-        Tok::True { .. } => true,
-        Tok::None { .. } => true,
-        _ => false,
-    }
+    matches!(
+        token,
+        Tok::False { .. } | Tok::True { .. } | Tok::None { .. },
+    )
 }
