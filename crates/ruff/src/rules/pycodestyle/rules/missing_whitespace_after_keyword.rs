@@ -1,10 +1,5 @@
 #![allow(dead_code)]
 
-use std::clone;
-
-use once_cell::sync::Lazy;
-use regex::Regex;
-
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::registry::DiagnosticKind;
@@ -28,7 +23,7 @@ impl Violation for MissingWhitespaceAfterKeyword {
 /// E275
 pub fn missing_whitespace_after_keyword(
     tokens: &Vec<(Location, &Tok, Location)>,
-) -> Vec<(usize, DiagnosticKind)> {
+) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut tokens_clone = tokens.clone();
     tokens_clone.remove(0);
@@ -44,7 +39,7 @@ pub fn missing_whitespace_after_keyword(
             && *tok1.1 != Tok::Colon
             && *tok1.1 != Tok::Newline
         {
-            diagnostics.push((tok0.2.column(), MissingWhitespaceAfterKeyword.into()));
+            diagnostics.push((tok0.2, MissingWhitespaceAfterKeyword.into()));
         }
     }
     diagnostics

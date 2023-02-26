@@ -7,8 +7,8 @@ use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
 use crate::rules::pycodestyle::rules::{
-    extraneous_whitespace, indentation, space_around_operator, whitespace_around_keywords,
-    whitespace_before_comment,
+    extraneous_whitespace, indentation, missing_whitespace_after_keyword, space_around_operator,
+    whitespace_around_keywords, whitespace_before_comment,
 };
 use crate::settings::Settings;
 use crate::source_code::{Locator, Stylist};
@@ -96,6 +96,18 @@ pub fn check_logical_lines(
             for (index, kind) in whitespace_around_keywords(&line.text) {
                 let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
                 let location = Location::new(pos.row(), pos.column() + index - token_offset);
+                if settings.rules.enabled(kind.rule()) {
+                    diagnostics.push(Diagnostic {
+                        kind,
+                        location,
+                        end_location: location,
+                        fix: None,
+                        parent: None,
+                    });
+                }
+            }
+
+            for (location, kind) in missing_whitespace_after_keyword(&line.tokens) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
