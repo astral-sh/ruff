@@ -1604,6 +1604,13 @@ where
                 if self.settings.rules.enabled(&Rule::OutdatedVersionBlock) {
                     pyupgrade::rules::outdated_version_block(self, stmt, test, body, orelse);
                 }
+                if self.settings.rules.enabled(&Rule::ElseIfUsed) {
+                    if let Some(diagnostic) =
+                        pylint::rules::else_if_used(stmt, body, orelse, self.locator)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
             }
             StmtKind::Assert { test, msg } => {
                 if self.settings.rules.enabled(&Rule::AssertTuple) {
