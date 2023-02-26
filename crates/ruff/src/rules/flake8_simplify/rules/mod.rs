@@ -1,10 +1,11 @@
 pub use ast_bool_op::{
-    a_and_not_a, a_or_not_a, and_false, compare_with_tuple, duplicate_isinstance_call, or_true,
-    AAndNotA, AOrNotA, AndFalse, CompareWithTuple, DuplicateIsinstanceCall, OrTrue,
+    compare_with_tuple, duplicate_isinstance_call, expr_and_false, expr_and_not_expr,
+    expr_or_not_expr, expr_or_true, CompareWithTuple, DuplicateIsinstanceCall, ExprAndFalse,
+    ExprAndNotExpr, ExprOrNotExpr, ExprOrTrue,
 };
 pub use ast_expr::{use_capital_environment_variables, UseCapitalEnvironmentVariables};
 pub use ast_if::{
-    if_with_same_arms, manual_dict_lookup, nested_if_statements, return_bool_condition_directly,
+    if_with_same_arms, manual_dict_lookup, needless_bool, nested_if_statements,
     use_dict_get_with_default, use_ternary_operator, CollapsibleIf, DictGetWithDefault,
     IfWithSameArms, ManualDictLookup, NeedlessBool, UseTernaryOperator,
 };

@@ -1599,7 +1599,7 @@ where
                     );
                 }
                 if self.settings.rules.enabled(&Rule::NeedlessBool) {
-                    flake8_simplify::rules::return_bool_condition_directly(self, stmt);
+                    flake8_simplify::rules::needless_bool(self, stmt);
                 }
                 if self.settings.rules.enabled(&Rule::ManualDictLookup) {
                     flake8_simplify::rules::manual_dict_lookup(self, stmt, test, body, orelse);
@@ -3454,17 +3454,17 @@ where
                 if self.settings.rules.enabled(&Rule::CompareWithTuple) {
                     flake8_simplify::rules::compare_with_tuple(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AAndNotA) {
-                    flake8_simplify::rules::a_and_not_a(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprAndNotExpr) {
+                    flake8_simplify::rules::expr_and_not_expr(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AOrNotA) {
-                    flake8_simplify::rules::a_or_not_a(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprOrNotExpr) {
+                    flake8_simplify::rules::expr_or_not_expr(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::OrTrue) {
-                    flake8_simplify::rules::or_true(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprOrTrue) {
+                    flake8_simplify::rules::expr_or_true(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AndFalse) {
-                    flake8_simplify::rules::and_false(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprAndFalse) {
+                    flake8_simplify::rules::expr_and_false(self, expr);
                 }
             }
             _ => {}
