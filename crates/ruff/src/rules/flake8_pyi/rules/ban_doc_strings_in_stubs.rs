@@ -1,5 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Constant, ExprKind, Located, StmtKind};
+use rustpython_parser::ast::{ExprKind, Located};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -17,14 +17,11 @@ impl Violation for BanDocStringsInStubs {
 }
 
 /// PYI021
-pub fn ban_doc_strings_in_stubs(
-    checker: &mut Checker,
-    docstring: &std::option::Option<&Located<ExprKind>>,
-) {
+pub fn ban_doc_strings_in_stubs(checker: &mut Checker, docstring: Option<&Located<ExprKind>>) {
     if let Some(docstr) = &docstring {
         checker.diagnostics.push(Diagnostic::new(
             BanDocStringsInStubs,
-            Range::from_located(&docstr),
+            Range::from_located(docstr),
         ));
     }
 }

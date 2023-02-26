@@ -5363,7 +5363,7 @@ impl<'a> Checker<'a> {
             }
             if self.is_interface_definition {
                 if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
-                    flake8_pyi::rules::ban_doc_strings_in_stubs(self, &definition.docstring);
+                    flake8_pyi::rules::ban_doc_strings_in_stubs(self, definition.docstring);
                 }
             }
 
