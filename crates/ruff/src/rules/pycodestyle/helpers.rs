@@ -4,6 +4,7 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::source_code::Stylist;
+use rustpython_parser::Tok;
 
 pub fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -55,4 +56,53 @@ pub fn is_overlong(
     }
 
     true
+}
+
+pub fn is_keyword(token: &Tok) -> bool {
+    match token {
+        Tok::False { .. } => true,
+        Tok::True { .. } => true,
+        Tok::None { .. } => true,
+        Tok::And { .. } => true,
+        Tok::As { .. } => true,
+        Tok::Assert { .. } => true,
+        Tok::Await { .. } => true,
+        Tok::Break { .. } => true,
+        Tok::Class { .. } => true,
+        Tok::Continue { .. } => true,
+        Tok::Def { .. } => true,
+        Tok::Del { .. } => true,
+        Tok::Elif { .. } => true,
+        Tok::Else { .. } => true,
+        Tok::Except { .. } => true,
+        Tok::Finally { .. } => true,
+        Tok::For { .. } => true,
+        Tok::From { .. } => true,
+        Tok::Global { .. } => true,
+        Tok::If { .. } => true,
+        Tok::Import { .. } => true,
+        Tok::In { .. } => true,
+        Tok::Is { .. } => true,
+        Tok::Lambda { .. } => true,
+        Tok::Nonlocal { .. } => true,
+        Tok::Not { .. } => true,
+        Tok::Or { .. } => true,
+        Tok::Pass { .. } => true,
+        Tok::Raise { .. } => true,
+        Tok::Return { .. } => true,
+        Tok::Try { .. } => true,
+        Tok::While { .. } => true,
+        Tok::With { .. } => true,
+        Tok::Yield { .. } => true,
+        _ => false,
+    }
+}
+
+pub fn is_singleton(token: &Tok) -> bool {
+    match token {
+        Tok::False { .. } => true,
+        Tok::True { .. } => true,
+        Tok::None { .. } => true,
+        _ => false,
+    }
 }
