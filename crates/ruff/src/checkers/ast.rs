@@ -2941,6 +2941,11 @@ where
                 {
                     pylint::rules::logging_call(self, func, args, keywords);
                 }
+
+                // flake8-django
+                if self.settings.rules.enabled(&Rule::LocalsInRenderFunction) {
+                    flake8_django::rules::locals_in_render_function(self, func, args, keywords);
+                }
             }
             ExprKind::Dict { keys, values } => {
                 if self
