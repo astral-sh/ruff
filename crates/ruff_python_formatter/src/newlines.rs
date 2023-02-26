@@ -38,13 +38,13 @@ enum Trailer {
     CompoundStatement,
 }
 
-struct NewlineNormalizer {
+struct StmtNormalizer {
     depth: Depth,
     trailer: Trailer,
     scope: Scope,
 }
 
-impl<'a> Visitor<'a> for NewlineNormalizer {
+impl<'a> Visitor<'a> for StmtNormalizer {
     fn visit_stmt(&mut self, stmt: &'a mut Stmt) {
         // Remove any runs of empty lines greater than two in a row.
         let mut count = 0;
@@ -296,16 +296,29 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
         self.depth = prev_depth;
         self.scope = prev_scope;
     }
+}
 
-    fn visit_expr(&mut self, _expr: &'a mut Expr) {}
+struct ExprNormalizer;
+
+impl<'a> Visitor<'a> for ExprNormalizer {
+    fn visit_expr(&mut self, expr: &'a mut Expr) {
+        expr.trivia.retain(|c| !c.kind.is_empty_line());
+
+        visitor::walk_expr(self, expr);
+    }
 }
 
 pub fn normalize_newlines(python_cst: &mut [Stmt]) {
-    let mut normalizer = NewlineNormalizer {
+    let mut normalizer = StmtNormalizer {
         depth: Depth::TopLevel,
         trailer: Trailer::None,
         scope: Scope::Module,
     };
+    for stmt in python_cst.iter_mut() {
+        normalizer.visit_stmt(stmt);
+    }
+
+    let mut normalizer = ExprNormalizer;
     for stmt in python_cst.iter_mut() {
         normalizer.visit_stmt(stmt);
     }

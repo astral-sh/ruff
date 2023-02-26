@@ -6,13 +6,14 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::{format_args, write};
 use ruff_text_size::TextSize;
 
-use crate::builders::literal;
 use crate::context::ASTFormatContext;
 use crate::core::types::Range;
 use crate::cst::{
     Arguments, Boolop, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, SliceIndex,
     SliceIndexKind, Unaryop,
 };
+use crate::format::builders::literal;
+use crate::format::comments::{dangling_comments, end_of_line_comments, leading_comments};
 use crate::format::helpers::{is_self_closing, is_simple_power, is_simple_slice};
 use crate::format::numbers::{complex_literal, float_literal, int_literal};
 use crate::format::strings::string_literal;
@@ -29,22 +30,7 @@ fn format_starred(
     value: &Expr,
 ) -> FormatResult<()> {
     write!(f, [text("*"), value.format()])?;
-
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
-
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -54,22 +40,7 @@ fn format_name(
     _id: &str,
 ) -> FormatResult<()> {
     write!(f, [literal(Range::from_located(expr))])?;
-
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
-
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -222,17 +193,7 @@ fn format_slice(
                 write!(f, [value.format()])?;
             }
 
-            // Apply any dangling comments.
-            for trivia in &lower.trivia {
-                if trivia.relationship.is_dangling() {
-                    if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                        write!(f, [expand_parent()])?;
-                        write!(f, [hard_line_break()])?;
-                        write!(f, [literal(range)])?;
-                        write!(f, [hard_line_break()])?;
-                    }
-                }
-            }
+            write!(f, [dangling_comments(lower)])?;
 
             if matches!(lower.node, SliceIndexKind::Index { .. }) {
                 if !is_simple {
@@ -240,21 +201,7 @@ fn format_slice(
                 }
             }
             write!(f, [text(":")])?;
-
-            // Format any end-of-line comments.
-            let mut first = true;
-            for range in lower.trivia.iter().filter_map(|trivia| {
-                if trivia.relationship.is_trailing() {
-                    trivia.kind.end_of_line_comment()
-                } else {
-                    None
-                }
-            }) {
-                if std::mem::take(&mut first) {
-                    write!(f, [line_suffix(&text("  "))])?;
-                }
-                write!(f, [line_suffix(&literal(range))])?;
-            }
+            write!(f, [end_of_line_comments(lower)])?;
 
             if let SliceIndexKind::Index { value } = &upper.node {
                 if !is_simple {
@@ -264,32 +211,8 @@ fn format_slice(
                 write!(f, [value.format()])?;
             }
 
-            // Apply any dangling comments.
-            for trivia in &upper.trivia {
-                if trivia.relationship.is_dangling() {
-                    if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                        write!(f, [expand_parent()])?;
-                        write!(f, [hard_line_break()])?;
-                        write!(f, [literal(range)])?;
-                        write!(f, [hard_line_break()])?;
-                    }
-                }
-            }
-
-            // Format any end-of-line comments.
-            let mut first = true;
-            for range in upper.trivia.iter().filter_map(|trivia| {
-                if trivia.relationship.is_trailing() {
-                    trivia.kind.end_of_line_comment()
-                } else {
-                    None
-                }
-            }) {
-                if std::mem::take(&mut first) {
-                    write!(f, [line_suffix(&text("  "))])?;
-                }
-                write!(f, [line_suffix(&literal(range))])?;
-            }
+            write!(f, [dangling_comments(upper)])?;
+            write!(f, [end_of_line_comments(upper)])?;
 
             if let Some(step) = step {
                 if matches!(upper.node, SliceIndexKind::Index { .. }) {
@@ -307,51 +230,14 @@ fn format_slice(
                     write!(f, [value.format()])?;
                 }
 
-                // Apply any dangling comments.
-                for trivia in &step.trivia {
-                    if trivia.relationship.is_dangling() {
-                        if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                            write!(f, [expand_parent()])?;
-                            write!(f, [hard_line_break()])?;
-                            write!(f, [literal(range)])?;
-                            write!(f, [hard_line_break()])?;
-                        }
-                    }
-                }
-
-                // Format any end-of-line comments.
-                let mut first = true;
-                for range in step.trivia.iter().filter_map(|trivia| {
-                    if trivia.relationship.is_trailing() {
-                        trivia.kind.end_of_line_comment()
-                    } else {
-                        None
-                    }
-                }) {
-                    if std::mem::take(&mut first) {
-                        write!(f, [line_suffix(&text("  "))])?;
-                    }
-                    write!(f, [line_suffix(&literal(range))])?;
-                }
+                write!(f, [dangling_comments(step)])?;
+                write!(f, [end_of_line_comments(step)])?;
             }
             Ok(())
         }))]
     )?;
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(expr)])?;
 
     Ok(())
 }
@@ -513,16 +399,7 @@ fn format_call(
                     }
                 }
 
-                // Apply any dangling trailing comments.
-                for trivia in &expr.trivia {
-                    if trivia.relationship.is_dangling() {
-                        if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                            write!(f, [expand_parent()])?;
-                            write!(f, [hard_line_break()])?;
-                            write!(f, [literal(range)])?;
-                        }
-                    }
-                }
+                write!(f, [dangling_comments(expr)])?;
 
                 Ok(())
             }))])]
@@ -709,20 +586,7 @@ fn format_compare(
         write!(f, [group(&format_args![comparators[i].format()])])?;
     }
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(expr)])?;
 
     Ok(())
 }
@@ -834,20 +698,7 @@ fn format_attribute(
     write!(f, [text(".")])?;
     write!(f, [dynamic_text(attr, TextSize::default())])?;
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(expr)])?;
 
     Ok(())
 }
@@ -870,20 +721,7 @@ fn format_bool_op(
         }
     }
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(expr)])?;
 
     Ok(())
 }
@@ -908,20 +746,7 @@ fn format_bin_op(
     }
     write!(f, [group(&format_args![right.format()])])?;
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if trivia.relationship.is_trailing() {
-            trivia.kind.end_of_line_comment()
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(expr)])?;
 
     Ok(())
 }
@@ -996,16 +821,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             write!(f, [text("(")])?;
         }
 
-        // Any leading comments come on the line before.
-        for trivia in &self.item.trivia {
-            if trivia.relationship.is_leading() {
-                if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                    write!(f, [expand_parent()])?;
-                    write!(f, [literal(range)])?;
-                    write!(f, [hard_line_break()])?;
-                }
-            }
-        }
+        write!(f, [leading_comments(self.item)])?;
 
         match &self.item.node {
             ExprKind::BoolOp { op, values } => format_bool_op(f, self.item, op, values),
