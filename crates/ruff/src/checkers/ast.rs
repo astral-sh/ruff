@@ -536,6 +536,16 @@ where
                     }
                 }
 
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PreferEllipsisOverPass) {
+                        flake8_pyi::rules::prefer_ellipsis_over_pass(self, body);
+                    }
+
+                    if self.settings.rules.enabled(&Rule::PreferOnlyEllipsis) {
+                        flake8_pyi::rules::prefer_only_ellipsis(self, body);
+                    }
+                }
+
                 if self.settings.rules.enabled(&Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
                         self.current_scope(),
@@ -862,6 +872,11 @@ where
                         flake8_bugbear::rules::abstract_base_class(
                             self, stmt, name, bases, keywords, body,
                         );
+                    }
+                }
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PreferEllipsisOverPass) {
+                        flake8_pyi::rules::prefer_ellipsis_over_pass(self, body);
                     }
                 }
 
@@ -3331,6 +3346,12 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteUnicodeLiteral) {
                     pyupgrade::rules::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
+
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
+                        flake8_pyi::rules::ban_doc_strings_in_stubs(self, expr);
+                    }
+                }
             }
             ExprKind::Lambda { args, body, .. } => {
                 if self.settings.rules.enabled(&Rule::PreferListBuiltin) {
@@ -4613,6 +4634,15 @@ impl<'a> Checker<'a> {
     {
         if self.settings.rules.enabled(&Rule::FStringDocstring) {
             flake8_bugbear::rules::f_string_docstring(self, python_ast);
+        }
+        if self.is_interface_definition {
+            if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
+                if let Some(stmt) = python_ast.first() {
+                    if let StmtKind::Expr { value } = &stmt.node {
+                        flake8_pyi::rules::ban_doc_strings_in_stubs(self, value);
+                    }
+                }
+            }
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);
         self.definitions.push((
