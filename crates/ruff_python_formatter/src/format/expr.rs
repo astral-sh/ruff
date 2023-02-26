@@ -166,7 +166,7 @@ fn format_slice(
     upper: &SliceIndex,
     step: Option<&SliceIndex>,
 ) -> FormatResult<()> {
-    // // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
+    // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
     let lower_is_simple = if let SliceIndexKind::Index { value } = &lower.node {
         is_simple_slice(value)
     } else {
@@ -239,6 +239,22 @@ fn format_slice(
 
     write!(f, [end_of_line_comments(expr)])?;
 
+    Ok(())
+}
+
+fn format_formatted_value(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    expr: &Expr,
+    value: &Expr,
+    _conversion: usize,
+    format_spec: Option<&Expr>,
+) -> FormatResult<()> {
+    write!(f, [text("!")])?;
+    write!(f, [value.format()])?;
+    if let Some(format_spec) = format_spec {
+        write!(f, [text(":")])?;
+        write!(f, [format_spec.format()])?;
+    }
     Ok(())
 }
 
@@ -703,6 +719,22 @@ fn format_attribute(
     Ok(())
 }
 
+fn format_named_expr(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    expr: &Expr,
+    target: &Expr,
+    value: &Expr,
+) -> FormatResult<()> {
+    write!(f, [target.format()])?;
+    write!(f, [text(":=")])?;
+    write!(f, [space()])?;
+    write!(f, [group(&format_args![value.format()])])?;
+
+    write!(f, [end_of_line_comments(expr)])?;
+
+    Ok(())
+}
+
 fn format_bool_op(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
@@ -825,7 +857,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
 
         match &self.item.node {
             ExprKind::BoolOp { op, values } => format_bool_op(f, self.item, op, values),
-            // ExprKind::NamedExpr { .. } => {}
+            ExprKind::NamedExpr { target, value } => format_named_expr(f, self.item, target, value),
             ExprKind::BinOp { left, op, right } => format_bin_op(f, self.item, left, op, right),
             ExprKind::UnaryOp { op, operand } => format_unary_op(f, self.item, op, operand),
             ExprKind::Lambda { args, body } => format_lambda(f, self.item, args, body),
@@ -859,7 +891,6 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
                 args,
                 keywords,
             } => format_call(f, self.item, func, args, keywords),
-            // ExprKind::FormattedValue { .. } => {}
             ExprKind::JoinedStr { values } => format_joined_str(f, self.item, values),
             ExprKind::Constant { value, kind } => {
                 format_constant(f, self.item, value, kind.as_deref())
@@ -875,9 +906,11 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             ExprKind::Slice { lower, upper, step } => {
                 format_slice(f, self.item, lower, upper, step.as_ref())
             }
-            _ => {
-                unimplemented!("Implement ExprKind: {:?}", self.item.node)
-            }
+            ExprKind::FormattedValue {
+                value,
+                conversion,
+                format_spec,
+            } => format_formatted_value(f, self.item, value, *conversion, format_spec.as_deref()),
         }?;
 
         // Any trailing comments come on the lines after.
