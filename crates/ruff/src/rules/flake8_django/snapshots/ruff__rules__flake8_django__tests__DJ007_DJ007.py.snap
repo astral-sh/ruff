@@ -1,0 +1,24 @@
+---
+source: crates/ruff/src/rules/flake8_django/mod.rs
+expression: diagnostics
+---
+- kind:
+    AllWithModelForm: ~
+  location:
+    row: 6
+    column: 8
+  end_location:
+    row: 6
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    AllWithModelForm: ~
+  location:
+    row: 11
+    column: 8
+  end_location:
+    row: 11
+    column: 27
+  fix: ~
+  parent: ~

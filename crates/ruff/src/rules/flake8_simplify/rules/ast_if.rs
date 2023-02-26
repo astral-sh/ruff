@@ -329,7 +329,7 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
 }
 
 /// SIM103
-pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
+pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let StmtKind::If { test, body, orelse } = &stmt.node else {
         return;
     };

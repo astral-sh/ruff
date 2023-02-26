@@ -1,0 +1,24 @@
+---
+source: crates/ruff/src/rules/flake8_django/mod.rs
+expression: diagnostics
+---
+- kind:
+    LocalsInRenderFunction: ~
+  location:
+    row: 5
+    column: 41
+  end_location:
+    row: 5
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    LocalsInRenderFunction: ~
+  location:
+    row: 9
+    column: 49
+  end_location:
+    row: 9
+    column: 57
+  fix: ~
+  parent: ~

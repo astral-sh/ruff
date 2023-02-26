@@ -53,6 +53,8 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
@@ -133,6 +135,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::BadStrStripCall,
+    rules::pylint::rules::CollapsibleElseIf,
     rules::pylint::rules::UselessImportAlias,
     rules::pylint::rules::UnnecessaryDirectLambdaCall,
     rules::pylint::rules::NonlocalWithoutBinding,
@@ -281,10 +284,10 @@ ruff_macros::register_rules!(
     rules::flake8_simplify::rules::IfExprWithTrueFalse,
     rules::flake8_simplify::rules::IfExprWithFalseTrue,
     rules::flake8_simplify::rules::IfExprWithTwistedArms,
-    rules::flake8_simplify::rules::AAndNotA,
-    rules::flake8_simplify::rules::AOrNotA,
-    rules::flake8_simplify::rules::OrTrue,
-    rules::flake8_simplify::rules::AndFalse,
+    rules::flake8_simplify::rules::ExprAndNotExpr,
+    rules::flake8_simplify::rules::ExprOrNotExpr,
+    rules::flake8_simplify::rules::ExprOrTrue,
+    rules::flake8_simplify::rules::ExprAndFalse,
     rules::flake8_simplify::rules::YodaConditions,
     rules::flake8_simplify::rules::DictGetWithDefault,
     // pyupgrade
@@ -463,6 +466,8 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::PassStatementStubBody,
     rules::flake8_pyi::rules::NonEmptyStubBody,
     rules::flake8_pyi::rules::DocstringInStub,
+    rules::flake8_pyi::rules::TypedArgumentSimpleDefaults,
+    rules::flake8_pyi::rules::ArgumentSimpleDefaults,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     rules::flake8_pytest_style::rules::FixturePositionalArgs,
@@ -578,6 +583,9 @@ ruff_macros::register_rules!(
     rules::ruff::rules::UnusedNOQA,
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
+    rules::flake8_django::rules::LocalsInRenderFunction,
+    rules::flake8_django::rules::ExcludeWithModelForm,
+    rules::flake8_django::rules::AllWithModelForm,
     rules::flake8_django::rules::ModelWithoutDunderStr,
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
@@ -825,6 +833,7 @@ impl Rule {
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
+            | Rule::MissingWhitespaceAfterKeyword
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
             | Rule::NoSpaceAfterBlockComment

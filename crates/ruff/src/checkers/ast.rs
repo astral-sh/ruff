@@ -816,6 +816,21 @@ where
                             self, body,
                         ));
                 }
+
+                if self.settings.rules.enabled(&Rule::ExcludeWithModelForm) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::exclude_with_model_form(self, bases, body)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+                if self.settings.rules.enabled(&Rule::AllWithModelForm) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::all_with_model_form(self, bases, body)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
                     if let Some(diagnostic) =
                         flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
@@ -1618,7 +1633,7 @@ where
                     );
                 }
                 if self.settings.rules.enabled(&Rule::NeedlessBool) {
-                    flake8_simplify::rules::return_bool_condition_directly(self, stmt);
+                    flake8_simplify::rules::needless_bool(self, stmt);
                 }
                 if self.settings.rules.enabled(&Rule::ManualDictLookup) {
                     flake8_simplify::rules::manual_dict_lookup(self, stmt, test, body, orelse);
@@ -1651,6 +1666,13 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::OutdatedVersionBlock) {
                     pyupgrade::rules::outdated_version_block(self, stmt, test, body, orelse);
+                }
+                if self.settings.rules.enabled(&Rule::CollapsibleElseIf) {
+                    if let Some(diagnostic) =
+                        pylint::rules::collapsible_else_if(orelse, self.locator)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
                 }
             }
             StmtKind::Assert { test, msg } => {
@@ -2991,6 +3013,11 @@ where
                 {
                     pylint::rules::logging_call(self, func, args, keywords);
                 }
+
+                // flake8-django
+                if self.settings.rules.enabled(&Rule::LocalsInRenderFunction) {
+                    flake8_django::rules::locals_in_render_function(self, func, args, keywords);
+                }
             }
             ExprKind::Dict { keys, values } => {
                 if self
@@ -3484,17 +3511,17 @@ where
                 if self.settings.rules.enabled(&Rule::CompareWithTuple) {
                     flake8_simplify::rules::compare_with_tuple(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AAndNotA) {
-                    flake8_simplify::rules::a_and_not_a(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprAndNotExpr) {
+                    flake8_simplify::rules::expr_and_not_expr(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AOrNotA) {
-                    flake8_simplify::rules::a_or_not_a(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprOrNotExpr) {
+                    flake8_simplify::rules::expr_or_not_expr(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::OrTrue) {
-                    flake8_simplify::rules::or_true(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprOrTrue) {
+                    flake8_simplify::rules::expr_or_true(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AndFalse) {
-                    flake8_simplify::rules::and_false(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprAndFalse) {
+                    flake8_simplify::rules::expr_and_false(self, expr);
                 }
             }
             _ => {}
@@ -3978,6 +4005,21 @@ where
             .enabled(&Rule::FunctionCallArgumentDefault)
         {
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
+        }
+
+        if self.is_interface_definition {
+            if self
+                .settings
+                .rules
+                .enabled(&Rule::TypedArgumentSimpleDefaults)
+            {
+                flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
+            }
+        }
+        if self.is_interface_definition {
+            if self.settings.rules.enabled(&Rule::ArgumentSimpleDefaults) {
+                flake8_pyi::rules::argument_simple_defaults(self, arguments);
+            }
         }
 
         // Bind, but intentionally avoid walking default expressions, as we handle them
@@ -5418,6 +5460,14 @@ impl<'a> Checker<'a> {
 
             // pydocstyle
             if enforce_docstrings {
+                if pydocstyle::helpers::should_ignore_definition(
+                    self,
+                    &definition,
+                    &self.settings.pydocstyle.ignore_decorators,
+                ) {
+                    continue;
+                }
+
                 if definition.docstring.is_none() {
                     pydocstyle::rules::not_missing(self, &definition, &visibility);
                     continue;

@@ -52,6 +52,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E273") => Rule::TabAfterKeyword,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E274") => Rule::TabBeforeKeyword,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E275") => Rule::MissingWhitespaceAfterKeyword,
         (Pycodestyle, "E401") => Rule::MultipleImportsOnOneLine,
         (Pycodestyle, "E402") => Rule::ModuleImportNotAtTopOfFile,
         (Pycodestyle, "E501") => Rule::LineTooLong,
@@ -143,6 +145,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R0133") => Rule::ComparisonOfConstant,
         (Pylint, "R1701") => Rule::ConsiderMergingIsinstance,
         (Pylint, "R1722") => Rule::ConsiderUsingSysExit,
+        (Pylint, "R5501") => Rule::CollapsibleElseIf,
         (Pylint, "R2004") => Rule::MagicValueComparison,
         (Pylint, "W0120") => Rule::UselessElseOnLoop,
         (Pylint, "W0602") => Rule::GlobalVariableNotAssigned,
@@ -293,10 +296,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "210") => Rule::IfExprWithTrueFalse,
         (Flake8Simplify, "211") => Rule::IfExprWithFalseTrue,
         (Flake8Simplify, "212") => Rule::IfExprWithTwistedArms,
-        (Flake8Simplify, "220") => Rule::AAndNotA,
-        (Flake8Simplify, "221") => Rule::AOrNotA,
-        (Flake8Simplify, "222") => Rule::OrTrue,
-        (Flake8Simplify, "223") => Rule::AndFalse,
+        (Flake8Simplify, "220") => Rule::ExprAndNotExpr,
+        (Flake8Simplify, "221") => Rule::ExprOrNotExpr,
+        (Flake8Simplify, "222") => Rule::ExprOrTrue,
+        (Flake8Simplify, "223") => Rule::ExprAndFalse,
         (Flake8Simplify, "300") => Rule::YodaConditions,
         (Flake8Simplify, "401") => Rule::DictGetWithDefault,
 
@@ -488,6 +491,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "008") => Rule::UnrecognizedPlatformName,
         (Flake8Pyi, "009") => Rule::PassStatementStubBody,
         (Flake8Pyi, "010") => Rule::NonEmptyStubBody,
+        (Flake8Pyi, "011") => Rule::TypedArgumentSimpleDefaults,
+        (Flake8Pyi, "014") => Rule::ArgumentSimpleDefaults,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
 
         // flake8-pytest-style
@@ -618,6 +623,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-django
         (Flake8Django, "001") => Rule::NullableModelStringField,
+        (Flake8Django, "003") => Rule::LocalsInRenderFunction,
+        (Flake8Django, "006") => Rule::ExcludeWithModelForm,
+        (Flake8Django, "007") => Rule::AllWithModelForm,
         (Flake8Django, "008") => Rule::ModelWithoutDunderStr,
         (Flake8Django, "013") => Rule::NonLeadingReceiverDecorator,
 
