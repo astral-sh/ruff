@@ -566,6 +566,95 @@ impl From<(rustpython_parser::ast::Excepthandler, &Locator<'_>)> for Excepthandl
     }
 }
 
+impl From<(rustpython_parser::ast::Pattern, &Locator<'_>)> for Pattern {
+    fn from((pattern, locator): (rustpython_parser::ast::Pattern, &Locator)) -> Self {
+        Pattern {
+            location: pattern.location,
+            end_location: pattern.end_location,
+            node: match pattern.node {
+                rustpython_parser::ast::PatternKind::MatchValue { value } => {
+                    PatternKind::MatchValue {
+                        value: Box::new((*value, locator).into()),
+                    }
+                }
+                rustpython_parser::ast::PatternKind::MatchSingleton { value } => {
+                    PatternKind::MatchSingleton { value }
+                }
+                rustpython_parser::ast::PatternKind::MatchSequence { patterns } => {
+                    PatternKind::MatchSequence {
+                        patterns: patterns
+                            .into_iter()
+                            .map(|pattern| (pattern, locator).into())
+                            .collect(),
+                    }
+                }
+                rustpython_parser::ast::PatternKind::MatchMapping {
+                    keys,
+                    patterns,
+                    rest,
+                } => PatternKind::MatchMapping {
+                    keys: keys.into_iter().map(|key| (key, locator).into()).collect(),
+                    patterns: patterns
+                        .into_iter()
+                        .map(|pattern| (pattern, locator).into())
+                        .collect(),
+                    rest,
+                },
+                rustpython_parser::ast::PatternKind::MatchClass {
+                    cls,
+                    patterns,
+                    kwd_attrs,
+                    kwd_patterns,
+                } => PatternKind::MatchClass {
+                    cls: Box::new((*cls, locator).into()),
+                    patterns: patterns
+                        .into_iter()
+                        .map(|pattern| (pattern, locator).into())
+                        .collect(),
+                    kwd_attrs,
+                    kwd_patterns: kwd_patterns
+                        .into_iter()
+                        .map(|pattern| (pattern, locator).into())
+                        .collect(),
+                },
+                rustpython_parser::ast::PatternKind::MatchStar { name } => {
+                    PatternKind::MatchStar { name }
+                }
+                rustpython_parser::ast::PatternKind::MatchAs { pattern, name } => {
+                    PatternKind::MatchAs {
+                        pattern: pattern.map(|pattern| Box::new((*pattern, locator).into())),
+                        name,
+                    }
+                }
+                rustpython_parser::ast::PatternKind::MatchOr { patterns } => PatternKind::MatchOr {
+                    patterns: patterns
+                        .into_iter()
+                        .map(|pattern| (pattern, locator).into())
+                        .collect(),
+                },
+            },
+            trivia: vec![],
+            parentheses: Parenthesize::Never,
+        }
+    }
+}
+
+impl From<(rustpython_parser::ast::MatchCase, &Locator<'_>)> for MatchCase {
+    fn from((match_case, locator): (rustpython_parser::ast::MatchCase, &Locator)) -> Self {
+        MatchCase {
+            pattern: (match_case.pattern, locator).into(),
+            guard: match_case
+                .guard
+                .map(|guard| Box::new((*guard, locator).into())),
+            body: match_case
+                .body
+                .into_iter()
+                .map(|node| (node, locator).into())
+                .collect(),
+        }
+    }
+}
+
 impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
     fn from((stmt, locator): (rustpython_parser::ast::Stmt, &Locator)) -> Self {
         match stmt.node {
@@ -875,9 +964,19 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 trivia: vec![],
                 parentheses: Parenthesize::Never,
             },
-            rustpython_parser::ast::StmtKind::Match { .. } => {
-                todo!("match statement");
-            }
+            rustpython_parser::ast::StmtKind::Match { subject, cases } => Stmt {
+                location: stmt.location,
+                end_location: stmt.end_location,
+                node: StmtKind::Match {
+                    subject: Box::new((*subject, locator).into()),
+                    cases: cases
+                        .into_iter()
+                        .map(|node| (node, locator).into())
+                        .collect(),
+                },
+                trivia: vec![],
+                parentheses: Parenthesize::Never,
+            },
             rustpython_parser::ast::StmtKind::Raise { exc, cause } => Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,

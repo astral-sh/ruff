@@ -6,52 +6,67 @@ use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::{
-    Alias, Arguments, Excepthandler, Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem,
+    Alias, Arguments, Excepthandler, Expr, ExprKind, Keyword, MatchCase, Operator, Stmt, StmtKind,
+    Withitem,
 };
 use crate::format::builders::{block, join_names};
 use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
 use crate::format::helpers::is_self_closing;
 use crate::shared_traits::AsFormat;
 
-fn format_break(f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-    write!(f, [text("break")])
-}
-
-fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
-    // Write the statement body.
-    write!(f, [text("pass")])?;
-
+fn format_break(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
+    write!(f, [text("break")])?;
     write!(f, [end_of_line_comments(stmt)])?;
-
     Ok(())
 }
 
-fn format_continue(f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-    write!(f, [text("continue")])
+fn format_pass(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
+    write!(f, [text("pass")])?;
+    write!(f, [end_of_line_comments(stmt)])?;
+    Ok(())
 }
 
-fn format_global(f: &mut Formatter<ASTFormatContext<'_>>, names: &[String]) -> FormatResult<()> {
+fn format_continue(f: &mut Formatter<ASTFormatContext<'_>>, stmt: &Stmt) -> FormatResult<()> {
+    write!(f, [text("continue")])?;
+    write!(f, [end_of_line_comments(stmt)])?;
+    Ok(())
+}
+
+fn format_global(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    names: &[String],
+) -> FormatResult<()> {
     write!(f, [text("global")])?;
     if !names.is_empty() {
         write!(f, [space(), join_names(names)])?;
     }
+    write!(f, [end_of_line_comments(stmt)])?;
     Ok(())
 }
 
-fn format_nonlocal(f: &mut Formatter<ASTFormatContext<'_>>, names: &[String]) -> FormatResult<()> {
+fn format_nonlocal(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    names: &[String],
+) -> FormatResult<()> {
     write!(f, [text("nonlocal")])?;
     if !names.is_empty() {
         write!(f, [space(), join_names(names)])?;
     }
+    write!(f, [end_of_line_comments(stmt)])?;
     Ok(())
 }
 
-fn format_delete(f: &mut Formatter<ASTFormatContext<'_>>, targets: &[Expr]) -> FormatResult<()> {
+fn format_delete(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    targets: &[Expr],
+) -> FormatResult<()> {
     write!(f, [text("del")])?;
-
     match targets.len() {
-        0 => Ok(()),
-        1 => write!(f, [space(), targets[0].format()]),
+        0 => {}
+        1 => write!(f, [space(), targets[0].format()])?,
         _ => {
             write!(
                 f,
@@ -74,9 +89,11 @@ fn format_delete(f: &mut Formatter<ASTFormatContext<'_>>, targets: &[Expr]) -> F
                         if_group_breaks(&text(")")),
                     ])
                 ]
-            )
+            )?;
         }
     }
+    write!(f, [end_of_line_comments(stmt)])?;
+    Ok(())
 }
 
 fn format_class_def(
@@ -223,6 +240,34 @@ fn format_assign(
     Ok(())
 }
 
+fn format_aug_assign(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    target: &Expr,
+    op: &Operator,
+    value: &Expr,
+) -> FormatResult<()> {
+    write!(f, [target.format()])?;
+    write!(f, [text(" "), op.format(), text("=")])?;
+    if is_self_closing(value) {
+        write!(f, [space(), group(&value.format())])?;
+    } else {
+        write!(
+            f,
+            [
+                space(),
+                group(&format_args![
+                    if_group_breaks(&text("(")),
+                    soft_block_indent(&value.format()),
+                    if_group_breaks(&text(")")),
+                ])
+            ]
+        )?;
+    }
+    write!(f, [end_of_line_comments(stmt)])?;
+    Ok(())
+}
+
 fn format_ann_assign(
     f: &mut Formatter<ASTFormatContext<'_>>,
     stmt: &Stmt,
@@ -268,7 +313,11 @@ fn format_for(
     body: &[Stmt],
     orelse: &[Stmt],
     _type_comment: Option<&str>,
+    async_: bool,
 ) -> FormatResult<()> {
+    if async_ {
+        write!(f, [text("async"), space()])?;
+    }
     write!(
         f,
         [
@@ -347,6 +396,19 @@ fn format_if(
         } else {
             write!(f, [text("else:"), block_indent(&block(orelse))])?;
         }
+    }
+    Ok(())
+}
+
+fn format_match(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    stmt: &Stmt,
+    subject: &Expr,
+    cases: &[MatchCase],
+) -> FormatResult<()> {
+    write!(f, [text("match"), space(), subject.format(), text(":")])?;
+    for case in cases {
+        write!(f, [block_indent(&case.format())])?;
     }
     Ok(())
 }
@@ -585,7 +647,6 @@ fn format_with_(
     if async_ {
         write!(f, [text("async"), space()])?;
     }
-
     write!(
         f,
         [
@@ -609,7 +670,8 @@ fn format_with_(
             text(":"),
             block_indent(&block(body))
         ]
-    )
+    )?;
+    Ok(())
 }
 
 pub struct FormatStmt<'a> {
@@ -622,10 +684,10 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
 
         match &self.item.node {
             StmtKind::Pass => format_pass(f, self.item),
-            StmtKind::Break => format_break(f),
-            StmtKind::Continue => format_continue(f),
-            StmtKind::Global { names } => format_global(f, names),
-            StmtKind::Nonlocal { names } => format_nonlocal(f, names),
+            StmtKind::Break => format_break(f, self.item),
+            StmtKind::Continue => format_continue(f, self.item),
+            StmtKind::Global { names } => format_global(f, self.item, names),
+            StmtKind::Nonlocal { names } => format_nonlocal(f, self.item, names),
             StmtKind::FunctionDef {
                 name,
                 args,
@@ -668,9 +730,11 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 decorator_list,
             } => format_class_def(f, name, bases, keywords, body, decorator_list),
             StmtKind::Return { value } => format_return(f, self.item, value.as_ref()),
-            StmtKind::Delete { targets } => format_delete(f, targets),
+            StmtKind::Delete { targets } => format_delete(f, self.item, targets),
             StmtKind::Assign { targets, value, .. } => format_assign(f, self.item, targets, value),
-            // StmtKind::AugAssign { .. } => {}
+            StmtKind::AugAssign { target, op, value } => {
+                format_aug_assign(f, self.item, target, op, value)
+            }
             StmtKind::AnnAssign {
                 target,
                 annotation,
@@ -691,8 +755,24 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 body,
                 orelse,
                 type_comment.as_deref(),
+                false,
             ),
-            // StmtKind::AsyncFor { .. } => {}
+            StmtKind::AsyncFor {
+                target,
+                iter,
+                body,
+                orelse,
+                type_comment,
+            } => format_for(
+                f,
+                self.item,
+                target,
+                iter,
+                body,
+                orelse,
+                type_comment.as_deref(),
+                true,
+            ),
             StmtKind::While { test, body, orelse } => {
                 format_while(f, self.item, test, body, orelse)
             }
@@ -721,7 +801,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 type_comment.as_ref().map(String::as_str),
                 true,
             ),
-            // StmtKind::Match { .. } => {}
+            StmtKind::Match { subject, cases } => format_match(f, self.item, subject, cases),
             StmtKind::Raise { exc, cause } => {
                 format_raise(f, self.item, exc.as_deref(), cause.as_deref())
             }
@@ -752,11 +832,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 names,
                 level.as_ref(),
             ),
-            // StmtKind::Nonlocal { .. } => {}
             StmtKind::Expr { value } => format_expr(f, self.item, value),
-            _ => {
-                unimplemented!("Implement StmtKind: {:?}", self.item.node)
-            }
         }?;
 
         write!(f, [hard_line_break()])?;
