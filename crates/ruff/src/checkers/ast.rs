@@ -1604,9 +1604,9 @@ where
                 if self.settings.rules.enabled(&Rule::OutdatedVersionBlock) {
                     pyupgrade::rules::outdated_version_block(self, stmt, test, body, orelse);
                 }
-                if self.settings.rules.enabled(&Rule::ElseIfUsed) {
+                if self.settings.rules.enabled(&Rule::CollapsibleElseIf) {
                     if let Some(diagnostic) =
-                        pylint::rules::else_if_used(stmt, body, orelse, self.locator)
+                        pylint::rules::collapsible_else_if(orelse, self.locator)
                     {
                         self.diagnostics.push(diagnostic);
                     }
