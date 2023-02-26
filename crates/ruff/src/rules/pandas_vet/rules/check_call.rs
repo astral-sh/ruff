@@ -1,5 +1,6 @@
+use rustpython_parser::ast::{Expr, ExprKind};
+
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{ExprKind, Located};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
@@ -59,7 +60,7 @@ impl Violation for UseOfDotStack {
     }
 }
 
-pub fn check_call(checker: &mut Checker, func: &Located<ExprKind>) {
+pub fn check_call(checker: &mut Checker, func: &Expr) {
     let rules = &checker.settings.rules;
     let ExprKind::Attribute { value, attr, .. } = &func.node else {return};
     let violation: DiagnosticKind = match attr.as_str() {

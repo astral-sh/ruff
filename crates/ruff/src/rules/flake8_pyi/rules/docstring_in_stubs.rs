@@ -1,5 +1,6 @@
+use rustpython_parser::ast::Expr;
+
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{ExprKind, Located};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -17,7 +18,7 @@ impl Violation for DocstringInStub {
 }
 
 /// PYI021
-pub fn docstring_in_stubs(checker: &mut Checker, docstring: Option<&Located<ExprKind>>) {
+pub fn docstring_in_stubs(checker: &mut Checker, docstring: Option<&Expr>) {
     if let Some(docstr) = &docstring {
         checker.diagnostics.push(Diagnostic::new(
             DocstringInStub,
