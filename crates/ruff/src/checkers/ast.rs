@@ -5362,8 +5362,8 @@ impl<'a> Checker<'a> {
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
             if self.is_interface_definition {
-                if self.settings.rules.enabled(&Rule::BanDocStringsInStubs) {
-                    flake8_pyi::rules::ban_doc_strings_in_stubs(self, definition.docstring);
+                if self.settings.rules.enabled(&Rule::DocstringInStub) {
+                    flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
                 }
             }
 

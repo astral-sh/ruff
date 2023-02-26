@@ -487,7 +487,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "008") => Rule::UnrecognizedPlatformName,
         (Flake8Pyi, "009") => Rule::PreferEllipsisOverPass,
         (Flake8Pyi, "010") => Rule::PreferOnlyEllipsis,
-        (Flake8Pyi, "021") => Rule::BanDocStringsInStubs,
+        (Flake8Pyi, "021") => Rule::DocstringInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::IncorrectFixtureParenthesesStyle,

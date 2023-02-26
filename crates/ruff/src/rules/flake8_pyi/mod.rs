@@ -23,8 +23,8 @@ mod tests {
     #[test_case(Rule::PreferOnlyEllipsis, Path::new("PYI010.pyi"))]
     #[test_case(Rule::PreferEllipsisOverPass, Path::new("PYI009.py"))]
     #[test_case(Rule::PreferEllipsisOverPass, Path::new("PYI009.pyi"))]
-    #[test_case(Rule::BanDocStringsInStubs, Path::new("PYI021.py"))]
-    #[test_case(Rule::BanDocStringsInStubs, Path::new("PYI021.pyi"))]
+    #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
+    #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

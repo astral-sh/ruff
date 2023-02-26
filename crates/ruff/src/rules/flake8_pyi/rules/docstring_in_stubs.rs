@@ -7,9 +7,9 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct BanDocStringsInStubs;
+    pub struct DocstringInStub;
 );
-impl Violation for BanDocStringsInStubs {
+impl Violation for DocstringInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Docstrings should not be included in stubs")
@@ -17,10 +17,10 @@ impl Violation for BanDocStringsInStubs {
 }
 
 /// PYI021
-pub fn ban_doc_strings_in_stubs(checker: &mut Checker, docstring: Option<&Located<ExprKind>>) {
+pub fn docstring_in_stubs(checker: &mut Checker, docstring: Option<&Located<ExprKind>>) {
     if let Some(docstr) = &docstring {
         checker.diagnostics.push(Diagnostic::new(
-            BanDocStringsInStubs,
+            DocstringInStub,
             Range::from_located(docstr),
         ));
     }
