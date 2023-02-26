@@ -25,6 +25,9 @@ pub use invalid_escape_sequence::{invalid_escape_sequence, InvalidEscapeSequence
 pub use lambda_assignment::{lambda_assignment, LambdaAssignment};
 pub use line_too_long::{line_too_long, LineTooLong};
 pub use literal_comparisons::{literal_comparisons, NoneComparison, TrueFalseComparison};
+pub use missing_whitespace_after_keyword::{
+    missing_whitespace_after_keyword, MissingWhitespaceAfterKeyword,
+};
 pub use mixed_spaces_and_tabs::{mixed_spaces_and_tabs, MixedSpacesAndTabs};
 pub use no_newline_at_end_of_file::{no_newline_at_end_of_file, NoNewLineAtEndOfFile};
 pub use not_tests::{not_tests, NotInTest, NotIsTest};
@@ -40,10 +43,6 @@ pub use whitespace_around_keywords::{
 pub use whitespace_before_comment::{
     whitespace_before_comment, MultipleLeadingHashesForBlockComment, NoSpaceAfterBlockComment,
     NoSpaceAfterInlineComment, TooFewSpacesBeforeInlineComment,
-};
-
-pub use missing_whitespace_after_keyword::{
-    missing_whitespace_after_keyword, MissingWhitespaceAfterKeyword,
 };
 
 mod ambiguous_class_name;
