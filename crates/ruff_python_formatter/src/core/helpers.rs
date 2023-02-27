@@ -1,7 +1,7 @@
 use rustpython_parser::ast::Location;
 
 use crate::core::locator::Locator;
-
+use crate::core::types::Range;
 
 /// Return the leading quote for a string or byte literal (e.g., `"""`).
 pub fn leading_quote(content: &str) -> Option<&str> {
@@ -99,7 +99,9 @@ pub fn expand_indented_block(
     for (index, line) in contents[end_index..].lines().skip(1).enumerate() {
         if line.is_empty() {
             continue;
-        } else if line
+        }
+
+        if line
             .chars()
             .take(indent_location.column())
             .all(char::is_whitespace)
@@ -112,6 +114,20 @@ pub fn expand_indented_block(
 
     let end_location = Location::new(end_location.row() + 1 + offset, 0);
     (colon_location, end_location)
+}
+
+/// Return true if the `orelse` block of an `if` statement is an `elif` statement.
+pub fn is_elif(orelse: &[rustpython_parser::ast::Stmt], locator: &Locator) -> bool {
+    if orelse.len() == 1 && matches!(orelse[0].node, rustpython_parser::ast::StmtKind::If { .. }) {
+        let (source, start, end) = locator.slice(Range::new(
+            orelse[0].location,
+            orelse[0].end_location.unwrap(),
+        ));
+        if source[start..end].starts_with("elif") {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(test)]

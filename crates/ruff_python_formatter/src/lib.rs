@@ -45,8 +45,6 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
     normalize_newlines(&mut python_cst);
     normalize_parentheses(&mut python_cst, &locator);
 
-    println!("{python_cst:#?}");
-
     format!(
         ASTFormatContext::new(
             SimpleFormatOptions {

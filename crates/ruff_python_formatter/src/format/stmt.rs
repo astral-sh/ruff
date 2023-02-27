@@ -370,8 +370,13 @@ fn format_if(
     test: &Expr,
     body: &Body,
     orelse: Option<&Body>,
+    is_elif: bool,
 ) -> FormatResult<()> {
-    write!(f, [text("if"), space()])?;
+    if is_elif {
+        write!(f, [text("elif"), space()])?;
+    } else {
+        write!(f, [text("if"), space()])?;
+    }
     if is_self_closing(test) {
         write!(f, [test.format()])?;
     } else {
@@ -394,8 +399,7 @@ fn format_if(
                 is_elif: true,
             } = &orelse.node[0].node
             {
-                write!(f, [text("el")])?;
-                format_if(f, test, body, orelse.as_ref())?;
+                format_if(f, test, body, orelse.as_ref(), true)?;
             } else {
                 write!(f, [text("else:"), block_indent(&block(orelse))])?;
             }
@@ -787,8 +791,11 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 format_while(f, self.item, test, body, orelse.as_ref())
             }
             StmtKind::If {
-                test, body, orelse, ..
-            } => format_if(f, test, body, orelse.as_ref()),
+                test,
+                body,
+                orelse,
+                is_elif,
+            } => format_if(f, test, body, orelse.as_ref(), *is_elif),
             StmtKind::With {
                 items,
                 body,

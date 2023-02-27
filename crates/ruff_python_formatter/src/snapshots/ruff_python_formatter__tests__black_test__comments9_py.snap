@@ -156,68 +156,63 @@ def bar():
  
  
  some = statement
--# This should be stick to the statement above
- 
- 
-+# This should be stick to the statement above
 +
++
+ # This should be stick to the statement above
+ 
+-
  # This should be split from the above by two lines
  class MyClassWithComplexLeadingComments:
      pass
-@@ -57,13 +58,13 @@
+@@ -56,13 +57,13 @@
+ 
  
  # leading 1
- @deco1
--# leading 2
-+@# leading 2
+-@deco1
+ # leading 2
  # leading 2 extra
--@deco2(with_args=True)
++# leading 3
++# leading 4
++@deco1
+ @deco2(with_args=True)
 -# leading 3
--@deco3
+ @deco3
 -# leading 4
-+deco2(with_args=True)
-+@# leading 3
-+deco3
  def decorated():
-+    # leading 4
      pass
  
+@@ -71,13 +72,13 @@
  
-@@ -72,13 +73,12 @@
  
  # leading 1
- @deco1
--# leading 2
+-@deco1
+ # leading 2
 -@deco2(with_args=True)
--
--# leading 3 that already has an empty line
--@deco3
+ 
+ # leading 3 that already has an empty line
++# leading 4
++@deco1
++@deco2(with_args=True)
+ @deco3
 -# leading 4
-+@# leading 2
-+deco2(with_args=True)
-+@# leading 3 that already has an empty line
-+deco3
  def decorated_with_split_leading_comments():
-+    # leading 4
      pass
  
+@@ -86,19 +87,20 @@
  
-@@ -87,18 +87,18 @@
  
  # leading 1
- @deco1
--# leading 2
+-@deco1
+ # leading 2
 -@deco2(with_args=True)
--# leading 3
+ # leading 3
 -@deco3
--
--# leading 4 that already has an empty line
-+@# leading 2
-+deco2(with_args=True)
-+@# leading 3
-+deco3
+ 
+ # leading 4 that already has an empty line
++@deco1
++@deco2(with_args=True)
++@deco3
  def decorated_with_split_leading_comments():
-+    # leading 4 that already has an empty line
      pass
  
  
@@ -227,7 +222,7 @@ def bar():
          # Leading comment before inline function
          def inline():
              pass
-@@ -108,12 +108,14 @@
+@@ -108,12 +110,14 @@
              pass
  
      else:
@@ -242,7 +237,7 @@ def bar():
      # Leading comment before "top-level inline" function
      def top_level_quote_inline():
          pass
-@@ -123,6 +125,7 @@
+@@ -123,6 +127,7 @@
          pass
  
  else:
@@ -250,13 +245,30 @@ def bar():
      # More leading comments
      def top_level_quote_inline_after_else():
          pass
-@@ -156,6 +159,6 @@
+@@ -136,13 +141,13 @@
+ 
+ 
+ # Regression test for https://github.com/psf/black/issues/3454.
+-def foo():
++def foo():  # fmt: skip
+     pass
+     # Trailing comment that belongs to this function
  
  
  @decorator1
--# A standalone comment
+-@decorator2  # fmt: skip
++@decorator2
  def bar():
-+    # A standalone comment
+     pass
+ 
+@@ -155,7 +160,7 @@
+     # should enforce two blank lines.
+ 
+ 
+-@decorator1
+ # A standalone comment
++@decorator1
+ def bar():
      pass
 ```
 
@@ -322,14 +334,14 @@ some = statement
 
 
 # leading 1
-@deco1
-@# leading 2
+# leading 2
 # leading 2 extra
-deco2(with_args=True)
-@# leading 3
-deco3
+# leading 3
+# leading 4
+@deco1
+@deco2(with_args=True)
+@deco3
 def decorated():
-    # leading 4
     pass
 
 
@@ -337,13 +349,14 @@ some = statement
 
 
 # leading 1
+# leading 2
+
+# leading 3 that already has an empty line
+# leading 4
 @deco1
-@# leading 2
-deco2(with_args=True)
-@# leading 3 that already has an empty line
-deco3
+@deco2(with_args=True)
+@deco3
 def decorated_with_split_leading_comments():
-    # leading 4
     pass
 
 
@@ -351,13 +364,14 @@ some = statement
 
 
 # leading 1
+# leading 2
+# leading 3
+
+# leading 4 that already has an empty line
 @deco1
-@# leading 2
-deco2(with_args=True)
-@# leading 3
-deco3
+@deco2(with_args=True)
+@deco3
 def decorated_with_split_leading_comments():
-    # leading 4 that already has an empty line
     pass
 
 
@@ -404,13 +418,13 @@ class MyClass:
 
 
 # Regression test for https://github.com/psf/black/issues/3454.
-def foo():
+def foo():  # fmt: skip
     pass
     # Trailing comment that belongs to this function
 
 
 @decorator1
-@decorator2  # fmt: skip
+@decorator2
 def bar():
     pass
 
@@ -423,9 +437,9 @@ def foo():
     # should enforce two blank lines.
 
 
+# A standalone comment
 @decorator1
 def bar():
-    # A standalone comment
     pass
 ```
 

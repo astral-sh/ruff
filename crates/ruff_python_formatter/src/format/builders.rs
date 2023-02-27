@@ -16,9 +16,8 @@ pub struct Block<'a> {
 impl Format<ASTFormatContext<'_>> for Block<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         // Any leading comments come on the line before.
-        // STOPSHIP(charlie): This probably won't be necessary once we expand the range, since any
-        // leading comments or empty lines will be part of the statement, rather than the body.
-        // However, we do need to write trailing and dangling comments.
+        // TODO(charlie): Anything that gets rendered here is probably a bug. Leading trivia
+        // should be attached to the first statement in the block.
         for trivia in self.body.trivia.iter().skip_while(|trivia| {
             matches!(
                 (trivia.relationship, trivia.kind),
