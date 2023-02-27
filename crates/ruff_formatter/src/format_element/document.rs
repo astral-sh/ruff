@@ -21,9 +21,9 @@ pub struct Document {
 
 impl Document {
     /// Sets [`expand`](tag::Group::expand) to [`GroupMode::Propagated`] if the group contains any of:
-    /// * a group with [`expand`](tag::Group::expand) set to [GroupMode::Propagated] or [GroupMode::Expand].
-    /// * a non-soft [line break](FormatElement::Line) with mode [LineMode::Hard], [LineMode::Empty], or [LineMode::Literal].
-    /// * a [FormatElement::ExpandParent]
+    /// - a group with [`expand`](tag::Group::expand) set to [GroupMode::Propagated] or [GroupMode::Expand].
+    /// - a non-soft [line break](FormatElement::Line) with mode [LineMode::Hard], [LineMode::Empty], or [LineMode::Literal].
+    /// - a [FormatElement::ExpandParent]
     ///
     /// [`BestFitting`] elements act as expand boundaries, meaning that the fact that a
     /// [`BestFitting`]'s content expands is not propagated past the [`BestFitting`] element.

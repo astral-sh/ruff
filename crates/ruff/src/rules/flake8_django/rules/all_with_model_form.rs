@@ -20,6 +20,7 @@ define_violation!(
     /// ```python
     /// from django.forms import ModelForm
     ///
+    ///
     /// class PostForm(ModelForm):
     ///     class Meta:
     ///         model = Post
@@ -29,6 +30,7 @@ define_violation!(
     /// Use instead:
     /// ```python
     /// from django.forms import ModelForm
+    ///
     ///
     /// class PostForm(ModelForm):
     ///     class Meta:

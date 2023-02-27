@@ -25,9 +25,9 @@ define_violation!(
     /// import asyncio
     ///
     /// for i in range(10):
-    ///    # This creates a weak reference to the task, which may be garbage
-    ///    # collected at any time.
-    ///    asyncio.create_task(some_coro(param=i))
+    ///     # This creates a weak reference to the task, which may be garbage
+    ///     # collected at any time.
+    ///     asyncio.create_task(some_coro(param=i))
     /// ```
     ///
     /// Use instead:
@@ -49,8 +49,8 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [_The Heisenbug lurking in your async code_](https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/)
-    /// * [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
+    /// - [_The Heisenbug lurking in your async code_](https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/)
+    /// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
     pub struct AsyncioDanglingTask {
         pub method: Method,
     }

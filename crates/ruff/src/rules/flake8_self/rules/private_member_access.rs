@@ -23,13 +23,14 @@ define_violation!(
     /// behavior. Instead, use the class's public interface.
     ///
     /// ## Options
-    /// * `flake8-self.ignore-names`
+    /// - `flake8-self.ignore-names`
     ///
     /// ## Example
     /// ```python
     /// class Class:
     ///     def __init__(self):
     ///         self._private_member = "..."
+    ///
     ///
     /// var = Class()
     /// print(var._private_member)
@@ -41,12 +42,13 @@ define_violation!(
     ///     def __init__(self):
     ///         self.public_member = "..."
     ///
+    ///
     /// var = Class()
     /// print(var.public_member)
     /// ```
     ///
     /// ## References
-    /// * [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
+    /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
     pub struct PrivateMemberAccess {
         pub access: String,
     }

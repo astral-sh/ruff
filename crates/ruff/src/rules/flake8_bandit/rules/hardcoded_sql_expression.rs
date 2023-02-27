@@ -33,8 +33,8 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [B608: Test for SQL injection](https://bandit.readthedocs.io/en/latest/plugins/b608_hardcoded_sql_expressions.html)
-    /// * [psycopg3: Server-side binding](https://www.psycopg.org/psycopg3/docs/basic/from_pg2.html#server-side-binding)
+    /// - [B608: Test for SQL injection](https://bandit.readthedocs.io/en/latest/plugins/b608_hardcoded_sql_expressions.html)
+    /// - [psycopg3: Server-side binding](https://www.psycopg.org/psycopg3/docs/basic/from_pg2.html#server-side-binding)
     pub struct HardcodedSQLExpression;
 );
 impl Violation for HardcodedSQLExpression {

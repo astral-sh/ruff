@@ -47,7 +47,7 @@ define_violation!(
     /// > ```
     ///
     /// ## Options
-    /// * `flake8-tidy-imports.ban-relative-imports`
+    /// - `flake8-tidy-imports.ban-relative-imports`
     ///
     /// ## Example
     /// ```python

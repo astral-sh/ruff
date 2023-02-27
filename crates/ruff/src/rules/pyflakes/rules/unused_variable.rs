@@ -26,7 +26,7 @@ define_violation!(
     /// [`dummy-variable-rgx`] pattern.
     ///
     /// ## Options
-    /// * `dummy-variable-rgx`
+    /// - `dummy-variable-rgx`
     ///
     /// ## Example
     /// ```python

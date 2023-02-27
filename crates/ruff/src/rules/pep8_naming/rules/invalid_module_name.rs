@@ -25,8 +25,8 @@ define_violation!(
     /// > a leading underscore (e.g. `_socket`).
     ///
     /// ## Example
-    /// * Instead of `example-module-name` or `example module name`, use `example_module_name`.
-    /// * Instead of `ExampleModule`, use `example_module`.
+    /// - Instead of `example-module-name` or `example module name`, use `example_module_name`.
+    /// - Instead of `ExampleModule`, use `example_module`.
     ///
     /// [PEP 8]: https://peps.python.org/pep-0008/#package-and-module-names
     pub struct InvalidModuleName {

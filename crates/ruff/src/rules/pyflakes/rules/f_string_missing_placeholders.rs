@@ -33,7 +33,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [PEP 498](https://www.python.org/dev/peps/pep-0498/)
+    /// - [PEP 498](https://www.python.org/dev/peps/pep-0498/)
     pub struct FStringMissingPlaceholders;
 );
 impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
