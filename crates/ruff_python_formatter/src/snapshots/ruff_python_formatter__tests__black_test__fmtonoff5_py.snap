@@ -106,7 +106,7 @@ elif   unformatted:
 -        # fmt: on
 -            ]  # Includes an formatted indentation.
 +            "foo-bar" "=foo.bar.:main",
-+        ],
++        ],  # Includes an formatted indentation.
      },
  )
  
@@ -200,7 +200,7 @@ setup(
         # fmt: off
         "console_scripts": [
             "foo-bar" "=foo.bar.:main",
-        ],
+        ],  # Includes an formatted indentation.
     },
 )
 

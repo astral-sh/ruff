@@ -178,43 +178,9 @@ instruction()#comment with bad spacing
 ```diff
 --- Black
 +++ Ruff
-@@ -13,7 +13,7 @@
-     "Callable",
-     "ClassVar",
-     # ABCs (from collections.abc).
--    "AbstractSet",  # collections.abc.Set.
-+    "AbstractSet",
-     "ByteString",
-     "Container",
-     # Concrete collection types.
-@@ -24,7 +24,7 @@
-     "List",
-     "Set",
-     "FrozenSet",
--    "NamedTuple",  # Not really a type.
-+    "NamedTuple",
-     "Generator",
- ]
- 
-@@ -60,26 +60,32 @@
- # Comment before function.
- def inline_comments_in_brackets_ruin_everything():
-     if typedargslist:
--        parameters.children = [children[0], body, children[-1]]  # (1  # )1
-+        parameters.children = [children[0], body, children[-1]]
-         parameters.children = [
-             children[0],
+@@ -72,14 +72,20 @@
              body,
--            children[-1],  # type: ignore
-+            children[-1],
-         ]
-     else:
-         parameters.children = [
--            parameters.children[0],  # (2 what if this was actually long
-+            parameters.children[0],
-             body,
--            parameters.children[-1],  # )2
-+            parameters.children[-1],
+             parameters.children[-1],  # )2
          ]
 -        parameters.children = [parameters.what_if_this_was_actually_long.children[0], body, parameters.children[-1]]  # type: ignore
 +        parameters.children = [
@@ -319,7 +285,7 @@ __all__ = [
     "Callable",
     "ClassVar",
     # ABCs (from collections.abc).
-    "AbstractSet",
+    "AbstractSet",  # collections.abc.Set.
     "ByteString",
     "Container",
     # Concrete collection types.
@@ -330,7 +296,7 @@ __all__ = [
     "List",
     "Set",
     "FrozenSet",
-    "NamedTuple",
+    "NamedTuple",  # Not really a type.
     "Generator",
 ]
 
@@ -366,17 +332,17 @@ else:
 # Comment before function.
 def inline_comments_in_brackets_ruin_everything():
     if typedargslist:
-        parameters.children = [children[0], body, children[-1]]
+        parameters.children = [children[0], body, children[-1]]  # (1  # )1
         parameters.children = [
             children[0],
             body,
-            children[-1],
+            children[-1],  # type: ignore
         ]
     else:
         parameters.children = [
-            parameters.children[0],
+            parameters.children[0],  # (2 what if this was actually long
             body,
-            parameters.children[-1],
+            parameters.children[-1],  # )2
         ]
         parameters.children = [
             parameters.what_if_this_was_actually_long.children[0],
