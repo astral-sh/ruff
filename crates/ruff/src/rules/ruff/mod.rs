@@ -56,6 +56,7 @@ mod tests {
                 Rule::LineTooLong,
                 Rule::UnusedImport,
                 Rule::UnusedVariable,
+                Rule::IdentationContainsTabs,
             ]),
         )?;
         assert_yaml_snapshot!(diagnostics);
