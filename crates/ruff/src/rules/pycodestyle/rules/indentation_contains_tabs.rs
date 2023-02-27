@@ -7,9 +7,9 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct IdentationContainsTabs;
+    pub struct IndentationContainsTabs;
 );
-impl Violation for IdentationContainsTabs {
+impl Violation for IndentationContainsTabs {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Indentation contains tabs")
@@ -17,12 +17,12 @@ impl Violation for IdentationContainsTabs {
 }
 
 /// W191
-pub fn identation_contains_tabs(lineno: usize, line: &str) -> Option<Diagnostic> {
+pub fn indentation_contains_tabs(lineno: usize, line: &str) -> Option<Diagnostic> {
     let indent = leading_space(line);
 
     if indent.contains('\t') {
         Some(Diagnostic::new(
-            IdentationContainsTabs,
+            IndentationContainsTabs,
             Range::new(
                 Location::new(lineno + 1, 0),
                 Location::new(lineno + 1, indent.chars().count()),
