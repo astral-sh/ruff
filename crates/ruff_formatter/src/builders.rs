@@ -2053,7 +2053,6 @@ impl<'a, Context> BestFitting<'a, Context> {
     /// You're looking for a way to create a `BestFitting` object, use the `best_fitting![least_expanded, most_expanded]` macro.
     ///
     /// ## Safety
-    ///
     /// The slice must contain at least two variants.
     pub unsafe fn from_arguments_unchecked(variants: Arguments<'a, Context>) -> Self {
         assert!(

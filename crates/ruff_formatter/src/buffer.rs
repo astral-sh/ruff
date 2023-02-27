@@ -71,7 +71,6 @@ pub trait Buffer {
     /// Restores the snapshot buffer
     ///
     /// ## Panics
-    ///
     /// If the passed snapshot id is a snapshot of another buffer OR
     /// if the snapshot is restored out of order
     fn restore_snapshot(&mut self, snapshot: BufferSnapshot);

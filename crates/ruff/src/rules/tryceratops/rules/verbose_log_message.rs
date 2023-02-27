@@ -12,17 +12,14 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for excessive logging of exception objects.
     ///
     /// ## Why is this bad?
-    ///
     /// When logging exceptions via `logging.exception`, the exception object
     /// is logged automatically. Including the exception object in the log
     /// message is redundant and can lead to excessive logging.
     ///
     /// ## Example
-    ///
     /// ```python
     /// try:
     ///     ...
@@ -31,7 +28,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// try:
     ///     ...

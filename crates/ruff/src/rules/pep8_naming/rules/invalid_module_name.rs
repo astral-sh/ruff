@@ -9,12 +9,10 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for module names that do not follow the `snake_case` naming
     /// convention.
     ///
     /// ## Why is this bad?
-    ///
     /// [PEP 8] recommends the use of the `snake_case` naming convention for
     /// module names:
     ///
@@ -27,7 +25,6 @@ define_violation!(
     /// > a leading underscore (e.g. `_socket`).
     ///
     /// ## Example
-    ///
     /// - Instead of `example-module-name` or `example module name`, use `example_module_name`.
     /// - Instead of `ExampleModule`, use `example_module`.
     ///

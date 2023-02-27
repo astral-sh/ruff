@@ -287,7 +287,6 @@ impl BestFitting {
     /// You're looking for a way to create a `BestFitting` object, use the `best_fitting![least_expanded, most_expanded]` macro.
     ///
     /// ## Safety
-    ///
     /// The slice must contain at least two variants.
     #[doc(hidden)]
     pub unsafe fn from_vec_unchecked(variants: Vec<Box<[FormatElement]>>) -> Self {

@@ -8,7 +8,6 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for functions with a high `McCabe` complexity.
     ///
     /// The `McCabe` complexity of a function is a measure of the complexity of
@@ -18,15 +17,12 @@ define_violation!(
     /// or more paths to follow.
     ///
     /// ## Why is this bad?
-    ///
     /// Functions with a high complexity are hard to understand and maintain.
     ///
     /// ## Options
-    ///
     /// - `mccabe.max-complexity`
     ///
     /// ## Example
-    ///
     /// ```python
     /// def foo(a, b, c):
     ///     if a:
@@ -42,7 +38,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// def foo(a, b, c):
     ///     if not a:

@@ -8,12 +8,10 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for functions names that do not follow the `snake_case` naming
     /// convention.
     ///
     /// ## Why is this bad?
-    ///
     /// [PEP 8] recommends that function names follow `snake_case`:
     ///
     /// > Function names should be lowercase, with words separated by underscores as necessary to
@@ -21,18 +19,15 @@ define_violation!(
     /// > prevailing style (e.g. threading.py), to retain backwards compatibility.
     ///
     /// ## Options
-    ///
     /// - `pep8-naming.ignore-names`
     ///
     /// ## Example
-    ///
     /// ```python
     /// def myFunction():
     ///     pass
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// def my_function():
     ///     pass

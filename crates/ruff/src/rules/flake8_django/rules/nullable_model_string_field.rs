@@ -12,12 +12,10 @@ use super::helpers;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks nullable string-based fields (like `CharField` and `TextField`)
     /// in Django models.
     ///
     /// ## Why is this bad?
-    ///
     /// If a string-based field is nullable, then your model will have two possible
     /// representations for "no data": `None` and the empty string. This can lead to
     /// confusion, as clients of the API have to check for both `None` and the
@@ -27,7 +25,6 @@ define_violation!(
     /// string-based fields.
     ///
     /// ## Example
-    ///
     /// ```python
     /// from django.db import models
     ///
@@ -37,7 +34,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// from django.db import models
     ///

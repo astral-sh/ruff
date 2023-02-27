@@ -11,12 +11,10 @@ use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for unnecessary `list` or `reversed` calls around `sorted`
     /// calls.
     ///
     /// ## Why is this bad?
-    ///
     /// It is unnecessary to use `list` around `sorted`, as the latter already
     /// returns a list.
     ///
@@ -27,13 +25,11 @@ define_violation!(
     /// In both cases, it's clearer to avoid the redundant call.
     ///
     /// ## Examples
-    ///
     /// ```python
     /// reversed(sorted(iterable))
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// sorted(iterable, reverse=True)
     /// ```

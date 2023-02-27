@@ -9,12 +9,10 @@ use std::fmt;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls
     /// that do not store a reference to the returned result.
     ///
     /// ## Why is this bad?
-    ///
     /// Per the `asyncio` documentation, the event loop only retains a weak
     /// reference to tasks. If the task returned by `asyncio.create_task` and
     /// `asyncio.ensure_future` is not stored in a variable, or a collection,
@@ -23,7 +21,6 @@ define_violation!(
     /// may not run to completion.
     ///
     /// ## Example
-    ///
     /// ```python
     /// import asyncio
     ///
@@ -34,7 +31,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// import asyncio
     ///
@@ -53,7 +49,6 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    ///
     /// - [_The Heisenbug lurking in your async code_](https://textual.textualize.io/blog/2023/02/11/the-heisenbug-lurking-in-your-async-code/)
     /// - [The Python Standard Library](https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task)
     pub struct AsyncioDanglingTask {

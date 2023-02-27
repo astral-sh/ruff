@@ -12,15 +12,12 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for too few positional arguments for a `logging` format string.
     ///
     /// ## Why is this bad?
-    ///
     /// A `TypeError` will be raised if the statement is run.
     ///
     /// ## Example
-    ///
     /// ```python
     /// import logging
     ///
@@ -32,7 +29,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// import logging
     ///
@@ -53,15 +49,12 @@ impl Violation for LoggingTooFewArgs {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for too many positional arguments for a `logging` format string.
     ///
     /// ## Why is this bad?
-    ///
     /// A `TypeError` will be raised if the statement is run.
     ///
     /// ## Example
-    ///
     /// ```python
     /// import logging
     ///
@@ -73,7 +66,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// import logging
     ///

@@ -12,11 +12,9 @@ use super::helpers;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that `__str__` method is defined in Django models.
     ///
     /// ## Why is this bad?
-    ///
     /// Django models should define `__str__` method to return a string representation
     /// of the model instance, as Django calls this method to display the object in
     /// the Django Admin and elsewhere.
@@ -25,7 +23,6 @@ define_violation!(
     /// of the object in the Django Admin.
     ///
     /// ## Example
-    ///
     /// ```python
     /// from django.db import models
     ///
@@ -35,7 +32,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// from django.db import models
     ///

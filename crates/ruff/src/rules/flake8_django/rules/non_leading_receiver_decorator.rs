@@ -8,19 +8,16 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that Django's `@receiver` decorator is listed first, prior to
     /// any other decorators.
     ///
     /// ## Why is this bad?
-    ///
     /// Django's `@receiver` decorator is special in that it does not return
     /// a wrapped function. Rather, `@receiver` connects the decorated function
     /// to a signal. If any other decorators are listed before `@receiver`,
     /// the decorated function will not be connected to the signal.
     ///
     /// ## Example
-    ///
     /// ```python
     /// from django.dispatch import receiver
     /// from django.db.models.signals import post_save
@@ -33,7 +30,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// from django.dispatch import receiver
     /// from django.db.models.signals import post_save

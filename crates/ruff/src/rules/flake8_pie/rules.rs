@@ -62,11 +62,9 @@ impl Violation for PreferUniqueEnums {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for unnecessary list comprehensions passed to `any` and `all`.
     ///
     /// ## Why is this bad?
-    ///
     /// `any` and `all` take any iterators, including generators. Converting a generator to a list
     /// by way of a list comprehension is unnecessary and reduces performance due to the
     /// overhead of creating the list.
@@ -83,14 +81,12 @@ define_violation!(
     /// ```
     ///
     /// ## Examples
-    ///
     /// ```python
     /// any([x.id for x in bar])
     /// all([x.id for x in bar])
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// any(x.id for x in bar)
     /// all(x.id for x in bar)

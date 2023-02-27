@@ -8,11 +8,9 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for class names that do not follow the `CamelCase` convention.
     ///
     /// ## Why is this bad?
-    ///
     /// [PEP 8] recommends the use of the `CapWords` (or `CamelCase`) convention
     /// for class names:
     ///
@@ -26,14 +24,12 @@ define_violation!(
     /// > names and builtin constants.
     ///
     /// ## Example
-    ///
     /// ```python
     /// class my_class:
     ///     pass
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// class MyClass:
     ///     pass

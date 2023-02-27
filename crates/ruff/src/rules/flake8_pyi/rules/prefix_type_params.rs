@@ -27,17 +27,14 @@ impl fmt::Display for VarKind {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that type `TypeVar`, `ParamSpec`, and `TypeVarTuple` definitions in
     /// stubs are prefixed with `_`.
     ///
     /// ## Why is this bad?
-    ///
     /// By prefixing type parameters with `_`, we can avoid accidentally exposing
     /// names internal to the stub.
     ///
     /// ## Example
-    ///
     /// ```python
     /// from typing import TypeVar
     ///
@@ -45,7 +42,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// from typing import TypeVar
     ///

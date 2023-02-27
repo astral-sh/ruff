@@ -11,11 +11,9 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for implicitly concatenated strings on a single line.
     ///
     /// ## Why is this bad?
-    ///
     /// While it is valid Python syntax to concatenate multiple string or byte
     /// literals implicitly (via whitespace delimiters), it is unnecessary and
     /// negatively affects code readability.
@@ -25,13 +23,11 @@ define_violation!(
     /// concatenations when collapsing long lines.
     ///
     /// ## Example
-    ///
     /// ```python
     /// z = "The quick " "brown fox."
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// z = "The quick brown fox."
     /// ```
@@ -46,11 +42,9 @@ impl Violation for SingleLineImplicitStringConcatenation {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for implicitly concatenated strings that span multiple lines.
     ///
     /// ## Why is this bad?
-    ///
     /// For string literals that wrap across multiple lines, PEP 8 recommends
     /// the use of implicit string concatenation within parentheses instead of
     /// using a backslash for line continuation, as the former is more readable
@@ -62,18 +56,15 @@ define_violation!(
     /// to `false`.
     ///
     /// ## Options
-    ///
     /// - `flake8-implicit-str-concat.allow-multiline`
     ///
     /// ## Example
-    ///
     /// ```python
     /// z = "The quick brown fox jumps over the lazy "\
     ///     "dog."
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// z = (
     ///     "The quick brown fox jumps over the lazy "
@@ -82,7 +73,6 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    ///
     /// - [PEP 8](https://peps.python.org/pep-0008/#maximum-line-length)
     pub struct MultiLineImplicitStringConcatenation;
 );
@@ -95,18 +85,15 @@ impl Violation for MultiLineImplicitStringConcatenation {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for string literals that are explicitly concatenated (using the
     /// `+` operator).
     ///
     /// ## Why is this bad?
-    ///
     /// For string literals that wrap across multiple lines, implicit string
     /// concatenation within parentheses is preferred over explicit
     /// concatenation using the `+` operator, as the former is more readable.
     ///
     /// ## Example
-    ///
     /// ```python
     /// z = (
     ///     "The quick brown fox jumps over the lazy "
@@ -115,7 +102,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// z = (
     ///     "The quick brown fox jumps over the lazy "

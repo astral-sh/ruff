@@ -77,15 +77,12 @@ impl Violation for NeedlessBool {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for three or more consecutive if-statements with direct returns
     ///
     /// ## Why is this bad?
-    ///
     /// These can be simplified by using a dictionary
     ///
     /// ## Example
-    ///
     /// ```python
     /// if x == 1:
     ///     return "Hello"
@@ -96,7 +93,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
     /// ```
@@ -134,16 +130,13 @@ impl Violation for UseTernaryOperator {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for `if` branches with identical arm bodies.
     ///
     /// ## Why is this bad?
-    ///
     /// If multiple arms of an `if` statement have the same body, using `or`
     /// better signals the intent of the statement.
     ///
     /// ## Example
-    ///
     /// ```python
     /// if x == 1:
     ///     print("Hello")
@@ -152,7 +145,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// if x == 1 or x == 2:
     ///     print("Hello")

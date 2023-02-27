@@ -8,18 +8,15 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for bare `except` catches in `try`-`except` statements.
     ///
     /// ## Why is this bad?
-    ///
     /// A bare `except` catches `BaseException` which includes
     /// `KeyboardInterrupt`, `SystemExit`, `Exception`, and others. Catching
     /// `BaseException` can make it hard to interrupt the program (e.g., with
     /// Ctrl-C) and disguise other problems.
     ///
     /// ## Example
-    ///
     /// ```python
     /// try:
     ///     raise KeyboardInterrupt("You probably don't mean to break CTRL-C.")
@@ -28,7 +25,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// try:
     ///     do_something_that_might_break()
@@ -37,7 +33,6 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    ///
     /// - [PEP 8](https://www.python.org/dev/peps/pep-0008/#programming-recommendations)
     /// - [Python: "Exception hierarchy"](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
     /// - [Google Python Style Guide: "Exceptions"](https://google.github.io/styleguide/pyguide.html#24-exceptions)

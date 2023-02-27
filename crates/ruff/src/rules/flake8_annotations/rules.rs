@@ -17,24 +17,20 @@ use crate::visibility::Visibility;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that function arguments have type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
     ///
     /// ## Example
-    ///
     /// ```python
     /// def foo(x):
     ///     ...
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// def foo(x: int):
     ///     ...
@@ -53,24 +49,20 @@ impl Violation for MissingTypeFunctionArgument {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that function `*args` arguments have type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
     ///
     /// ## Example
-    ///
     /// ```python
     /// def foo(*args):
     ///     ...
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// def foo(*args: int):
     ///     ...
@@ -89,24 +81,20 @@ impl Violation for MissingTypeArgs {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that function `**kwargs` arguments have type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
     ///
     /// ## Example
-    ///
     /// ```python
     /// def foo(**kwargs):
     ///     ...
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// def foo(**kwargs: int):
     ///     ...
@@ -125,11 +113,9 @@ impl Violation for MissingTypeKwargs {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that instance method `self` arguments have type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
@@ -138,7 +124,6 @@ define_violation!(
     /// annotation is not strictly necessary.
     ///
     /// ## Example
-    ///
     /// ```python
     /// class Foo:
     ///     def bar(self):
@@ -146,7 +131,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// class Foo:
     ///     def bar(self: "Foo"):
@@ -166,11 +150,9 @@ impl Violation for MissingTypeSelf {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that class method `cls` arguments have type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the types of function arguments. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any provided arguments match expectation.
@@ -179,7 +161,6 @@ define_violation!(
     /// annotation is not strictly necessary.
     ///
     /// ## Example
-    ///
     /// ```python
     /// class Foo:
     ///     @classmethod
@@ -188,7 +169,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// class Foo:
     ///     @classmethod
@@ -209,24 +189,20 @@ impl Violation for MissingTypeCls {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that public functions and methods have return type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
     ///
     /// ## Example
-    ///
     /// ```python
     /// def add(a, b):
     ///     return a + b
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// def add(a: int, b: int) -> int:
     ///     return a + b
@@ -245,24 +221,20 @@ impl Violation for MissingReturnTypePublicFunction {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that private functions and methods have return type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
     ///
     /// ## Example
-    ///
     /// ```python
     /// def _add(a, b):
     ///     return a + b
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// def _add(a: int, b: int) -> int:
     ///     return a + b
@@ -281,12 +253,10 @@ impl Violation for MissingReturnTypePrivateFunction {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that "special" methods, like `__init__`, `__new__`, and `__call__`, have
     /// return type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
@@ -302,7 +272,6 @@ define_violation!(
     /// ```
     ///
     /// ## Example
-    ///
     /// ```python
     /// class Foo:
     ///     def __init__(self, x: int):
@@ -310,7 +279,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// class Foo:
     ///     def __init__(self, x: int) -> None:
@@ -334,17 +302,14 @@ impl AlwaysAutofixableViolation for MissingReturnTypeSpecialMethod {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that static methods have return type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
     ///
     /// ## Example
-    ///
     /// ```python
     /// class Foo:
     ///     @staticmethod
@@ -353,7 +318,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// class Foo:
     ///     @staticmethod
@@ -374,17 +338,14 @@ impl Violation for MissingReturnTypeStaticMethod {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that class methods have return type annotations.
     ///
     /// ## Why is this bad?
-    ///
     /// Type annotations are a good way to document the return types of functions. They also
     /// help catch bugs, when used alongside a type checker, by ensuring that the types of
     /// any returned values, and the types expected by callers, match expectation.
     ///
     /// ## Example
-    ///
     /// ```python
     /// class Foo:
     ///     @classmethod
@@ -393,7 +354,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// class Foo:
     ///     @classmethod
@@ -414,12 +374,10 @@ impl Violation for MissingReturnTypeClassMethod {
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks that an expression is annotated with a more specific type than
     /// `Any`.
     ///
     /// ## Why is this bad?
-    ///
     /// `Any` is a special type indicating an unconstrained type. When an
     /// expression is annotated with type `Any`, type checkers will allow all
     /// operations on it.
@@ -428,21 +386,18 @@ define_violation!(
     /// `Any` as an "escape hatch" only when it is really needed.
     ///
     /// ## Example
-    ///
     /// ```python
     /// def foo(x: Any):
     ///     ...
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// def foo(x: int):
     ///     ...
     /// ```
     ///
     /// ## References
-    ///
     /// - [PEP 484](https://www.python.org/dev/peps/pep-0484/#the-any-type)
     /// - [`typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
     /// - [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)

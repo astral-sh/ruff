@@ -10,11 +10,9 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for `__init__` methods that return values.
     ///
     /// ## Why is this bad?
-    ///
     /// The `__init__` method is the constructor for a given Python class,
     /// responsible for initializing, rather than creating, new objects.
     ///
@@ -22,7 +20,6 @@ define_violation!(
     /// an `__init__` method will result in a runtime error.
     ///
     /// ## Example
-    ///
     /// ```python
     /// class Example:
     ///     def __init__(self):
@@ -30,7 +27,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// class Example:
     ///     def __init__(self):
@@ -38,7 +34,6 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    ///
     /// - [CodeQL: `py-explicit-return-in-init`](https://codeql.github.com/codeql-query-help/python/py-explicit-return-in-init/)
     pub struct ReturnInInit;
 );

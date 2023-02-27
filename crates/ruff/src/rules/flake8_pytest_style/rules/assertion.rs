@@ -28,16 +28,13 @@ use super::unittest_assert::UnittestAssert;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for assertions that combine multiple independent conditions.
     ///
     /// ## Why is this bad?
-    ///
     /// Composite assertion statements are harder debug upon failure, as the
     /// failure message will not indicate which condition failed.
     ///
     /// ## Example
-    ///
     /// ```python
     /// def test_foo():
     ///     assert something and something_else
@@ -48,7 +45,6 @@ define_violation!(
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// def test_foo():
     ///     assert something

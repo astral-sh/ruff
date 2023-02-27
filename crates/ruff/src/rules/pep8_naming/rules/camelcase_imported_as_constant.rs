@@ -10,11 +10,9 @@ use crate::violation::Violation;
 
 define_violation!(
     /// ## What it does
-    ///
     /// Checks for `CamelCase` imports that are aliased to constant-style names.
     ///
     /// ## Why is this bad?
-    ///
     /// [PEP 8] recommends naming conventions for classes, functions,
     /// constants, and more. The use of inconsistent naming styles between
     /// import and alias names may lead readers to expect an import to be of
@@ -24,13 +22,11 @@ define_violation!(
     /// being imported.
     ///
     /// ## Example
-    ///
     /// ```python
     /// from example import MyClassName as MY_CLASS_NAME
     /// ```
     ///
     /// Use instead:
-    ///
     /// ```python
     /// from example import MyClassName
     /// ```
