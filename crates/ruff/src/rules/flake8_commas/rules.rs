@@ -310,7 +310,7 @@ pub fn trailing_commas(
                 // lead to a syntax error.
                 let contents = locator.slice(&Range::new(missing_comma.0, missing_comma.2));
                 diagnostic.amend(Fix::replacement(
-                    contents.to_owned() + ",",
+                    format!("{contents},"),
                     missing_comma.0,
                     missing_comma.2,
                 ));
