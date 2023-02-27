@@ -103,11 +103,14 @@ fn match_defaults(keywords: &[Keyword]) -> Result<&[Expr]> {
 /// Create a list of property assignments from the `NamedTuple` arguments.
 fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<Stmt>> {
     let Some(fields) = args.get(1) else {
-        return Ok(vec![]);
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
     };
     let ExprKind::List { elts, .. } = &fields.node else {
         bail!("Expected argument to be `ExprKind::List`");
     };
+    if elts.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
     let padded_defaults = if elts.len() >= defaults.len() {
         std::iter::repeat(None)
             .take(elts.len() - defaults.len())

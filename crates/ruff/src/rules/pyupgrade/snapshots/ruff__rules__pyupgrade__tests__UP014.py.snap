@@ -59,4 +59,42 @@ expression: diagnostics
       row: 15
       column: 62
   parent: ~
+- kind:
+    ConvertNamedTupleFunctionalToClass:
+      name: MyType
+      fixable: true
+  location:
+    row: 28
+    column: 0
+  end_location:
+    row: 28
+    column: 36
+  fix:
+    content: "class MyType(typing.NamedTuple):\n    pass"
+    location:
+      row: 28
+      column: 0
+    end_location:
+      row: 28
+      column: 36
+  parent: ~
+- kind:
+    ConvertNamedTupleFunctionalToClass:
+      name: MyType
+      fixable: true
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 31
+    column: 40
+  fix:
+    content: "class MyType(typing.NamedTuple):\n    pass"
+    location:
+      row: 31
+      column: 0
+    end_location:
+      row: 31
+      column: 40
+  parent: ~
 

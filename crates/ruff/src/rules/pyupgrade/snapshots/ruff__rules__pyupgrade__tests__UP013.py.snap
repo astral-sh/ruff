@@ -192,4 +192,42 @@ expression: diagnostics
       row: 30
       column: 49
   parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType
+      fixable: true
+  location:
+    row: 40
+    column: 0
+  end_location:
+    row: 40
+    column: 32
+  fix:
+    content: "class MyType(TypedDict):\n    pass"
+    location:
+      row: 40
+      column: 0
+    end_location:
+      row: 40
+      column: 32
+  parent: ~
+- kind:
+    ConvertTypedDictFunctionalToClass:
+      name: MyType
+      fixable: true
+  location:
+    row: 43
+    column: 0
+  end_location:
+    row: 43
+    column: 36
+  fix:
+    content: "class MyType(TypedDict):\n    pass"
+    location:
+      row: 43
+      column: 0
+    end_location:
+      row: 43
+      column: 36
+  parent: ~
 
