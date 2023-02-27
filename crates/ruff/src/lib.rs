@@ -11,7 +11,7 @@ pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;
 pub use violation::{AutofixKind, Availability as AutofixAvailability};
 
-mod ast;
+pub mod ast;
 mod autofix;
 pub mod cache;
 mod checkers;

@@ -2,14 +2,16 @@ use std::collections::hash_map::DefaultHasher;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use filetime::FileTime;
 use log::error;
 use path_absolutize::Absolutize;
+use ruff::ast::types::Import;
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -19,11 +21,13 @@ const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Serialize)]
 struct CheckResultRef<'a> {
     messages: &'a [Message],
+    imports: &'a [FxHashMap<Option<PathBuf>, Vec<Import>>],
 }
 
 #[derive(Deserialize)]
 struct CheckResult {
     messages: Vec<Message>,
+    imports: Vec<FxHashMap<Option<PathBuf>, Vec<Import>>>,
 }
 
 fn content_dir() -> &'static Path {
@@ -95,14 +99,14 @@ pub fn get<P: AsRef<Path>>(
     metadata: &fs::Metadata,
     settings: &AllSettings,
     autofix: flags::Autofix,
-) -> Option<Vec<Message>> {
+) -> Option<(Vec<Message>, Vec<FxHashMap<Option<PathBuf>, Vec<Import>>>)> {
     let encoded = read_sync(
         &settings.cli.cache_dir,
         cache_key(path, package, metadata, &settings.lib, autofix),
     )
     .ok()?;
     match bincode::deserialize::<CheckResult>(&encoded[..]) {
-        Ok(CheckResult { messages }) => Some(messages),
+        Ok(CheckResult { messages, imports }) => Some((messages, imports)),
         Err(e) => {
             error!("Failed to deserialize encoded cache entry: {e:?}");
             None
@@ -118,8 +122,9 @@ pub fn set<P: AsRef<Path>>(
     settings: &AllSettings,
     autofix: flags::Autofix,
     messages: &[Message],
+    imports: &[FxHashMap<Option<PathBuf>, Vec<Import>>],
 ) {
-    let check_result = CheckResultRef { messages };
+    let check_result = CheckResultRef { messages, imports };
     if let Err(e) = write_sync(
         &settings.cli.cache_dir,
         cache_key(path, package, metadata, &settings.lib, autofix),

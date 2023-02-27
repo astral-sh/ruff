@@ -115,7 +115,7 @@ pub fn run(
                             ),
                             format!("{}", path.display()),
                             None,
-                        )])
+                        )], vec![])
                     } else {
                         Diagnostics::default()
                     }
@@ -129,7 +129,8 @@ pub fn run(
             acc += item;
             acc
         });
-
+    // check imports?
+    debug!("{:?}", diagnostics.imports);
     diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);

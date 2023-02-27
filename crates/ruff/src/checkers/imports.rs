@@ -1,9 +1,10 @@
 //! Lint rules based on import analysis.
+use std::path::{Path, PathBuf};
 
-use std::path::Path;
+use rustc_hash::FxHashMap;
+use rustpython_parser::ast::{StmtKind, Suite};
 
-use rustpython_parser::ast::{Located, Location, StmtKind, Suite};
-
+use crate::ast::types::Import;
 use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
 use crate::registry::{Diagnostic, Rule};
@@ -11,12 +12,6 @@ use crate::rules::isort;
 use crate::rules::isort::track::{Block, ImportTracker};
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ImportCheck {
-    pub name: String,
-    pub location: Location,
-}
 
 #[allow(clippy::too_many_arguments)]
 pub fn check_imports<'a>(
@@ -29,7 +24,7 @@ pub fn check_imports<'a>(
     autofix: flags::Autofix,
     path: &'a Path,
     package: Option<&'a Path>,
-) -> (Vec<Diagnostic>, Vec<Vec<Located<StmtKind>>>) {
+) -> (Vec<Diagnostic>, FxHashMap<Option<PathBuf>, Vec<Import>>) {
     // Extract all imports from the AST.
     let tracker = {
         let mut tracker = ImportTracker::new(locator, directives, path);
@@ -58,10 +53,41 @@ pub fn check_imports<'a>(
             &blocks, python_ast, locator, stylist, settings, autofix,
         ));
     }
+    let mut imports: FxHashMap<Option<PathBuf>, Vec<Import>> = FxHashMap::default();
+    let mut imports_vec = vec![];
+    for &block in blocks.iter() {
+        block.imports.iter().for_each(|&stmt| match &stmt.node {
+            StmtKind::Import { names } => {
+                // from testing, seems this should only have one entry
+                imports_vec.push(Import {
+                    name: names[0].node.name.to_owned(),
+                    location: stmt.location.clone(),
+                    end_location: stmt.end_location.unwrap().clone(),
+                });
+            }
+            StmtKind::ImportFrom { module, names, .. } => imports_vec.extend(
+                names
+                    .iter()
+                    .map(|name| Import {
+                        name: format!("{}{}", { if let Some(n) = module {
+                            n } else { "" }}, name.node.name),
+                        location: name.location.clone(),
+                        end_location: name.end_location.unwrap().clone(),
+                    })
+                    .collect::<Vec<Import>>(),
+            ),
+            _ => unreachable!("Should only have import statements"),
+        });
+    }
 
-    let imports_vec: Vec<Vec<Located<StmtKind>>> = blocks
-        .iter()
-        .map(|&block| block.imports.iter().map(|&stmt| stmt.clone()).collect())
-        .collect();
-    (diagnostics, imports_vec)
+    // to avoid depedence on ref to python_ast
+    let package = if let Some(package_path) = package {
+        Some(package_path.to_path_buf())
+    } else {
+        None
+    };
+
+    imports.insert(package, imports_vec);
+    println!("imports.rs {imports:?}");
+    (diagnostics, imports)
 }

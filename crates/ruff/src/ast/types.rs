@@ -1,6 +1,6 @@
 use std::ops::Deref;
 use std::sync::atomic::{AtomicUsize, Ordering};
-
+use serde::{Deserialize, Serialize};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arguments, Expr, Keyword, Located, Location, Stmt};
 
@@ -277,3 +277,10 @@ impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
 }
 
 pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 8]>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Import {
+    pub name: String,
+    pub location: Location,
+    pub end_location: Location,
+}

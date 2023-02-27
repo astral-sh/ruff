@@ -4,7 +4,7 @@ use std::fs::write;
 use std::io;
 use std::io::Write;
 use std::ops::AddAssign;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use colored::Colorize;
@@ -12,6 +12,7 @@ use log::{debug, error};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
+use ruff::ast::types::Import;
 use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
@@ -23,13 +24,15 @@ use crate::cache;
 pub struct Diagnostics {
     pub messages: Vec<Message>,
     pub fixed: FxHashMap<String, FixTable>,
+    pub imports: Vec<FxHashMap<Option<PathBuf>, Vec<Import>>>,
 }
 
 impl Diagnostics {
-    pub fn new(messages: Vec<Message>) -> Self {
+    pub fn new(messages: Vec<Message>, imports: Vec<FxHashMap<Option<PathBuf>, Vec<Import>>>) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),
+            imports,
         }
     }
 }
@@ -37,6 +40,7 @@ impl Diagnostics {
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
         self.messages.extend(other.messages);
+        self.imports.extend(other.imports);
         for (filename, fixed) in other.fixed {
             if fixed.is_empty() {
                 continue;
@@ -68,11 +72,11 @@ pub fn lint_path(
     let metadata = if cache.into() && matches!(autofix, fix::FixMode::None | fix::FixMode::Generate)
     {
         let metadata = path.metadata()?;
-        if let Some(messages) =
+        if let Some((messages, imports)) =
             cache::get(path, package.as_ref(), &metadata, settings, autofix.into())
         {
             debug!("Cache hit for: {}", path.to_string_lossy());
-            return Ok(Diagnostics::new(messages));
+            return Ok(Diagnostics::new(messages, imports));
         }
         Some(metadata)
     } else {
@@ -140,14 +144,16 @@ pub fn lint_path(
                 &metadata,
                 settings,
                 autofix.into(),
-                &messages,
+                &messages.0,
+                &[messages.1.clone()]
             );
         }
     }
 
     Ok(Diagnostics {
-        messages,
+        messages: messages.0,
         fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
+        imports: vec![messages.1],
     })
 }
 
@@ -232,10 +238,11 @@ pub fn lint_stdin(
     }
 
     Ok(Diagnostics {
-        messages,
+        messages: messages.0,
         fixed: FxHashMap::from_iter([(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
         )]),
+        imports: vec![messages.1],
     })
 }
