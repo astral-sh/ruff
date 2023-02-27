@@ -80,7 +80,35 @@ impl Violation for RedefinedLoopName {
             outer_kind,
             inner_kind,
         } = self;
-        format!("Outer {outer_kind} variable `{name}` overwritten by inner {inner_kind} target")
+        // Prefix the nouns describing the outer and inner kinds with "outer" and "inner"
+        // to better distinguish them, but to avoid confusion, only do so if the outer and inner
+        // kinds are equal. For example, instead of:
+        //
+        //    "Outer for loop variable `i` overwritten by inner assignment target."
+        //
+        // We have:
+        //
+        //    "For loop variable `i` overwritten by assignment target."
+        //
+        // While at the same time, we have:
+        //
+        //    "Outer for loop variable `i` overwritten by inner for loop target."
+        //    "Outer with statement variable `f` overwritten by inner with statement target."
+
+        let use_outer_inner_adjectives = outer_kind == inner_kind;
+        let (outer_with_space, inner_with_space) = if use_outer_inner_adjectives {
+            ("outer ", "inner ")
+        } else {
+            ("", "")
+        };
+        let sentence = format!(
+            "{outer_with_space}{outer_kind} variable `{name}` overwritten by \
+            {inner_with_space}{inner_kind} target"
+        );
+        // Capitalize the first letter.
+        let first_letter_uppercased = sentence.chars().next().unwrap().to_uppercase();
+        let remaining_letters = &sentence[sentence.char_indices().nth(1).unwrap().0..];
+        format!("{first_letter_uppercased}{remaining_letters}")
     }
 }
 
