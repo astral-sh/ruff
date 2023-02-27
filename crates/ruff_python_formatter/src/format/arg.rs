@@ -4,6 +4,7 @@ use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::Arg;
+use crate::format::comments::end_of_line_comments;
 use crate::shared_traits::AsFormat;
 
 pub struct FormatArg<'a> {
@@ -27,6 +28,7 @@ impl Format<ASTFormatContext<'_>> for FormatArg<'_> {
             write!(f, [text(": ")])?;
             write!(f, [annotation.format()])?;
         }
+        write!(f, [end_of_line_comments(arg)])?;
 
         Ok(())
     }

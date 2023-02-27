@@ -131,68 +131,18 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 ```diff
 --- Black
 +++ Ruff
-@@ -2,7 +2,7 @@
- 
- 
+@@ -31,8 +31,8 @@
  def f(
--    a,  # type: int
-+    a,
- ):
-     pass
- 
-@@ -14,44 +14,42 @@
- 
- 
- def f(
--    a,  # type: int
--    b,  # type: int
--    c,  # type: int
--    d,  # type: int
--    e,  # type: int
--    f,  # type: int
--    g,  # type: int
--    h,  # type: int
--    i,  # type: int
-+    a,
-+    b,
-+    c,
-+    d,
-+    e,
-+    f,
-+    g,
-+    h,
-+    i,
- ):
-     # type: (...) -> None
-     pass
- 
- 
- def f(
--    arg,  # type: int
--    *args,  # type: *Any
+     arg,  # type: int
+     *args,  # type: *Any
 -    default=False,  # type: bool
 -    **kwargs,  # type: **Any
-+    arg,
-+    *args,
-+    default=False,
++    default=False,  # type: bool  # type: **Any
 +    **kwargs,
  ):
      # type: (...) -> None
      pass
- 
- 
- def f(
--    a,  # type: int
--    b,  # type: int
--    c,  # type: int
--    d,  # type: int
-+    a,
-+    b,
-+    c,
-+    d,
- ):
-     # type: (...) -> None
- 
+@@ -49,9 +49,7 @@
      element = 0  # type: int
      another_element = 1  # type: float
      another_element_with_long_name = 2  # type: int
@@ -203,38 +153,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      an_element_with_a_long_value = calls() or more_calls() and more()  # type: bool
  
      tup = (
-@@ -70,21 +68,21 @@
- 
- 
- def f(
--    x,  # not a type comment
--    y,  # type: int
-+    x,
-+    y,
- ):
-     # type: (...) -> None
-     pass
- 
- 
- def f(
--    x,  # not a type comment
-+    x,
- ):  # type: (int) -> None
-     pass
- 
- 
- def func(
--    a=some_list[0],  # type: int
-+    a=some_list[0],
- ):  # type: () -> int
-     c = call(
-         0.0123,
-@@ -96,23 +94,37 @@
-         0.0123,
-         0.0456,
-         0.0789,
--        a[-1],  # type: ignore
-+        a[-1],
+@@ -100,19 +98,33 @@
      )
  
      c = call(
@@ -245,7 +164,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +        "aaaaaaaa",
 +        "aaaaaaaa",
 +        "aaaaaaaa",
-+        "aaaaaaaa",
++        "aaaaaaaa",  # type: ignore
      )
  
  
@@ -270,7 +189,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +        AAAAAAAAAAAAAAAAAAAAAAA,
 +        AAAAAAAAAAAAAAAAAAAAAAA,
 +        BBBBBBBBBBBB,
-+    ],
++    ],  # type: ignore
  )
  
  aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]
@@ -283,7 +202,7 @@ from typing import Any, Tuple
 
 
 def f(
-    a,
+    a,  # type: int
 ):
     pass
 
@@ -295,24 +214,24 @@ def f(a, b, c, d, e, f, g, h, i):
 
 
 def f(
-    a,
-    b,
-    c,
-    d,
-    e,
-    f,
-    g,
-    h,
-    i,
+    a,  # type: int
+    b,  # type: int
+    c,  # type: int
+    d,  # type: int
+    e,  # type: int
+    f,  # type: int
+    g,  # type: int
+    h,  # type: int
+    i,  # type: int
 ):
     # type: (...) -> None
     pass
 
 
 def f(
-    arg,
-    *args,
-    default=False,
+    arg,  # type: int
+    *args,  # type: *Any
+    default=False,  # type: bool  # type: **Any
     **kwargs,
 ):
     # type: (...) -> None
@@ -320,10 +239,10 @@ def f(
 
 
 def f(
-    a,
-    b,
-    c,
-    d,
+    a,  # type: int
+    b,  # type: int
+    c,  # type: int
+    d,  # type: int
 ):
     # type: (...) -> None
 
@@ -349,21 +268,21 @@ def f(
 
 
 def f(
-    x,
-    y,
+    x,  # not a type comment
+    y,  # type: int
 ):
     # type: (...) -> None
     pass
 
 
 def f(
-    x,
+    x,  # not a type comment
 ):  # type: (int) -> None
     pass
 
 
 def func(
-    a=some_list[0],
+    a=some_list[0],  # type: int
 ):  # type: () -> int
     c = call(
         0.0123,
@@ -375,7 +294,7 @@ def func(
         0.0123,
         0.0456,
         0.0789,
-        a[-1],
+        a[-1],  # type: ignore
     )
 
     c = call(
@@ -385,7 +304,7 @@ def func(
         "aaaaaaaa",
         "aaaaaaaa",
         "aaaaaaaa",
-        "aaaaaaaa",
+        "aaaaaaaa",  # type: ignore
     )
 
 
@@ -405,7 +324,7 @@ call_to_some_function_asdf(
         AAAAAAAAAAAAAAAAAAAAAAA,
         AAAAAAAAAAAAAAAAAAAAAAA,
         BBBBBBBBBBBB,
-    ],
+    ],  # type: ignore
 )
 
 aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*items)))  # type: ignore[arg-type]

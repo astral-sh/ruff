@@ -5,7 +5,7 @@ use rustpython_parser::Tok;
 
 use crate::core::types::Range;
 use crate::cst::{
-    Alias, Body, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Pattern, PatternKind,
+    Alias, Arg, Body, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Pattern, PatternKind,
     SliceIndex, SliceIndexKind, Stmt, StmtKind,
 };
 
@@ -16,6 +16,7 @@ pub enum Node<'a> {
     Stmt(&'a Stmt),
     Expr(&'a Expr),
     Alias(&'a Alias),
+    Arg(&'a Arg),
     Excepthandler(&'a Excepthandler),
     SliceIndex(&'a SliceIndex),
     Pattern(&'a Pattern),
@@ -29,6 +30,7 @@ impl Node<'_> {
             Node::Stmt(node) => node.id(),
             Node::Expr(node) => node.id(),
             Node::Alias(node) => node.id(),
+            Node::Arg(node) => node.id(),
             Node::Excepthandler(node) => node.id(),
             Node::SliceIndex(node) => node.id(),
             Node::Pattern(node) => node.id(),
@@ -268,29 +270,19 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     result.push(Node::Expr(decorator));
                 }
                 for arg in &args.posonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 for arg in &args.args {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 if let Some(arg) = &args.vararg {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 for arg in &args.kwonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 if let Some(arg) = &args.kwarg {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 for expr in &args.defaults {
                     result.push(Node::Expr(expr));
@@ -450,6 +442,11 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             StmtKind::Global { .. } => {}
             StmtKind::Nonlocal { .. } => {}
         },
+        Node::Arg(arg) => {
+            if let Some(annotation) = &arg.node.annotation {
+                result.push(Node::Expr(annotation));
+            }
+        }
         Node::Expr(expr) => match &expr.node {
             ExprKind::BoolOp { values, .. } => {
                 for value in values {
@@ -710,6 +707,7 @@ pub fn decorate_token<'a>(
             Node::Stmt(node) => node.location,
             Node::Expr(node) => node.location,
             Node::Alias(node) => node.location,
+            Node::Arg(node) => node.location,
             Node::Excepthandler(node) => node.location,
             Node::SliceIndex(node) => node.location,
             Node::Pattern(node) => node.location,
@@ -720,6 +718,7 @@ pub fn decorate_token<'a>(
             Node::Stmt(node) => node.end_location.unwrap(),
             Node::Expr(node) => node.end_location.unwrap(),
             Node::Alias(node) => node.end_location.unwrap(),
+            Node::Arg(node) => node.end_location.unwrap(),
             Node::Excepthandler(node) => node.end_location.unwrap(),
             Node::SliceIndex(node) => node.end_location.unwrap(),
             Node::Pattern(node) => node.end_location.unwrap(),
@@ -734,6 +733,7 @@ pub fn decorate_token<'a>(
                 Node::Stmt(node) => node.location,
                 Node::Expr(node) => node.location,
                 Node::Alias(node) => node.location,
+                Node::Arg(node) => node.location,
                 Node::Excepthandler(node) => node.location,
                 Node::SliceIndex(node) => node.location,
                 Node::Pattern(node) => node.location,
@@ -744,6 +744,7 @@ pub fn decorate_token<'a>(
                 Node::Stmt(node) => node.end_location.unwrap(),
                 Node::Expr(node) => node.end_location.unwrap(),
                 Node::Alias(node) => node.end_location.unwrap(),
+                Node::Arg(node) => node.end_location.unwrap(),
                 Node::Excepthandler(node) => node.end_location.unwrap(),
                 Node::SliceIndex(node) => node.end_location.unwrap(),
                 Node::Pattern(node) => node.end_location.unwrap(),
@@ -806,6 +807,7 @@ pub struct TriviaIndex {
     pub stmt: FxHashMap<usize, Vec<Trivia>>,
     pub expr: FxHashMap<usize, Vec<Trivia>>,
     pub alias: FxHashMap<usize, Vec<Trivia>>,
+    pub arg: FxHashMap<usize, Vec<Trivia>>,
     pub excepthandler: FxHashMap<usize, Vec<Trivia>>,
     pub slice_index: FxHashMap<usize, Vec<Trivia>>,
     pub pattern: FxHashMap<usize, Vec<Trivia>>,
@@ -838,6 +840,13 @@ fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
         Node::Alias(node) => {
             trivia
                 .alias
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::Arg(node) => {
+            trivia
+                .arg
                 .entry(node.id())
                 .or_insert_with(Vec::new)
                 .push(comment);

@@ -71,9 +71,8 @@ fn format_subscript(
             Ok(())
         }))])]
     )?;
-
     write!(f, [text("]")])?;
-
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -286,6 +285,7 @@ fn format_list(
         )?;
     }
     write!(f, [text("]")])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -613,6 +613,7 @@ fn format_joined_str(
     _values: &[Expr],
 ) -> FormatResult<()> {
     write!(f, [literal(Range::from_located(expr))])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -639,6 +640,7 @@ fn format_constant(
         Constant::Complex { .. } => write!(f, [complex_literal(Range::from_located(expr))])?,
         Constant::Tuple(_) => unreachable!("Constant::Tuple should be handled by format_tuple"),
     }
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -713,9 +715,7 @@ fn format_attribute(
     write!(f, [value.format()])?;
     write!(f, [text(".")])?;
     write!(f, [dynamic_text(attr, TextSize::default())])?;
-
     write!(f, [end_of_line_comments(expr)])?;
-
     Ok(())
 }
 
@@ -729,9 +729,7 @@ fn format_named_expr(
     write!(f, [text(":=")])?;
     write!(f, [space()])?;
     write!(f, [group(&format_args![value.format()])])?;
-
     write!(f, [end_of_line_comments(expr)])?;
-
     Ok(())
 }
 
@@ -752,9 +750,7 @@ fn format_bool_op(
             write!(f, [group(&format_args![value.format()])])?;
         }
     }
-
     write!(f, [end_of_line_comments(expr)])?;
-
     Ok(())
 }
 
@@ -767,7 +763,6 @@ fn format_bin_op(
 ) -> FormatResult<()> {
     // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators
     let is_simple = matches!(op, Operator::Pow) && is_simple_power(left) && is_simple_power(right);
-
     write!(f, [left.format()])?;
     if !is_simple {
         write!(f, [soft_line_break_or_space()])?;
@@ -776,10 +771,8 @@ fn format_bin_op(
     if !is_simple {
         write!(f, [space()])?;
     }
-    write!(f, [group(&format_args![right.format()])])?;
-
+    write!(f, [group(&right.format())])?;
     write!(f, [end_of_line_comments(expr)])?;
-
     Ok(())
 }
 
@@ -808,6 +801,7 @@ fn format_unary_op(
     } else {
         write!(f, [operand.format()])?;
     }
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -825,6 +819,7 @@ fn format_lambda(
     write!(f, [text(":")])?;
     write!(f, [space()])?;
     write!(f, [body.format()])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
