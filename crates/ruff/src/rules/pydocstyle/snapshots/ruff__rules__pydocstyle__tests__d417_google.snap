@@ -9,10 +9,10 @@ expression: diagnostics
         - z
   location:
     row: 1
-    column: 0
+    column: 4
   end_location:
-    row: 11
-    column: 12
+    row: 1
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -22,10 +22,10 @@ expression: diagnostics
         - z
   location:
     row: 14
-    column: 0
+    column: 4
   end_location:
-    row: 24
-    column: 12
+    row: 14
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -35,10 +35,10 @@ expression: diagnostics
         - z
   location:
     row: 27
-    column: 0
+    column: 4
   end_location:
-    row: 36
-    column: 12
+    row: 27
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -48,10 +48,10 @@ expression: diagnostics
         - z
   location:
     row: 39
-    column: 0
+    column: 4
   end_location:
-    row: 49
-    column: 12
+    row: 39
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -60,10 +60,10 @@ expression: diagnostics
         - y
   location:
     row: 52
-    column: 0
+    column: 4
   end_location:
-    row: 62
-    column: 12
+    row: 52
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -72,10 +72,10 @@ expression: diagnostics
         - y
   location:
     row: 65
-    column: 0
+    column: 4
   end_location:
-    row: 74
-    column: 12
+    row: 65
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -84,10 +84,10 @@ expression: diagnostics
         - y
   location:
     row: 77
-    column: 0
+    column: 4
   end_location:
-    row: 84
-    column: 12
+    row: 77
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -96,10 +96,10 @@ expression: diagnostics
         - x
   location:
     row: 98
-    column: 0
+    column: 4
   end_location:
-    row: 105
-    column: 12
+    row: 98
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -108,10 +108,10 @@ expression: diagnostics
         - "*args"
   location:
     row: 108
-    column: 0
+    column: 4
   end_location:
-    row: 115
-    column: 12
+    row: 108
+    column: 5
   fix: ~
   parent: ~
 
