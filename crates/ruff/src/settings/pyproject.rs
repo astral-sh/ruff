@@ -48,6 +48,12 @@ pub fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
 /// Return the path to the `pyproject.toml` or `ruff.toml` file in a given
 /// directory.
 pub fn settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
+    // Check for `.ruff.toml`.
+    let ruff_toml = path.as_ref().join(".ruff.toml");
+    if ruff_toml.is_file() {
+        return Ok(Some(ruff_toml));
+    }
+
     // Check for `ruff.toml`.
     let ruff_toml = path.as_ref().join("ruff.toml");
     if ruff_toml.is_file() {
@@ -77,6 +83,14 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
 /// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
 /// exists.
 pub fn find_user_settings_toml() -> Option<PathBuf> {
+    // Search for a user-specific `.ruff.toml`.
+    let mut path = dirs::config_dir()?;
+    path.push("ruff");
+    path.push(".ruff.toml");
+    if path.is_file() {
+        return Some(path);
+    }
+
     // Search for a user-specific `ruff.toml`.
     let mut path = dirs::config_dir()?;
     path.push("ruff");

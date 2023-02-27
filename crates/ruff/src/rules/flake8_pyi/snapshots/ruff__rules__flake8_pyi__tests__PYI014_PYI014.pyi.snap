@@ -1,0 +1,115 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 3
+    column: 6
+  end_location:
+    row: 3
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 7
+    column: 6
+  end_location:
+    row: 11
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 14
+    column: 6
+  end_location:
+    row: 18
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 21
+    column: 6
+  end_location:
+    row: 25
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 27
+    column: 10
+  end_location:
+    row: 27
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 29
+    column: 6
+  end_location:
+    row: 29
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 32
+    column: 6
+  end_location:
+    row: 32
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 35
+    column: 6
+  end_location:
+    row: 35
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 38
+    column: 6
+  end_location:
+    row: 38
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 41
+    column: 6
+  end_location:
+    row: 41
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    ArgumentSimpleDefaults: ~
+  location:
+    row: 44
+    column: 6
+  end_location:
+    row: 44
+    column: 19
+  fix: ~
+  parent: ~
+

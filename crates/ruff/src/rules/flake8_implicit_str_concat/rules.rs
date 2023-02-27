@@ -56,7 +56,7 @@ define_violation!(
     /// to `false`.
     ///
     /// ## Options
-    /// * `flake8-implicit-str-concat.allow-multiline`
+    /// - `flake8-implicit-str-concat.allow-multiline`
     ///
     /// ## Example
     /// ```python
@@ -73,7 +73,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [PEP 8](https://peps.python.org/pep-0008/#maximum-line-length)
+    /// - [PEP 8](https://peps.python.org/pep-0008/#maximum-line-length)
     pub struct MultiLineImplicitStringConcatenation;
 );
 impl Violation for MultiLineImplicitStringConcatenation {

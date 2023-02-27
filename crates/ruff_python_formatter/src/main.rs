@@ -2,6 +2,7 @@ use std::fs;
 
 use anyhow::Result;
 use clap::Parser as ClapParser;
+
 use ruff_python_formatter::cli::Cli;
 use ruff_python_formatter::fmt;
 

@@ -37,8 +37,8 @@ pub struct Options {
     /// Whether to suppress `ANN200`-level violations for functions that meet
     /// either of the following criteria:
     ///
-    /// * Contain no `return` statement.
-    /// * Explicit `return` statement(s) all return `None` (explicitly or
+    /// - Contain no `return` statement.
+    /// - Explicit `return` statement(s) all return `None` (explicitly or
     ///   implicitly).
     pub suppress_none_returning: Option<bool>,
     #[option(

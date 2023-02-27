@@ -24,7 +24,7 @@ define_violation!(
     /// try:
     ///     function()
     /// except Exception as e:
-    ///     logging.error('%s error occurred: %s', e)  # [logging-too-few-args]
+    ///     logging.error("%s error occurred: %s", e)
     ///     raise
     /// ```
     ///
@@ -35,7 +35,7 @@ define_violation!(
     /// try:
     ///     function()
     /// except Exception as e:
-    ///     logging.error('%s error occurred: %s', type(e), e)
+    ///     logging.error("%s error occurred: %s", type(e), e)
     ///     raise
     /// ```
     pub struct LoggingTooFewArgs;
@@ -61,7 +61,7 @@ define_violation!(
     /// try:
     ///     function()
     /// except Exception as e:
-    ///     logging.error('Error occurred: %s', type(e), e)  # [logging-too-many-args]
+    ///     logging.error("Error occurred: %s", type(e), e)
     ///     raise
     /// ```
     ///
@@ -72,7 +72,7 @@ define_violation!(
     /// try:
     ///     function()
     /// except Exception as e:
-    ///     logging.error('%s error occurred: %s', type(e), e)
+    ///     logging.error("%s error occurred: %s", type(e), e)
     ///     raise
     /// ```
     pub struct LoggingTooManyArgs;
@@ -84,8 +84,22 @@ impl Violation for LoggingTooManyArgs {
     }
 }
 
-/// Check logging calls for violations.
+/// PLE1205
+/// PLE1206
 pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+    // If there are any starred arguments, abort.
+    if args
+        .iter()
+        .any(|arg| matches!(arg.node, ExprKind::Starred { .. }))
+    {
+        return;
+    }
+
+    // If there are any starred keyword arguments, abort.
+    if keywords.iter().any(|keyword| keyword.node.arg.is_none()) {
+        return;
+    }
+
     if !is_logger_candidate(func) {
         return;
     }
@@ -93,8 +107,6 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     if let ExprKind::Attribute { attr, .. } = &func.node {
         if LoggingLevel::from_str(attr.as_str()).is_some() {
             let call_args = SimpleCallArgs::new(args, keywords);
-
-            // E1205 - E1206
             if let Some(msg) = call_args.get_argument("msg", Some(0)) {
                 if let ExprKind::Constant {
                     value: Constant::Str(value),
@@ -106,30 +118,27 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                             return;
                         }
 
-                        if !call_args.kwargs.is_empty() {
-                            // Keyword checking on logging strings is complicated by
-                            // special keywords - out of scope.
-                            return;
-                        }
-
                         let message_args = call_args.args.len() - 1;
 
-                        if checker.settings.rules.enabled(&Rule::LoggingTooManyArgs)
-                            && summary.num_positional < message_args
-                        {
-                            checker.diagnostics.push(Diagnostic::new(
-                                LoggingTooManyArgs,
-                                Range::from_located(func),
-                            ));
+                        if checker.settings.rules.enabled(&Rule::LoggingTooManyArgs) {
+                            if summary.num_positional < message_args {
+                                checker.diagnostics.push(Diagnostic::new(
+                                    LoggingTooManyArgs,
+                                    Range::from_located(func),
+                                ));
+                            }
                         }
 
-                        if checker.settings.rules.enabled(&Rule::LoggingTooFewArgs)
-                            && summary.num_positional > message_args
-                        {
-                            checker.diagnostics.push(Diagnostic::new(
-                                LoggingTooFewArgs,
-                                Range::from_located(func),
-                            ));
+                        if checker.settings.rules.enabled(&Rule::LoggingTooFewArgs) {
+                            if message_args > 0
+                                && call_args.kwargs.is_empty()
+                                && summary.num_positional > message_args
+                            {
+                                checker.diagnostics.push(Diagnostic::new(
+                                    LoggingTooFewArgs,
+                                    Range::from_located(func),
+                                ));
+                            }
                         }
                     }
                 }

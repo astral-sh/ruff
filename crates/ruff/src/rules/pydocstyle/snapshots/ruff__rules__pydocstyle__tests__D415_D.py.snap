@@ -175,23 +175,6 @@ expression: diagnostics
 - kind:
     EndsInPunctuation: ~
   location:
-    row: 509
-    column: 4
-  end_location:
-    row: 509
-    column: 34
-  fix:
-    content: "."
-    location:
-      row: 509
-      column: 31
-    end_location:
-      row: 509
-      column: 31
-  parent: ~
-- kind:
-    EndsInPunctuation: ~
-  location:
     row: 520
     column: 4
   end_location:

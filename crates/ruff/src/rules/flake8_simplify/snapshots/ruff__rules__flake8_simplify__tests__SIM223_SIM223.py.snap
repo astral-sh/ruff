@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AndFalse: ~
+    ExprAndFalse: ~
   location:
     row: 1
     column: 9
@@ -20,7 +20,7 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    AndFalse: ~
+    ExprAndFalse: ~
   location:
     row: 4
     column: 16
@@ -37,7 +37,7 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    AndFalse: ~
+    ExprAndFalse: ~
   location:
     row: 7
     column: 15

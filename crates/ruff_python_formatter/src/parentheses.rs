@@ -1,18 +1,18 @@
+use rustpython_parser::ast::Constant;
+
 use crate::core::helpers::is_radix_literal;
 use crate::core::locator::Locator;
 use crate::core::types::Range;
 use crate::core::visitor;
 use crate::core::visitor::Visitor;
 use crate::cst::{Expr, ExprKind, Stmt, StmtKind};
-use crate::trivia::{Parenthesize, TriviaKind};
-use rustpython_parser::ast::Constant;
+use crate::trivia::Parenthesize;
 
 /// Modify an [`Expr`] to infer parentheses, rather than respecting any user-provided trivia.
 fn use_inferred_parens(expr: &mut Expr) {
     // Remove parentheses, unless it's a generator expression, in which case, keep them.
     if !matches!(expr.node, ExprKind::GeneratorExp { .. }) {
-        expr.trivia
-            .retain(|trivia| !matches!(trivia.kind, TriviaKind::Parentheses));
+        expr.trivia.retain(|trivia| !trivia.kind.is_parentheses());
     }
 
     // If it's a tuple, add parentheses if it's a singleton; otherwise, we only need parentheses
@@ -35,8 +35,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
         // Always remove parentheses around statements, unless it's an expression statement,
         // in which case, remove parentheses around the expression.
         let before = stmt.trivia.len();
-        stmt.trivia
-            .retain(|trivia| !matches!(trivia.kind, TriviaKind::Parentheses));
+        stmt.trivia.retain(|trivia| !trivia.kind.is_parentheses());
         let after = stmt.trivia.len();
         if let StmtKind::Expr { value } = &mut stmt.node {
             if before != after {
@@ -112,8 +111,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
     fn visit_expr(&mut self, expr: &'a mut Expr) {
         // Always retain parentheses around expressions.
         let before = expr.trivia.len();
-        expr.trivia
-            .retain(|trivia| !matches!(trivia.kind, TriviaKind::Parentheses));
+        expr.trivia.retain(|trivia| !trivia.kind.is_parentheses());
         let after = expr.trivia.len();
         if before != after {
             expr.parentheses = Parenthesize::Always;
@@ -169,7 +167,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
                 if !slice
                     .trivia
                     .iter()
-                    .any(|trivia| matches!(trivia.kind, TriviaKind::Parentheses))
+                    .any(|trivia| trivia.kind.is_parentheses())
                 {
                     value.parentheses = Parenthesize::Never;
                 }

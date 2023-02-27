@@ -626,3 +626,8 @@ result = function(
     bar,
     **{'ham': spam}
 )
+
+# Make sure the COM812 and UP034 rules don't autofix simultaneously and cause a syntax error.
+the_first_one = next(
+    (i for i in range(10) if i // 2 == 0)  # COM812 fix should include the final bracket
+)

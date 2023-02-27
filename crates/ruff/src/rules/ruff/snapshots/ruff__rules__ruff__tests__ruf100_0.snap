@@ -68,12 +68,12 @@ expression: diagnostics
 - kind:
     UnusedNOQA:
       codes:
-        unknown:
-          - W191
+        unknown: []
         disabled:
           - F821
         unmatched:
           - F841
+          - W191
   location:
     row: 19
     column: 11

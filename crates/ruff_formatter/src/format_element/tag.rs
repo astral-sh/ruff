@@ -29,8 +29,8 @@ pub enum Tag {
     EndDedent,
 
     /// Creates a logical group where its content is either consistently printed:
-    /// * on a single line: Omitting `LineMode::Soft` line breaks and printing spaces for `LineMode::SoftOrSpace`
-    /// * on multiple lines: Printing all line breaks
+    /// - on a single line: Omitting `LineMode::Soft` line breaks and printing spaces for `LineMode::SoftOrSpace`
+    /// - on multiple lines: Printing all line breaks
     ///
     /// See [crate::builders::group] for documentation and examples.
     StartGroup(Group),
@@ -203,8 +203,8 @@ pub enum DedentMode {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Condition {
-    /// * Flat -> Omitted if the enclosing group is a multiline group, printed for groups fitting on a single line
-    /// * Multiline -> Omitted if the enclosing group fits on a single line, printed if the group breaks over multiple lines.
+    /// - Flat -> Omitted if the enclosing group is a multiline group, printed for groups fitting on a single line
+    /// - Multiline -> Omitted if the enclosing group fits on a single line, printed if the group breaks over multiple lines.
     pub(crate) mode: PrintMode,
 
     /// The id of the group for which it should check if it breaks or not. The group must appear in the document

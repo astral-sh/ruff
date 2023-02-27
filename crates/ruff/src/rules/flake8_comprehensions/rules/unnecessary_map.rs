@@ -32,11 +32,11 @@ define_violation!(
     ///
     /// This rule also applies to `map` calls within `list`, `set`, and `dict`
     /// calls. For example:
-    /// * Instead of `list(map(lambda num: num * 2, nums))`, use
+    /// - Instead of `list(map(lambda num: num * 2, nums))`, use
     ///   `[num * 2 for num in nums]`.
-    /// * Instead of `set(map(lambda num: num % 2 == 0, nums))`, use
+    /// - Instead of `set(map(lambda num: num % 2 == 0, nums))`, use
     ///   `{num % 2 == 0 for num in nums}`.
-    /// * Instead of `dict(map(lambda v: (v, v ** 2), values))`, use
+    /// - Instead of `dict(map(lambda v: (v, v ** 2), values))`, use
     ///   `{v: v ** 2 for v in values}`.
     pub struct UnnecessaryMap {
         pub obj_type: String,

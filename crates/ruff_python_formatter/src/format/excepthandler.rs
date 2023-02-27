@@ -5,6 +5,7 @@ use ruff_text_size::TextSize;
 use crate::context::ASTFormatContext;
 use crate::cst::{Excepthandler, ExcepthandlerKind};
 use crate::format::builders::block;
+use crate::format::comments::end_of_line_comments;
 use crate::shared_traits::AsFormat;
 
 pub struct FormatExcepthandler<'a> {
@@ -21,7 +22,8 @@ impl AsFormat<ASTFormatContext<'_>> for Excepthandler {
 
 impl Format<ASTFormatContext<'_>> for FormatExcepthandler<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
-        let ExcepthandlerKind::ExceptHandler { type_, name, body } = &self.item.node;
+        let excepthandler = self.item;
+        let ExcepthandlerKind::ExceptHandler { type_, name, body } = &excepthandler.node;
 
         write!(f, [text("except")])?;
         if let Some(type_) = &type_ {
@@ -39,6 +41,8 @@ impl Format<ASTFormatContext<'_>> for FormatExcepthandler<'_> {
             }
         }
         write!(f, [text(":")])?;
+        write!(f, [end_of_line_comments(excepthandler)])?;
+
         write!(f, [block_indent(&block(body))])?;
 
         Ok(())

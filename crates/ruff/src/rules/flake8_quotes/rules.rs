@@ -22,7 +22,7 @@ define_violation!(
     /// strings, but be consistent.
     ///
     /// ## Options
-    /// * `flake8-quotes.inline-quotes`
+    /// - `flake8-quotes.inline-quotes`
     ///
     /// ## Example
     /// ```python
@@ -67,7 +67,7 @@ define_violation!(
     /// strings, but be consistent.
     ///
     /// ## Options
-    /// * `flake8-quotes.multiline-quotes`
+    /// - `flake8-quotes.multiline-quotes`
     ///
     /// ## Example
     /// ```python
@@ -115,7 +115,7 @@ define_violation!(
     /// strings, but be consistent.
     ///
     /// ## Options
-    /// * `flake8-quotes.docstring-quotes`
+    /// - `flake8-quotes.docstring-quotes`
     ///
     /// ## Example
     /// ```python

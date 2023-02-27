@@ -38,21 +38,18 @@ enum Trailer {
     CompoundStatement,
 }
 
-struct NewlineNormalizer {
+struct StmtNormalizer {
     depth: Depth,
     trailer: Trailer,
     scope: Scope,
 }
 
-impl<'a> Visitor<'a> for NewlineNormalizer {
+impl<'a> Visitor<'a> for StmtNormalizer {
     fn visit_stmt(&mut self, stmt: &'a mut Stmt) {
         // Remove any runs of empty lines greater than two in a row.
         let mut count = 0;
         stmt.trivia.retain(|c| {
-            if matches!(
-                (c.kind, c.relationship),
-                (TriviaKind::EmptyLine, Relationship::Leading)
-            ) {
+            if c.kind.is_empty_line() && c.relationship.is_leading() {
                 count += 1;
                 count <= self.depth.max_newlines()
             } else {
@@ -78,10 +75,7 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                 if seen_non_empty {
                     true
                 } else {
-                    if matches!(
-                        (c.kind, c.relationship),
-                        (TriviaKind::EmptyLine, Relationship::Leading)
-                    ) {
+                    if c.kind.is_empty_line() && c.relationship.is_leading() {
                         false
                     } else {
                         seen_non_empty = true;
@@ -104,12 +98,7 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
             let present_newlines = stmt
                 .trivia
                 .iter()
-                .take_while(|c| {
-                    matches!(
-                        (c.kind, c.relationship),
-                        (TriviaKind::EmptyLine, Relationship::Leading)
-                    )
-                })
+                .take_while(|c| c.kind.is_empty_line() && c.relationship.is_leading())
                 .count();
             if present_newlines < required_newlines {
                 for _ in 0..(required_newlines - present_newlines) {
@@ -135,12 +124,7 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                     - stmt
                         .trivia
                         .iter()
-                        .take_while(|c| {
-                            matches!(
-                                (c.kind, c.relationship),
-                                (TriviaKind::EmptyLine, Relationship::Leading)
-                            )
-                        })
+                        .take_while(|c| c.kind.is_empty_line() && c.relationship.is_leading())
                         .count();
                 for _ in 0..num_to_insert {
                     stmt.trivia.insert(
@@ -312,16 +296,29 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
         self.depth = prev_depth;
         self.scope = prev_scope;
     }
+}
 
-    fn visit_expr(&mut self, _expr: &'a mut Expr) {}
+struct ExprNormalizer;
+
+impl<'a> Visitor<'a> for ExprNormalizer {
+    fn visit_expr(&mut self, expr: &'a mut Expr) {
+        expr.trivia.retain(|c| !c.kind.is_empty_line());
+
+        visitor::walk_expr(self, expr);
+    }
 }
 
 pub fn normalize_newlines(python_cst: &mut [Stmt]) {
-    let mut normalizer = NewlineNormalizer {
+    let mut normalizer = StmtNormalizer {
         depth: Depth::TopLevel,
         trailer: Trailer::None,
         scope: Scope::Module,
     };
+    for stmt in python_cst.iter_mut() {
+        normalizer.visit_stmt(stmt);
+    }
+
+    let mut normalizer = ExprNormalizer;
     for stmt in python_cst.iter_mut() {
         normalizer.visit_stmt(stmt);
     }

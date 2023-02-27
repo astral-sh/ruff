@@ -4,6 +4,7 @@ use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::Alias;
+use crate::format::comments::end_of_line_comments;
 use crate::shared_traits::AsFormat;
 
 pub struct FormatAlias<'a> {
@@ -27,6 +28,8 @@ impl Format<ASTFormatContext<'_>> for FormatAlias<'_> {
             write!(f, [text(" as ")])?;
             write!(f, [dynamic_text(asname, TextSize::default())])?;
         }
+
+        write!(f, [end_of_line_comments(alias)])?;
 
         Ok(())
     }

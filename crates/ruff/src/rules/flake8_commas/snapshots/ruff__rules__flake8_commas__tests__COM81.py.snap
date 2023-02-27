@@ -11,10 +11,10 @@ expression: diagnostics
     row: 4
     column: 17
   fix:
-    content: ","
+    content: "'test',"
     location:
       row: 4
-      column: 17
+      column: 11
     end_location:
       row: 4
       column: 17
@@ -28,10 +28,10 @@ expression: diagnostics
     row: 10
     column: 5
   fix:
-    content: ","
+    content: "3,"
     location:
       row: 10
-      column: 5
+      column: 4
     end_location:
       row: 10
       column: 5
@@ -45,10 +45,10 @@ expression: diagnostics
     row: 16
     column: 5
   fix:
-    content: ","
+    content: "3,"
     location:
       row: 16
-      column: 5
+      column: 4
     end_location:
       row: 16
       column: 5
@@ -62,10 +62,10 @@ expression: diagnostics
     row: 23
     column: 5
   fix:
-    content: ","
+    content: "3,"
     location:
       row: 23
-      column: 5
+      column: 4
     end_location:
       row: 23
       column: 5
@@ -149,10 +149,10 @@ expression: diagnostics
     row: 70
     column: 7
   fix:
-    content: ","
+    content: "bar,"
     location:
       row: 70
-      column: 7
+      column: 4
     end_location:
       row: 70
       column: 7
@@ -166,10 +166,10 @@ expression: diagnostics
     row: 78
     column: 7
   fix:
-    content: ","
+    content: "bar,"
     location:
       row: 78
-      column: 7
+      column: 4
     end_location:
       row: 78
       column: 7
@@ -183,10 +183,10 @@ expression: diagnostics
     row: 86
     column: 7
   fix:
-    content: ","
+    content: "bar,"
     location:
       row: 86
-      column: 7
+      column: 4
     end_location:
       row: 86
       column: 7
@@ -200,10 +200,10 @@ expression: diagnostics
     row: 152
     column: 5
   fix:
-    content: ","
+    content: "y,"
     location:
       row: 152
-      column: 5
+      column: 4
     end_location:
       row: 152
       column: 5
@@ -217,10 +217,10 @@ expression: diagnostics
     row: 158
     column: 10
   fix:
-    content: ","
+    content: "Anyway,"
     location:
       row: 158
-      column: 10
+      column: 4
     end_location:
       row: 158
       column: 10
@@ -234,10 +234,10 @@ expression: diagnostics
     row: 293
     column: 14
   fix:
-    content: ","
+    content: "123,"
     location:
       row: 293
-      column: 14
+      column: 11
     end_location:
       row: 293
       column: 14
@@ -251,10 +251,10 @@ expression: diagnostics
     row: 304
     column: 13
   fix:
-    content: ","
+    content: "2,"
     location:
       row: 304
-      column: 13
+      column: 12
     end_location:
       row: 304
       column: 13
@@ -268,10 +268,10 @@ expression: diagnostics
     row: 310
     column: 13
   fix:
-    content: ","
+    content: "3,"
     location:
       row: 310
-      column: 13
+      column: 12
     end_location:
       row: 310
       column: 13
@@ -285,10 +285,10 @@ expression: diagnostics
     row: 316
     column: 9
   fix:
-    content: ","
+    content: "3,"
     location:
       row: 316
-      column: 9
+      column: 8
     end_location:
       row: 316
       column: 9
@@ -302,10 +302,10 @@ expression: diagnostics
     row: 322
     column: 14
   fix:
-    content: ","
+    content: "123,"
     location:
       row: 322
-      column: 14
+      column: 11
     end_location:
       row: 322
       column: 14
@@ -319,10 +319,10 @@ expression: diagnostics
     row: 368
     column: 14
   fix:
-    content: ","
+    content: "\"not good\","
     location:
       row: 368
-      column: 14
+      column: 4
     end_location:
       row: 368
       column: 14
@@ -336,10 +336,10 @@ expression: diagnostics
     row: 375
     column: 14
   fix:
-    content: ","
+    content: "\"not good\","
     location:
       row: 375
-      column: 14
+      column: 4
     end_location:
       row: 375
       column: 14
@@ -353,10 +353,10 @@ expression: diagnostics
     row: 404
     column: 14
   fix:
-    content: ","
+    content: "\"not fine\","
     location:
       row: 404
-      column: 14
+      column: 4
     end_location:
       row: 404
       column: 14
@@ -370,10 +370,10 @@ expression: diagnostics
     row: 432
     column: 14
   fix:
-    content: ","
+    content: "\"not fine\","
     location:
       row: 432
-      column: 14
+      column: 4
     end_location:
       row: 432
       column: 14
@@ -557,10 +557,10 @@ expression: diagnostics
     row: 519
     column: 12
   fix:
-    content: ","
+    content: "kwargs,"
     location:
       row: 519
-      column: 12
+      column: 6
     end_location:
       row: 519
       column: 12
@@ -574,10 +574,10 @@ expression: diagnostics
     row: 526
     column: 9
   fix:
-    content: ","
+    content: "args,"
     location:
       row: 526
-      column: 9
+      column: 5
     end_location:
       row: 526
       column: 9
@@ -591,10 +591,10 @@ expression: diagnostics
     row: 534
     column: 15
   fix:
-    content: ","
+    content: "extra_kwarg,"
     location:
       row: 534
-      column: 15
+      column: 4
     end_location:
       row: 534
       column: 15
@@ -608,10 +608,10 @@ expression: diagnostics
     row: 541
     column: 12
   fix:
-    content: ","
+    content: "kwargs,"
     location:
       row: 541
-      column: 12
+      column: 6
     end_location:
       row: 541
       column: 12
@@ -625,10 +625,10 @@ expression: diagnostics
     row: 547
     column: 23
   fix:
-    content: ","
+    content: "not_called_kwargs,"
     location:
       row: 547
-      column: 23
+      column: 6
     end_location:
       row: 547
       column: 23
@@ -642,10 +642,10 @@ expression: diagnostics
     row: 554
     column: 14
   fix:
-    content: ","
+    content: "kwarg_only,"
     location:
       row: 554
-      column: 14
+      column: 4
     end_location:
       row: 554
       column: 14
@@ -659,10 +659,10 @@ expression: diagnostics
     row: 561
     column: 12
   fix:
-    content: ","
+    content: "kwargs,"
     location:
       row: 561
-      column: 12
+      column: 6
     end_location:
       row: 561
       column: 12
@@ -676,10 +676,10 @@ expression: diagnostics
     row: 565
     column: 12
   fix:
-    content: ","
+    content: "kwargs,"
     location:
       row: 565
-      column: 12
+      column: 6
     end_location:
       row: 565
       column: 12
@@ -693,10 +693,10 @@ expression: diagnostics
     row: 573
     column: 9
   fix:
-    content: ","
+    content: "args,"
     location:
       row: 573
-      column: 9
+      column: 5
     end_location:
       row: 573
       column: 9
@@ -710,10 +710,10 @@ expression: diagnostics
     row: 577
     column: 9
   fix:
-    content: ","
+    content: "args,"
     location:
       row: 577
-      column: 9
+      column: 5
     end_location:
       row: 577
       column: 9
@@ -727,10 +727,10 @@ expression: diagnostics
     row: 583
     column: 9
   fix:
-    content: ","
+    content: "args,"
     location:
       row: 583
-      column: 9
+      column: 5
     end_location:
       row: 583
       column: 9
@@ -744,10 +744,10 @@ expression: diagnostics
     row: 590
     column: 12
   fix:
-    content: ","
+    content: "kwargs,"
     location:
       row: 590
-      column: 12
+      column: 6
     end_location:
       row: 590
       column: 12
@@ -761,10 +761,10 @@ expression: diagnostics
     row: 598
     column: 14
   fix:
-    content: ","
+    content: "kwarg_only,"
     location:
       row: 598
-      column: 14
+      column: 4
     end_location:
       row: 598
       column: 14
@@ -778,12 +778,29 @@ expression: diagnostics
     row: 627
     column: 19
   fix:
-    content: ","
+    content: "},"
     location:
       row: 627
-      column: 19
+      column: 18
     end_location:
       row: 627
       column: 19
+  parent: ~
+- kind:
+    TrailingCommaMissing: ~
+  location:
+    row: 632
+    column: 41
+  end_location:
+    row: 632
+    column: 41
+  fix:
+    content: "),"
+    location:
+      row: 632
+      column: 40
+    end_location:
+      row: 632
+      column: 41
   parent: ~
 

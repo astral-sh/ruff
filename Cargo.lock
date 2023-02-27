@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "Inflector"
+version = "0.11.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
+
+[[package]]
 name = "adler"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -593,6 +599,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derivative"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -753,7 +770,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.252"
+version = "0.0.253"
 dependencies = [
  "anyhow",
  "clap 4.1.6",
@@ -1021,6 +1038,19 @@ checksum = "1abeb7a0dd0f8181267ff8adc397075586500b81b28a73e8a0208b00fc170fb3"
 dependencies = [
  "libc",
  "windows-sys 0.45.0",
+]
+
+[[package]]
+name = "is-macro"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a7d079e129b77477a49c5c4f1cfe9ce6c2c909ef52520693e8e811a714c7b20"
+dependencies = [
+ "Inflector",
+ "pmutil",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1951,7 +1981,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.252"
+version = "0.0.253"
 dependencies = [
  "anyhow",
  "bisection",
@@ -1963,6 +1993,7 @@ dependencies = [
  "console_error_panic_hook",
  "console_log",
  "criterion",
+ "derivative",
  "dirs",
  "fern",
  "getrandom",
@@ -1971,6 +2002,7 @@ dependencies = [
  "ignore",
  "imperative",
  "insta",
+ "is-macro",
  "itertools",
  "js-sys",
  "libcst",
@@ -2008,7 +2040,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.252"
+version = "0.0.253"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2108,6 +2140,7 @@ dependencies = [
  "anyhow",
  "clap 4.1.6",
  "insta",
+ "is-macro",
  "once_cell",
  "ruff_formatter",
  "ruff_python",
@@ -2197,7 +2230,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c4b67896662b16b5699a779c0e52aa0ca2587fec#c4b67896662b16b5699a779c0e52aa0ca2587fec"
+source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
 dependencies = [
  "num-bigint",
  "rustpython-compiler-core",
@@ -2206,7 +2239,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c4b67896662b16b5699a779c0e52aa0ca2587fec#c4b67896662b16b5699a779c0e52aa0ca2587fec"
+source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2231,7 +2264,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c4b67896662b16b5699a779c0e52aa0ca2587fec#c4b67896662b16b5699a779c0e52aa0ca2587fec"
+source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2248,7 +2281,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=c4b67896662b16b5699a779c0e52aa0ca2587fec#c4b67896662b16b5699a779c0e52aa0ca2587fec"
+source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
 dependencies = [
  "ahash",
  "anyhow",

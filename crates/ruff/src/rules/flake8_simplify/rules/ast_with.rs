@@ -38,7 +38,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
+    /// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
     pub struct MultipleWithStatements {
         pub fixable: bool,
     }
@@ -55,12 +55,8 @@ impl Violation for MultipleWithStatements {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultipleWithStatements { fixable, .. } = self;
-        if *fixable {
-            Some(|_| format!("Combine `with` statements"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|_| format!("Combine `with` statements"))
     }
 }
 

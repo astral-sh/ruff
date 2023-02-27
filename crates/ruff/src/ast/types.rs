@@ -1,8 +1,8 @@
-use std::ops::Deref;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use serde::{Deserialize, Serialize};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arguments, Expr, Keyword, Located, Location, Stmt};
+use serde::{Deserialize, Serialize};
+use std::ops::Deref;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn id() -> usize {
     static COUNTER: AtomicUsize = AtomicUsize::new(1);
@@ -124,7 +124,7 @@ impl<'a> Scope<'a> {
 //        StarImportation
 //        FutureImportation
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, is_macro::Is)]
 pub enum BindingKind<'a> {
     Annotation,
     Argument,

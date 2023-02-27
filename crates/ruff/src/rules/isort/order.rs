@@ -1,12 +1,12 @@
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
+use crate::rules::isort::types::ImportFromStatement;
 use itertools::Itertools;
-use rustc_hash::FxHashMap;
 
 use super::settings::RelativeImportsOrder;
 use super::sorting::{cmp_import_from, cmp_members, cmp_modules};
-use super::types::{AliasData, CommentSet, ImportBlock, OrderedImportBlock, TrailingComma};
+use super::types::{AliasData, CommentSet, ImportBlock, OrderedImportBlock};
 
 pub fn order_imports<'a>(
     block: ImportBlock<'a>,
@@ -38,76 +38,43 @@ pub fn order_imports<'a>(
                 block
                     .import_from_as
                     .into_iter()
-                    .map(|((import_from, alias), comments)| {
-                        (
-                            import_from,
-                            (
-                                CommentSet {
-                                    atop: comments.atop,
-                                    inline: vec![],
-                                },
-                                FxHashMap::from_iter([(
-                                    alias,
-                                    CommentSet {
-                                        atop: vec![],
-                                        inline: comments.inline,
-                                    },
-                                )]),
-                                TrailingComma::Absent,
-                            ),
-                        )
-                    }),
+                    .map(|((import_from, ..), body)| (import_from, body)),
             )
             .chain(
                 // Include all star imports.
-                block
-                    .import_from_star
-                    .into_iter()
-                    .map(|(import_from, comments)| {
-                        (
-                            import_from,
-                            (
-                                CommentSet {
-                                    atop: comments.atop,
-                                    inline: vec![],
-                                },
-                                FxHashMap::from_iter([(
-                                    AliasData {
-                                        name: "*",
-                                        asname: None,
-                                    },
-                                    CommentSet {
-                                        atop: vec![],
-                                        inline: comments.inline,
-                                    },
-                                )]),
-                                TrailingComma::Absent,
-                            ),
-                        )
-                    }),
+                block.import_from_star.into_iter(),
             )
-            .map(|(import_from, (comments, aliases, locations))| {
-                // Within each `StmtKind::ImportFrom`, sort the members.
-                (
+            .map(
+                |(
                     import_from,
-                    comments,
-                    locations,
-                    aliases
-                        .into_iter()
-                        .sorted_by(|(alias1, _), (alias2, _)| {
-                            cmp_members(
-                                alias1,
-                                alias2,
-                                order_by_type,
-                                classes,
-                                constants,
-                                variables,
-                                force_to_top,
-                            )
-                        })
-                        .collect::<Vec<(AliasData, CommentSet)>>(),
-                )
-            })
+                    ImportFromStatement {
+                        comments,
+                        aliases,
+                        trailing_comma,
+                    },
+                )| {
+                    // Within each `StmtKind::ImportFrom`, sort the members.
+                    (
+                        import_from,
+                        comments,
+                        trailing_comma,
+                        aliases
+                            .into_iter()
+                            .sorted_by(|(alias1, _), (alias2, _)| {
+                                cmp_members(
+                                    alias1,
+                                    alias2,
+                                    order_by_type,
+                                    classes,
+                                    constants,
+                                    variables,
+                                    force_to_top,
+                                )
+                            })
+                            .collect::<Vec<(AliasData, CommentSet)>>(),
+                    )
+                },
+            )
             .sorted_by(
                 |(import_from1, _, _, aliases1), (import_from2, _, _, aliases2)| {
                     cmp_import_from(

@@ -26,19 +26,21 @@ define_violation!(
     /// ```python
     /// from django.db import models
     ///
+    ///
     /// class MyModel(models.Model):
-    ///    field = models.CharField(max_length=255)
+    ///     field = models.CharField(max_length=255)
     /// ```
     ///
     /// Use instead:
     /// ```python
     /// from django.db import models
     ///
-    /// class MyModel(models.Model):
-    ///    field = models.CharField(max_length=255)
     ///
-    ///   def __str__(self):
-    ///      return f"{self.field}"
+    /// class MyModel(models.Model):
+    ///     field = models.CharField(max_length=255)
+    ///
+    ///     def __str__(self):
+    ///         return f"{self.field}"
     /// ```
     pub struct ModelWithoutDunderStr;
 );

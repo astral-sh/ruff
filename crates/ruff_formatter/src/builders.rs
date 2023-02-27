@@ -602,8 +602,8 @@ impl<Context> std::fmt::Debug for Indent<'_, Context> {
 }
 
 /// It reduces the indention for the given content depending on the closest [indent] or [align] parent element.
-/// * [align] Undoes the spaces added by [align]
-/// * [indent] Reduces the indention level by one
+/// - [align] Undoes the spaces added by [align]
+/// - [indent] Reduces the indention level by one
 ///
 /// This is a No-op if the indention level is zero.
 ///
@@ -774,8 +774,8 @@ where
 ///
 /// You can see that:
 ///
-/// * the printer indents the function's `}` by two spaces because it is inside of an `align`.
-/// * the block `console.log` gets indented by two tabs.
+/// - the printer indents the function's `}` by two spaces because it is inside of an `align`.
+/// - the block `console.log` gets indented by two tabs.
 ///   This is because `align` increases the indention level by one (same as `indent`)
 ///   if you nest an `indent` inside an `align`.
 ///   Meaning that, `align > ... > indent` results in the same indention as `indent > ... > indent`.
@@ -825,8 +825,8 @@ where
 /// The printing of `align` differs if using spaces as indention sequence *and* it contains an `indent`.
 /// You can see the difference when comparing the indention of the `console.log(...)` expression to the previous example:
 ///
-/// * tab indention: Printer indents the expression with two tabs because the `align` increases the indention level.
-/// * space indention: Printer indents the expression by 4 spaces (one indention level) **and** 2 spaces for the align.
+/// - tab indention: Printer indents the expression with two tabs because the `align` increases the indention level.
+/// - space indention: Printer indents the expression by 4 spaces (one indention level) **and** 2 spaces for the align.
 pub fn align<Content, Context>(count: u8, content: &Content) -> Align<Context>
 where
     Content: Format<Context>,
