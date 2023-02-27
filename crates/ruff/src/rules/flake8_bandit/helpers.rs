@@ -4,8 +4,9 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::checkers::ast::Checker;
 
-static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"(^|_)(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)($|_)").unwrap());
+static PASSWORD_CANDIDATE_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(^|_)(?i)(pas+wo?r?d|pass(phrase)?|pwd|token|secrete?)($|_)").unwrap()
+});
 
 pub fn string_literal(expr: &Expr) -> Option<&str> {
     match &expr.node {
@@ -17,7 +18,6 @@ pub fn string_literal(expr: &Expr) -> Option<&str> {
     }
 }
 
-// Maybe use regex for this?
 pub fn matches_password_name(string: &str) -> bool {
     PASSWORD_CANDIDATE_REGEX.is_match(string)
 }
