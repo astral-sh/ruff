@@ -74,3 +74,13 @@ elif b == b"two":
     return 2
 elif a == b"three":
     return 3
+
+# SIM116
+if func_name == "create":
+    return "A"
+elif func_name == "modify":
+    return "M"
+elif func_name == "remove":
+    return "D"
+elif func_name == "move":
+    return "MV"
