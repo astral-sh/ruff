@@ -105,16 +105,7 @@ def g():
 ```diff
 --- Black
 +++ Ruff
-@@ -13,7 +13,7 @@
- 
-     if t in ALWAYS_NO_SPACE:
-         pass
--    if t == token.COMMENT:  # another trailing comment
-+    if t == token.COMMENT:
-         return DOUBLESPACE
- 
-     assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"
-@@ -25,30 +25,36 @@
+@@ -25,23 +25,30 @@
              return NO
  
          if prevp.type == token.EQUAL:
@@ -160,13 +151,14 @@ def g():
                  return NO
  
  
- ###############################################################################
+@@ -49,7 +56,6 @@
  # SECTION BECAUSE SECTIONS
  ###############################################################################
--
  
+-
  def g():
      NO = ""
+     SPACE = " "
 @@ -67,7 +73,7 @@
          return DOUBLESPACE
  
@@ -219,7 +211,7 @@ def f():
 
     if t in ALWAYS_NO_SPACE:
         pass
-    if t == token.COMMENT:
+    if t == token.COMMENT:  # another trailing comment
         return DOUBLESPACE
 
     assert p is not None, f"INTERNAL ERROR: hand-made leaf without parent: {leaf!r}"

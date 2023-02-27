@@ -929,7 +929,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 };
 
                 Stmt {
-                    location: stmt.location,
+                    location: decorator_list.first().map_or(stmt.location, |d| d.location),
                     end_location: body.end_location,
                     node: StmtKind::FunctionDef {
                         name,

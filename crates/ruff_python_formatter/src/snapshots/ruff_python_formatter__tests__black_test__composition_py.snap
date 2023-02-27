@@ -204,7 +204,7 @@ class C:
              )
              self.assertEqual(
                  unstyle(str(report)),
-@@ -22,133 +23,156 @@
+@@ -22,133 +23,155 @@
                  if (
                      # Rule 1
                      i % 2 == 0
@@ -217,10 +217,10 @@ class C:
 -                    while (
 -                        # Just a comment
 -                        call()
+-                        # Another
+-                    ):
 +                    while # Just a comment
 +                    call():
-                         # Another
--                    ):
                          print(i)
          xxxxxxxxxxxxxxxx = Yyyy2YyyyyYyyyyy(
              push_manager=context.request.resource_manager,
@@ -460,7 +460,7 @@ class C:
              "Not what we expected and the message is too long to fit in one line"
              " because it's too long"
          )
-@@ -161,9 +185,8 @@
+@@ -161,9 +184,8 @@
                        8 STORE_ATTR               0 (x)
                       10 LOAD_CONST               0 (None)
                       12 RETURN_VALUE
@@ -508,7 +508,6 @@ class C:
                 ):
                     while # Just a comment
                     call():
-                        # Another
                         print(i)
         xxxxxxxxxxxxxxxx = Yyyy2YyyyyYyyyyy(
             push_manager=context.request.resource_manager,

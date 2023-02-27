@@ -15,28 +15,6 @@ pub struct Block<'a> {
 
 impl Format<ASTFormatContext<'_>> for Block<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        // Any leading comments come on the line before.
-        // TODO(charlie): Anything that gets rendered here is probably a bug. Leading trivia
-        // should be attached to the first statement in the block.
-        for trivia in self.body.trivia.iter().skip_while(|trivia| {
-            matches!(
-                (trivia.relationship, trivia.kind),
-                (Relationship::Leading, TriviaKind::EmptyLine)
-            )
-        }) {
-            if matches!(trivia.relationship, Relationship::Leading) {
-                match trivia.kind {
-                    TriviaKind::EmptyLine => {
-                        write!(f, [empty_line()])?;
-                    }
-                    TriviaKind::OwnLineComment(range) => {
-                        write!(f, [literal(range), hard_line_break()])?;
-                    }
-                    _ => {}
-                }
-            }
-        }
-
         for (i, stmt) in self.body.node.iter().enumerate() {
             if i > 0 {
                 write!(f, [hard_line_break()])?;
@@ -44,7 +22,6 @@ impl Format<ASTFormatContext<'_>> for Block<'_> {
             write!(f, [stmt.format()])?;
         }
 
-        // Any trailing comments come on the lines after.
         for trivia in &self.body.trivia {
             if matches!(trivia.relationship, Relationship::Dangling) {
                 match trivia.kind {

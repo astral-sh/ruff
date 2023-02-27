@@ -108,6 +108,8 @@ fn format_class_def(
         write!(f, [text("@"), decorator.format(), hard_line_break()])?;
     }
 
+    write!(f, [leading_comments(body)])?;
+
     write!(
         f,
         [
@@ -161,6 +163,7 @@ fn format_class_def(
         )?;
     }
 
+    write!(f, [end_of_line_comments(body)])?;
     write!(f, [text(":"), block_indent(&block(body))])
 }
 
@@ -177,6 +180,9 @@ fn format_func_def(
     for decorator in decorator_list {
         write!(f, [text("@"), decorator.format(), hard_line_break()])?;
     }
+
+    write!(f, [leading_comments(body)])?;
+
     if async_ {
         write!(f, [text("async"), space()])?;
     }
@@ -202,10 +208,10 @@ fn format_func_def(
     }
 
     write!(f, [text(":")])?;
+    write!(f, [end_of_line_comments(body)])?;
+    write!(f, [block_indent(&block(body))])?;
 
-    write!(f, [end_of_line_comments(stmt)])?;
-
-    write!(f, [block_indent(&format_args![block(body)])])
+    Ok(())
 }
 
 fn format_assign(
@@ -329,11 +335,19 @@ fn format_for(
             space(),
             group(&iter.format()),
             text(":"),
+            end_of_line_comments(body),
             block_indent(&block(body))
         ]
     )?;
     if let Some(orelse) = orelse {
-        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+        write!(
+            f,
+            [
+                text("else:"),
+                end_of_line_comments(orelse),
+                block_indent(&block(orelse))
+            ]
+        )?;
     }
     Ok(())
 }
@@ -358,9 +372,23 @@ fn format_while(
             ])]
         )?;
     }
-    write!(f, [text(":"), block_indent(&block(body))])?;
+    write!(
+        f,
+        [
+            text(":"),
+            end_of_line_comments(body),
+            block_indent(&block(body))
+        ]
+    )?;
     if let Some(orelse) = orelse {
-        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+        write!(
+            f,
+            [
+                text("else:"),
+                end_of_line_comments(orelse),
+                block_indent(&block(orelse))
+            ]
+        )?;
     }
     Ok(())
 }
@@ -389,7 +417,14 @@ fn format_if(
             ])]
         )?;
     }
-    write!(f, [text(":"), block_indent(&block(body))])?;
+    write!(
+        f,
+        [
+            text(":"),
+            end_of_line_comments(body),
+            block_indent(&block(body))
+        ]
+    )?;
     if let Some(orelse) = orelse {
         if orelse.node.len() == 1 {
             if let StmtKind::If {
@@ -401,10 +436,24 @@ fn format_if(
             {
                 format_if(f, test, body, orelse.as_ref(), true)?;
             } else {
-                write!(f, [text("else:"), block_indent(&block(orelse))])?;
+                write!(
+                    f,
+                    [
+                        text("else:"),
+                        end_of_line_comments(orelse),
+                        block_indent(&block(orelse))
+                    ]
+                )?;
             }
         } else {
-            write!(f, [text("else:"), block_indent(&block(orelse))])?;
+            write!(
+                f,
+                [
+                    text("else:"),
+                    end_of_line_comments(orelse),
+                    block_indent(&block(orelse))
+                ]
+            )?;
         }
     }
     Ok(())
@@ -416,7 +465,16 @@ fn format_match(
     subject: &Expr,
     cases: &[MatchCase],
 ) -> FormatResult<()> {
-    write!(f, [text("match"), space(), subject.format(), text(":")])?;
+    write!(
+        f,
+        [
+            text("match"),
+            space(),
+            subject.format(),
+            text(":"),
+            end_of_line_comments(stmt),
+        ]
+    )?;
     for case in cases {
         write!(f, [block_indent(&case.format())])?;
     }
@@ -462,7 +520,14 @@ fn format_try(
     orelse: Option<&Body>,
     finalbody: Option<&Body>,
 ) -> FormatResult<()> {
-    write!(f, [text("try:"), block_indent(&block(body))])?;
+    write!(
+        f,
+        [
+            text("try:"),
+            end_of_line_comments(body),
+            block_indent(&block(body))
+        ]
+    )?;
     for handler in handlers {
         write!(f, [handler.format()])?;
     }
@@ -487,16 +552,37 @@ fn format_try_star(
     orelse: Option<&Body>,
     finalbody: Option<&Body>,
 ) -> FormatResult<()> {
-    write!(f, [text("try:"), block_indent(&block(body))])?;
+    write!(
+        f,
+        [
+            text("try:"),
+            end_of_line_comments(body),
+            block_indent(&block(body))
+        ]
+    )?;
     for handler in handlers {
         // TODO(charlie): Include `except*`.
         write!(f, [handler.format()])?;
     }
     if let Some(orelse) = orelse {
-        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+        write!(
+            f,
+            [
+                text("else:"),
+                end_of_line_comments(orelse),
+                block_indent(&block(orelse))
+            ]
+        )?;
     }
     if let Some(finalbody) = finalbody {
-        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
+        write!(
+            f,
+            [
+                text("finally:"),
+                end_of_line_comments(finalbody),
+                block_indent(&block(finalbody))
+            ]
+        )?;
     }
     Ok(())
 }
@@ -682,6 +768,7 @@ fn format_with_(
                 if_group_breaks(&text(")")),
             ]),
             text(":"),
+            end_of_line_comments(body),
             block_indent(&block(body))
         ]
     )?;

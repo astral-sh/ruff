@@ -72,13 +72,12 @@ pub struct EndOfLineComments<'a, T> {
 impl<T> Format<ASTFormatContext<'_>> for EndOfLineComments<'_, T> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         let mut first = true;
-        for range in self.item.trivia.iter().filter_map(|trivia| {
-            if trivia.relationship.is_trailing() {
-                trivia.kind.end_of_line_comment()
-            } else {
-                None
-            }
-        }) {
+        for range in self
+            .item
+            .trivia
+            .iter()
+            .filter_map(|trivia| trivia.kind.end_of_line_comment())
+        {
             if std::mem::take(&mut first) {
                 write!(f, [line_suffix(&text("  "))])?;
             }
