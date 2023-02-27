@@ -17,7 +17,7 @@ define_violation!(
     ///
     /// > ..."magic" objects or attributes that live in user-controlled
     /// > namespaces. E.g. `__init__`, `__import__` or `__file__`. Never invent
-    /// such names; only use them as documented.
+    /// > such names; only use them as documented.
     ///
     /// ## Example
     /// ```python

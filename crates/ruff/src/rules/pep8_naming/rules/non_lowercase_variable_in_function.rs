@@ -17,10 +17,10 @@ define_violation!(
     /// > Function names should be lowercase, with words separated by underscores as necessary to
     /// > improve readability. Variable names follow the same convention as function names. mixedCase
     /// > is allowed only in contexts where that's already the prevailing style (e.g. threading.py),
-    /// to retain backwards compatibility.
+    /// > to retain backwards compatibility.
     ///
     /// ## Options
-    /// * `pep8-naming.ignore-names`
+    /// - `pep8-naming.ignore-names`
     ///
     /// ## Example
     /// ```python

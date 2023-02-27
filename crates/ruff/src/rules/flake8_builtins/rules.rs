@@ -23,7 +23,7 @@ define_violation!(
     ///
     /// ## Options
     ///
-    /// * `flake8-builtins.builtins-ignorelist`
+    /// - `flake8-builtins.builtins-ignorelist`
     ///
     /// ## Example
     /// ```python
@@ -45,7 +45,7 @@ define_violation!(
     ///     return result
     /// ```
     ///
-    /// * [Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
+    /// - [_Why is it a bad idea to name a variable `id` in Python?_](https://stackoverflow.com/questions/77552/id-is-a-bad-variable-name-in-python)
     pub struct BuiltinVariableShadowing {
         pub name: String,
     }
@@ -73,7 +73,7 @@ define_violation!(
     ///
     /// ## Options
     ///
-    /// * `flake8-builtins.builtins-ignorelist`
+    /// - `flake8-builtins.builtins-ignorelist`
     ///
     /// ## Example
     /// ```python
@@ -128,7 +128,7 @@ define_violation!(
     ///
     /// ## Options
     ///
-    /// * `flake8-builtins.builtins-ignorelist`
+    /// - `flake8-builtins.builtins-ignorelist`
     ///
     /// ## Example
     /// ```python
