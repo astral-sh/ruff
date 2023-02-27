@@ -79,6 +79,7 @@ ruff_macros::register_rules!(
     rules::pycodestyle::rules::IOError,
     rules::pycodestyle::rules::SyntaxError,
     // pycodestyle warnings
+    rules::pycodestyle::rules::IndentationContainsTabs,
     rules::pycodestyle::rules::TrailingWhitespace,
     rules::pycodestyle::rules::NoNewLineAtEndOfFile,
     rules::pycodestyle::rules::BlankLineContainsWhitespace,
@@ -803,6 +804,7 @@ impl Rule {
             | Rule::ShebangPython
             | Rule::ShebangWhitespace
             | Rule::TrailingWhitespace
+            | Rule::IndentationContainsTabs
             | Rule::BlankLineContainsWhitespace => &LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
