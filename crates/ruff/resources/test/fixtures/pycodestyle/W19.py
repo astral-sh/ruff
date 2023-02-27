@@ -28,12 +28,12 @@ if x == 2 \
 
 #: E101 W191 W504
 if (foo == bar and
-        baz == frop):
+        baz == bop):
 	pass
 #: E101 W191 W504
 if (
     foo == bar and
-    baz == frop
+    baz == bop
 ):
 	pass
 #:
@@ -68,13 +68,13 @@ if bar:
 #: E101 W191 W504
 # you want vertical alignment, so use a parens
 if ((foo.bar("baz") and
-     foo.bar("frop")
+     foo.bar("bop")
      )):
 	print "yes"
 #: E101 W191 W504
 # also ok, but starting to look like LISP
 if ((foo.bar("baz") and
-     foo.bar("frop"))):
+     foo.bar("bop"))):
 	print "yes"
 #: E101 W191 W504
 if (a == 2 or
@@ -109,8 +109,8 @@ if os.path.exists(os.path.join(path, PEP8_BIN)):
 '''sometimes, you just need to go nuts in a multiline string
 	and allow all sorts of crap
   like mixed tabs and spaces
-      
-or trailing whitespace  
+
+or trailing whitespace
 or long long long long long long long long long long long long long long long long long lines
 '''  # nopep8
 #: Okay
@@ -120,7 +120,7 @@ even though the noqa comment is not immediately after the string
 ''' + foo  # noqa
 #
 #: E101 W191
-if foo is None and bar is "frop" and \
+if foo is None and bar is "bop" and \
         blah == 'yeah':
 	blah = 'yeahnah'
 
