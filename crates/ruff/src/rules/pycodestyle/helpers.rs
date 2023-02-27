@@ -104,3 +104,55 @@ pub fn is_singleton_token(token: &Tok) -> bool {
         Tok::False { .. } | Tok::True { .. } | Tok::None { .. },
     )
 }
+
+pub fn is_op_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::Lpar
+            | Tok::Rpar
+            | Tok::Lsqb
+            | Tok::Rsqb
+            | Tok::Comma
+            | Tok::Semi
+            | Tok::Plus
+            | Tok::Minus
+            | Tok::Star
+            | Tok::Slash
+            | Tok::Vbar
+            | Tok::Amper
+            | Tok::Less
+            | Tok::Greater
+            | Tok::Equal
+            | Tok::Dot
+            | Tok::Percent
+            | Tok::Lbrace
+            | Tok::Rbrace
+            | Tok::Equal
+            | Tok::NotEqual
+            | Tok::LessEqual
+            | Tok::Greater
+            | Tok::Tilde
+            | Tok::CircumFlex
+            | Tok::LeftShift
+            | Tok::RightShift
+            | Tok::DoubleStar
+            | Tok::PlusEqual
+            | Tok::MinusEqual
+            | Tok::StarEqual
+            | Tok::SlashEqual
+            | Tok::PercentEqual
+            | Tok::AmperEqual
+            | Tok::VbarEqual
+            | Tok::CircumflexEqual
+            | Tok::LeftShiftEqual
+            | Tok::RightShiftEqual
+            | Tok::DoubleStarEqual
+            | Tok::DoubleSlash
+            | Tok::DoubleSlashEqual
+            | Tok::At
+            | Tok::AtEqual
+            | Tok::Rarrow
+            | Tok::Ellipsis
+            | Tok::ColonEqual
+    )
+}
