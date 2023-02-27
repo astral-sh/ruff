@@ -53,7 +53,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
             },
             locator,
         ),
-        [format::builders::block(&python_cst)]
+        [format::builders::statements(&python_cst)]
     )
     .map_err(Into::into)
 }

@@ -163,15 +163,14 @@ impl<'a> Visitor<'a> for StmtNormalizer {
                 self.trailer = Trailer::CompoundStatement;
                 self.visit_body(body);
 
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     // If the previous body ended with a function or class definition, we need to
                     // insert an empty line before the else block. Since the `else` itself isn't
                     // a statement, we need to insert it into the last statement of the body.
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        let stmt = body.last_mut().unwrap();
-                        stmt.trivia.push(Trivia {
+                        body.trivia.push(Trivia {
                             kind: TriviaKind::EmptyLine,
-                            relationship: Relationship::Trailing,
+                            relationship: Relationship::Dangling,
                         });
                     }
 
@@ -185,12 +184,11 @@ impl<'a> Visitor<'a> for StmtNormalizer {
                 self.trailer = Trailer::CompoundStatement;
                 self.visit_body(body);
 
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        let stmt = body.last_mut().unwrap();
-                        stmt.trivia.push(Trivia {
+                        body.trivia.push(Trivia {
                             kind: TriviaKind::EmptyLine,
-                            relationship: Relationship::Trailing,
+                            relationship: Relationship::Dangling,
                         });
                     }
 
@@ -220,49 +218,44 @@ impl<'a> Visitor<'a> for StmtNormalizer {
                 self.depth = Depth::Nested;
                 self.trailer = Trailer::CompoundStatement;
                 self.visit_body(body);
-                let mut last = body.last_mut();
+
+                let mut prev = &mut body.trivia;
 
                 for handler in handlers {
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        if let Some(stmt) = last.as_mut() {
-                            stmt.trivia.push(Trivia {
-                                kind: TriviaKind::EmptyLine,
-                                relationship: Relationship::Trailing,
-                            });
-                        }
+                        prev.push(Trivia {
+                            kind: TriviaKind::EmptyLine,
+                            relationship: Relationship::Dangling,
+                        });
                     }
 
                     self.depth = Depth::Nested;
                     self.trailer = Trailer::CompoundStatement;
                     let ExcepthandlerKind::ExceptHandler { body, .. } = &mut handler.node;
                     self.visit_body(body);
-                    last = body.last_mut();
+                    prev = &mut body.trivia;
                 }
 
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        if let Some(stmt) = last.as_mut() {
-                            stmt.trivia.push(Trivia {
-                                kind: TriviaKind::EmptyLine,
-                                relationship: Relationship::Trailing,
-                            });
-                        }
+                        prev.push(Trivia {
+                            kind: TriviaKind::EmptyLine,
+                            relationship: Relationship::Dangling,
+                        });
                     }
 
                     self.depth = Depth::Nested;
                     self.trailer = Trailer::CompoundStatement;
                     self.visit_body(orelse);
-                    last = body.last_mut();
+                    prev = &mut body.trivia;
                 }
 
-                if !finalbody.is_empty() {
+                if let Some(finalbody) = finalbody {
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        if let Some(stmt) = last.as_mut() {
-                            stmt.trivia.push(Trivia {
-                                kind: TriviaKind::EmptyLine,
-                                relationship: Relationship::Trailing,
-                            });
-                        }
+                        prev.push(Trivia {
+                            kind: TriviaKind::EmptyLine,
+                            relationship: Relationship::Dangling,
+                        });
                     }
 
                     self.depth = Depth::Nested;

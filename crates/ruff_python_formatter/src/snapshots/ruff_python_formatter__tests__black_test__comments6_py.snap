@@ -131,16 +131,14 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 ```diff
 --- Black
 +++ Ruff
-@@ -2,8 +2,8 @@
+@@ -2,7 +2,7 @@
  
  
  def f(
 -    a,  # type: int
--):
 +    a,
-+):  # type: int
+ ):
      pass
- 
  
 @@ -14,44 +14,42 @@
  
@@ -155,7 +153,6 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -    g,  # type: int
 -    h,  # type: int
 -    i,  # type: int
--):
 +    a,
 +    b,
 +    c,
@@ -165,7 +162,7 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 +    g,
 +    h,
 +    i,
-+):  # type: int# type: int# type: int# type: int# type: int# type: int# type: int# type: int# type: int
+ ):
      # type: (...) -> None
      pass
  
@@ -175,12 +172,11 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -    *args,  # type: *Any
 -    default=False,  # type: bool
 -    **kwargs,  # type: **Any
--):
 +    arg,
 +    *args,
 +    default=False,
 +    **kwargs,
-+):  # type: int# type: *Any
+ ):
      # type: (...) -> None
      pass
  
@@ -190,12 +186,11 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
 -    b,  # type: int
 -    c,  # type: int
 -    d,  # type: int
--):
 +    a,
 +    b,
 +    c,
 +    d,
-+):  # type: int# type: int# type: int# type: int# type: int
+ ):
      # type: (...) -> None
  
      element = 0  # type: int
@@ -208,41 +203,32 @@ aaaaaaaaaaaaa, bbbbbbbbb = map(list, map(itertools.chain.from_iterable, zip(*ite
      an_element_with_a_long_value = calls() or more_calls() and more()  # type: bool
  
      tup = (
-@@ -66,26 +64,26 @@
-         + element
-         + another_element
-         + another_element_with_long_name
--    )  # type: int
-+    )
+@@ -70,21 +68,21 @@
  
  
  def f(
 -    x,  # not a type comment
 -    y,  # type: int
--):
 +    x,
 +    y,
-+):  # not a type comment# type: int
+ ):
      # type: (...) -> None
      pass
  
  
  def f(
 -    x,  # not a type comment
--):  # type: (int) -> None
 +    x,
-+):  # not a type comment# type: (int) -> None
+ ):  # type: (int) -> None
      pass
  
  
  def func(
 -    a=some_list[0],  # type: int
--):  # type: () -> int
 +    a=some_list[0],
-+):
+ ):  # type: () -> int
      c = call(
          0.0123,
-         0.0456,
 @@ -96,23 +94,37 @@
          0.0123,
          0.0456,
@@ -298,7 +284,7 @@ from typing import Any, Tuple
 
 def f(
     a,
-):  # type: int
+):
     pass
 
 
@@ -318,7 +304,7 @@ def f(
     g,
     h,
     i,
-):  # type: int# type: int# type: int# type: int# type: int# type: int# type: int# type: int# type: int
+):
     # type: (...) -> None
     pass
 
@@ -328,7 +314,7 @@ def f(
     *args,
     default=False,
     **kwargs,
-):  # type: int# type: *Any
+):
     # type: (...) -> None
     pass
 
@@ -338,7 +324,7 @@ def f(
     b,
     c,
     d,
-):  # type: int# type: int# type: int# type: int# type: int
+):
     # type: (...) -> None
 
     element = 0  # type: int
@@ -359,26 +345,26 @@ def f(
         + element
         + another_element
         + another_element_with_long_name
-    )
+    )  # type: int
 
 
 def f(
     x,
     y,
-):  # not a type comment# type: int
+):
     # type: (...) -> None
     pass
 
 
 def f(
     x,
-):  # not a type comment# type: (int) -> None
+):  # type: (int) -> None
     pass
 
 
 def func(
     a=some_list[0],
-):
+):  # type: () -> int
     c = call(
         0.0123,
         0.0456,

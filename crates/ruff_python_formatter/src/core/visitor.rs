@@ -1,8 +1,8 @@
 use rustpython_parser::ast::Constant;
 
 use crate::cst::{
-    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Excepthandler, ExcepthandlerKind, Expr,
-    ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern, PatternKind, SliceIndex,
+    Alias, Arg, Arguments, Body, Boolop, Cmpop, Comprehension, Excepthandler, ExcepthandlerKind,
+    Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern, PatternKind, SliceIndex,
     SliceIndexKind, Stmt, StmtKind, Unaryop, Withitem,
 };
 
@@ -67,13 +67,13 @@ pub trait Visitor<'a> {
     fn visit_pattern(&mut self, pattern: &'a mut Pattern) {
         walk_pattern(self, pattern);
     }
-    fn visit_body(&mut self, body: &'a mut [Stmt]) {
+    fn visit_body(&mut self, body: &'a mut Body) {
         walk_body(self, body);
     }
 }
 
-pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a mut [Stmt]) {
-    for stmt in body {
+pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a mut Body) {
+    for stmt in &mut body.node {
         visitor.visit_stmt(stmt);
     }
 }
@@ -173,7 +173,9 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
             visitor.visit_expr(iter);
             visitor.visit_expr(target);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
         }
         StmtKind::AsyncFor {
             target,
@@ -185,17 +187,25 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
             visitor.visit_expr(iter);
             visitor.visit_expr(target);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
         }
         StmtKind::While { test, body, orelse } => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
         }
-        StmtKind::If { test, body, orelse } => {
+        StmtKind::If {
+            test, body, orelse, ..
+        } => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
         }
         StmtKind::With { items, body, .. } => {
             for withitem in items {
@@ -210,7 +220,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
             visitor.visit_body(body);
         }
         StmtKind::Match { subject, cases } => {
-            // TODO(charlie): Handle `cases`.
             visitor.visit_expr(subject);
             for match_case in cases {
                 visitor.visit_match_case(match_case);
@@ -234,8 +243,12 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
             for excepthandler in handlers {
                 visitor.visit_excepthandler(excepthandler);
             }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
+            if let Some(finalbody) = finalbody {
+                visitor.visit_body(finalbody);
+            }
         }
         StmtKind::TryStar {
             body,
@@ -247,8 +260,12 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
             for excepthandler in handlers {
                 visitor.visit_excepthandler(excepthandler);
             }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
+            if let Some(finalbody) = finalbody {
+                visitor.visit_body(finalbody);
+            }
         }
         StmtKind::Assert { test, msg } => {
             visitor.visit_expr(test);

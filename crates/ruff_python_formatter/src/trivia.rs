@@ -5,13 +5,14 @@ use rustpython_parser::Tok;
 
 use crate::core::types::Range;
 use crate::cst::{
-    Alias, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Pattern, PatternKind, SliceIndex,
-    SliceIndexKind, Stmt, StmtKind,
+    Alias, Body, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Pattern, PatternKind,
+    SliceIndex, SliceIndexKind, Stmt, StmtKind,
 };
 
 #[derive(Clone, Debug)]
 pub enum Node<'a> {
     Mod(&'a [Stmt]),
+    Body(&'a Body),
     Stmt(&'a Stmt),
     Expr(&'a Expr),
     Alias(&'a Alias),
@@ -24,6 +25,7 @@ impl Node<'_> {
     pub fn id(&self) -> usize {
         match self {
             Node::Mod(nodes) => nodes as *const _ as usize,
+            Node::Body(node) => node.id(),
             Node::Stmt(node) => node.id(),
             Node::Expr(node) => node.id(),
             Node::Alias(node) => node.id(),
@@ -227,6 +229,11 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 result.push(Node::Stmt(stmt));
             }
         }
+        Node::Body(body) => {
+            for stmt in &body.node {
+                result.push(Node::Stmt(stmt));
+            }
+        }
         Node::Stmt(stmt) => match &stmt.node {
             StmtKind::Return { value } => {
                 if let Some(value) = value {
@@ -294,9 +301,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 if let Some(returns) = returns {
                     result.push(Node::Expr(returns));
                 }
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
+                result.push(Node::Body(body));
             }
             StmtKind::ClassDef {
                 bases,
@@ -314,9 +319,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 for keyword in keywords {
                     result.push(Node::Expr(&keyword.node.value));
                 }
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
+                result.push(Node::Body(body));
             }
             StmtKind::Delete { targets } => {
                 for target in targets {
@@ -355,29 +358,25 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             } => {
                 result.push(Node::Expr(target));
                 result.push(Node::Expr(iter));
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
-                for stmt in orelse {
-                    result.push(Node::Stmt(stmt));
+                result.push(Node::Body(body));
+                if let Some(orelse) = orelse {
+                    result.push(Node::Body(orelse));
                 }
             }
             StmtKind::While { test, body, orelse } => {
                 result.push(Node::Expr(test));
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
-                for stmt in orelse {
-                    result.push(Node::Stmt(stmt));
+                result.push(Node::Body(body));
+                if let Some(orelse) = orelse {
+                    result.push(Node::Body(orelse));
                 }
             }
-            StmtKind::If { test, body, orelse } => {
+            StmtKind::If {
+                test, body, orelse, ..
+            } => {
                 result.push(Node::Expr(test));
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
-                for stmt in orelse {
-                    result.push(Node::Stmt(stmt));
+                result.push(Node::Body(body));
+                if let Some(orelse) = orelse {
+                    result.push(Node::Body(orelse));
                 }
             }
             StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
@@ -387,9 +386,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                         result.push(Node::Expr(expr));
                     }
                 }
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
+                result.push(Node::Body(body));
             }
             StmtKind::Match { subject, cases } => {
                 result.push(Node::Expr(subject));
@@ -398,9 +395,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     if let Some(expr) = &case.guard {
                         result.push(Node::Expr(expr));
                     }
-                    for stmt in &case.body {
-                        result.push(Node::Stmt(stmt));
-                    }
+                    result.push(Node::Body(&case.body));
                 }
             }
             StmtKind::Raise { exc, cause } => {
@@ -431,17 +426,15 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 orelse,
                 finalbody,
             } => {
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
+                result.push(Node::Body(body));
                 for handler in handlers {
                     result.push(Node::Excepthandler(handler));
                 }
-                for stmt in orelse {
-                    result.push(Node::Stmt(stmt));
+                if let Some(orelse) = orelse {
+                    result.push(Node::Body(orelse));
                 }
-                for stmt in finalbody {
-                    result.push(Node::Stmt(stmt));
+                if let Some(finalbody) = finalbody {
+                    result.push(Node::Body(finalbody));
                 }
             }
             StmtKind::Import { names } => {
@@ -457,7 +450,6 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             StmtKind::Global { .. } => {}
             StmtKind::Nonlocal { .. } => {}
         },
-        // TODO(charlie): Actual logic, this doesn't do anything.
         Node::Expr(expr) => match &expr.node {
             ExprKind::BoolOp { values, .. } => {
                 for value in values {
@@ -476,7 +468,6 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 result.push(Node::Expr(operand));
             }
             ExprKind::Lambda { body, args, .. } => {
-                // TODO(charlie): Arguments.
                 for expr in &args.defaults {
                     result.push(Node::Expr(expr));
                 }
@@ -630,9 +621,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             if let Some(type_) = type_ {
                 result.push(Node::Expr(type_));
             }
-            for stmt in body {
-                result.push(Node::Stmt(stmt));
-            }
+            result.push(Node::Body(body));
         }
         Node::SliceIndex(slice_index) => {
             if let SliceIndexKind::Index { value } = &slice_index.node {
@@ -717,6 +706,7 @@ pub fn decorate_token<'a>(
         let middle = (left + right) / 2;
         let child = &child_nodes[middle];
         let start = match &child {
+            Node::Body(node) => node.location,
             Node::Stmt(node) => node.location,
             Node::Expr(node) => node.location,
             Node::Alias(node) => node.location,
@@ -726,6 +716,7 @@ pub fn decorate_token<'a>(
             Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
         };
         let end = match &child {
+            Node::Body(node) => node.end_location.unwrap(),
             Node::Stmt(node) => node.end_location.unwrap(),
             Node::Expr(node) => node.end_location.unwrap(),
             Node::Alias(node) => node.end_location.unwrap(),
@@ -739,6 +730,7 @@ pub fn decorate_token<'a>(
             // Special-case: if we're dealing with a statement that's a single expression,
             // we want to treat the expression as the enclosed node.
             let existing_start = match &existing {
+                Node::Body(node) => node.location,
                 Node::Stmt(node) => node.location,
                 Node::Expr(node) => node.location,
                 Node::Alias(node) => node.location,
@@ -748,6 +740,7 @@ pub fn decorate_token<'a>(
                 Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
             };
             let existing_end = match &existing {
+                Node::Body(node) => node.end_location.unwrap(),
                 Node::Stmt(node) => node.end_location.unwrap(),
                 Node::Expr(node) => node.end_location.unwrap(),
                 Node::Alias(node) => node.end_location.unwrap(),
@@ -809,6 +802,7 @@ pub fn decorate_token<'a>(
 
 #[derive(Debug, Default)]
 pub struct TriviaIndex {
+    pub body: FxHashMap<usize, Vec<Trivia>>,
     pub stmt: FxHashMap<usize, Vec<Trivia>>,
     pub expr: FxHashMap<usize, Vec<Trivia>>,
     pub alias: FxHashMap<usize, Vec<Trivia>>,
@@ -820,6 +814,13 @@ pub struct TriviaIndex {
 fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
     match node {
         Node::Mod(_) => {}
+        Node::Body(node) => {
+            trivia
+                .body
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
         Node::Stmt(node) => {
             trivia
                 .stmt
