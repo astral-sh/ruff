@@ -61,8 +61,8 @@ pub fn check_imports<'a>(
                 // from testing, seems this should only have one entry
                 imports_vec.push(Import {
                     name: names[0].node.name.to_owned(),
-                    location: stmt.location.clone(),
-                    end_location: stmt.end_location.unwrap().clone(),
+                    location: stmt.location,
+                    end_location: stmt.end_location.unwrap(),
                 });
             }
             StmtKind::ImportFrom { module, names, .. } => imports_vec.extend(
@@ -71,8 +71,8 @@ pub fn check_imports<'a>(
                     .map(|name| Import {
                         name: format!("{}{}", { if let Some(n) = module {
                             n } else { "" }}, name.node.name),
-                        location: name.location.clone(),
-                        end_location: name.end_location.unwrap().clone(),
+                        location: name.location,
+                        end_location: name.end_location.unwrap(),
                     })
                     .collect::<Vec<Import>>(),
             ),
