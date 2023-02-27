@@ -1636,7 +1636,14 @@ where
                     flake8_simplify::rules::needless_bool(self, stmt);
                 }
                 if self.settings.rules.enabled(&Rule::ManualDictLookup) {
-                    flake8_simplify::rules::manual_dict_lookup(self, stmt, test, body, orelse);
+                    flake8_simplify::rules::manual_dict_lookup(
+                        self,
+                        stmt,
+                        test,
+                        body,
+                        orelse,
+                        self.current_stmt_parent().map(std::convert::Into::into),
+                    );
                 }
                 if self.settings.rules.enabled(&Rule::UseTernaryOperator) {
                     flake8_simplify::rules::use_ternary_operator(
