@@ -2112,7 +2112,10 @@ where
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
                 self.pop_scope();
             }
-            StmtKind::ClassDef { name, .. } => {
+            StmtKind::ClassDef { name, .. } => { // maybe E0203 goes here?
+                println!("Current scope for {name}");
+                let current_scope = self.current_scope();
+                println!("{:#?}", current_scope);
                 self.pop_scope();
                 self.add_binding(
                     name,
@@ -2279,7 +2282,7 @@ where
                     pylint::rules::used_prior_global_declaration(self, id, expr);
                 }
             }
-            ExprKind::Attribute { attr, value, .. } => {
+            ExprKind::Attribute { attr, value, ctx } => {
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
@@ -2316,6 +2319,8 @@ where
                     flake8_self::rules::private_member_access(self, expr);
                 }
                 pandas_vet::rules::check_attr(self, attr, value, expr);
+                println!("attrib {attr} {value:?} {ctx:?}");
+                // push to scope?
             }
             ExprKind::Call {
                 func,
