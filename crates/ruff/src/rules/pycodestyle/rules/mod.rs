@@ -22,7 +22,7 @@ pub use indentation::{
     UnexpectedIndentationComment,
 };
 
-pub use identation_contains_tabs::{identation_contains_tabs, IdentationContainsTabs};
+pub use indentation_contains_tabs::{indentation_contains_tabs, IndentationContainsTabs};
 pub use invalid_escape_sequence::{invalid_escape_sequence, InvalidEscapeSequence};
 pub use lambda_assignment::{lambda_assignment, LambdaAssignment};
 pub use line_too_long::{line_too_long, LineTooLong};
@@ -58,9 +58,9 @@ mod compound_statements;
 mod doc_line_too_long;
 mod errors;
 mod extraneous_whitespace;
-mod identation_contains_tabs;
 mod imports;
 mod indentation;
+mod indentation_contains_tabs;
 mod invalid_escape_sequence;
 mod lambda_assignment;
 mod line_too_long;

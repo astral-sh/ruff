@@ -74,7 +74,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E999") => Rule::SyntaxError,
 
         // pycodestyle warnings
-        (Pycodestyle, "W191") => Rule::IdentationContainsTabs,
+        (Pycodestyle, "W191") => Rule::IndentationContainsTabs,
         (Pycodestyle, "W291") => Rule::TrailingWhitespace,
         (Pycodestyle, "W292") => Rule::NoNewLineAtEndOfFile,
         (Pycodestyle, "W293") => Rule::BlankLineContainsWhitespace,

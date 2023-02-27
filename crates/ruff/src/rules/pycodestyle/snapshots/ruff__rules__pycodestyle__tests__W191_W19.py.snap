@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 3
     column: 0
@@ -13,7 +13,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 9
     column: 0
@@ -23,7 +23,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 16
     column: 0
@@ -33,7 +33,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 21
     column: 0
@@ -43,7 +43,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 26
     column: 0
@@ -53,7 +53,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 32
     column: 0
@@ -63,7 +63,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 38
     column: 0
@@ -73,7 +73,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 44
     column: 0
@@ -83,7 +83,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 45
     column: 0
@@ -93,7 +93,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 54
     column: 0
@@ -103,7 +103,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 58
     column: 0
@@ -113,7 +113,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 61
     column: 0
@@ -123,7 +123,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 62
     column: 0
@@ -133,7 +133,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 63
     column: 0
@@ -143,7 +143,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 64
     column: 0
@@ -153,7 +153,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 65
     column: 0
@@ -163,7 +163,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 66
     column: 0
@@ -173,7 +173,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 73
     column: 0
@@ -183,7 +183,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 78
     column: 0
@@ -193,7 +193,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 83
     column: 0
@@ -203,7 +203,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 88
     column: 0
@@ -213,7 +213,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 91
     column: 0
@@ -223,7 +223,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 92
     column: 0
@@ -233,7 +233,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 98
     column: 0
@@ -243,7 +243,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 99
     column: 0
@@ -253,7 +253,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 102
     column: 0
@@ -263,7 +263,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 105
     column: 0
@@ -273,7 +273,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 110
     column: 0
@@ -283,7 +283,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 125
     column: 0
@@ -293,7 +293,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 131
     column: 0
@@ -303,7 +303,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 132
     column: 0
@@ -313,7 +313,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 133
     column: 0
@@ -323,7 +323,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 136
     column: 0
@@ -333,7 +333,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 137
     column: 0
@@ -343,7 +343,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 138
     column: 0
@@ -353,7 +353,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 139
     column: 0
@@ -363,7 +363,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 140
     column: 0
@@ -373,7 +373,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IdentationContainsTabs: ~
+    IndentationContainsTabs: ~
   location:
     row: 143
     column: 0

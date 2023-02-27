@@ -8,7 +8,7 @@ use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
 use crate::rules::pycodestyle::rules::{
-    doc_line_too_long, identation_contains_tabs, line_too_long, mixed_spaces_and_tabs,
+    doc_line_too_long, indentation_contains_tabs, line_too_long, mixed_spaces_and_tabs,
     no_newline_at_end_of_file, trailing_whitespace,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
@@ -45,7 +45,7 @@ pub fn check_physical_lines(
     let enforce_trailing_whitespace = settings.rules.enabled(&Rule::TrailingWhitespace);
     let enforce_blank_line_contains_whitespace =
         settings.rules.enabled(&Rule::BlankLineContainsWhitespace);
-    let enforce_identation_contains_tabs = settings.rules.enabled(&Rule::IdentationContainsTabs);
+    let enforce_indentation_contains_tabs = settings.rules.enabled(&Rule::IndentationContainsTabs);
 
     let fix_unnecessary_coding_comment =
         autofix.into() && settings.rules.should_fix(&Rule::UTF8EncodingDeclaration);
@@ -151,8 +151,8 @@ pub fn check_physical_lines(
             }
         }
 
-        if enforce_identation_contains_tabs {
-            if let Some(diagnostic) = identation_contains_tabs(index, line) {
+        if enforce_indentation_contains_tabs {
+            if let Some(diagnostic) = indentation_contains_tabs(index, line) {
                 diagnostics.push(diagnostic);
             }
         }
