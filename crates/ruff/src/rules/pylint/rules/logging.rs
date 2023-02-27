@@ -84,8 +84,22 @@ impl Violation for LoggingTooManyArgs {
     }
 }
 
-/// Check logging calls for violations.
+/// PLE1205
+/// PLE1206
 pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
+    // If there are any starred arguments, abort.
+    if args
+        .iter()
+        .any(|arg| matches!(arg.node, ExprKind::Starred { .. }))
+    {
+        return;
+    }
+
+    // If there are any starred keyword arguments, abort.
+    if keywords.iter().any(|keyword| keyword.node.arg.is_none()) {
+        return;
+    }
+
     if !is_logger_candidate(func) {
         return;
     }
@@ -93,8 +107,6 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     if let ExprKind::Attribute { attr, .. } = &func.node {
         if LoggingLevel::from_str(attr.as_str()).is_some() {
             let call_args = SimpleCallArgs::new(args, keywords);
-
-            // E1205 - E1206
             if let Some(msg) = call_args.get_argument("msg", Some(0)) {
                 if let ExprKind::Constant {
                     value: Constant::Str(value),
@@ -103,12 +115,6 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                 {
                     if let Ok(summary) = CFormatSummary::try_from(value.as_str()) {
                         if summary.starred {
-                            return;
-                        }
-
-                        if !call_args.kwargs.is_empty() {
-                            // Keyword checking on logging strings is complicated by
-                            // special keywords - out of scope.
                             return;
                         }
 
@@ -124,7 +130,10 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                         }
 
                         if checker.settings.rules.enabled(&Rule::LoggingTooFewArgs) {
-                            if message_args > 0 && summary.num_positional > message_args {
+                            if message_args > 0
+                                && call_args.kwargs.is_empty()
+                                && summary.num_positional > message_args
+                            {
                                 checker.diagnostics.push(Diagnostic::new(
                                     LoggingTooFewArgs,
                                     Range::from_located(func),
