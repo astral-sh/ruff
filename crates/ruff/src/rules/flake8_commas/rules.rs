@@ -7,6 +7,7 @@ use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
+use crate::source_code::Locator;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 /// Simplified token type.
@@ -149,6 +150,7 @@ impl AlwaysAutofixableViolation for TrailingCommaProhibited {
 /// COM812, COM818, COM819
 pub fn trailing_commas(
     tokens: &[LexResult],
+    locator: &Locator,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
@@ -302,7 +304,16 @@ pub fn trailing_commas(
                 },
             );
             if autofix.into() && settings.rules.should_fix(&Rule::TrailingCommaMissing) {
-                diagnostic.amend(Fix::insertion(",".to_owned(), missing_comma.2));
+                // Create a replacement that includes the final bracket (or other token),
+                // rather than just inserting a comma at the end. This prevents the UP034 autofix
+                // removing any brackets in the same linter pass - doing both at the same time could
+                // lead to a syntax error.
+                let contents = locator.slice(&Range::new(missing_comma.0, missing_comma.2));
+                diagnostic.amend(Fix::replacement(
+                    format!("{contents},"),
+                    missing_comma.0,
+                    missing_comma.2,
+                ));
             }
             diagnostics.push(diagnostic);
         }
