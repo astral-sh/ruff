@@ -65,7 +65,7 @@ expression: parse_ast
                                     operand: Located {
                                         location: Location {
                                             row: 5,
-                                            column: 9,
+                                            column: 10,
                                         },
                                         end_location: Some(
                                             Location {
@@ -2161,7 +2161,7 @@ expression: parse_ast
                                         end_location: Some(
                                             Location {
                                                 row: 41,
-                                                column: 21,
+                                                column: 13,
                                             },
                                         ),
                                         custom: (),
@@ -2176,7 +2176,7 @@ expression: parse_ast
                                     right: Located {
                                         location: Location {
                                             row: 41,
-                                            column: 9,
+                                            column: 16,
                                         },
                                         end_location: Some(
                                             Location {
@@ -2320,7 +2320,7 @@ expression: parse_ast
                                     operand: Located {
                                         location: Location {
                                             row: 45,
-                                            column: 9,
+                                            column: 10,
                                         },
                                         end_location: Some(
                                             Location {
@@ -4738,7 +4738,7 @@ expression: parse_ast
                                         end_location: Some(
                                             Location {
                                                 row: 95,
-                                                column: 22,
+                                                column: 14,
                                             },
                                         ),
                                         custom: (),
@@ -4747,12 +4747,12 @@ expression: parse_ast
                                             operand: Located {
                                                 location: Location {
                                                     row: 95,
-                                                    column: 9,
+                                                    column: 10,
                                                 },
                                                 end_location: Some(
                                                     Location {
                                                         row: 95,
-                                                        column: 22,
+                                                        column: 14,
                                                     },
                                                 ),
                                                 custom: (),
@@ -4769,7 +4769,7 @@ expression: parse_ast
                                     right: Located {
                                         location: Location {
                                             row: 95,
-                                            column: 9,
+                                            column: 17,
                                         },
                                         end_location: Some(
                                             Location {

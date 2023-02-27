@@ -576,6 +576,41 @@ StarPattern: ast::PatternKind = {
     },
 }
 
+ConstantAtom: ast::Expr = {
+    <location:@L> <value:Constant> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::Constant { value, kind: None }
+    },
+}
+
+ConstantExpr: ast::Expr = {
+    ConstantAtom,
+    <location:@L> "-" <operand:ConstantAtom> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::UnaryOp {
+            op: ast::Unaryop::USub,
+            operand: Box::new(operand)
+        }
+    },
+}
+
+AddOpExpr: ast::Expr = {
+    <location:@L> <left:ConstantExpr> <op:AddOp> <right:ConstantAtom> <end_location:@R> => ast::Expr {
+        location,
+        end_location: Some(end_location),
+        custom: (),
+        node: ast::ExprKind::BinOp {
+            left: Box::new(left),
+            op,
+            right: Box::new(right),
+        }
+    },
+}
+
 LiteralPattern: ast::PatternKind = {
     "None" => ast::PatternKind::MatchSingleton {
         value: ast::Constant::None
@@ -586,81 +621,11 @@ LiteralPattern: ast::PatternKind = {
     "False" => ast::PatternKind::MatchSingleton {
         value: false.into()
     },
-    <location:@L> <value:Constant> <end_location:@R> => ast::PatternKind::MatchValue {
-        value: Box::new(ast::Expr {
-            location,
-            end_location: Some(end_location),
-            custom: (),
-            node: ast::ExprKind::Constant { value, kind: None }
-        })
+    <location:@L> <value:ConstantExpr> <end_location:@R> => ast::PatternKind::MatchValue {
+        value: Box::new(value)
     },
-    <location:@L> "-" <value:Constant> <end_location:@R> => ast::PatternKind::MatchValue {
-        value: Box::new(ast::Expr {
-            location,
-            end_location: Some(end_location),
-            custom: (),
-            node: ast::ExprKind::UnaryOp {
-                op: ast::Unaryop::USub,
-                operand: Box::new(ast::Expr {
-                    location,
-                    end_location: Some(end_location),
-                    custom: (),
-                    node: ast::ExprKind::Constant { value, kind: None }
-                })
-            }
-        })
-    },
-    <location:@L> <left:Constant> <op:AddOp> <right:Constant> <end_location:@R> => ast::PatternKind::MatchValue {
-        value: Box::new(ast::Expr {
-            location,
-            end_location: Some(end_location),
-            custom: (),
-            node: ast::ExprKind::BinOp {
-                left: Box::new(ast::Expr {
-                    location,
-                    end_location: Some(end_location),
-                    custom: (),
-                    node: ast::ExprKind::Constant { value: left, kind: None }
-                }),
-                op,
-                right: Box::new(ast::Expr {
-                    location,
-                    end_location: Some(end_location),
-                    custom: (),
-                    node: ast::ExprKind::Constant { value: right, kind: None }
-                }),
-            }
-        })
-    },
-    <location:@L> "-" <left:Constant> <op:AddOp> <right:Constant> <end_location:@R> => ast::PatternKind::MatchValue {
-        value: Box::new(ast::Expr {
-            location,
-            end_location: Some(end_location),
-            custom: (),
-            node: ast::ExprKind::BinOp {
-                left: Box::new(ast::Expr {
-                    location,
-                    end_location: Some(end_location),
-                    custom: (),
-                    node: ast::ExprKind::UnaryOp {
-                        op: ast::Unaryop::USub,
-                        operand: Box::new(ast::Expr {
-                            location,
-                            end_location: Some(end_location),
-                            custom: (),
-                            node: ast::ExprKind::Constant { value: left, kind: None }
-                        })
-                    }
-                }),
-                op,
-                right: Box::new(ast::Expr {
-                    location,
-                    end_location: Some(end_location),
-                    custom: (),
-                    node: ast::ExprKind::Constant { value: right, kind: None }
-                }),
-            }
-        })
+    <location:@L> <value:AddOpExpr> => ast::PatternKind::MatchValue {
+        value: Box::new(value)
     },
     <location:@L> <s:(@L string @R)+> =>? Ok(ast::PatternKind::MatchValue {
         value: Box::new(parse_strings(s)?)
@@ -713,6 +678,9 @@ ValuePattern: ast::PatternKind = {
 }
 
 MappingKey: ast::Expr = {
+    ConstantExpr,
+    AddOpExpr,
+    MatchNameOrAttr,
     <location:@L> "None" <end_location:@R> => ast::Expr {
         location,
         end_location: Some(end_location),
@@ -740,76 +708,7 @@ MappingKey: ast::Expr = {
             kind: None,
         },
     },
-    <location:@L> <value:Constant> <end_location:@R> => ast::Expr {
-        location,
-        end_location: Some(end_location),
-        custom: (),
-        node: ast::ExprKind::Constant { value, kind: None }
-    },
-    <location:@L> "-" <value:Constant> <end_location:@R> => ast::Expr {
-        location,
-        end_location: Some(end_location),
-        custom: (),
-        node: ast::ExprKind::UnaryOp {
-            op: ast::Unaryop::USub,
-            operand: Box::new(ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::Constant { value, kind: None }
-            })
-        }
-    },
-    <location:@L> <left:Constant> <op:AddOp> <right:Constant> <end_location:@R> => ast::Expr {
-        location,
-        end_location: Some(end_location),
-        custom: (),
-        node: ast::ExprKind::BinOp {
-            left: Box::new(ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::Constant { value: left, kind: None }
-            }),
-            op,
-            right: Box::new(ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::Constant { value: right, kind: None }
-            }),
-        }
-    },
-    <location:@L> "-" <left:Constant> <op:AddOp> <right:Constant> <end_location:@R> => ast::Expr {
-        location,
-        end_location: Some(end_location),
-        custom: (),
-        node: ast::ExprKind::BinOp {
-            left: Box::new(ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::UnaryOp {
-                    op: ast::Unaryop::USub,
-                    operand: Box::new(ast::Expr {
-                        location,
-                        end_location: Some(end_location),
-                        custom: (),
-                        node: ast::ExprKind::Constant { value: left, kind: None }
-                    })
-                }
-            }),
-            op,
-            right: Box::new(ast::Expr {
-                location,
-                end_location: Some(end_location),
-                custom: (),
-                node: ast::ExprKind::Constant { value: right, kind: None }
-            }),
-        }
-    },
     <location:@L> <s:(@L string @R)+> =>? Ok(parse_strings(s)?),
-    MatchNameOrAttr,
 }
 
 MatchMappingEntry: (ast::Expr, ast::Pattern) = {
