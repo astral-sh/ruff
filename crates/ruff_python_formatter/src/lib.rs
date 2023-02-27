@@ -75,13 +75,7 @@ mod tests {
         pattern = "resources/test/fixtures/black/**/*.py",
         // Excluded tests because they reach unreachable when attaching tokens
         exclude = [
-            "*comments.py",
-            "*comments[3,5,8].py",
-            "*comments_non_breaking_space.py",
-            "*docstring_preview.py",
-            "*docstring.py",
-            "*fmtonoff.py",
-            "*fmtskip8.py",
+            "*comments8.py",
         ])
     ]
     #[test]
