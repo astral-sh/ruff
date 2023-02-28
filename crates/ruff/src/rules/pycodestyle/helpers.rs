@@ -61,40 +61,40 @@ pub fn is_overlong(
 pub fn is_keyword_token(token: &Tok) -> bool {
     matches!(
         token,
-        Tok::False { .. }
-            | Tok::True { .. }
-            | Tok::None { .. }
-            | Tok::And { .. }
-            | Tok::As { .. }
-            | Tok::Assert { .. }
-            | Tok::Await { .. }
-            | Tok::Break { .. }
-            | Tok::Class { .. }
-            | Tok::Continue { .. }
-            | Tok::Def { .. }
-            | Tok::Del { .. }
-            | Tok::Elif { .. }
-            | Tok::Else { .. }
-            | Tok::Except { .. }
-            | Tok::Finally { .. }
-            | Tok::For { .. }
-            | Tok::From { .. }
-            | Tok::Global { .. }
-            | Tok::If { .. }
-            | Tok::Import { .. }
-            | Tok::In { .. }
-            | Tok::Is { .. }
-            | Tok::Lambda { .. }
-            | Tok::Nonlocal { .. }
-            | Tok::Not { .. }
-            | Tok::Or { .. }
-            | Tok::Pass { .. }
-            | Tok::Raise { .. }
-            | Tok::Return { .. }
-            | Tok::Try { .. }
-            | Tok::While { .. }
-            | Tok::With { .. }
-            | Tok::Yield { .. }
+        Tok::False
+            | Tok::True
+            | Tok::None
+            | Tok::And
+            | Tok::As
+            | Tok::Assert
+            | Tok::Await
+            | Tok::Break
+            | Tok::Class
+            | Tok::Continue
+            | Tok::Def
+            | Tok::Del
+            | Tok::Elif
+            | Tok::Else
+            | Tok::Except
+            | Tok::Finally
+            | Tok::For
+            | Tok::From
+            | Tok::Global
+            | Tok::If
+            | Tok::Import
+            | Tok::In
+            | Tok::Is
+            | Tok::Lambda
+            | Tok::Nonlocal
+            | Tok::Not
+            | Tok::Or
+            | Tok::Pass
+            | Tok::Raise
+            | Tok::Return
+            | Tok::Try
+            | Tok::While
+            | Tok::With
+            | Tok::Yield
     )
 }
 
