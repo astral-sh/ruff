@@ -160,8 +160,8 @@ pub fn yoda_conditions(
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 suggestion,
-                left.location,
-                right.end_location.unwrap(),
+                expr.location,
+                expr.end_location.unwrap(),
             ));
         }
         checker.diagnostics.push(diagnostic);
