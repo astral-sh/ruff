@@ -1,7 +1,7 @@
 mod alias;
 mod arg;
 mod arguments;
-mod boolop;
+mod bool_op;
 pub mod builders;
 mod cmpop;
 mod comments;
@@ -9,6 +9,7 @@ mod comprehension;
 mod excepthandler;
 mod expr;
 mod helpers;
+mod keyword;
 mod match_case;
 mod numbers;
 mod operator;

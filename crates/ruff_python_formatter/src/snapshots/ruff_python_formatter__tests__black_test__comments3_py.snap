@@ -77,30 +77,6 @@ def func():
      ]
      # Capture each of the exceptions in the MultiError along with each of their causes and contexts
      if isinstance(exc_value, MultiError):
-@@ -26,9 +27,9 @@
-                         limit=limit,
-                         lookup_lines=lookup_lines,
-                         capture_locals=capture_locals,
--                        # copy the set of _seen exceptions so that duplicates
-+                        _seen=# copy the set of _seen exceptions so that duplicates
-                         # shared between sub-exceptions are not omitted
--                        _seen=set(_seen),
-+                        set(_seen),
-                     )
-                     # This should be left alone (after)
-                 )
-@@ -39,9 +40,9 @@
-         limit=limit,
-         lookup_lines=lookup_lines,
-         capture_locals=capture_locals,
--        # copy the set of _seen exceptions so that duplicates
-+        _seen=# copy the set of _seen exceptions so that duplicates
-         # shared between sub-exceptions are not omitted
--        _seen=set(_seen),
-+        set(_seen),
-     )
- 
- 
 ```
 
 ## Ruff Output
@@ -135,9 +111,9 @@ def func():
                         limit=limit,
                         lookup_lines=lookup_lines,
                         capture_locals=capture_locals,
-                        _seen=# copy the set of _seen exceptions so that duplicates
+                        # copy the set of _seen exceptions so that duplicates
                         # shared between sub-exceptions are not omitted
-                        set(_seen),
+                        _seen=set(_seen),
                     )
                     # This should be left alone (after)
                 )
@@ -148,9 +124,9 @@ def func():
         limit=limit,
         lookup_lines=lookup_lines,
         capture_locals=capture_locals,
-        _seen=# copy the set of _seen exceptions so that duplicates
+        # copy the set of _seen exceptions so that duplicates
         # shared between sub-exceptions are not omitted
-        set(_seen),
+        _seen=set(_seen),
     )
 
 

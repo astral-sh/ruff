@@ -2141,6 +2141,7 @@ dependencies = [
  "clap 4.1.6",
  "insta",
  "is-macro",
+ "itertools",
  "once_cell",
  "ruff_formatter",
  "ruff_python",

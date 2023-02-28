@@ -1,9 +1,11 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-use crate::core::helpers::{expand_indented_block, is_elif};
 use rustpython_parser::ast::{Constant, Location};
 use rustpython_parser::Mode;
 
+use itertools::Itertools;
+
+use crate::core::helpers::{expand_indented_block, find_tok, is_elif};
 use crate::core::locator::Locator;
 use crate::core::types::Range;
 use crate::trivia::{Parenthesize, Trivia};
@@ -57,19 +59,21 @@ impl From<rustpython_parser::ast::ExprContext> for ExprContext {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Boolop {
+pub enum BoolOpKind {
     And,
     Or,
 }
 
-impl From<rustpython_parser::ast::Boolop> for Boolop {
-    fn from(op: rustpython_parser::ast::Boolop) -> Self {
+impl From<&rustpython_parser::ast::Boolop> for BoolOpKind {
+    fn from(op: &rustpython_parser::ast::Boolop) -> Self {
         match op {
             rustpython_parser::ast::Boolop::And => Self::And,
             rustpython_parser::ast::Boolop::Or => Self::Or,
         }
     }
 }
+
+pub type BoolOp = Located<BoolOpKind>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Operator {
@@ -308,7 +312,7 @@ pub type Stmt = Located<StmtKind>;
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind {
     BoolOp {
-        op: Boolop,
+        ops: Vec<BoolOp>,
         values: Vec<Expr>,
     },
     NamedExpr {
@@ -1677,7 +1681,23 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::BoolOp {
-                    op: op.into(),
+                    ops: values
+                        .iter()
+                        .tuple_windows()
+                        .map(|(left, right)| {
+                            let target = match &op {
+                                rustpython_parser::ast::Boolop::And => rustpython_parser::Tok::And,
+                                rustpython_parser::ast::Boolop::Or => rustpython_parser::Tok::Or,
+                            };
+                            let (op_location, op_end_location) = find_tok(
+                                left.end_location.unwrap(),
+                                right.location,
+                                locator,
+                                |tok| tok == target,
+                            );
+                            BoolOp::new(op_location, op_end_location, (&op).into())
+                        })
+                        .collect(),
                     values: values
                         .into_iter()
                         .map(|node| (node, locator).into())

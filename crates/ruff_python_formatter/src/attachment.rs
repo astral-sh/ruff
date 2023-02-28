@@ -1,6 +1,8 @@
 use crate::core::visitor;
 use crate::core::visitor::Visitor;
-use crate::cst::{Alias, Arg, Body, Excepthandler, Expr, Pattern, SliceIndex, Stmt};
+use crate::cst::{
+    Alias, Arg, Body, BoolOp, Excepthandler, Expr, Keyword, Pattern, SliceIndex, Stmt,
+};
 use crate::trivia::{decorate_trivia, TriviaIndex, TriviaToken};
 
 struct AttachmentVisitor {
@@ -54,6 +56,22 @@ impl<'a> Visitor<'a> for AttachmentVisitor {
             excepthandler.trivia.extend(comments);
         }
         visitor::walk_excepthandler(self, excepthandler);
+    }
+
+    fn visit_keyword(&mut self, keyword: &'a mut Keyword) {
+        let trivia = self.index.keyword.remove(&keyword.id());
+        if let Some(comments) = trivia {
+            keyword.trivia.extend(comments);
+        }
+        visitor::walk_keyword(self, keyword);
+    }
+
+    fn visit_bool_op(&mut self, bool_op: &'a mut BoolOp) {
+        let trivia = self.index.bool_op.remove(&bool_op.id());
+        if let Some(comments) = trivia {
+            bool_op.trivia.extend(comments);
+        }
+        visitor::walk_bool_op(self, bool_op);
     }
 
     fn visit_slice_index(&mut self, slice_index: &'a mut SliceIndex) {

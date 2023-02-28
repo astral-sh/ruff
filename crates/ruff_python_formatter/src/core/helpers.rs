@@ -28,6 +28,7 @@ pub fn trailing_quote(content: &str) -> Option<&&str> {
         .find(|&pattern| content.ends_with(pattern))
 }
 
+/// Return `true` if the given string is a radix literal (e.g., `0b101`).
 pub fn is_radix_literal(content: &str) -> bool {
     content.starts_with("0b")
         || content.starts_with("0o")
@@ -35,6 +36,29 @@ pub fn is_radix_literal(content: &str) -> bool {
         || content.starts_with("0B")
         || content.starts_with("0O")
         || content.starts_with("0X")
+}
+
+/// Find the first token in the given range that satisfies the given predicate.
+pub fn find_tok(
+    location: Location,
+    end_location: Location,
+    locator: &Locator,
+    f: impl Fn(rustpython_parser::Tok) -> bool,
+) -> (Location, Location) {
+    let (source, start_index, end_index) = locator.slice(Range::new(location, end_location));
+    for (start, tok, end) in rustpython_parser::lexer::lex_located(
+        &source[start_index..end_index],
+        rustpython_parser::Mode::Module,
+        location,
+    )
+    .flatten()
+    {
+        if f(tok) {
+            return (start, end);
+        }
+    }
+
+    unreachable!()
 }
 
 /// Expand the range of a compound statement.

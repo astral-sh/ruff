@@ -1,7 +1,7 @@
 use rustpython_parser::ast::Constant;
 
 use crate::cst::{
-    Alias, Arg, Arguments, Body, Boolop, Cmpop, Comprehension, Excepthandler, ExcepthandlerKind,
+    Alias, Arg, Arguments, Body, BoolOp, Cmpop, Comprehension, Excepthandler, ExcepthandlerKind,
     Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern, PatternKind, SliceIndex,
     SliceIndexKind, Stmt, StmtKind, Unaryop, Withitem,
 };
@@ -22,8 +22,8 @@ pub trait Visitor<'a> {
     fn visit_expr_context(&mut self, expr_context: &'a mut ExprContext) {
         walk_expr_context(self, expr_context);
     }
-    fn visit_boolop(&mut self, boolop: &'a mut Boolop) {
-        walk_boolop(self, boolop);
+    fn visit_bool_op(&mut self, bool_op: &'a mut BoolOp) {
+        walk_bool_op(self, bool_op);
     }
     fn visit_operator(&mut self, operator: &'a mut Operator) {
         walk_operator(self, operator);
@@ -294,10 +294,12 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
 
 pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Expr) {
     match &mut expr.node {
-        ExprKind::BoolOp { op, values } => {
-            visitor.visit_boolop(op);
-            for expr in values {
-                visitor.visit_expr(expr);
+        ExprKind::BoolOp { ops, values } => {
+            for op in ops {
+                visitor.visit_bool_op(op);
+            }
+            for value in values {
+                visitor.visit_expr(value);
             }
         }
         ExprKind::NamedExpr { target, value } => {
@@ -600,7 +602,7 @@ pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
 }
 
 #[allow(unused_variables)]
-pub fn walk_boolop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, boolop: &'a mut Boolop) {}
+pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, bool_op: &'a mut BoolOp) {}
 
 #[allow(unused_variables)]
 pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, operator: &'a mut Operator) {}

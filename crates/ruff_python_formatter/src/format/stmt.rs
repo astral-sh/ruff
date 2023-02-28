@@ -131,18 +131,7 @@ fn format_class_def(
                 }
 
                 for (i, keyword) in keywords.iter().enumerate() {
-                    if let Some(arg) = &keyword.node.arg {
-                        write!(
-                            f,
-                            [
-                                dynamic_text(arg, TextSize::default()),
-                                text("="),
-                                keyword.node.value.format()
-                            ]
-                        )?;
-                    } else {
-                        write!(f, [text("**"), keyword.node.value.format()])?;
-                    }
+                    write!(f, [keyword.format()])?;
                     if i < keywords.len() - 1 {
                         write!(f, [text(","), soft_line_break_or_space()])?;
                     } else {

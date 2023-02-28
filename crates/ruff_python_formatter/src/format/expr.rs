@@ -9,7 +9,7 @@ use ruff_text_size::TextSize;
 use crate::context::ASTFormatContext;
 use crate::core::types::Range;
 use crate::cst::{
-    Arguments, Boolop, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, SliceIndex,
+    Arguments, BoolOp, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, SliceIndex,
     SliceIndexKind, Unaryop,
 };
 use crate::format::builders::literal;
@@ -338,38 +338,10 @@ fn format_call(
     if args.is_empty() && keywords.is_empty() {
         write!(f, [text("(")])?;
         write!(f, [text(")")])?;
-
-        // Format any end-of-line comments.
-        let mut first = true;
-        for range in expr.trivia.iter().filter_map(|trivia| {
-            if trivia.relationship.is_trailing() {
-                trivia.kind.end_of_line_comment()
-            } else {
-                None
-            }
-        }) {
-            if std::mem::take(&mut first) {
-                write!(f, [line_suffix(&text("  "))])?;
-            }
-            write!(f, [line_suffix(&literal(range))])?;
-        }
+        write!(f, [end_of_line_comments(expr)])?;
     } else {
         write!(f, [text("(")])?;
-
-        // Format any end-of-line comments.
-        let mut first = true;
-        for range in expr.trivia.iter().filter_map(|trivia| {
-            if trivia.relationship.is_trailing() {
-                trivia.kind.end_of_line_comment()
-            } else {
-                None
-            }
-        }) {
-            if std::mem::take(&mut first) {
-                write!(f, [line_suffix(&text("  "))])?;
-            }
-            write!(f, [line_suffix(&literal(range))])?;
-        }
+        write!(f, [end_of_line_comments(expr)])?;
 
         let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
@@ -394,14 +366,7 @@ fn format_call(
                     write!(
                         f,
                         [group(&format_args![&format_with(|f| {
-                            if let Some(arg) = &keyword.node.arg {
-                                write!(f, [dynamic_text(arg, TextSize::default())])?;
-                                write!(f, [text("=")])?;
-                                write!(f, [keyword.node.value.format()])?;
-                            } else {
-                                write!(f, [text("**")])?;
-                                write!(f, [keyword.node.value.format()])?;
-                            }
+                            write!(f, [keyword.format()])?;
                             Ok(())
                         })])]
                     )?;
@@ -736,19 +701,15 @@ fn format_named_expr(
 fn format_bool_op(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
-    op: &Boolop,
+    ops: &[BoolOp],
     values: &[Expr],
 ) -> FormatResult<()> {
-    let mut first = true;
-    for value in values {
-        if std::mem::take(&mut first) {
-            write!(f, [group(&format_args![value.format()])])?;
-        } else {
-            write!(f, [soft_line_break_or_space()])?;
-            write!(f, [op.format()])?;
-            write!(f, [space()])?;
-            write!(f, [group(&format_args![value.format()])])?;
-        }
+    write!(f, [group(&format_args![values[0].format()])])?;
+    for (op, value) in ops.iter().zip(&values[1..]) {
+        write!(f, [soft_line_break_or_space()])?;
+        write!(f, [op.format()])?;
+        write!(f, [space()])?;
+        write!(f, [group(&format_args![value.format()])])?;
     }
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
@@ -851,7 +812,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
         write!(f, [leading_comments(self.item)])?;
 
         match &self.item.node {
-            ExprKind::BoolOp { op, values } => format_bool_op(f, self.item, op, values),
+            ExprKind::BoolOp { ops, values } => format_bool_op(f, self.item, ops, values),
             ExprKind::NamedExpr { target, value } => format_named_expr(f, self.item, target, value),
             ExprKind::BinOp { left, op, right } => format_bin_op(f, self.item, left, op, right),
             ExprKind::UnaryOp { op, operand } => format_unary_op(f, self.item, op, operand),

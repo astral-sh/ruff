@@ -394,25 +394,8 @@ d={'a':1,
          # fmt: on
      )
  
-@@ -200,8 +213,8 @@
-     xxxxxx_xxxxxx=2,
-     xxxxxx_xxxxx_xxxxxxxx=70,
-     xxxxxx_xxxxxx_xxxxx=True,
--    # fmt: off
--    xxxxxxx_xxxxxxxxxxxx={
-+    xxxxxxx_xxxxxxxxxxxx=# fmt: off
-+    {
-         "xxxxxxxx": {
-             "xxxxxx": False,
-             "xxxxxxx": False,
-@@ -213,12 +226,11 @@
-             "xxxx_xxxxxx": "xxxxxx",
-         },
-     },
--    # fmt: on
--    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
-+    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=# fmt: on
-+    5,
+@@ -217,8 +230,7 @@
+     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
  )
  # fmt: off
 -yield  'hello'
@@ -643,8 +626,8 @@ cfg.rule(
     xxxxxx_xxxxxx=2,
     xxxxxx_xxxxx_xxxxxxxx=70,
     xxxxxx_xxxxxx_xxxxx=True,
-    xxxxxxx_xxxxxxxxxxxx=# fmt: off
-    {
+    # fmt: off
+    xxxxxxx_xxxxxxxxxxxx={
         "xxxxxxxx": {
             "xxxxxx": False,
             "xxxxxxx": False,
@@ -656,8 +639,8 @@ cfg.rule(
             "xxxx_xxxxxx": "xxxxxx",
         },
     },
-    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=# fmt: on
-    5,
+    # fmt: on
+    xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 )
 # fmt: off
 yield "hello"
