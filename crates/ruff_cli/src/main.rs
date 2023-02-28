@@ -194,9 +194,10 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         let modifications =
             commands::add_noqa::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
+            let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("Added {modifications} noqa directives.");
+                eprintln!("Added {modifications} noqa directive{s}.");
             }
         }
         return Ok(ExitStatus::Success);
