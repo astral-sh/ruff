@@ -1187,6 +1187,10 @@ impl<'a> SimpleCallArgs<'a> {
     pub fn len(&self) -> usize {
         self.args.len() + self.kwargs.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.args.is_empty() && self.kwargs.is_empty()
+    }
 }
 
 /// Return `true` if the given `Expr` is a potential logging call. Matches

@@ -133,7 +133,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     }
 
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
-        if let Some(logging_level) = LoggingLevel::from_str(attr.as_str()) {
+        if let Some(logging_level) = LoggingLevel::from_python_logger_method_str(attr.as_str()) {
             let call_args = SimpleCallArgs::new(args, keywords);
             let level_call_range = Range::new(
                 Location::new(
