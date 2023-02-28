@@ -2912,6 +2912,9 @@ where
                 if self.settings.rules.enabled(&Rule::BadStrStripCall) {
                     pylint::rules::bad_str_strip_call(self, func, args);
                 }
+                if self.settings.rules.enabled(&Rule::EvalUsage) {
+                    pylint::rules::eval_usage(self, func);
+                }
 
                 // flake8-pytest-style
                 if self.settings.rules.enabled(&Rule::PatchWithLambda) {
