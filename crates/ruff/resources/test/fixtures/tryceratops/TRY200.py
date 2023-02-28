@@ -30,3 +30,11 @@ def good():
         raise e  # This is verbose violation, shouldn't trigger no cause
     except Exception:
         raise  # Just re-raising don't need 'from'
+
+
+def good():
+    try:
+        from mod import f
+    except ImportError:
+        def f():
+            raise MyException()  # Raising within a new scope is fine
