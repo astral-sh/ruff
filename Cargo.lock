@@ -2231,7 +2231,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
+source = "git+https://github.com/RustPython/RustPython.git?rev=aa8336ee94492b52458ed8e1517238e5c6c2914c#aa8336ee94492b52458ed8e1517238e5c6c2914c"
 dependencies = [
  "num-bigint",
  "rustpython-compiler-core",
@@ -2240,7 +2240,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
+source = "git+https://github.com/RustPython/RustPython.git?rev=aa8336ee94492b52458ed8e1517238e5c6c2914c#aa8336ee94492b52458ed8e1517238e5c6c2914c"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2265,7 +2265,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
+source = "git+https://github.com/RustPython/RustPython.git?rev=aa8336ee94492b52458ed8e1517238e5c6c2914c#aa8336ee94492b52458ed8e1517238e5c6c2914c"
 dependencies = [
  "bincode",
  "bitflags",
@@ -2282,7 +2282,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
+source = "git+https://github.com/RustPython/RustPython.git?rev=aa8336ee94492b52458ed8e1517238e5c6c2914c#aa8336ee94492b52458ed8e1517238e5c6c2914c"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2948,9 +2948,11 @@ checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
 name = "unicode_names2"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "029df4cc8238cefc911704ff8fa210853a0f3bce2694d8f51181dd41ee0f3301"
+version = "0.6.0"
+source = "git+https://github.com/youknowone/unicode_names2.git?tag=v0.6.0+character-alias#4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde"
+dependencies = [
+ "phf",
+]
 
 [[package]]
 name = "untrusted"
