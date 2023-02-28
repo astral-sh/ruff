@@ -90,9 +90,8 @@ pub fn check_imports(
     }
 
     // to avoid depedence on ref to python_ast
-    let package = package.map(|package_path| package_path.to_path_buf());
+    let package = package.map(std::path::Path::to_path_buf);
 
     imports.insert(package, imports_vec);
-    println!("imports.rs {imports:?}");
     (diagnostics, imports)
 }

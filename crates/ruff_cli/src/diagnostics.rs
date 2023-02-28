@@ -154,7 +154,7 @@ pub fn lint_path(
     }
 
     Ok(Diagnostics {
-        messages: messages,
+        messages,
         fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
         imports: vec![imports],
     })
@@ -241,7 +241,7 @@ pub fn lint_stdin(
     }
 
     Ok(Diagnostics {
-        messages: messages,
+        messages,
         fixed: FxHashMap::from_iter([(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,

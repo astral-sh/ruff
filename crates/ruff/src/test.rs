@@ -30,7 +30,7 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
     let LinterResult {
-        data: mut diagnostics,
+        data: (mut diagnostics, _imports),
         ..
     } = check_path(
         &path,
@@ -65,7 +65,8 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
             let directives =
                 directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
             let LinterResult {
-                data: diagnostics, ..
+                data: (diagnostics, _imports),
+                ..
             } = check_path(
                 &path,
                 None,
