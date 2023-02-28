@@ -286,11 +286,11 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
 
 /// Generate a [`Message`] for each [`Diagnostic`] triggered by the given source
 /// code.
-pub fn lint_only<'a>(
-    contents: &'a str,
-    path: &'a Path,
-    package: Option<&'a Path>,
-    settings: &'a Settings,
+pub fn lint_only(
+    contents: &str,
+    path: &Path,
+    package: Option<&Path>,
+    settings: &Settings,
     autofix: flags::Autofix,
 ) -> LinterResult<(Vec<Message>, FxHashMap<Option<PathBuf>, Vec<Import>>)> {
     // Tokenize once.

@@ -14,16 +14,16 @@ use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
 
 #[allow(clippy::too_many_arguments)]
-pub fn check_imports<'a>(
-    python_ast: &'a Suite,
-    locator: &'a Locator<'a>,
-    indexer: &'a Indexer,
-    directives: &'a IsortDirectives,
-    settings: &'a Settings,
-    stylist: &'a Stylist<'a>,
+pub fn check_imports(
+    python_ast: &Suite,
+    locator: &Locator,
+    indexer: &Indexer,
+    directives: &IsortDirectives,
+    settings: &Settings,
+    stylist: &Stylist,
     autofix: flags::Autofix,
-    path: &'a Path,
-    package: Option<&'a Path>,
+    path: &Path,
+    package: Option<&Path>,
 ) -> (Vec<Diagnostic>, FxHashMap<Option<PathBuf>, Vec<Import>>) {
     // Extract all imports from the AST.
     let tracker = {
