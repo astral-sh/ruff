@@ -19,6 +19,7 @@ class Section(NamedTuple):
 
 SECTIONS: list[Section] = [
     Section("Overview", "index.md", generated=True),
+    Section("Tutorial", "tutorial.md", generated=False),
     Section("Installation", "installation.md", generated=False),
     Section("Usage", "usage.md", generated=False),
     Section("Configuration", "configuration.md", generated=False),
