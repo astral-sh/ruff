@@ -1,7 +1,8 @@
 use crate::core::visitor;
 use crate::core::visitor::Visitor;
 use crate::cst::{
-    Alias, Arg, Body, BoolOp, Excepthandler, Expr, Keyword, Pattern, SliceIndex, Stmt,
+    Alias, Arg, Body, BoolOp, CmpOp, Excepthandler, Expr, Keyword, Operator, Pattern, SliceIndex,
+    Stmt, UnaryOp,
 };
 use crate::trivia::{decorate_trivia, TriviaIndex, TriviaToken};
 
@@ -72,6 +73,30 @@ impl<'a> Visitor<'a> for AttachmentVisitor {
             bool_op.trivia.extend(comments);
         }
         visitor::walk_bool_op(self, bool_op);
+    }
+
+    fn visit_unary_op(&mut self, unary_op: &'a mut UnaryOp) {
+        let trivia = self.index.unary_op.remove(&unary_op.id());
+        if let Some(comments) = trivia {
+            unary_op.trivia.extend(comments);
+        }
+        visitor::walk_unary_op(self, unary_op);
+    }
+
+    fn visit_cmp_op(&mut self, cmp_op: &'a mut CmpOp) {
+        let trivia = self.index.cmp_op.remove(&cmp_op.id());
+        if let Some(comments) = trivia {
+            cmp_op.trivia.extend(comments);
+        }
+        visitor::walk_cmp_op(self, cmp_op);
+    }
+
+    fn visit_operator(&mut self, operator: &'a mut Operator) {
+        let trivia = self.index.operator.remove(&operator.id());
+        if let Some(comments) = trivia {
+            operator.trivia.extend(comments);
+        }
+        visitor::walk_operator(self, operator);
     }
 
     fn visit_slice_index(&mut self, slice_index: &'a mut SliceIndex) {

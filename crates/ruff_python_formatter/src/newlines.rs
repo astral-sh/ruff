@@ -3,8 +3,8 @@ use rustpython_parser::ast::Constant;
 use crate::core::visitor;
 use crate::core::visitor::Visitor;
 use crate::cst::{
-    Alias, Arg, BoolOp, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Pattern,
-    SliceIndex, Stmt, StmtKind,
+    Alias, Arg, BoolOp, CmpOp, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Operator,
+    Pattern, SliceIndex, Stmt, StmtKind, UnaryOp,
 };
 use crate::trivia::{Relationship, Trivia, TriviaKind};
 
@@ -325,6 +325,21 @@ impl<'a> Visitor<'a> for ExprNormalizer {
     fn visit_bool_op(&mut self, bool_op: &'a mut BoolOp) {
         bool_op.trivia.retain(|c| !c.kind.is_empty_line());
         visitor::walk_bool_op(self, bool_op);
+    }
+
+    fn visit_unary_op(&mut self, unary_op: &'a mut UnaryOp) {
+        unary_op.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_unary_op(self, unary_op);
+    }
+
+    fn visit_cmp_op(&mut self, cmp_op: &'a mut CmpOp) {
+        cmp_op.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_cmp_op(self, cmp_op);
+    }
+
+    fn visit_operator(&mut self, operator: &'a mut Operator) {
+        operator.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_operator(self, operator);
     }
 
     fn visit_slice_index(&mut self, slice_index: &'a mut SliceIndex) {

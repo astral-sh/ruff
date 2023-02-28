@@ -1,9 +1,9 @@
 use rustpython_parser::ast::Constant;
 
 use crate::cst::{
-    Alias, Arg, Arguments, Body, BoolOp, Cmpop, Comprehension, Excepthandler, ExcepthandlerKind,
+    Alias, Arg, Arguments, Body, BoolOp, CmpOp, Comprehension, Excepthandler, ExcepthandlerKind,
     Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern, PatternKind, SliceIndex,
-    SliceIndexKind, Stmt, StmtKind, Unaryop, Withitem,
+    SliceIndexKind, Stmt, StmtKind, UnaryOp, Withitem,
 };
 
 pub trait Visitor<'a> {
@@ -28,11 +28,11 @@ pub trait Visitor<'a> {
     fn visit_operator(&mut self, operator: &'a mut Operator) {
         walk_operator(self, operator);
     }
-    fn visit_unaryop(&mut self, unaryop: &'a mut Unaryop) {
-        walk_unaryop(self, unaryop);
+    fn visit_unary_op(&mut self, unary_op: &'a mut UnaryOp) {
+        walk_unary_op(self, unary_op);
     }
-    fn visit_cmpop(&mut self, cmpop: &'a mut Cmpop) {
-        walk_cmpop(self, cmpop);
+    fn visit_cmp_op(&mut self, cmp_op: &'a mut CmpOp) {
+        walk_cmp_op(self, cmp_op);
     }
     fn visit_comprehension(&mut self, comprehension: &'a mut Comprehension) {
         walk_comprehension(self, comprehension);
@@ -312,7 +312,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Exp
             visitor.visit_expr(right);
         }
         ExprKind::UnaryOp { op, operand } => {
-            visitor.visit_unaryop(op);
+            visitor.visit_unary_op(op);
             visitor.visit_expr(operand);
         }
         ExprKind::Lambda { args, body } => {
@@ -380,7 +380,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Exp
         } => {
             visitor.visit_expr(left);
             for cmpop in ops {
-                visitor.visit_cmpop(cmpop);
+                visitor.visit_cmp_op(cmpop);
             }
             for expr in comparators {
                 visitor.visit_expr(expr);
@@ -608,10 +608,10 @@ pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, bool_op: &'a m
 pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, operator: &'a mut Operator) {}
 
 #[allow(unused_variables)]
-pub fn walk_unaryop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unaryop: &'a mut Unaryop) {}
+pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unary_op: &'a mut UnaryOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_cmpop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmpop: &'a mut Cmpop) {}
+pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmp_op: &'a mut CmpOp) {}
 
 #[allow(unused_variables)]
 pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, alias: &'a mut Alias) {}

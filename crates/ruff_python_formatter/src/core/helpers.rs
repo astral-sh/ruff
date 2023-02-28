@@ -57,8 +57,10 @@ pub fn find_tok(
             return (start, end);
         }
     }
-
-    unreachable!()
+    unreachable!(
+        "Failed to find token in range {:?}..{:?}",
+        location, end_location
+    )
 }
 
 /// Expand the range of a compound statement.
