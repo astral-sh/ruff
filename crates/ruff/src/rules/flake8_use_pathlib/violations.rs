@@ -42,7 +42,7 @@ define_violation!(
 impl Violation for PathlibMkdir {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.mkdir` should be replaced by `.mkdir()`")
+        format!("`os.mkdir(...)` should be replaced by `Path(...).mkdir()`")
     }
 }
 
