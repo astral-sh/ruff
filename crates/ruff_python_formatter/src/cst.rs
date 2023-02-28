@@ -1,5 +1,7 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
+use std::iter;
+
 use rustpython_parser::ast::{Constant, Location};
 use rustpython_parser::Mode;
 
@@ -76,7 +78,7 @@ impl From<&rustpython_parser::ast::Boolop> for BoolOpKind {
 pub type BoolOp = Located<BoolOpKind>;
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Operator {
+pub enum OperatorKind {
     Add,
     Sub,
     Mult,
@@ -92,8 +94,10 @@ pub enum Operator {
     FloorDiv,
 }
 
-impl From<rustpython_parser::ast::Operator> for Operator {
-    fn from(op: rustpython_parser::ast::Operator) -> Self {
+pub type Operator = Located<OperatorKind>;
+
+impl From<&rustpython_parser::ast::Operator> for OperatorKind {
+    fn from(op: &rustpython_parser::ast::Operator) -> Self {
         match op {
             rustpython_parser::ast::Operator::Add => Self::Add,
             rustpython_parser::ast::Operator::Sub => Self::Sub,
@@ -113,15 +117,17 @@ impl From<rustpython_parser::ast::Operator> for Operator {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Unaryop {
+pub enum UnaryOpKind {
     Invert,
     Not,
     UAdd,
     USub,
 }
 
-impl From<rustpython_parser::ast::Unaryop> for Unaryop {
-    fn from(op: rustpython_parser::ast::Unaryop) -> Self {
+pub type UnaryOp = Located<UnaryOpKind>;
+
+impl From<&rustpython_parser::ast::Unaryop> for UnaryOpKind {
+    fn from(op: &rustpython_parser::ast::Unaryop) -> Self {
         match op {
             rustpython_parser::ast::Unaryop::Invert => Self::Invert,
             rustpython_parser::ast::Unaryop::Not => Self::Not,
@@ -132,7 +138,7 @@ impl From<rustpython_parser::ast::Unaryop> for Unaryop {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Cmpop {
+pub enum CmpOpKind {
     Eq,
     NotEq,
     Lt,
@@ -145,8 +151,10 @@ pub enum Cmpop {
     NotIn,
 }
 
-impl From<rustpython_parser::ast::Cmpop> for Cmpop {
-    fn from(op: rustpython_parser::ast::Cmpop) -> Self {
+pub type CmpOp = Located<CmpOpKind>;
+
+impl From<&rustpython_parser::ast::Cmpop> for CmpOpKind {
+    fn from(op: &rustpython_parser::ast::Cmpop) -> Self {
         match op {
             rustpython_parser::ast::Cmpop::Eq => Self::Eq,
             rustpython_parser::ast::Cmpop::NotEq => Self::NotEq,
@@ -325,7 +333,7 @@ pub enum ExprKind {
         right: Box<Expr>,
     },
     UnaryOp {
-        op: Unaryop,
+        op: UnaryOp,
         operand: Box<Expr>,
     },
     Lambda {
@@ -372,7 +380,7 @@ pub enum ExprKind {
     },
     Compare {
         left: Box<Expr>,
-        ops: Vec<Cmpop>,
+        ops: Vec<CmpOp>,
         comparators: Vec<Expr>,
     },
     Call {
@@ -1013,8 +1021,57 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 location: stmt.location,
                 end_location: stmt.end_location,
                 node: StmtKind::AugAssign {
+                    op: {
+                        let target_tok = match &op {
+                            rustpython_parser::ast::Operator::Add => {
+                                rustpython_parser::Tok::PlusEqual
+                            }
+                            rustpython_parser::ast::Operator::Sub => {
+                                rustpython_parser::Tok::MinusEqual
+                            }
+                            rustpython_parser::ast::Operator::Mult => {
+                                rustpython_parser::Tok::StarEqual
+                            }
+                            rustpython_parser::ast::Operator::MatMult => {
+                                rustpython_parser::Tok::AtEqual
+                            }
+                            rustpython_parser::ast::Operator::Div => {
+                                rustpython_parser::Tok::SlashEqual
+                            }
+                            rustpython_parser::ast::Operator::Mod => {
+                                rustpython_parser::Tok::PercentEqual
+                            }
+                            rustpython_parser::ast::Operator::Pow => {
+                                rustpython_parser::Tok::DoubleStarEqual
+                            }
+                            rustpython_parser::ast::Operator::LShift => {
+                                rustpython_parser::Tok::LeftShiftEqual
+                            }
+                            rustpython_parser::ast::Operator::RShift => {
+                                rustpython_parser::Tok::RightShiftEqual
+                            }
+                            rustpython_parser::ast::Operator::BitOr => {
+                                rustpython_parser::Tok::VbarEqual
+                            }
+                            rustpython_parser::ast::Operator::BitXor => {
+                                rustpython_parser::Tok::CircumflexEqual
+                            }
+                            rustpython_parser::ast::Operator::BitAnd => {
+                                rustpython_parser::Tok::AmperEqual
+                            }
+                            rustpython_parser::ast::Operator::FloorDiv => {
+                                rustpython_parser::Tok::DoubleSlashEqual
+                            }
+                        };
+                        let (op_location, op_end_location) = find_tok(
+                            target.end_location.unwrap(),
+                            value.location,
+                            locator,
+                            |tok| tok == target_tok,
+                        );
+                        Operator::new(op_location, op_end_location, (&op).into())
+                    },
                     target: Box::new((*target, locator).into()),
-                    op: op.into(),
                     value: Box::new((*value, locator).into()),
                 },
                 trivia: vec![],
@@ -1685,7 +1742,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                         .iter()
                         .tuple_windows()
                         .map(|(left, right)| {
-                            let target = match &op {
+                            let target_tok = match &op {
                                 rustpython_parser::ast::Boolop::And => rustpython_parser::Tok::And,
                                 rustpython_parser::ast::Boolop::Or => rustpython_parser::Tok::Or,
                             };
@@ -1693,7 +1750,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                                 left.end_location.unwrap(),
                                 right.location,
                                 locator,
-                                |tok| tok == target,
+                                |tok| tok == target_tok,
                             );
                             BoolOp::new(op_location, op_end_location, (&op).into())
                         })
@@ -1720,8 +1777,43 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::BinOp {
+                    op: {
+                        let target_tok = match &op {
+                            rustpython_parser::ast::Operator::Add => rustpython_parser::Tok::Plus,
+                            rustpython_parser::ast::Operator::Sub => rustpython_parser::Tok::Minus,
+                            rustpython_parser::ast::Operator::Mult => rustpython_parser::Tok::Star,
+                            rustpython_parser::ast::Operator::MatMult => rustpython_parser::Tok::At,
+                            rustpython_parser::ast::Operator::Div => rustpython_parser::Tok::Slash,
+                            rustpython_parser::ast::Operator::Mod => {
+                                rustpython_parser::Tok::Percent
+                            }
+                            rustpython_parser::ast::Operator::Pow => {
+                                rustpython_parser::Tok::DoubleStar
+                            }
+                            rustpython_parser::ast::Operator::LShift => {
+                                rustpython_parser::Tok::LeftShift
+                            }
+                            rustpython_parser::ast::Operator::RShift => {
+                                rustpython_parser::Tok::RightShift
+                            }
+                            rustpython_parser::ast::Operator::BitOr => rustpython_parser::Tok::Vbar,
+                            rustpython_parser::ast::Operator::BitXor => {
+                                rustpython_parser::Tok::CircumFlex
+                            }
+                            rustpython_parser::ast::Operator::BitAnd => {
+                                rustpython_parser::Tok::Amper
+                            }
+                            rustpython_parser::ast::Operator::FloorDiv => {
+                                rustpython_parser::Tok::DoubleSlash
+                            }
+                        };
+                        let (op_location, op_end_location) =
+                            find_tok(left.end_location.unwrap(), right.location, locator, |tok| {
+                                tok == target_tok
+                            });
+                        Operator::new(op_location, op_end_location, (&op).into())
+                    },
                     left: Box::new((*left, locator).into()),
-                    op: op.into(),
                     right: Box::new((*right, locator).into()),
                 },
                 trivia: vec![],
@@ -1731,7 +1823,21 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::UnaryOp {
-                    op: op.into(),
+                    op: {
+                        let target_tok = match &op {
+                            rustpython_parser::ast::Unaryop::Invert => {
+                                rustpython_parser::Tok::Tilde
+                            }
+                            rustpython_parser::ast::Unaryop::Not => rustpython_parser::Tok::Not,
+                            rustpython_parser::ast::Unaryop::UAdd => rustpython_parser::Tok::Plus,
+                            rustpython_parser::ast::Unaryop::USub => rustpython_parser::Tok::Minus,
+                        };
+                        let (op_location, op_end_location) =
+                            find_tok(expr.location, operand.location, locator, |tok| {
+                                tok == target_tok
+                            });
+                        UnaryOp::new(op_location, op_end_location, (&op).into())
+                    },
                     operand: Box::new((*operand, locator).into()),
                 },
                 trivia: vec![],
@@ -1878,8 +1984,45 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 location: expr.location,
                 end_location: expr.end_location,
                 node: ExprKind::Compare {
+                    ops: iter::once(left.as_ref())
+                        .chain(comparators.iter())
+                        .tuple_windows()
+                        .zip(ops.into_iter())
+                        .map(|((left, right), op)| {
+                            let target_tok = match &op {
+                                rustpython_parser::ast::Cmpop::Eq => {
+                                    rustpython_parser::Tok::EqEqual
+                                }
+                                rustpython_parser::ast::Cmpop::NotEq => {
+                                    rustpython_parser::Tok::NotEqual
+                                }
+                                rustpython_parser::ast::Cmpop::Lt => rustpython_parser::Tok::Less,
+                                rustpython_parser::ast::Cmpop::LtE => {
+                                    rustpython_parser::Tok::LessEqual
+                                }
+                                rustpython_parser::ast::Cmpop::Gt => {
+                                    rustpython_parser::Tok::Greater
+                                }
+                                rustpython_parser::ast::Cmpop::GtE => {
+                                    rustpython_parser::Tok::GreaterEqual
+                                }
+                                rustpython_parser::ast::Cmpop::Is => rustpython_parser::Tok::Is,
+                                // TODO(charlie): Break this into two tokens.
+                                rustpython_parser::ast::Cmpop::IsNot => rustpython_parser::Tok::Is,
+                                rustpython_parser::ast::Cmpop::In => rustpython_parser::Tok::In,
+                                // TODO(charlie): Break this into two tokens.
+                                rustpython_parser::ast::Cmpop::NotIn => rustpython_parser::Tok::In,
+                            };
+                            let (op_location, op_end_location) = find_tok(
+                                left.end_location.unwrap(),
+                                right.location,
+                                locator,
+                                |tok| tok == target_tok,
+                            );
+                            CmpOp::new(op_location, op_end_location, (&op).into())
+                        })
+                        .collect(),
                     left: Box::new((*left, locator).into()),
-                    ops: ops.into_iter().map(Into::into).collect(),
                     comparators: comparators
                         .into_iter()
                         .map(|node| (node, locator).into())

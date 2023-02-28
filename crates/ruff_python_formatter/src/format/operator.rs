@@ -2,7 +2,8 @@ use ruff_formatter::prelude::*;
 use ruff_formatter::write;
 
 use crate::context::ASTFormatContext;
-use crate::cst::Operator;
+use crate::cst::{Operator, OperatorKind};
+use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
 use crate::shared_traits::AsFormat;
 
 pub struct FormatOperator<'a> {
@@ -20,26 +21,27 @@ impl AsFormat<ASTFormatContext<'_>> for Operator {
 impl Format<ASTFormatContext<'_>> for FormatOperator<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         let operator = self.item;
-
+        write!(f, [leading_comments(operator)])?;
         write!(
             f,
-            [text(match operator {
-                Operator::Add => "+",
-                Operator::Sub => "-",
-                Operator::Mult => "*",
-                Operator::MatMult => "@",
-                Operator::Div => "/",
-                Operator::Mod => "%",
-                Operator::Pow => "**",
-                Operator::LShift => "<<",
-                Operator::RShift => ">>",
-                Operator::BitOr => "|",
-                Operator::BitXor => "^",
-                Operator::BitAnd => "&",
-                Operator::FloorDiv => "//",
+            [text(match operator.node {
+                OperatorKind::Add => "+",
+                OperatorKind::Sub => "-",
+                OperatorKind::Mult => "*",
+                OperatorKind::MatMult => "@",
+                OperatorKind::Div => "/",
+                OperatorKind::Mod => "%",
+                OperatorKind::Pow => "**",
+                OperatorKind::LShift => "<<",
+                OperatorKind::RShift => ">>",
+                OperatorKind::BitOr => "|",
+                OperatorKind::BitXor => "^",
+                OperatorKind::BitAnd => "&",
+                OperatorKind::FloorDiv => "//",
             })]
         )?;
-
+        write!(f, [end_of_line_comments(operator)])?;
+        write!(f, [trailing_comments(operator)])?;
         Ok(())
     }
 }

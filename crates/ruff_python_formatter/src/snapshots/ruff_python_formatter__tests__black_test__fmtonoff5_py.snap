@@ -110,17 +110,6 @@ elif   unformatted:
      },
  )
  
-@@ -18,8 +16,8 @@
-         "ls",
-         "-la",
-     ]
--    # fmt: on
--    + path,
-+    + # fmt: on
-+    path,
-     check=True,
- )
- 
 @@ -27,9 +25,8 @@
  # Regression test for https://github.com/psf/black/issues/3026.
  def test_func():
@@ -212,8 +201,8 @@ run(
         "ls",
         "-la",
     ]
-    + # fmt: on
-    path,
+    # fmt: on
+    + path,
     check=True,
 )
 

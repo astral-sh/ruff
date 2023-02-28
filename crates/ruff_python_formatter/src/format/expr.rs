@@ -9,8 +9,8 @@ use ruff_text_size::TextSize;
 use crate::context::ASTFormatContext;
 use crate::core::types::Range;
 use crate::cst::{
-    Arguments, BoolOp, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, SliceIndex,
-    SliceIndexKind, Unaryop,
+    Arguments, BoolOp, CmpOp, Comprehension, Expr, ExprKind, Keyword, Operator, OperatorKind,
+    SliceIndex, SliceIndexKind, UnaryOp, UnaryOpKind,
 };
 use crate::format::builders::literal;
 use crate::format::comments::{dangling_comments, end_of_line_comments, leading_comments};
@@ -556,7 +556,7 @@ fn format_compare(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) -> FormatResult<()> {
     write!(f, [group(&format_args![left.format()])])?;
@@ -723,7 +723,8 @@ fn format_bin_op(
     right: &Expr,
 ) -> FormatResult<()> {
     // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators
-    let is_simple = matches!(op, Operator::Pow) && is_simple_power(left) && is_simple_power(right);
+    let is_simple =
+        matches!(op.node, OperatorKind::Pow) && is_simple_power(left) && is_simple_power(right);
     write!(f, [left.format()])?;
     if !is_simple {
         write!(f, [soft_line_break_or_space()])?;
@@ -740,12 +741,12 @@ fn format_bin_op(
 fn format_unary_op(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
-    op: &Unaryop,
+    op: &UnaryOp,
     operand: &Expr,
 ) -> FormatResult<()> {
     write!(f, [op.format()])?;
     // TODO(charlie): Do this in the normalization pass.
-    if !matches!(op, Unaryop::Not)
+    if !matches!(op.node, UnaryOpKind::Not)
         && matches!(
             operand.node,
             ExprKind::BoolOp { .. } | ExprKind::Compare { .. } | ExprKind::BinOp { .. }

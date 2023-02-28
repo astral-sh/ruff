@@ -20,19 +20,17 @@ impl AsFormat<ASTFormatContext<'_>> for BoolOp {
 
 impl Format<ASTFormatContext<'_>> for FormatBoolOp<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext>) -> FormatResult<()> {
-        let boolop = self.item;
-
-        write!(f, [leading_comments(boolop)])?;
+        let bool_op = self.item;
+        write!(f, [leading_comments(bool_op)])?;
         write!(
             f,
-            [text(match boolop.node {
+            [text(match bool_op.node {
                 BoolOpKind::And => "and",
                 BoolOpKind::Or => "or",
             })]
         )?;
-        write!(f, [end_of_line_comments(boolop)])?;
-        write!(f, [trailing_comments(boolop)])?;
-
+        write!(f, [end_of_line_comments(bool_op)])?;
+        write!(f, [trailing_comments(bool_op)])?;
         Ok(())
     }
 }
