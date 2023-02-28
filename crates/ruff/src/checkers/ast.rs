@@ -2584,6 +2584,9 @@ where
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias(self, &expr);
                 }
+                if self.settings.rules.enabled(&Rule::IsInstanceTypingUnion) {
+                    pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
+                }
 
                 // flake8-print
                 if self.settings.rules.enabled(&Rule::PrintFound)

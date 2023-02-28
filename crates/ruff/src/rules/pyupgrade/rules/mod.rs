@@ -39,6 +39,7 @@ pub(crate) use unnecessary_future_import::{unnecessary_future_import, Unnecessar
 pub(crate) use unpack_list_comprehension::{unpack_list_comprehension, RewriteListComprehension};
 pub(crate) use use_pep585_annotation::{use_pep585_annotation, DeprecatedCollectionType};
 pub(crate) use use_pep604_annotation::{use_pep604_annotation, TypingUnion};
+pub(crate) use use_pep604_isinstance::{use_pep604_isinstance, IsInstanceTypingUnion};
 pub(crate) use useless_metaclass_type::{useless_metaclass_type, UselessMetaclassType};
 pub(crate) use useless_object_inheritance::{useless_object_inheritance, UselessObjectInheritance};
 
@@ -75,5 +76,6 @@ mod unnecessary_future_import;
 mod unpack_list_comprehension;
 mod use_pep585_annotation;
 mod use_pep604_annotation;
+mod use_pep604_isinstance;
 mod useless_metaclass_type;
 mod useless_object_inheritance;

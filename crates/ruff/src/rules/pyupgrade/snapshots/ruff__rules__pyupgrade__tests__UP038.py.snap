@@ -1,0 +1,39 @@
+---
+source: crates/ruff/src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    IsInstanceTypingUnion: ~
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 27
+  fix:
+    content: int | float
+    location:
+      row: 1
+      column: 14
+    end_location:
+      row: 1
+      column: 26
+  parent: ~
+- kind:
+    IsInstanceTypingUnion: ~
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 36
+  fix:
+    content: int | float | str
+    location:
+      row: 2
+      column: 18
+    end_location:
+      row: 2
+      column: 35
+  parent: ~
+

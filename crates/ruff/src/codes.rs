@@ -344,6 +344,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pyupgrade, "035") => Rule::ImportReplacements,
         (Pyupgrade, "036") => Rule::OutdatedVersionBlock,
         (Pyupgrade, "037") => Rule::QuotedAnnotation,
+        (Pyupgrade, "038") => Rule::IsInstanceTypingUnion,
 
         // pydocstyle
         (Pydocstyle, "100") => Rule::PublicModule,
