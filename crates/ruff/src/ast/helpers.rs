@@ -765,7 +765,7 @@ pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath
     call_path
 }
 
-/// A [`Visitor`] that collects all return statements in a function or method.
+/// A [`Visitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<Option<&'a Expr>>,
@@ -782,6 +782,48 @@ where
             }
             StmtKind::Return { value } => self.returns.push(value.as_deref()),
             _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+}
+
+/// A [`Visitor`] that collects all `raise` statements in a function or method.
+#[derive(Default)]
+pub struct RaiseStatementVisitor<'a> {
+    pub raises: Vec<(Range, Option<&'a Expr>, Option<&'a Expr>)>,
+}
+
+impl<'a, 'b> Visitor<'b> for RaiseStatementVisitor<'b>
+where
+    'b: 'a,
+{
+    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        match &stmt.node {
+            StmtKind::Raise { exc, cause } => {
+                self.raises
+                    .push((Range::from_located(stmt), exc.as_deref(), cause.as_deref()));
+            }
+            StmtKind::ClassDef { .. }
+            | StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+            | StmtKind::Try { .. }
+            | StmtKind::TryStar { .. } => {}
+            StmtKind::If { body, orelse, .. } => {
+                visitor::walk_body(self, body);
+                visitor::walk_body(self, orelse);
+            }
+            StmtKind::While { body, .. }
+            | StmtKind::With { body, .. }
+            | StmtKind::AsyncWith { body, .. }
+            | StmtKind::For { body, .. }
+            | StmtKind::AsyncFor { body, .. } => {
+                visitor::walk_body(self, body);
+            }
+            StmtKind::Match { cases, .. } => {
+                for case in cases {
+                    visitor::walk_body(self, &case.body);
+                }
+            }
+            _ => {}
         }
     }
 }
