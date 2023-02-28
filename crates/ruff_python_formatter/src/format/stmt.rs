@@ -6,8 +6,8 @@ use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
 use crate::cst::{
-    Alias, Arguments, Excepthandler, Expr, ExprKind, Keyword, MatchCase, Operator, Stmt, StmtKind,
-    Withitem,
+    Alias, Arguments, Body, Excepthandler, Expr, ExprKind, Keyword, MatchCase, Operator, Stmt,
+    StmtKind, Withitem,
 };
 use crate::format::builders::{block, join_names};
 use crate::format::comments::{end_of_line_comments, leading_comments, trailing_comments};
@@ -101,12 +101,14 @@ fn format_class_def(
     name: &str,
     bases: &[Expr],
     keywords: &[Keyword],
-    body: &[Stmt],
+    body: &Body,
     decorator_list: &[Expr],
 ) -> FormatResult<()> {
     for decorator in decorator_list {
         write!(f, [text("@"), decorator.format(), hard_line_break()])?;
     }
+
+    write!(f, [leading_comments(body)])?;
 
     write!(
         f,
@@ -129,18 +131,7 @@ fn format_class_def(
                 }
 
                 for (i, keyword) in keywords.iter().enumerate() {
-                    if let Some(arg) = &keyword.node.arg {
-                        write!(
-                            f,
-                            [
-                                dynamic_text(arg, TextSize::default()),
-                                text("="),
-                                keyword.node.value.format()
-                            ]
-                        )?;
-                    } else {
-                        write!(f, [text("**"), keyword.node.value.format()])?;
-                    }
+                    write!(f, [keyword.format()])?;
                     if i < keywords.len() - 1 {
                         write!(f, [text(","), soft_line_break_or_space()])?;
                     } else {
@@ -161,6 +152,7 @@ fn format_class_def(
         )?;
     }
 
+    write!(f, [end_of_line_comments(body)])?;
     write!(f, [text(":"), block_indent(&block(body))])
 }
 
@@ -170,13 +162,16 @@ fn format_func_def(
     name: &str,
     args: &Arguments,
     returns: Option<&Expr>,
-    body: &[Stmt],
+    body: &Body,
     decorator_list: &[Expr],
     async_: bool,
 ) -> FormatResult<()> {
     for decorator in decorator_list {
         write!(f, [text("@"), decorator.format(), hard_line_break()])?;
     }
+
+    write!(f, [leading_comments(body)])?;
+
     if async_ {
         write!(f, [text("async"), space()])?;
     }
@@ -202,10 +197,10 @@ fn format_func_def(
     }
 
     write!(f, [text(":")])?;
+    write!(f, [end_of_line_comments(body)])?;
+    write!(f, [block_indent(&block(body))])?;
 
-    write!(f, [end_of_line_comments(stmt)])?;
-
-    write!(f, [block_indent(&format_args![block(body)])])
+    Ok(())
 }
 
 fn format_assign(
@@ -310,8 +305,8 @@ fn format_for(
     stmt: &Stmt,
     target: &Expr,
     iter: &Expr,
-    body: &[Stmt],
-    orelse: &[Stmt],
+    body: &Body,
+    orelse: Option<&Body>,
     _type_comment: Option<&str>,
     async_: bool,
 ) -> FormatResult<()> {
@@ -329,11 +324,19 @@ fn format_for(
             space(),
             group(&iter.format()),
             text(":"),
+            end_of_line_comments(body),
             block_indent(&block(body))
         ]
     )?;
-    if !orelse.is_empty() {
-        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    if let Some(orelse) = orelse {
+        write!(
+            f,
+            [
+                text("else:"),
+                end_of_line_comments(orelse),
+                block_indent(&block(orelse))
+            ]
+        )?;
     }
     Ok(())
 }
@@ -342,8 +345,8 @@ fn format_while(
     f: &mut Formatter<ASTFormatContext<'_>>,
     stmt: &Stmt,
     test: &Expr,
-    body: &[Stmt],
-    orelse: &[Stmt],
+    body: &Body,
+    orelse: Option<&Body>,
 ) -> FormatResult<()> {
     write!(f, [text("while"), space()])?;
     if is_self_closing(test) {
@@ -358,9 +361,23 @@ fn format_while(
             ])]
         )?;
     }
-    write!(f, [text(":"), block_indent(&block(body))])?;
-    if !orelse.is_empty() {
-        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    write!(
+        f,
+        [
+            text(":"),
+            end_of_line_comments(body),
+            block_indent(&block(body))
+        ]
+    )?;
+    if let Some(orelse) = orelse {
+        write!(
+            f,
+            [
+                text("else:"),
+                end_of_line_comments(orelse),
+                block_indent(&block(orelse))
+            ]
+        )?;
     }
     Ok(())
 }
@@ -368,10 +385,15 @@ fn format_while(
 fn format_if(
     f: &mut Formatter<ASTFormatContext<'_>>,
     test: &Expr,
-    body: &[Stmt],
-    orelse: &[Stmt],
+    body: &Body,
+    orelse: Option<&Body>,
+    is_elif: bool,
 ) -> FormatResult<()> {
-    write!(f, [text("if"), space()])?;
+    if is_elif {
+        write!(f, [text("elif"), space()])?;
+    } else {
+        write!(f, [text("if"), space()])?;
+    }
     if is_self_closing(test) {
         write!(f, [test.format()])?;
     } else {
@@ -384,17 +406,43 @@ fn format_if(
             ])]
         )?;
     }
-    write!(f, [text(":"), block_indent(&block(body))])?;
-    if !orelse.is_empty() {
-        if orelse.len() == 1 {
-            if let StmtKind::If { test, body, orelse } = &orelse[0].node {
-                write!(f, [text("el")])?;
-                format_if(f, test, body, orelse)?;
+    write!(
+        f,
+        [
+            text(":"),
+            end_of_line_comments(body),
+            block_indent(&block(body))
+        ]
+    )?;
+    if let Some(orelse) = orelse {
+        if orelse.node.len() == 1 {
+            if let StmtKind::If {
+                test,
+                body,
+                orelse,
+                is_elif: true,
+            } = &orelse.node[0].node
+            {
+                format_if(f, test, body, orelse.as_ref(), true)?;
             } else {
-                write!(f, [text("else:"), block_indent(&block(orelse))])?;
+                write!(
+                    f,
+                    [
+                        text("else:"),
+                        end_of_line_comments(orelse),
+                        block_indent(&block(orelse))
+                    ]
+                )?;
             }
         } else {
-            write!(f, [text("else:"), block_indent(&block(orelse))])?;
+            write!(
+                f,
+                [
+                    text("else:"),
+                    end_of_line_comments(orelse),
+                    block_indent(&block(orelse))
+                ]
+            )?;
         }
     }
     Ok(())
@@ -406,7 +454,16 @@ fn format_match(
     subject: &Expr,
     cases: &[MatchCase],
 ) -> FormatResult<()> {
-    write!(f, [text("match"), space(), subject.format(), text(":")])?;
+    write!(
+        f,
+        [
+            text("match"),
+            space(),
+            subject.format(),
+            text(":"),
+            end_of_line_comments(stmt),
+        ]
+    )?;
     for case in cases {
         write!(f, [block_indent(&case.format())])?;
     }
@@ -447,20 +504,31 @@ fn format_return(
 fn format_try(
     f: &mut Formatter<ASTFormatContext<'_>>,
     stmt: &Stmt,
-    body: &[Stmt],
+    body: &Body,
     handlers: &[Excepthandler],
-    orelse: &[Stmt],
-    finalbody: &[Stmt],
+    orelse: Option<&Body>,
+    finalbody: Option<&Body>,
 ) -> FormatResult<()> {
-    write!(f, [text("try:"), block_indent(&block(body))])?;
+    write!(
+        f,
+        [
+            text("try:"),
+            end_of_line_comments(body),
+            block_indent(&block(body))
+        ]
+    )?;
     for handler in handlers {
         write!(f, [handler.format()])?;
     }
-    if !orelse.is_empty() {
-        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    if let Some(orelse) = orelse {
+        write!(f, [text("else:")])?;
+        write!(f, [end_of_line_comments(orelse)])?;
+        write!(f, [block_indent(&block(orelse))])?;
     }
-    if !finalbody.is_empty() {
-        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
+    if let Some(finalbody) = finalbody {
+        write!(f, [text("finally:")])?;
+        write!(f, [end_of_line_comments(finalbody)])?;
+        write!(f, [block_indent(&block(finalbody))])?;
     }
     Ok(())
 }
@@ -468,21 +536,42 @@ fn format_try(
 fn format_try_star(
     f: &mut Formatter<ASTFormatContext<'_>>,
     stmt: &Stmt,
-    body: &[Stmt],
+    body: &Body,
     handlers: &[Excepthandler],
-    orelse: &[Stmt],
-    finalbody: &[Stmt],
+    orelse: Option<&Body>,
+    finalbody: Option<&Body>,
 ) -> FormatResult<()> {
-    write!(f, [text("try:"), block_indent(&block(body))])?;
+    write!(
+        f,
+        [
+            text("try:"),
+            end_of_line_comments(body),
+            block_indent(&block(body))
+        ]
+    )?;
     for handler in handlers {
         // TODO(charlie): Include `except*`.
         write!(f, [handler.format()])?;
     }
-    if !orelse.is_empty() {
-        write!(f, [text("else:"), block_indent(&block(orelse))])?;
+    if let Some(orelse) = orelse {
+        write!(
+            f,
+            [
+                text("else:"),
+                end_of_line_comments(orelse),
+                block_indent(&block(orelse))
+            ]
+        )?;
     }
-    if !finalbody.is_empty() {
-        write!(f, [text("finally:"), block_indent(&block(finalbody))])?;
+    if let Some(finalbody) = finalbody {
+        write!(
+            f,
+            [
+                text("finally:"),
+                end_of_line_comments(finalbody),
+                block_indent(&block(finalbody))
+            ]
+        )?;
     }
     Ok(())
 }
@@ -640,7 +729,7 @@ fn format_with_(
     f: &mut Formatter<ASTFormatContext<'_>>,
     stmt: &Stmt,
     items: &[Withitem],
-    body: &[Stmt],
+    body: &Body,
     type_comment: Option<&str>,
     async_: bool,
 ) -> FormatResult<()> {
@@ -668,6 +757,7 @@ fn format_with_(
                 if_group_breaks(&text(")")),
             ]),
             text(":"),
+            end_of_line_comments(body),
             block_indent(&block(body))
         ]
     )?;
@@ -753,7 +843,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 target,
                 iter,
                 body,
-                orelse,
+                orelse.as_ref(),
                 type_comment.as_deref(),
                 false,
             ),
@@ -769,14 +859,19 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 target,
                 iter,
                 body,
-                orelse,
+                orelse.as_ref(),
                 type_comment.as_deref(),
                 true,
             ),
             StmtKind::While { test, body, orelse } => {
-                format_while(f, self.item, test, body, orelse)
+                format_while(f, self.item, test, body, orelse.as_ref())
             }
-            StmtKind::If { test, body, orelse } => format_if(f, test, body, orelse),
+            StmtKind::If {
+                test,
+                body,
+                orelse,
+                is_elif,
+            } => format_if(f, test, body, orelse.as_ref(), *is_elif),
             StmtKind::With {
                 items,
                 body,
@@ -810,13 +905,27 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 handlers,
                 orelse,
                 finalbody,
-            } => format_try(f, self.item, body, handlers, orelse, finalbody),
+            } => format_try(
+                f,
+                self.item,
+                body,
+                handlers,
+                orelse.as_ref(),
+                finalbody.as_ref(),
+            ),
             StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            } => format_try_star(f, self.item, body, handlers, orelse, finalbody),
+            } => format_try_star(
+                f,
+                self.item,
+                body,
+                handlers,
+                orelse.as_ref(),
+                finalbody.as_ref(),
+            ),
             StmtKind::Assert { test, msg } => {
                 format_assert(f, self.item, test, msg.as_ref().map(|expr| &**expr))
             }

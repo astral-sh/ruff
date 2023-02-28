@@ -8,10 +8,10 @@ expression: diagnostics
         - y
   location:
     row: 283
-    column: 4
+    column: 8
   end_location:
-    row: 293
-    column: 16
+    row: 283
+    column: 11
   fix: ~
   parent: ~
 - kind:
@@ -20,10 +20,10 @@ expression: diagnostics
         - y
   location:
     row: 300
-    column: 0
+    column: 4
   end_location:
-    row: 306
-    column: 7
+    row: 300
+    column: 28
   fix: ~
   parent: ~
 - kind:
@@ -34,10 +34,10 @@ expression: diagnostics
         - z
   location:
     row: 324
-    column: 4
+    column: 8
   end_location:
-    row: 330
-    column: 11
+    row: 324
+    column: 25
   fix: ~
   parent: ~
 - kind:
@@ -48,10 +48,10 @@ expression: diagnostics
         - z
   location:
     row: 336
-    column: 4
+    column: 8
   end_location:
-    row: 343
-    column: 11
+    row: 336
+    column: 38
   fix: ~
   parent: ~
 - kind:
@@ -62,10 +62,10 @@ expression: diagnostics
         - z
   location:
     row: 349
-    column: 4
+    column: 8
   end_location:
-    row: 355
-    column: 11
+    row: 349
+    column: 39
   fix: ~
   parent: ~
 - kind:
@@ -75,10 +75,10 @@ expression: diagnostics
         - b
   location:
     row: 361
-    column: 4
+    column: 8
   end_location:
-    row: 367
-    column: 11
+    row: 361
+    column: 30
   fix: ~
   parent: ~
 - kind:
@@ -87,10 +87,10 @@ expression: diagnostics
         - y
   location:
     row: 389
-    column: 0
+    column: 4
   end_location:
-    row: 398
-    column: 7
+    row: 389
+    column: 27
   fix: ~
   parent: ~
 - kind:
@@ -101,10 +101,10 @@ expression: diagnostics
         - z
   location:
     row: 425
-    column: 4
+    column: 8
   end_location:
-    row: 434
-    column: 11
+    row: 425
+    column: 25
   fix: ~
   parent: ~
 - kind:
@@ -115,10 +115,10 @@ expression: diagnostics
         - z
   location:
     row: 440
-    column: 4
+    column: 8
   end_location:
-    row: 453
-    column: 11
+    row: 440
+    column: 38
   fix: ~
   parent: ~
 - kind:
@@ -128,10 +128,10 @@ expression: diagnostics
         - z
   location:
     row: 459
-    column: 4
+    column: 8
   end_location:
-    row: 469
-    column: 11
+    row: 459
+    column: 39
   fix: ~
   parent: ~
 - kind:
@@ -140,10 +140,10 @@ expression: diagnostics
         - y
   location:
     row: 489
-    column: 4
+    column: 8
   end_location:
-    row: 497
-    column: 11
+    row: 489
+    column: 29
   fix: ~
   parent: ~
 

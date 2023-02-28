@@ -4,6 +4,7 @@ use ruff_formatter::write;
 use crate::context::ASTFormatContext;
 use crate::cst::MatchCase;
 use crate::format::builders::block;
+use crate::format::comments::{end_of_line_comments, leading_comments};
 use crate::shared_traits::AsFormat;
 
 pub struct FormatMatchCase<'a> {
@@ -26,12 +27,16 @@ impl Format<ASTFormatContext<'_>> for FormatMatchCase<'_> {
             body,
         } = self.item;
 
+        write!(f, [leading_comments(pattern)])?;
+
         write!(f, [text("case")])?;
         write!(f, [space(), pattern.format()])?;
         if let Some(guard) = &guard {
             write!(f, [space(), text("if"), space(), guard.format()])?;
         }
         write!(f, [text(":")])?;
+
+        write!(f, [end_of_line_comments(body)])?;
         write!(f, [block_indent(&block(body))])?;
 
         Ok(())

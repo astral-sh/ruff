@@ -1,7 +1,8 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Arguments, Stmt};
 
-use crate::ast::types::Range;
+use ruff_macros::{define_violation, derive_message_formats};
+
+use crate::ast::helpers::identifier_range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
@@ -34,7 +35,7 @@ pub fn too_many_arguments(checker: &mut Checker, args: &Arguments, stmt: &Stmt) 
                 c_args: num_args,
                 max_args: checker.settings.pylint.max_args,
             },
-            Range::from_located(stmt),
+            identifier_range(stmt, checker.locator),
         ));
     }
 }

@@ -5,6 +5,7 @@ use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::StmtKind;
 
+use crate::ast::helpers::identifier_range;
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::ast::{cast, whitespace};
@@ -837,7 +838,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         let names = missing_arg_names.into_iter().sorted().collect();
         checker.diagnostics.push(Diagnostic::new(
             UndocumentedParam { names },
-            Range::from_located(parent),
+            identifier_range(parent, checker.locator),
         ));
     }
 }

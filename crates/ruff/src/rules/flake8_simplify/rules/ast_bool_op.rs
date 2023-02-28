@@ -38,8 +38,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
-    /// ```
+    /// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
     pub struct DuplicateIsinstanceCall {
         pub name: String,
     }

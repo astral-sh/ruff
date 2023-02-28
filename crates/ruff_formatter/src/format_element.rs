@@ -328,8 +328,8 @@ impl std::fmt::Debug for BestFitting {
 pub trait FormatElements {
     /// Returns true if this [FormatElement] is guaranteed to break across multiple lines by the printer.
     /// This is the case if this format element recursively contains a:
-    /// * [crate::builders::empty_line] or [crate::builders::hard_line_break]
-    /// * A token containing '\n'
+    /// - [crate::builders::empty_line] or [crate::builders::hard_line_break]
+    /// - A token containing '\n'
     ///
     /// Use this with caution, this is only a heuristic and the printer may print the element over multiple
     /// lines if this element is part of a group and the group doesn't fit on a single line.
@@ -339,12 +339,12 @@ pub trait FormatElements {
     fn has_label(&self, label: LabelId) -> bool;
 
     /// Returns the start tag of `kind` if:
-    /// * the last element is an end tag of `kind`.
-    /// * there's a matching start tag in this document (may not be true if this slice is an interned element and the `start` is in the document storing the interned element).
+    /// - the last element is an end tag of `kind`.
+    /// - there's a matching start tag in this document (may not be true if this slice is an interned element and the `start` is in the document storing the interned element).
     fn start_tag(&self, kind: TagKind) -> Option<&Tag>;
 
     /// Returns the end tag if:
-    /// * the last element is an end tag of `kind`
+    /// - the last element is an end tag of `kind`
     fn end_tag(&self, kind: TagKind) -> Option<&Tag>;
 }
 

@@ -164,7 +164,7 @@ def bar():
  # This should be split from the above by two lines
  class MyClassWithComplexLeadingComments:
      pass
-@@ -57,13 +58,13 @@
+@@ -57,11 +58,11 @@
  
  # leading 1
  @deco1
@@ -174,16 +174,13 @@ def bar():
 -@deco2(with_args=True)
 -# leading 3
 -@deco3
--# leading 4
 +deco2(with_args=True)
 +@# leading 3
 +deco3
+ # leading 4
  def decorated():
-+    # leading 4
      pass
- 
- 
-@@ -72,13 +73,12 @@
+@@ -72,11 +73,10 @@
  
  # leading 1
  @deco1
@@ -192,17 +189,14 @@ def bar():
 -
 -# leading 3 that already has an empty line
 -@deco3
--# leading 4
 +@# leading 2
 +deco2(with_args=True)
 +@# leading 3 that already has an empty line
 +deco3
+ # leading 4
  def decorated_with_split_leading_comments():
-+    # leading 4
      pass
- 
- 
-@@ -87,18 +87,18 @@
+@@ -87,10 +87,10 @@
  
  # leading 1
  @deco1
@@ -210,16 +204,14 @@ def bar():
 -@deco2(with_args=True)
 -# leading 3
 -@deco3
--
--# leading 4 that already has an empty line
 +@# leading 2
 +deco2(with_args=True)
 +@# leading 3
 +deco3
- def decorated_with_split_leading_comments():
-+    # leading 4 that already has an empty line
-     pass
  
+ # leading 4 that already has an empty line
+ def decorated_with_split_leading_comments():
+@@ -99,6 +99,7 @@
  
  def main():
      if a:
@@ -227,7 +219,7 @@ def bar():
          # Leading comment before inline function
          def inline():
              pass
-@@ -108,12 +108,14 @@
+@@ -108,12 +109,14 @@
              pass
  
      else:
@@ -242,7 +234,7 @@ def bar():
      # Leading comment before "top-level inline" function
      def top_level_quote_inline():
          pass
-@@ -123,6 +125,7 @@
+@@ -123,6 +126,7 @@
          pass
  
  else:
@@ -250,37 +242,6 @@ def bar():
      # More leading comments
      def top_level_quote_inline_after_else():
          pass
-@@ -138,9 +141,11 @@
- # Regression test for https://github.com/psf/black/issues/3454.
- def foo():
-     pass
--    # Trailing comment that belongs to this function
- 
- 
-+# Trailing comment that belongs to this function
-+
-+
- @decorator1
- @decorator2  # fmt: skip
- def bar():
-@@ -150,12 +155,13 @@
- # Regression test for https://github.com/psf/black/issues/3454.
- def foo():
-     pass
--    # Trailing comment that belongs to this function.
--    # NOTE this comment only has one empty line below, and the formatter
--    # should enforce two blank lines.
- 
- 
-+# Trailing comment that belongs to this function.
-+# NOTE this comment only has one empty line below, and the formatter
-+# should enforce two blank lines.
-+
- @decorator1
--# A standalone comment
- def bar():
-+    # A standalone comment
-     pass
 ```
 
 ## Ruff Output
@@ -351,8 +312,8 @@ some = statement
 deco2(with_args=True)
 @# leading 3
 deco3
+# leading 4
 def decorated():
-    # leading 4
     pass
 
 
@@ -365,8 +326,8 @@ some = statement
 deco2(with_args=True)
 @# leading 3 that already has an empty line
 deco3
+# leading 4
 def decorated_with_split_leading_comments():
-    # leading 4
     pass
 
 
@@ -379,8 +340,9 @@ some = statement
 deco2(with_args=True)
 @# leading 3
 deco3
+
+# leading 4 that already has an empty line
 def decorated_with_split_leading_comments():
-    # leading 4 that already has an empty line
     pass
 
 
@@ -429,9 +391,7 @@ class MyClass:
 # Regression test for https://github.com/psf/black/issues/3454.
 def foo():
     pass
-
-
-# Trailing comment that belongs to this function
+    # Trailing comment that belongs to this function
 
 
 @decorator1
@@ -443,15 +403,14 @@ def bar():
 # Regression test for https://github.com/psf/black/issues/3454.
 def foo():
     pass
+    # Trailing comment that belongs to this function.
+    # NOTE this comment only has one empty line below, and the formatter
+    # should enforce two blank lines.
 
-
-# Trailing comment that belongs to this function.
-# NOTE this comment only has one empty line below, and the formatter
-# should enforce two blank lines.
 
 @decorator1
+# A standalone comment
 def bar():
-    # A standalone comment
     pass
 ```
 

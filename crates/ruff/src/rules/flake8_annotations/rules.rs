@@ -398,9 +398,9 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [PEP 484](https://www.python.org/dev/peps/pep-0484/#the-any-type)
-    /// * [`typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
-    /// * [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
+    /// - [PEP 484](https://www.python.org/dev/peps/pep-0484/#the-any-type)
+    /// - [`typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
+    /// - [Mypy: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
     pub struct AnyType {
         pub name: String,
     }

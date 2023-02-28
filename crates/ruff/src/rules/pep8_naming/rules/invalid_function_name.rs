@@ -19,7 +19,7 @@ define_violation!(
     /// > prevailing style (e.g. threading.py), to retain backwards compatibility.
     ///
     /// ## Options
-    /// * `pep8-naming.ignore-names`
+    /// - `pep8-naming.ignore-names`
     ///
     /// ## Example
     /// ```python

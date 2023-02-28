@@ -76,20 +76,20 @@ impl Violation for NeedlessBool {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for three or more consecutive if-statements with direct returns
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// These can be simplified by using a dictionary
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// if x == 1:
     ///     return "Hello"
     /// elif x == 2:
     ///     return "Goodbye"
     /// else:
-    ///    return "Goodnight"
+    ///     return "Goodnight"
     /// ```
     ///
     /// Use instead:
@@ -129,14 +129,14 @@ impl Violation for UseTernaryOperator {
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for `if` branches with identical arm bodies.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// If multiple arms of an `if` statement have the same body, using `or`
     /// better signals the intent of the statement.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// if x == 1:
     ///     print("Hello")
@@ -592,6 +592,7 @@ pub fn manual_dict_lookup(
     test: &Expr,
     body: &[Stmt],
     orelse: &[Stmt],
+    parent: Option<&Stmt>,
 ) {
     // Throughout this rule:
     // * Each if-statement's test must consist of a constant equality check with the same variable.
@@ -631,6 +632,36 @@ pub fn manual_dict_lookup(
         .map_or(false, |value| contains_effect(checker, value))
     {
         return;
+    }
+
+    // It's part of a bigger if-elif block:
+    // https://github.com/MartinThoma/flake8-simplify/issues/115
+    if let Some(StmtKind::If {
+        orelse: parent_orelse,
+        ..
+    }) = parent.map(|parent| &parent.node)
+    {
+        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
+            // TODO(charlie): These two cases have the same AST:
+            //
+            // if True:
+            //     pass
+            // elif a:
+            //     b = 1
+            // else:
+            //     b = 2
+            //
+            // if True:
+            //     pass
+            // else:
+            //     if a:
+            //         b = 1
+            //     else:
+            //         b = 2
+            //
+            // We want to flag the latter, but not the former. Right now, we flag neither.
+            return;
+        }
     }
 
     let mut constants: FxHashSet<ComparableConstant> = FxHashSet::default();

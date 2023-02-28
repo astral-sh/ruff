@@ -42,6 +42,7 @@ mod tests {
     #[test_case(Rule::NotInTest, Path::new("E713.py"))]
     #[test_case(Rule::NotIsTest, Path::new("E714.py"))]
     #[test_case(Rule::SyntaxError, Path::new("E999.py"))]
+    #[test_case(Rule::IndentationContainsTabs, Path::new("W19.py"))]
     #[test_case(Rule::TrailingWhitespace, Path::new("W29.py"))]
     #[test_case(Rule::TrueFalseComparison, Path::new("E712.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]

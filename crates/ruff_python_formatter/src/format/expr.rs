@@ -9,8 +9,8 @@ use ruff_text_size::TextSize;
 use crate::context::ASTFormatContext;
 use crate::core::types::Range;
 use crate::cst::{
-    Arguments, Boolop, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, SliceIndex,
-    SliceIndexKind, Unaryop,
+    Arguments, BoolOp, CmpOp, Comprehension, Expr, ExprKind, Keyword, Operator, OperatorKind,
+    SliceIndex, SliceIndexKind, UnaryOp, UnaryOpKind,
 };
 use crate::format::builders::literal;
 use crate::format::comments::{dangling_comments, end_of_line_comments, leading_comments};
@@ -71,9 +71,8 @@ fn format_subscript(
             Ok(())
         }))])]
     )?;
-
     write!(f, [text("]")])?;
-
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -286,6 +285,7 @@ fn format_list(
         )?;
     }
     write!(f, [text("]")])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -338,38 +338,10 @@ fn format_call(
     if args.is_empty() && keywords.is_empty() {
         write!(f, [text("(")])?;
         write!(f, [text(")")])?;
-
-        // Format any end-of-line comments.
-        let mut first = true;
-        for range in expr.trivia.iter().filter_map(|trivia| {
-            if trivia.relationship.is_trailing() {
-                trivia.kind.end_of_line_comment()
-            } else {
-                None
-            }
-        }) {
-            if std::mem::take(&mut first) {
-                write!(f, [line_suffix(&text("  "))])?;
-            }
-            write!(f, [line_suffix(&literal(range))])?;
-        }
+        write!(f, [end_of_line_comments(expr)])?;
     } else {
         write!(f, [text("(")])?;
-
-        // Format any end-of-line comments.
-        let mut first = true;
-        for range in expr.trivia.iter().filter_map(|trivia| {
-            if trivia.relationship.is_trailing() {
-                trivia.kind.end_of_line_comment()
-            } else {
-                None
-            }
-        }) {
-            if std::mem::take(&mut first) {
-                write!(f, [line_suffix(&text("  "))])?;
-            }
-            write!(f, [line_suffix(&literal(range))])?;
-        }
+        write!(f, [end_of_line_comments(expr)])?;
 
         let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
@@ -394,14 +366,7 @@ fn format_call(
                     write!(
                         f,
                         [group(&format_args![&format_with(|f| {
-                            if let Some(arg) = &keyword.node.arg {
-                                write!(f, [dynamic_text(arg, TextSize::default())])?;
-                                write!(f, [text("=")])?;
-                                write!(f, [keyword.node.value.format()])?;
-                            } else {
-                                write!(f, [text("**")])?;
-                                write!(f, [keyword.node.value.format()])?;
-                            }
+                            write!(f, [keyword.format()])?;
                             Ok(())
                         })])]
                     )?;
@@ -591,7 +556,7 @@ fn format_compare(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) -> FormatResult<()> {
     write!(f, [group(&format_args![left.format()])])?;
@@ -613,6 +578,7 @@ fn format_joined_str(
     _values: &[Expr],
 ) -> FormatResult<()> {
     write!(f, [literal(Range::from_located(expr))])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -639,6 +605,7 @@ fn format_constant(
         Constant::Complex { .. } => write!(f, [complex_literal(Range::from_located(expr))])?,
         Constant::Tuple(_) => unreachable!("Constant::Tuple should be handled by format_tuple"),
     }
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -713,9 +680,7 @@ fn format_attribute(
     write!(f, [value.format()])?;
     write!(f, [text(".")])?;
     write!(f, [dynamic_text(attr, TextSize::default())])?;
-
     write!(f, [end_of_line_comments(expr)])?;
-
     Ok(())
 }
 
@@ -729,32 +694,24 @@ fn format_named_expr(
     write!(f, [text(":=")])?;
     write!(f, [space()])?;
     write!(f, [group(&format_args![value.format()])])?;
-
     write!(f, [end_of_line_comments(expr)])?;
-
     Ok(())
 }
 
 fn format_bool_op(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
-    op: &Boolop,
+    ops: &[BoolOp],
     values: &[Expr],
 ) -> FormatResult<()> {
-    let mut first = true;
-    for value in values {
-        if std::mem::take(&mut first) {
-            write!(f, [group(&format_args![value.format()])])?;
-        } else {
-            write!(f, [soft_line_break_or_space()])?;
-            write!(f, [op.format()])?;
-            write!(f, [space()])?;
-            write!(f, [group(&format_args![value.format()])])?;
-        }
+    write!(f, [group(&format_args![values[0].format()])])?;
+    for (op, value) in ops.iter().zip(&values[1..]) {
+        write!(f, [soft_line_break_or_space()])?;
+        write!(f, [op.format()])?;
+        write!(f, [space()])?;
+        write!(f, [group(&format_args![value.format()])])?;
     }
-
     write!(f, [end_of_line_comments(expr)])?;
-
     Ok(())
 }
 
@@ -766,8 +723,8 @@ fn format_bin_op(
     right: &Expr,
 ) -> FormatResult<()> {
     // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators
-    let is_simple = matches!(op, Operator::Pow) && is_simple_power(left) && is_simple_power(right);
-
+    let is_simple =
+        matches!(op.node, OperatorKind::Pow) && is_simple_power(left) && is_simple_power(right);
     write!(f, [left.format()])?;
     if !is_simple {
         write!(f, [soft_line_break_or_space()])?;
@@ -776,22 +733,20 @@ fn format_bin_op(
     if !is_simple {
         write!(f, [space()])?;
     }
-    write!(f, [group(&format_args![right.format()])])?;
-
+    write!(f, [group(&right.format())])?;
     write!(f, [end_of_line_comments(expr)])?;
-
     Ok(())
 }
 
 fn format_unary_op(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
-    op: &Unaryop,
+    op: &UnaryOp,
     operand: &Expr,
 ) -> FormatResult<()> {
     write!(f, [op.format()])?;
     // TODO(charlie): Do this in the normalization pass.
-    if !matches!(op, Unaryop::Not)
+    if !matches!(op.node, UnaryOpKind::Not)
         && matches!(
             operand.node,
             ExprKind::BoolOp { .. } | ExprKind::Compare { .. } | ExprKind::BinOp { .. }
@@ -808,6 +763,7 @@ fn format_unary_op(
     } else {
         write!(f, [operand.format()])?;
     }
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -825,6 +781,7 @@ fn format_lambda(
     write!(f, [text(":")])?;
     write!(f, [space()])?;
     write!(f, [body.format()])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -856,7 +813,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
         write!(f, [leading_comments(self.item)])?;
 
         match &self.item.node {
-            ExprKind::BoolOp { op, values } => format_bool_op(f, self.item, op, values),
+            ExprKind::BoolOp { ops, values } => format_bool_op(f, self.item, ops, values),
             ExprKind::NamedExpr { target, value } => format_named_expr(f, self.item, target, value),
             ExprKind::BinOp { left, op, right } => format_bin_op(f, self.item, left, op, right),
             ExprKind::UnaryOp { op, operand } => format_unary_op(f, self.item, op, operand),

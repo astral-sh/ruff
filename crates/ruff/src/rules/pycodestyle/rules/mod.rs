@@ -21,6 +21,8 @@ pub use indentation::{
     NoIndentedBlock, NoIndentedBlockComment, OverIndented, UnexpectedIndentation,
     UnexpectedIndentationComment,
 };
+
+pub use indentation_contains_tabs::{indentation_contains_tabs, IndentationContainsTabs};
 pub use invalid_escape_sequence::{invalid_escape_sequence, InvalidEscapeSequence};
 pub use lambda_assignment::{lambda_assignment, LambdaAssignment};
 pub use line_too_long::{line_too_long, LineTooLong};
@@ -63,6 +65,7 @@ mod errors;
 mod extraneous_whitespace;
 mod imports;
 mod indentation;
+mod indentation_contains_tabs;
 mod invalid_escape_sequence;
 mod lambda_assignment;
 mod line_too_long;

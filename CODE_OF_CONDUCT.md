@@ -1,16 +1,16 @@
 # Contributor Covenant Code of Conduct
 
-* [Our Pledge](#our-pledge)
-* [Our Standards](#our-standards)
-* [Enforcement Responsibilities](#enforcement-responsibilities)
-* [Scope](#scope)
-* [Enforcement](#enforcement)
-* [Enforcement Guidelines](#enforcement-guidelines)
-  * [1. Correction](#1-correction)
-  * [2. Warning](#2-warning)
-  * [3. Temporary Ban](#3-temporary-ban)
-  * [4. Permanent Ban](#4-permanent-ban)
-* [Attribution](#attribution)
+- [Our Pledge](#our-pledge)
+- [Our Standards](#our-standards)
+- [Enforcement Responsibilities](#enforcement-responsibilities)
+- [Scope](#scope)
+- [Enforcement](#enforcement)
+- [Enforcement Guidelines](#enforcement-guidelines)
+  - [1. Correction](#1-correction)
+  - [2. Warning](#2-warning)
+  - [3. Temporary Ban](#3-temporary-ban)
+  - [4. Permanent Ban](#4-permanent-ban)
+- [Attribution](#attribution)
 
 ## Our Pledge
 
@@ -29,23 +29,23 @@ diverse, inclusive, and healthy community.
 Examples of behavior that contributes to a positive environment for our
 community include:
 
-* Demonstrating empathy and kindness toward other people
-* Being respectful of differing opinions, viewpoints, and experiences
-* Giving and gracefully accepting constructive feedback
-* Accepting responsibility and apologizing to those affected by our mistakes,
+- Demonstrating empathy and kindness toward other people
+- Being respectful of differing opinions, viewpoints, and experiences
+- Giving and gracefully accepting constructive feedback
+- Accepting responsibility and apologizing to those affected by our mistakes,
   and learning from the experience
-* Focusing on what is best not just for us as individuals, but for the
+- Focusing on what is best not just for us as individuals, but for the
   overall community
 
 Examples of unacceptable behavior include:
 
-* The use of sexualized language or imagery, and sexual attention or
+- The use of sexualized language or imagery, and sexual attention or
   advances of any kind
-* Trolling, insulting or derogatory comments, and personal or political attacks
-* Public or private harassment
-* Publishing others' private information, such as a physical or email
+- Trolling, insulting or derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information, such as a physical or email
   address, without their explicit permission
-* Other conduct which could reasonably be considered inappropriate in a
+- Other conduct which could reasonably be considered inappropriate in a
   professional setting
 
 ## Enforcement Responsibilities
@@ -132,7 +132,7 @@ version 2.0, available [here](https://www.contributor-covenant.org/version/2/0/c
 Community Impact Guidelines were inspired by [Mozilla's code of conduct
 enforcement ladder](https://github.com/mozilla/diversity).
 
-[homepage]: https://www.contributor-covenant.org
-
 For answers to common questions about this code of conduct, see the [FAQ](https://www.contributor-covenant.org/faq).
 Translations are available [here](https://www.contributor-covenant.org/translations).
+
+[homepage]: https://www.contributor-covenant.org

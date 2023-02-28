@@ -48,11 +48,11 @@ pub struct Options {
     /// Expected type for multiple argument names in `@pytest.mark.parametrize`.
     /// The following values are supported:
     ///
-    /// * `csv` — a comma-separated list, e.g.
+    /// - `csv` — a comma-separated list, e.g.
     ///   `@pytest.mark.parametrize('name1,name2', ...)`
-    /// * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
-    ///   ...)`
-    /// * `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
+    /// - `tuple` (default) — e.g.
+    ///   `@pytest.mark.parametrize(('name1', 'name2'), ...)`
+    /// - `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`
     pub parametrize_names_type: Option<types::ParametrizeNameType>,
     #[option(
         default = "list",
@@ -62,8 +62,8 @@ pub struct Options {
     /// Expected type for the list of values rows in `@pytest.mark.parametrize`.
     /// The following values are supported:
     ///
-    /// * `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))`
-    /// * `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`
+    /// - `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))`
+    /// - `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`
     pub parametrize_values_type: Option<types::ParametrizeValuesType>,
     #[option(
         default = "tuple",
@@ -73,10 +73,10 @@ pub struct Options {
     /// Expected type for each row of values in `@pytest.mark.parametrize` in
     /// case of multiple parameters. The following values are supported:
     ///
-    /// * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'),
-    ///   [(1, 2), (3, 4)])`
-    /// * `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2],
-    ///   [3, 4]])`
+    /// - `tuple` (default) — e.g.
+    ///   `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])`
+    /// - `list` — e.g.
+    ///   `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`
     pub parametrize_values_row_type: Option<types::ParametrizeValuesRowType>,
     #[option(
         default = r#"["BaseException", "Exception", "ValueError", "OSError", "IOError", "EnvironmentError", "socket.error"]"#,

@@ -81,9 +81,9 @@ pub enum InvalidDocumentError {
     StartTagMissing { kind: TagKind },
 
     /// Expected a specific start tag but instead is:
-    /// * at the end of the document
-    /// * at another start tag
-    /// * at an end tag
+    /// - at the end of the document
+    /// - at another start tag
+    /// - at an end tag
     ExpectedStart {
         expected_start: TagKind,
         actual: ActualStart,

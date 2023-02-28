@@ -5,31 +5,83 @@ use rustpython_parser::Tok;
 
 use crate::core::types::Range;
 use crate::cst::{
-    Alias, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Pattern, PatternKind, SliceIndex,
-    SliceIndexKind, Stmt, StmtKind,
+    Alias, Arg, Body, BoolOp, CmpOp, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword,
+    Operator, Pattern, PatternKind, SliceIndex, SliceIndexKind, Stmt, StmtKind, UnaryOp,
 };
 
 #[derive(Clone, Debug)]
 pub enum Node<'a> {
-    Mod(&'a [Stmt]),
-    Stmt(&'a Stmt),
-    Expr(&'a Expr),
     Alias(&'a Alias),
+    Arg(&'a Arg),
+    Body(&'a Body),
+    BoolOp(&'a BoolOp),
+    CmpOp(&'a CmpOp),
     Excepthandler(&'a Excepthandler),
-    SliceIndex(&'a SliceIndex),
+    Expr(&'a Expr),
+    Keyword(&'a Keyword),
+    Mod(&'a [Stmt]),
+    Operator(&'a Operator),
     Pattern(&'a Pattern),
+    SliceIndex(&'a SliceIndex),
+    Stmt(&'a Stmt),
+    UnaryOp(&'a UnaryOp),
 }
 
 impl Node<'_> {
     pub fn id(&self) -> usize {
         match self {
-            Node::Mod(nodes) => nodes as *const _ as usize,
-            Node::Stmt(node) => node.id(),
-            Node::Expr(node) => node.id(),
             Node::Alias(node) => node.id(),
+            Node::Arg(node) => node.id(),
+            Node::Body(node) => node.id(),
+            Node::BoolOp(node) => node.id(),
+            Node::CmpOp(node) => node.id(),
             Node::Excepthandler(node) => node.id(),
-            Node::SliceIndex(node) => node.id(),
+            Node::Expr(node) => node.id(),
+            Node::Keyword(node) => node.id(),
+            Node::Mod(nodes) => nodes as *const _ as usize,
+            Node::Operator(node) => node.id(),
             Node::Pattern(node) => node.id(),
+            Node::SliceIndex(node) => node.id(),
+            Node::Stmt(node) => node.id(),
+            Node::UnaryOp(node) => node.id(),
+        }
+    }
+
+    pub fn location(&self) -> Location {
+        match self {
+            Node::Alias(node) => node.location,
+            Node::Arg(node) => node.location,
+            Node::Body(node) => node.location,
+            Node::BoolOp(node) => node.location,
+            Node::CmpOp(node) => node.location,
+            Node::Excepthandler(node) => node.location,
+            Node::Expr(node) => node.location,
+            Node::Keyword(node) => node.location,
+            Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
+            Node::Operator(node) => node.location,
+            Node::Pattern(node) => node.location,
+            Node::SliceIndex(node) => node.location,
+            Node::Stmt(node) => node.location,
+            Node::UnaryOp(node) => node.location,
+        }
+    }
+
+    pub fn end_location(&self) -> Location {
+        match self {
+            Node::Alias(node) => node.end_location.unwrap(),
+            Node::Arg(node) => node.end_location.unwrap(),
+            Node::Body(node) => node.end_location.unwrap(),
+            Node::BoolOp(node) => node.end_location.unwrap(),
+            Node::CmpOp(node) => node.end_location.unwrap(),
+            Node::Excepthandler(node) => node.end_location.unwrap(),
+            Node::Expr(node) => node.end_location.unwrap(),
+            Node::Keyword(node) => node.end_location.unwrap(),
+            Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
+            Node::Operator(node) => node.end_location.unwrap(),
+            Node::Pattern(node) => node.end_location.unwrap(),
+            Node::SliceIndex(node) => node.end_location.unwrap(),
+            Node::Stmt(node) => node.end_location.unwrap(),
+            Node::UnaryOp(node) => node.end_location.unwrap(),
         }
     }
 }
@@ -227,6 +279,11 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 result.push(Node::Stmt(stmt));
             }
         }
+        Node::Body(body) => {
+            for stmt in &body.node {
+                result.push(Node::Stmt(stmt));
+            }
+        }
         Node::Stmt(stmt) => match &stmt.node {
             StmtKind::Return { value } => {
                 if let Some(value) = value {
@@ -261,29 +318,19 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     result.push(Node::Expr(decorator));
                 }
                 for arg in &args.posonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 for arg in &args.args {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 if let Some(arg) = &args.vararg {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 for arg in &args.kwonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 if let Some(arg) = &args.kwarg {
-                    if let Some(expr) = &arg.node.annotation {
-                        result.push(Node::Expr(expr));
-                    }
+                    result.push(Node::Arg(arg));
                 }
                 for expr in &args.defaults {
                     result.push(Node::Expr(expr));
@@ -294,9 +341,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 if let Some(returns) = returns {
                     result.push(Node::Expr(returns));
                 }
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
+                result.push(Node::Body(body));
             }
             StmtKind::ClassDef {
                 bases,
@@ -312,19 +357,18 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     result.push(Node::Expr(base));
                 }
                 for keyword in keywords {
-                    result.push(Node::Expr(&keyword.node.value));
+                    result.push(Node::Keyword(keyword));
                 }
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
+                result.push(Node::Body(body));
             }
             StmtKind::Delete { targets } => {
                 for target in targets {
                     result.push(Node::Expr(target));
                 }
             }
-            StmtKind::AugAssign { target, value, .. } => {
+            StmtKind::AugAssign { target, op, value } => {
                 result.push(Node::Expr(target));
+                result.push(Node::Operator(op));
                 result.push(Node::Expr(value));
             }
             StmtKind::AnnAssign {
@@ -355,29 +399,25 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             } => {
                 result.push(Node::Expr(target));
                 result.push(Node::Expr(iter));
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
-                for stmt in orelse {
-                    result.push(Node::Stmt(stmt));
+                result.push(Node::Body(body));
+                if let Some(orelse) = orelse {
+                    result.push(Node::Body(orelse));
                 }
             }
             StmtKind::While { test, body, orelse } => {
                 result.push(Node::Expr(test));
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
-                for stmt in orelse {
-                    result.push(Node::Stmt(stmt));
+                result.push(Node::Body(body));
+                if let Some(orelse) = orelse {
+                    result.push(Node::Body(orelse));
                 }
             }
-            StmtKind::If { test, body, orelse } => {
+            StmtKind::If {
+                test, body, orelse, ..
+            } => {
                 result.push(Node::Expr(test));
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
-                for stmt in orelse {
-                    result.push(Node::Stmt(stmt));
+                result.push(Node::Body(body));
+                if let Some(orelse) = orelse {
+                    result.push(Node::Body(orelse));
                 }
             }
             StmtKind::With { items, body, .. } | StmtKind::AsyncWith { items, body, .. } => {
@@ -387,9 +427,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                         result.push(Node::Expr(expr));
                     }
                 }
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
+                result.push(Node::Body(body));
             }
             StmtKind::Match { subject, cases } => {
                 result.push(Node::Expr(subject));
@@ -398,9 +436,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     if let Some(expr) = &case.guard {
                         result.push(Node::Expr(expr));
                     }
-                    for stmt in &case.body {
-                        result.push(Node::Stmt(stmt));
-                    }
+                    result.push(Node::Body(&case.body));
                 }
             }
             StmtKind::Raise { exc, cause } => {
@@ -431,17 +467,15 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 orelse,
                 finalbody,
             } => {
-                for stmt in body {
-                    result.push(Node::Stmt(stmt));
-                }
+                result.push(Node::Body(body));
                 for handler in handlers {
                     result.push(Node::Excepthandler(handler));
                 }
-                for stmt in orelse {
-                    result.push(Node::Stmt(stmt));
+                if let Some(orelse) = orelse {
+                    result.push(Node::Body(orelse));
                 }
-                for stmt in finalbody {
-                    result.push(Node::Stmt(stmt));
+                if let Some(finalbody) = finalbody {
+                    result.push(Node::Body(finalbody));
                 }
             }
             StmtKind::Import { names } => {
@@ -457,10 +491,16 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
             StmtKind::Global { .. } => {}
             StmtKind::Nonlocal { .. } => {}
         },
-        // TODO(charlie): Actual logic, this doesn't do anything.
+        Node::Arg(arg) => {
+            if let Some(annotation) = &arg.node.annotation {
+                result.push(Node::Expr(annotation));
+            }
+        }
         Node::Expr(expr) => match &expr.node {
-            ExprKind::BoolOp { values, .. } => {
-                for value in values {
+            ExprKind::BoolOp { ops, values } => {
+                result.push(Node::Expr(&values[0]));
+                for (op, value) in ops.iter().zip(&values[1..]) {
+                    result.push(Node::BoolOp(op));
                     result.push(Node::Expr(value));
                 }
             }
@@ -468,15 +508,16 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 result.push(Node::Expr(target));
                 result.push(Node::Expr(value));
             }
-            ExprKind::BinOp { left, right, .. } => {
+            ExprKind::BinOp { left, op, right } => {
                 result.push(Node::Expr(left));
+                result.push(Node::Operator(op));
                 result.push(Node::Expr(right));
             }
-            ExprKind::UnaryOp { operand, .. } => {
+            ExprKind::UnaryOp { op, operand } => {
+                result.push(Node::UnaryOp(op));
                 result.push(Node::Expr(operand));
             }
             ExprKind::Lambda { body, args, .. } => {
-                // TODO(charlie): Arguments.
                 for expr in &args.defaults {
                     result.push(Node::Expr(expr));
                 }
@@ -560,10 +601,13 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 result.push(Node::Expr(value));
             }
             ExprKind::Compare {
-                left, comparators, ..
+                left,
+                ops,
+                comparators,
             } => {
                 result.push(Node::Expr(left));
-                for comparator in comparators {
+                for (op, comparator) in ops.iter().zip(comparators) {
+                    result.push(Node::CmpOp(op));
                     result.push(Node::Expr(comparator));
                 }
             }
@@ -577,7 +621,7 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                     result.push(Node::Expr(arg));
                 }
                 for keyword in keywords {
-                    result.push(Node::Expr(&keyword.node.value));
+                    result.push(Node::Keyword(keyword));
                 }
             }
             ExprKind::FormattedValue {
@@ -624,15 +668,16 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 }
             }
         },
+        Node::Keyword(keyword) => {
+            result.push(Node::Expr(&keyword.node.value));
+        }
         Node::Alias(..) => {}
         Node::Excepthandler(excepthandler) => {
             let ExcepthandlerKind::ExceptHandler { type_, body, .. } = &excepthandler.node;
             if let Some(type_) = type_ {
                 result.push(Node::Expr(type_));
             }
-            for stmt in body {
-                result.push(Node::Stmt(stmt));
-            }
+            result.push(Node::Body(body));
         }
         Node::SliceIndex(slice_index) => {
             if let SliceIndexKind::Index { value } = &slice_index.node {
@@ -681,6 +726,10 @@ fn sorted_child_nodes_inner<'a>(node: &Node<'a>, result: &mut Vec<Node<'a>>) {
                 }
             }
         },
+        Node::BoolOp(..) => {}
+        Node::UnaryOp(..) => {}
+        Node::Operator(..) => {}
+        Node::CmpOp(..) => {}
     }
 }
 
@@ -716,46 +765,14 @@ pub fn decorate_token<'a>(
     while left < right {
         let middle = (left + right) / 2;
         let child = &child_nodes[middle];
-        let start = match &child {
-            Node::Stmt(node) => node.location,
-            Node::Expr(node) => node.location,
-            Node::Alias(node) => node.location,
-            Node::Excepthandler(node) => node.location,
-            Node::SliceIndex(node) => node.location,
-            Node::Pattern(node) => node.location,
-            Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
-        };
-        let end = match &child {
-            Node::Stmt(node) => node.end_location.unwrap(),
-            Node::Expr(node) => node.end_location.unwrap(),
-            Node::Alias(node) => node.end_location.unwrap(),
-            Node::Excepthandler(node) => node.end_location.unwrap(),
-            Node::SliceIndex(node) => node.end_location.unwrap(),
-            Node::Pattern(node) => node.end_location.unwrap(),
-            Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
-        };
+        let start = child.location();
+        let end = child.end_location();
 
         if let Some(existing) = &enclosed_node {
             // Special-case: if we're dealing with a statement that's a single expression,
             // we want to treat the expression as the enclosed node.
-            let existing_start = match &existing {
-                Node::Stmt(node) => node.location,
-                Node::Expr(node) => node.location,
-                Node::Alias(node) => node.location,
-                Node::Excepthandler(node) => node.location,
-                Node::SliceIndex(node) => node.location,
-                Node::Pattern(node) => node.location,
-                Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
-            };
-            let existing_end = match &existing {
-                Node::Stmt(node) => node.end_location.unwrap(),
-                Node::Expr(node) => node.end_location.unwrap(),
-                Node::Alias(node) => node.end_location.unwrap(),
-                Node::Excepthandler(node) => node.end_location.unwrap(),
-                Node::SliceIndex(node) => node.end_location.unwrap(),
-                Node::Pattern(node) => node.end_location.unwrap(),
-                Node::Mod(..) => unreachable!("Node::Mod cannot be a child node"),
-            };
+            let existing_start = existing.location();
+            let existing_end = existing.end_location();
             if start == existing_start && end == existing_end {
                 enclosed_node = Some(child.clone());
             }
@@ -809,34 +826,54 @@ pub fn decorate_token<'a>(
 
 #[derive(Debug, Default)]
 pub struct TriviaIndex {
-    pub stmt: FxHashMap<usize, Vec<Trivia>>,
-    pub expr: FxHashMap<usize, Vec<Trivia>>,
     pub alias: FxHashMap<usize, Vec<Trivia>>,
+    pub arg: FxHashMap<usize, Vec<Trivia>>,
+    pub body: FxHashMap<usize, Vec<Trivia>>,
+    pub bool_op: FxHashMap<usize, Vec<Trivia>>,
+    pub cmp_op: FxHashMap<usize, Vec<Trivia>>,
     pub excepthandler: FxHashMap<usize, Vec<Trivia>>,
-    pub slice_index: FxHashMap<usize, Vec<Trivia>>,
+    pub expr: FxHashMap<usize, Vec<Trivia>>,
+    pub keyword: FxHashMap<usize, Vec<Trivia>>,
+    pub operator: FxHashMap<usize, Vec<Trivia>>,
     pub pattern: FxHashMap<usize, Vec<Trivia>>,
+    pub slice_index: FxHashMap<usize, Vec<Trivia>>,
+    pub stmt: FxHashMap<usize, Vec<Trivia>>,
+    pub unary_op: FxHashMap<usize, Vec<Trivia>>,
 }
 
 fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
     match node {
-        Node::Mod(_) => {}
-        Node::Stmt(node) => {
-            trivia
-                .stmt
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
-        Node::Expr(node) => {
-            trivia
-                .expr
-                .entry(node.id())
-                .or_insert_with(Vec::new)
-                .push(comment);
-        }
         Node::Alias(node) => {
             trivia
                 .alias
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::Arg(node) => {
+            trivia
+                .arg
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::Body(node) => {
+            trivia
+                .body
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::BoolOp(node) => {
+            trivia
+                .bool_op
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::CmpOp(node) => {
+            trivia
+                .cmp_op
                 .entry(node.id())
                 .or_insert_with(Vec::new)
                 .push(comment);
@@ -848,9 +885,23 @@ fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
                 .or_insert_with(Vec::new)
                 .push(comment);
         }
-        Node::SliceIndex(node) => {
+        Node::Expr(node) => {
             trivia
-                .slice_index
+                .expr
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::Keyword(node) => {
+            trivia
+                .keyword
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::Operator(node) => {
+            trivia
+                .operator
                 .entry(node.id())
                 .or_insert_with(Vec::new)
                 .push(comment);
@@ -862,6 +913,28 @@ fn add_comment(comment: Trivia, node: &Node, trivia: &mut TriviaIndex) {
                 .or_insert_with(Vec::new)
                 .push(comment);
         }
+        Node::SliceIndex(node) => {
+            trivia
+                .slice_index
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::Stmt(node) => {
+            trivia
+                .stmt
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::UnaryOp(node) => {
+            trivia
+                .unary_op
+                .entry(node.id())
+                .or_insert_with(Vec::new)
+                .push(comment);
+        }
+        Node::Mod(_) => {}
     }
 }
 

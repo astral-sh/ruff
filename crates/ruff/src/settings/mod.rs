@@ -470,6 +470,7 @@ mod tests {
             Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
 
@@ -490,6 +491,7 @@ mod tests {
             Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
 
@@ -526,6 +528,7 @@ mod tests {
             Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
 
@@ -563,6 +566,7 @@ mod tests {
             Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
 
@@ -582,6 +586,7 @@ mod tests {
             Rule::TrailingWhitespace,
             Rule::BlankLineContainsWhitespace,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
     }

@@ -29,12 +29,12 @@ define_violation!(
     /// Use instead:
     /// ```python
     /// class Example:
-    ///    def __init__(self):
-    ///       self.value = []
+    ///     def __init__(self):
+    ///         self.value = []
     /// ```
     ///
     /// ## References
-    /// * [CodeQL: `py-explicit-return-in-init`](https://codeql.github.com/codeql-query-help/python/py-explicit-return-in-init/)
+    /// - [CodeQL: `py-explicit-return-in-init`](https://codeql.github.com/codeql-query-help/python/py-explicit-return-in-init/)
     pub struct ReturnInInit;
 );
 impl Violation for ReturnInInit {

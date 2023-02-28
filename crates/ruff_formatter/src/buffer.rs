@@ -433,8 +433,8 @@ where
 
 /// A Buffer that removes any soft line breaks.
 ///
-/// * Removes [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::Soft).
-/// * Replaces [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::SoftOrSpace) with a [`Space`](FormatElement::Space)
+/// - Removes [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::Soft).
+/// - Replaces [`lines`](FormatElement::Line) with the mode [`Soft`](LineMode::SoftOrSpace) with a [`Space`](FormatElement::Space)
 ///
 /// # Examples
 ///

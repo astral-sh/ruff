@@ -22,21 +22,25 @@ define_violation!(
     /// ## Example
     /// ```python
     /// if sys.platform.startswith("linux"):
-    ///    # Linux specific definitions
+    ///     # Linux specific definitions
+    ///     ...
     /// else:
-    ///   # Posix specific definitions
+    ///     # Posix specific definitions
+    ///     ...
     /// ```
     ///
     /// Instead, use a simple string comparison, such as `==` or `!=`:
     /// ```python
     /// if sys.platform == "linux":
     ///     # Linux specific definitions
+    ///     ...
     /// else:
     ///     # Posix specific definitions
+    ///     ...
     /// ```
     ///
     /// ## References
-    /// * [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
+    /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
     pub struct UnrecognizedPlatformCheck;
 );
 impl Violation for UnrecognizedPlatformCheck {
@@ -68,11 +72,11 @@ define_violation!(
     /// Use instead:
     /// ```python
     /// if sys.platform == "linux":
-    ///    ...
+    ///     ...
     /// ```
     ///
     /// ## References
-    /// * [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
+    /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
     pub struct UnrecognizedPlatformName {
         pub platform: String,
     }
