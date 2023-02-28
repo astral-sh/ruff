@@ -69,7 +69,7 @@ pub fn whitespace_around_named_parameter_equals(
                 diagnostics.push((*start, MissingWhitespaceAroundParameterEquals.into()));
             }
         }
-        if is_op_token(*token) {
+        if is_op_token(token) {
             if **token == Tok::Lpar || **token == Tok::Lsqb {
                 parens += 1;
             } else if **token == Tok::Rpar || **token == Tok::Rsqb {
@@ -96,7 +96,7 @@ pub fn whitespace_around_named_parameter_equals(
             }
 
             if parens < 1 {
-                annotated_func_arg = false
+                annotated_func_arg = false;
             }
         }
         prev_end = Some(end);
