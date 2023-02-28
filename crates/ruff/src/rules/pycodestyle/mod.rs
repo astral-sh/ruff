@@ -100,6 +100,7 @@ mod tests {
     #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]
     #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
+    #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
     #[test_case(
         Rule::UnexpectedSpacesAroundKeywordParameterEquals,
         Path::new("E25.py")
