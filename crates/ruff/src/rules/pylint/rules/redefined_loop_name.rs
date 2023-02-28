@@ -1,3 +1,10 @@
+use std::{fmt, iter};
+
+use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind, Withitem};
+use serde::{Deserialize, Serialize};
+
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::comparable::ComparableExpr;
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::{Node, Range};
@@ -7,25 +14,46 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::settings::hashable::HashableRegex;
 use crate::violation::Violation;
-use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind, Withitem};
-use serde::{Deserialize, Serialize};
-use std::{fmt, iter};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
-pub enum BindingKind {
+pub enum OuterBindingKind {
+    For,
+    With,
+}
+
+impl fmt::Display for OuterBindingKind {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OuterBindingKind::For => fmt.write_str("`for` loop"),
+            OuterBindingKind::With => fmt.write_str("`with` statement"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
+pub enum InnerBindingKind {
     For,
     With,
     Assignment,
 }
 
-impl fmt::Display for BindingKind {
+impl fmt::Display for InnerBindingKind {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            BindingKind::For => fmt.write_str("for loop"),
-            BindingKind::With => fmt.write_str("with statement"),
-            BindingKind::Assignment => fmt.write_str("assignment"),
+            InnerBindingKind::For => fmt.write_str("`for` loop"),
+            InnerBindingKind::With => fmt.write_str("`with` statement"),
+            InnerBindingKind::Assignment => fmt.write_str("assignment"),
         }
+    }
+}
+
+impl PartialEq<InnerBindingKind> for OuterBindingKind {
+    fn eq(&self, other: &InnerBindingKind) -> bool {
+        matches!(
+            (self, other),
+            (OuterBindingKind::For, InnerBindingKind::For)
+                | (OuterBindingKind::With, InnerBindingKind::With)
+        )
     }
 }
 
@@ -68,8 +96,8 @@ define_violation!(
     /// ```
     pub struct RedefinedLoopName {
         pub name: String,
-        pub outer_kind: BindingKind,
-        pub inner_kind: BindingKind,
+        pub outer_kind: OuterBindingKind,
+        pub inner_kind: InnerBindingKind,
     }
 );
 impl Violation for RedefinedLoopName {
@@ -84,42 +112,38 @@ impl Violation for RedefinedLoopName {
         // to better distinguish them, but to avoid confusion, only do so if the outer and inner
         // kinds are equal. For example, instead of:
         //
-        //    "Outer for loop variable `i` overwritten by inner assignment target."
+        //    "Outer `for` loop variable `i` overwritten by inner assignment target."
         //
         // We have:
         //
-        //    "For loop variable `i` overwritten by assignment target."
+        //    "`for` loop variable `i` overwritten by assignment target."
         //
         // While at the same time, we have:
         //
-        //    "Outer for loop variable `i` overwritten by inner for loop target."
-        //    "Outer with statement variable `f` overwritten by inner with statement target."
+        //    "Outer `for` loop variable `i` overwritten by inner `for` loop target."
+        //    "Outer `with` statement variable `f` overwritten by inner `with` statement target."
 
-        let use_outer_inner_adjectives = outer_kind == inner_kind;
-        let (outer_with_space, inner_with_space) = if use_outer_inner_adjectives {
-            ("outer ", "inner ")
+        if outer_kind == inner_kind {
+            format!("Outer {outer_kind} variable `{name}` overwritten by inner {inner_kind} target")
         } else {
-            ("", "")
-        };
-        let sentence = format!(
-            "{outer_with_space}{outer_kind} variable `{name}` overwritten by \
-            {inner_with_space}{inner_kind} target"
-        );
-        // Capitalize the first letter.
-        let first_letter_uppercased = sentence.chars().next().unwrap().to_uppercase();
-        let remaining_letters = &sentence[sentence.char_indices().nth(1).unwrap().0..];
-        format!("{first_letter_uppercased}{remaining_letters}")
+            format!("{outer_kind} variable `{name}` overwritten by {inner_kind} target")
+        }
     }
 }
 
-struct ExprWithBindingKind<'a> {
+struct ExprWithOuterBindingKind<'a> {
     expr: &'a Expr,
-    binding_kind: BindingKind,
+    binding_kind: OuterBindingKind,
+}
+
+struct ExprWithInnerBindingKind<'a> {
+    expr: &'a Expr,
+    binding_kind: InnerBindingKind,
 }
 
 struct InnerForWithAssignTargetsVisitor<'a> {
     dummy_variable_rgx: &'a HashableRegex,
-    assignment_targets: Vec<ExprWithBindingKind<'a>>,
+    assignment_targets: Vec<ExprWithInnerBindingKind<'a>>,
 }
 
 impl<'a, 'b> Visitor<'b> for InnerForWithAssignTargetsVisitor<'a>
@@ -133,9 +157,9 @@ where
             StmtKind::For { target, .. } | StmtKind::AsyncFor { target, .. } => {
                 self.assignment_targets.extend(
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
-                        ExprWithBindingKind {
+                        ExprWithInnerBindingKind {
                             expr,
-                            binding_kind: BindingKind::For,
+                            binding_kind: InnerBindingKind::For,
                         }
                     }),
                 );
@@ -144,9 +168,9 @@ where
             StmtKind::With { items, .. } => {
                 self.assignment_targets.extend(
                     assignment_targets_from_with_items(items, self.dummy_variable_rgx).map(
-                        |expr| ExprWithBindingKind {
+                        |expr| ExprWithInnerBindingKind {
                             expr,
-                            binding_kind: BindingKind::With,
+                            binding_kind: InnerBindingKind::With,
                         },
                     ),
                 );
@@ -155,9 +179,9 @@ where
             StmtKind::Assign { targets, .. } => {
                 self.assignment_targets.extend(
                     assignment_targets_from_assign_targets(targets, self.dummy_variable_rgx).map(
-                        |expr| ExprWithBindingKind {
+                        |expr| ExprWithInnerBindingKind {
                             expr,
-                            binding_kind: BindingKind::Assignment,
+                            binding_kind: InnerBindingKind::Assignment,
                         },
                     ),
                 );
@@ -165,9 +189,9 @@ where
             StmtKind::AugAssign { target, .. } | StmtKind::AnnAssign { target, .. } => {
                 self.assignment_targets.extend(
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
-                        ExprWithBindingKind {
+                        ExprWithInnerBindingKind {
                             expr,
-                            binding_kind: BindingKind::Assignment,
+                            binding_kind: InnerBindingKind::Assignment,
                         }
                     }),
                 );
@@ -269,11 +293,11 @@ pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>
         Node::Stmt(stmt) => match &stmt.node {
             // With.
             StmtKind::With { items, body, .. } => {
-                let outer_assignment_targets: Vec<ExprWithBindingKind<'a>> =
+                let outer_assignment_targets: Vec<ExprWithOuterBindingKind<'a>> =
                     assignment_targets_from_with_items(items, &checker.settings.dummy_variable_rgx)
-                        .map(|expr| ExprWithBindingKind {
+                        .map(|expr| ExprWithOuterBindingKind {
                             expr,
-                            binding_kind: BindingKind::With,
+                            binding_kind: OuterBindingKind::With,
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
@@ -287,11 +311,11 @@ pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>
             }
             // For and async for.
             StmtKind::For { target, body, .. } | StmtKind::AsyncFor { target, body, .. } => {
-                let outer_assignment_targets: Vec<ExprWithBindingKind<'a>> =
+                let outer_assignment_targets: Vec<ExprWithOuterBindingKind<'a>> =
                     assignment_targets_from_expr(target, &checker.settings.dummy_variable_rgx)
-                        .map(|expr| ExprWithBindingKind {
+                        .map(|expr| ExprWithOuterBindingKind {
                             expr,
-                            binding_kind: BindingKind::For,
+                            binding_kind: OuterBindingKind::For,
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
