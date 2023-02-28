@@ -40,25 +40,25 @@ static STARTSWITH_DEF_REGEX: Lazy<Regex> =
 pub fn whitespace_around_named_parameter_equals(
     tokens: &[(Location, &Tok, Location)],
     line: &str,
-) -> Vec<(usize, DiagnosticKind)> {
+) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut parens = 0;
     let mut require_space = false;
     let mut no_space = false;
     let mut annotated_func_arg = false;
-    let mut prev_end: Option<&Location> = None;
+    let mut prev_end: Option<Location> = None;
 
     let in_def = STARTSWITH_DEF_REGEX.is_match(line);
 
-    for (start, token, end) in tokens.iter() {
-        if **token == Tok::NonLogicalNewline {
+    for (start, token, end) in tokens.to_owned() {
+        if *token == Tok::NonLogicalNewline {
             continue;
         }
         if no_space {
             no_space = false;
             if Some(start) != prev_end {
                 diagnostics.push((
-                    prev_end.unwrap().column(),
+                    prev_end.unwrap(),
                     UnexpectedSpacesAroundKeywordParameterEquals.into(),
                 ));
             }
@@ -66,35 +66,29 @@ pub fn whitespace_around_named_parameter_equals(
         if require_space {
             require_space = false;
             if Some(start) == prev_end {
-                diagnostics.push((
-                    start.column(),
-                    MissingWhitespaceAroundParameterEquals.into(),
-                ));
+                diagnostics.push((start, MissingWhitespaceAroundParameterEquals.into()));
             }
         }
-        if is_op_token(*token) {
-            if **token == Tok::Lpar || **token == Tok::Lsqb {
+        if is_op_token(token) {
+            if *token == Tok::Lpar || *token == Tok::Lsqb {
                 parens += 1;
-            } else if **token == Tok::Rpar || **token == Tok::Rsqb {
+            } else if *token == Tok::Rpar || *token == Tok::Rsqb {
                 parens -= 1;
-            } else if in_def && **token == Tok::Colon && parens == 1 {
+            } else if in_def && *token == Tok::Colon && parens == 1 {
                 annotated_func_arg = true;
-            } else if parens == 1 && **token == Tok::Comma {
+            } else if parens == 1 && *token == Tok::Comma {
                 annotated_func_arg = false;
-            } else if parens > 0 && **token == Tok::Equal {
+            } else if parens > 0 && *token == Tok::Equal {
                 if annotated_func_arg && parens == 1 {
                     require_space = true;
                     if Some(start) == prev_end {
-                        diagnostics.push((
-                            start.column(),
-                            MissingWhitespaceAroundParameterEquals.into(),
-                        ));
+                        diagnostics.push((start, MissingWhitespaceAroundParameterEquals.into()));
                     }
                 } else {
                     no_space = true;
                     if Some(start) != prev_end {
                         diagnostics.push((
-                            prev_end.unwrap().column(),
+                            prev_end.unwrap(),
                             UnexpectedSpacesAroundKeywordParameterEquals.into(),
                         ));
                     }

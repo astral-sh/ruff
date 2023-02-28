@@ -134,10 +134,9 @@ pub fn check_logical_lines(
             }
         }
         if line.flags.contains(TokenFlags::OPERATOR) {
-            for (index, kind) in whitespace_around_named_parameter_equals(&line.tokens, &line.text)
+            for (location, kind) in
+                whitespace_around_named_parameter_equals(&line.tokens, &line.text)
             {
-                let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
-                let location = Location::new(pos.row(), pos.column() + index - token_offset);
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,

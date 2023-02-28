@@ -852,6 +852,8 @@ impl Rule {
             | Rule::UnexpectedIndentationComment
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
+            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
+            | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }
