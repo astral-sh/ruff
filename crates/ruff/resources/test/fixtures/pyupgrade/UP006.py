@@ -28,3 +28,10 @@ def f(x: IList[str]) -> None:
 
 def f(x: "List[str]") -> None:
     ...
+
+
+list = "abc"
+
+
+def f(x: List[str]) -> None:
+    ...
