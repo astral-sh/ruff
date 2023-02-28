@@ -20,8 +20,7 @@ the intention of adding a stable public API in the future.
 ### `select`, `extend-select`, `ignore`, and `extend-ignore` have new semantics ([#2312](https://github.com/charliermarsh/ruff/pull/2312))
 
 Previously, the interplay between `select` and its related options could lead to unexpected
-behavior. For example, `ruff --select E501 --ignore ALL` and `ruff --select E501 --extend-ignore
-ALL` behaved differently. (See [#2312](https://github.com/charliermarsh/ruff/pull/2312) for more
+behavior. For example, `ruff --select E501 --ignore ALL` and `ruff --select E501 --extend-ignore ALL` behaved differently. (See [#2312](https://github.com/charliermarsh/ruff/pull/2312) for more
 examples.)
 
 When Ruff determines the enabled rule set, it has to reconcile `select` and `ignore` from a variety
@@ -74,7 +73,7 @@ ruff rule E402   --format json      # Works! (And preferred.)
 This change is largely backwards compatible -- most users should experience
 no change in behavior. However, please note the following exceptions:
 
-* Subcommands will now fail when invoked with unsupported arguments, instead
+- Subcommands will now fail when invoked with unsupported arguments, instead
   of silently ignoring them. For example, the following will now fail:
 
   ```console
@@ -83,16 +82,16 @@ no change in behavior. However, please note the following exceptions:
 
   (the `clean` command doesn't support `--respect-gitignore`.)
 
-* The semantics of `ruff <arg>` have changed slightly when `<arg>` is a valid subcommand.
+- The semantics of `ruff <arg>` have changed slightly when `<arg>` is a valid subcommand.
   For example, prior to this release, running `ruff rule` would run `ruff` over a file or
   directory called `rule`. Now, `ruff rule` would invoke the `rule` subcommand. This should
   only impact projects with files or directories named `rule`, `check`, `explain`, `clean`,
   or `generate-shell-completion`.
 
-* Scripts that invoke ruff should supply `--` before any positional arguments.
+- Scripts that invoke ruff should supply `--` before any positional arguments.
   (The semantics of `ruff -- <arg>` have not changed.)
 
-* `--explain` previously treated `--format grouped` as a synonym for `--format text`.
+- `--explain` previously treated `--format grouped` as a synonym for `--format text`.
   This is no longer supported; instead, use `--format text`.
 
 ## 0.0.226

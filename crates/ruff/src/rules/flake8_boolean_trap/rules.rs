@@ -56,6 +56,9 @@ const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "bytes",
     "int",
     "float",
+    "getint",
+    "getfloat",
+    "getboolean",
 ];
 
 const FUNC_DEF_NAME_ALLOWLIST: &[&str] = &["__setitem__"];

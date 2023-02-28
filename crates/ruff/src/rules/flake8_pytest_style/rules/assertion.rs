@@ -12,7 +12,7 @@ use rustpython_parser::ast::{
 
 use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::helpers::unparse_stmt;
+use crate::ast::helpers::{has_comments_in, unparse_stmt};
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::{visitor, whitespace};
@@ -39,6 +39,7 @@ define_violation!(
     /// def test_foo():
     ///     assert something and something_else
     ///
+    ///
     /// def test_bar():
     ///     assert not (something or something_else)
     /// ```
@@ -48,6 +49,7 @@ define_violation!(
     /// def test_foo():
     ///     assert something
     ///     assert something_else
+    ///
     ///
     /// def test_bar():
     ///     assert not something
@@ -66,12 +68,8 @@ impl Violation for CompositeAssertion {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let CompositeAssertion { fixable } = self;
-        if *fixable {
-            Some(|_| format!("Break down assertion into multiple parts"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|_| format!("Break down assertion into multiple parts"))
     }
 }
 
@@ -187,7 +185,7 @@ fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
 /// PT009
 pub fn unittest_assertion(
     checker: &Checker,
-    call: &Expr,
+    expr: &Expr,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
@@ -198,7 +196,8 @@ pub fn unittest_assertion(
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
                 let fixable = checker.current_expr_parent().is_none()
-                    && matches!(checker.current_stmt().node, StmtKind::Expr { .. });
+                    && matches!(checker.current_stmt().node, StmtKind::Expr { .. })
+                    && !has_comments_in(Range::from_located(expr), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     UnittestAssertion {
                         assertion: unittest_assert.to_string(),
@@ -210,8 +209,8 @@ pub fn unittest_assertion(
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         diagnostic.amend(Fix::replacement(
                             unparse_stmt(&stmt, checker.stylist),
-                            call.location,
-                            call.end_location.unwrap(),
+                            expr.location,
+                            expr.end_location.unwrap(),
                         ));
                     }
                 }
@@ -434,7 +433,9 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
-        let fixable = matches!(composite, CompositionKind::Simple) && msg.is_none();
+        let fixable = matches!(composite, CompositionKind::Simple)
+            && msg.is_none()
+            && !has_comments_in(Range::from_located(stmt), checker.locator);
         let mut diagnostic =
             Diagnostic::new(CompositeAssertion { fixable }, Range::from_located(stmt));
         if fixable && checker.patch(diagnostic.kind.rule()) {

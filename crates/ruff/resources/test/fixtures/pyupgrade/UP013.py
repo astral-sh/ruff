@@ -35,3 +35,9 @@ MyType = TypedDict("MyType", {"in": int, "x-y": int})
 # unpacking (OK)
 c = {"c": float}
 MyType = TypedDict("MyType", {"a": int, "b": str, **c})
+
+# Empty dict literal
+MyType = TypedDict("MyType", {})
+
+# Empty dict call
+MyType = TypedDict("MyType", dict())

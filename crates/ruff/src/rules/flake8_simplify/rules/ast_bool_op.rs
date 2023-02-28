@@ -38,8 +38,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
-    /// ```
+    /// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
     pub struct DuplicateIsinstanceCall {
         pub name: String,
     }
@@ -76,14 +75,14 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
 }
 
 define_violation!(
-    pub struct AAndNotA {
+    pub struct ExprAndNotExpr {
         pub name: String,
     }
 );
-impl AlwaysAutofixableViolation for AAndNotA {
+impl AlwaysAutofixableViolation for ExprAndNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AAndNotA { name } = self;
+        let ExprAndNotExpr { name } = self;
         format!("Use `False` instead of `{name} and not {name}`")
     }
 
@@ -93,14 +92,14 @@ impl AlwaysAutofixableViolation for AAndNotA {
 }
 
 define_violation!(
-    pub struct AOrNotA {
+    pub struct ExprOrNotExpr {
         pub name: String,
     }
 );
-impl AlwaysAutofixableViolation for AOrNotA {
+impl AlwaysAutofixableViolation for ExprOrNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AOrNotA { name } = self;
+        let ExprOrNotExpr { name } = self;
         format!("Use `True` instead of `{name} or not {name}`")
     }
 
@@ -110,9 +109,9 @@ impl AlwaysAutofixableViolation for AOrNotA {
 }
 
 define_violation!(
-    pub struct OrTrue;
+    pub struct ExprOrTrue;
 );
-impl AlwaysAutofixableViolation for OrTrue {
+impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `True` instead of `... or True`")
@@ -124,9 +123,9 @@ impl AlwaysAutofixableViolation for OrTrue {
 }
 
 define_violation!(
-    pub struct AndFalse;
+    pub struct ExprAndFalse;
 );
-impl AlwaysAutofixableViolation for AndFalse {
+impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `False` instead of `... and False`")
@@ -369,7 +368,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM220
-pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
+pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
         return;
     };
@@ -404,7 +403,7 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut diagnostic = Diagnostic::new(
-                    AAndNotA {
+                    ExprAndNotExpr {
                         name: id.to_string(),
                     },
                     Range::from_located(expr),
@@ -423,7 +422,7 @@ pub fn a_and_not_a(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM221
-pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
+pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
         return;
     };
@@ -458,7 +457,7 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
         for non_negate_expr in &non_negated_expr {
             if let Some(id) = is_same_expr(negate_expr, non_negate_expr) {
                 let mut diagnostic = Diagnostic::new(
-                    AOrNotA {
+                    ExprOrNotExpr {
                         name: id.to_string(),
                     },
                     Range::from_located(expr),
@@ -477,7 +476,7 @@ pub fn a_or_not_a(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM222
-pub fn or_true(checker: &mut Checker, expr: &Expr) {
+pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
         return;
     };
@@ -490,7 +489,7 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut diagnostic = Diagnostic::new(OrTrue, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(ExprOrTrue, Range::from_located(value));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "True".to_string(),
@@ -504,7 +503,7 @@ pub fn or_true(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM223
-pub fn and_false(checker: &mut Checker, expr: &Expr) {
+pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
         return;
     };
@@ -517,7 +516,7 @@ pub fn and_false(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut diagnostic = Diagnostic::new(AndFalse, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(ExprAndFalse, Range::from_located(value));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "False".to_string(),

@@ -25,14 +25,10 @@ impl Violation for ConsiderUsingFromImport {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let ConsiderUsingFromImport { fixable, .. } = self;
-        if *fixable {
-            Some(|ConsiderUsingFromImport { module, name, .. }| {
+        self.fixable
+            .then_some(|ConsiderUsingFromImport { module, name, .. }| {
                 format!("Replace with `from {module} import {name}`")
             })
-        } else {
-            None
-        }
     }
 }
 

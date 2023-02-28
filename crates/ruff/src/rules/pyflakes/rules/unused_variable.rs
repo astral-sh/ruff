@@ -5,7 +5,7 @@ use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers::contains_effect;
-use crate::ast::types::{BindingKind, Range, RefEquality, ScopeKind};
+use crate::ast::types::{Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
@@ -26,7 +26,7 @@ define_violation!(
     /// [`dummy-variable-rgx`] pattern.
     ///
     /// ## Options
-    /// * `dummy-variable-rgx`
+    /// - `dummy-variable-rgx`
     ///
     /// ## Example
     /// ```python
@@ -330,7 +330,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
         .map(|(name, index)| (name, &checker.bindings[*index]))
     {
         if !binding.used()
-            && matches!(binding.kind, BindingKind::Assignment)
+            && binding.kind.is_assignment()
             && !checker.settings.dummy_variable_rgx.is_match(name)
             && name != &"__tracebackhide__"
             && name != &"__traceback_info__"

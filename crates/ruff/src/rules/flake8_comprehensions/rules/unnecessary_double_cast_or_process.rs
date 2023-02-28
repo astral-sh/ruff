@@ -32,19 +32,19 @@ define_violation!(
     ///
     /// This rule applies to a variety of functions, including `list`, `reversed`,
     /// `set`, `sorted`, and `tuple`. For example:
-    /// * Instead of `list(list(iterable))`, use `list(iterable)`.
-    /// * Instead of `list(tuple(iterable))`, use `list(iterable)`.
-    /// * Instead of `tuple(list(iterable))`, use `tuple(iterable)`.
-    /// * Instead of `tuple(tuple(iterable))`, use `tuple(iterable)`.
-    /// * Instead of `set(set(iterable))`, use `set(iterable)`.
-    /// * Instead of `set(list(iterable))`, use `set(iterable)`.
-    /// * Instead of `set(tuple(iterable))`, use `set(iterable)`.
-    /// * Instead of `set(sorted(iterable))`, use `set(iterable)`.
-    /// * Instead of `set(reversed(iterable))`, use `set(iterable)`.
-    /// * Instead of `sorted(list(iterable))`, use `sorted(iterable)`.
-    /// * Instead of `sorted(tuple(iterable))`, use `sorted(iterable)`.
-    /// * Instead of `sorted(sorted(iterable))`, use `sorted(iterable)`.
-    /// * Instead of `sorted(reversed(iterable))`, use `sorted(iterable)`.
+    /// - Instead of `list(list(iterable))`, use `list(iterable)`.
+    /// - Instead of `list(tuple(iterable))`, use `list(iterable)`.
+    /// - Instead of `tuple(list(iterable))`, use `tuple(iterable)`.
+    /// - Instead of `tuple(tuple(iterable))`, use `tuple(iterable)`.
+    /// - Instead of `set(set(iterable))`, use `set(iterable)`.
+    /// - Instead of `set(list(iterable))`, use `set(iterable)`.
+    /// - Instead of `set(tuple(iterable))`, use `set(iterable)`.
+    /// - Instead of `set(sorted(iterable))`, use `set(iterable)`.
+    /// - Instead of `set(reversed(iterable))`, use `set(iterable)`.
+    /// - Instead of `sorted(list(iterable))`, use `sorted(iterable)`.
+    /// - Instead of `sorted(tuple(iterable))`, use `sorted(iterable)`.
+    /// - Instead of `sorted(sorted(iterable))`, use `sorted(iterable)`.
+    /// - Instead of `sorted(reversed(iterable))`, use `sorted(iterable)`.
     pub struct UnnecessaryDoubleCastOrProcess {
         pub inner: String,
         pub outer: String,

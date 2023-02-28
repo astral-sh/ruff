@@ -2,16 +2,16 @@
 
 Welcome! We're happy to have you here. Thank you in advance for your contribution to Ruff.
 
-* [The Basics](#the-basics)
-  * [Prerequisites](#prerequisites)
-  * [Development](#development)
-  * [Project Structure](#project-structure)
-  * [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
-    * [Rule naming convention](#rule-naming-convention)
-  * [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
-* [MkDocs](#mkdocs)
-* [Release Process](#release-process)
-* [Benchmarks](#benchmarks)
+- [The Basics](#the-basics)
+  - [Prerequisites](#prerequisites)
+  - [Development](#development)
+  - [Project Structure](#project-structure)
+  - [Example: Adding a new lint rule](#example-adding-a-new-lint-rule)
+    - [Rule naming convention](#rule-naming-convention)
+  - [Example: Adding a new configuration option](#example-adding-a-new-configuration-option)
+- [MkDocs](#mkdocs)
+- [Release Process](#release-process)
+- [Benchmarks](#benchmarks)
 
 ## The Basics
 
@@ -56,9 +56,9 @@ Prior to opening a pull request, ensure that your code has been auto-formatted,
 and that it passes both the lint and test validation checks:
 
 ```shell
-cargo fmt --all  # Auto-formatting...
+cargo fmt  # Auto-formatting...
 cargo clippy --fix --workspace --all-targets --all-features  # Linting...
-cargo test --all  # Testing...
+cargo test  # Testing...
 ```
 
 These checks will run on GitHub Actions when you open your Pull Request, but running them locally
@@ -91,27 +91,27 @@ The vast majority of the code, including all lint rules, lives in the `ruff` cra
 
 At time of writing, the repository includes the following crates:
 
-* `crates/ruff`: library crate containing all lint rules and the core logic for running them.
-* `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
-* `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g., `cargo dev generate-all`).
-* `crates/ruff_macros`: library crate containing macros used by Ruff.
-* `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of standard library modules by versionb).
-* `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
+- `crates/ruff`: library crate containing all lint rules and the core logic for running them.
+- `crates/ruff_cli`: binary crate containing Ruff's command-line interface.
+- `crates/ruff_dev`: binary crate containing utilities used in the development of Ruff itself (e.g., `cargo dev generate-all`).
+- `crates/ruff_macros`: library crate containing macros used by Ruff.
+- `crates/ruff_python`: library crate implementing Python-specific functionality (e.g., lists of standard library modules by versionb).
+- `crates/flake8_to_ruff`: binary crate for generating Ruff configuration from Flake8 configuration.
 
 ### Example: Adding a new lint rule
 
 At a high level, the steps involved in adding a new lint rule are as follows:
 
 1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention).
-2. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
-3. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
-4. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
-5. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast.rs` (for AST-based
+1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
+1. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
+1. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
+1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast.rs` (for AST-based
    checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks), `crates/ruff/src/checkers/lines.rs`
    (for text-based checks), or `crates/ruff/src/checkers/filesystem.rs` (for filesystem-based
    checks).
-6. Add a test fixture.
-7. Update the generated files (documentation and generated code).
+1. Add a test fixture.
+1. Update the generated files (documentation and generated code).
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate
 rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
@@ -135,7 +135,7 @@ Run `cargo dev generate-all` to generate the code for your new fixture. Then run
 locally with (e.g.) `cargo run -p ruff_cli -- check crates/ruff/resources/test/fixtures/pycodestyle/E402.py --no-cache --select E402`.
 
 Once you're satisfied with the output, codify the behavior as a snapshot test by adding a new
-`test_case` macro in the relevant `crates/ruff/src/[linter]/mod.rs` file. Then, run `cargo test --all`.
+`test_case` macro in the relevant `crates/ruff/src/[linter]/mod.rs` file. Then, run `cargo test`.
 Your test will fail, but you'll be prompted to follow-up with `cargo insta review`. Accept the
 generated snapshot, then commit the snapshot file alongside the rest of your changes.
 
@@ -147,9 +147,9 @@ The rule name should make sense when read as "allow _rule-name_" or "allow _rule
 
 This implies that rule names:
 
-* should state the bad thing being checked for
+- should state the bad thing being checked for
 
-* should not contain instructions on what you what you should use instead
+- should not contain instructions on what you what you should use instead
   (these belong in the rule documentation and the `autofix_title` for rules that have autofix)
 
 When re-implementing rules from other linters, this convention is given more importance than
@@ -191,13 +191,13 @@ To preview any changes to the documentation locally:
    pip install -r docs/requirements.txt
    ```
 
-2. Generate the MkDocs site with:
+1. Generate the MkDocs site with:
 
    ```shell
    python scripts/generate_mkdocs.py
    ```
 
-3. Run the development server with:
+1. Run the development server with:
 
    ```shell
    mkdocs serve

@@ -36,7 +36,7 @@ define_violation!(
     /// automatic way.
     ///
     /// ## Options
-    /// * `flake8-tidy-imports.banned-api`
+    /// - `flake8-tidy-imports.banned-api`
     pub struct BannedApi {
         pub name: String,
         pub message: String,

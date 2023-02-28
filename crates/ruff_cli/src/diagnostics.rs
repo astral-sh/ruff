@@ -28,7 +28,10 @@ pub struct Diagnostics {
 }
 
 impl Diagnostics {
-    pub fn new(messages: Vec<Message>, imports: Vec<FxHashMap<Option<PathBuf>, Vec<Import>>>) -> Self {
+    pub fn new(
+        messages: Vec<Message>,
+        imports: Vec<FxHashMap<Option<PathBuf>, Vec<Import>>>,
+    ) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),
@@ -76,7 +79,7 @@ pub fn lint_path(
             cache::get(path, package.as_ref(), &metadata, settings, autofix.into())
         {
             debug!("Cache hit for: {}", path.to_string_lossy());
-            return Ok(Diagnostics::new(messages, imports));
+            return Ok(Diagnostics::new(messages, vec![imports]));
         }
         Some(metadata)
     } else {
@@ -89,7 +92,7 @@ pub fn lint_path(
     // Lint the file.
     let (
         LinterResult {
-            data: messages,
+            data: (messages, imports),
             error: parse_error,
         },
         fixed,
@@ -144,16 +147,16 @@ pub fn lint_path(
                 &metadata,
                 settings,
                 autofix.into(),
-                &messages.0,
-                &[messages.1.clone()]
+                &messages,
+                &imports,
             );
         }
     }
 
     Ok(Diagnostics {
-        messages: messages.0,
+        messages: messages,
         fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
-        imports: vec![messages.1],
+        imports: vec![imports],
     })
 }
 
@@ -169,7 +172,7 @@ pub fn lint_stdin(
     // Lint the inputs.
     let (
         LinterResult {
-            data: messages,
+            data: (messages, imports),
             error: parse_error,
         },
         fixed,
@@ -238,11 +241,11 @@ pub fn lint_stdin(
     }
 
     Ok(Diagnostics {
-        messages: messages.0,
+        messages: messages,
         fixed: FxHashMap::from_iter([(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
         )]),
-        imports: vec![messages.1],
+        imports: vec![imports],
     })
 }

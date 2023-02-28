@@ -1,7 +1,8 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Stmt};
 
-use crate::ast::types::Range;
+use ruff_macros::{define_violation, derive_message_formats};
+
+use crate::ast::helpers::identifier_range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
@@ -15,6 +16,7 @@ impl Violation for PropertyWithParameters {
         format!("Cannot have defined parameters for properties")
     }
 }
+
 /// PLR0206
 pub fn property_with_parameters(
     checker: &mut Checker,
@@ -39,7 +41,7 @@ pub fn property_with_parameters(
     {
         checker.diagnostics.push(Diagnostic::new(
             PropertyWithParameters,
-            Range::from_located(stmt),
+            identifier_range(stmt, checker.locator),
         ));
     }
 }

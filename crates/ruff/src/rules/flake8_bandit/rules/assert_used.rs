@@ -1,5 +1,6 @@
+use rustpython_parser::ast::Stmt;
+
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Located, StmtKind};
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
@@ -16,7 +17,7 @@ impl Violation for Assert {
 }
 
 /// S101
-pub fn assert_used(stmt: &Located<StmtKind>) -> Diagnostic {
+pub fn assert_used(stmt: &Stmt) -> Diagnostic {
     Diagnostic::new(
         Assert,
         Range::new(stmt.location, stmt.location.with_col_offset("assert".len())),

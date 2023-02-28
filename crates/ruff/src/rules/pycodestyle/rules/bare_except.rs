@@ -19,7 +19,7 @@ define_violation!(
     /// ## Example
     /// ```python
     /// try:
-    ///     raise(KeyboardInterrupt("You probably don't mean to break CTRL-C."))
+    ///     raise KeyboardInterrupt("You probably don't mean to break CTRL-C.")
     /// except:
     ///     print("But a bare `except` will ignore keyboard interrupts.")
     /// ```
@@ -33,9 +33,9 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [PEP 8](https://www.python.org/dev/peps/pep-0008/#programming-recommendations)
-    /// * [Python: "Exception hierarchy"](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
-    /// * [Google Python Style Guide: "Exceptions"](https://google.github.io/styleguide/pyguide.html#24-exceptions)
+    /// - [PEP 8](https://www.python.org/dev/peps/pep-0008/#programming-recommendations)
+    /// - [Python: "Exception hierarchy"](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
+    /// - [Google Python Style Guide: "Exceptions"](https://google.github.io/styleguide/pyguide.html#24-exceptions)
     pub struct BareExcept;
 );
 impl Violation for BareExcept {

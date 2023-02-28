@@ -229,9 +229,8 @@ impl<'a> Checker<'a> {
 
     /// Return `true` if `member` is bound as a builtin.
     pub fn is_builtin(&self, member: &str) -> bool {
-        self.find_binding(member).map_or(false, |binding| {
-            matches!(binding.kind, BindingKind::Builtin)
-        })
+        self.find_binding(member)
+            .map_or(false, |binding| binding.kind.is_builtin())
     }
 
     pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
@@ -537,6 +536,15 @@ where
                     }
                 }
 
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                        flake8_pyi::rules::pass_statement_stub_body(self, body);
+                    }
+                    if self.settings.rules.enabled(&Rule::NonEmptyStubBody) {
+                        flake8_pyi::rules::non_empty_stub_body(self, body);
+                    }
+                }
+
                 if self.settings.rules.enabled(&Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
                         self.current_scope(),
@@ -546,6 +554,10 @@ where
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
+                }
+
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    pylint::rules::global_statement(self, name);
                 }
 
                 if self
@@ -804,12 +816,30 @@ where
                             self, body,
                         ));
                 }
+
+                if self.settings.rules.enabled(&Rule::ExcludeWithModelForm) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::exclude_with_model_form(self, bases, body)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+                if self.settings.rules.enabled(&Rule::AllWithModelForm) {
+                    if let Some(diagnostic) =
+                        flake8_django::rules::all_with_model_form(self, bases, body)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
                 if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
                     if let Some(diagnostic) =
                         flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
                     {
                         self.diagnostics.push(diagnostic);
                     }
+                }
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    pylint::rules::global_statement(self, name);
                 }
                 if self.settings.rules.enabled(&Rule::UselessObjectInheritance) {
                     pyupgrade::rules::useless_object_inheritance(self, stmt, name, bases, keywords);
@@ -865,6 +895,11 @@ where
                         );
                     }
                 }
+                if self.is_interface_definition {
+                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                        flake8_pyi::rules::pass_statement_stub_body(self, body);
+                    }
+                }
 
                 if self
                     .settings
@@ -909,6 +944,17 @@ where
                 {
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt);
                 }
+
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    for name in names.iter() {
+                        if let Some(asname) = name.node.asname.as_ref() {
+                            pylint::rules::global_statement(self, asname);
+                        } else {
+                            pylint::rules::global_statement(self, &name.node.name);
+                        }
+                    }
+                }
+
                 if self.settings.rules.enabled(&Rule::RewriteCElementTree) {
                     pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
@@ -1164,6 +1210,16 @@ where
                     .enabled(&Rule::ModuleImportNotAtTopOfFile)
                 {
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt);
+                }
+
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    for name in names.iter() {
+                        if let Some(asname) = name.node.asname.as_ref() {
+                            pylint::rules::global_statement(self, asname);
+                        } else {
+                            pylint::rules::global_statement(self, &name.node.name);
+                        }
+                    }
                 }
 
                 if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport)
@@ -1548,6 +1604,12 @@ where
             }
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
+
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    if let ExprKind::Name { id, .. } = &target.node {
+                        pylint::rules::global_statement(self, id);
+                    }
+                }
             }
             StmtKind::If { test, body, orelse } => {
                 if self.settings.rules.enabled(&Rule::IfTuple) {
@@ -1571,7 +1633,7 @@ where
                     );
                 }
                 if self.settings.rules.enabled(&Rule::NeedlessBool) {
-                    flake8_simplify::rules::return_bool_condition_directly(self, stmt);
+                    flake8_simplify::rules::needless_bool(self, stmt);
                 }
                 if self.settings.rules.enabled(&Rule::ManualDictLookup) {
                     flake8_simplify::rules::manual_dict_lookup(self, stmt, test, body, orelse);
@@ -1604,6 +1666,13 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::OutdatedVersionBlock) {
                     pyupgrade::rules::outdated_version_block(self, stmt, test, body, orelse);
+                }
+                if self.settings.rules.enabled(&Rule::CollapsibleElseIf) {
+                    if let Some(diagnostic) =
+                        pylint::rules::collapsible_else_if(orelse, self.locator)
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
                 }
             }
             StmtKind::Assert { test, msg } => {
@@ -1811,6 +1880,14 @@ where
                     }
                 }
 
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    for target in targets.iter() {
+                        if let ExprKind::Name { id, .. } = &target.node {
+                            pylint::rules::global_statement(self, id);
+                        }
+                    }
+                }
+
                 if self.settings.rules.enabled(&Rule::UselessMetaclassType) {
                     pyupgrade::rules::useless_metaclass_type(self, stmt, value, targets);
                 }
@@ -1861,7 +1938,15 @@ where
                     );
                 }
             }
-            StmtKind::Delete { .. } => {}
+            StmtKind::Delete { targets } => {
+                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                    for target in targets.iter() {
+                        if let ExprKind::Name { id, .. } = &target.node {
+                            pylint::rules::global_statement(self, id);
+                        }
+                    }
+                }
+            }
             StmtKind::Expr { value, .. } => {
                 if self.settings.rules.enabled(&Rule::UselessComparison) {
                     flake8_bugbear::rules::useless_comparison(self, value);
@@ -1928,9 +2013,7 @@ where
                     if self.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| {
-                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        })
+                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
                     {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
@@ -1992,9 +2075,7 @@ where
                     if self.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| {
-                            matches!(self.bindings[*index].kind, BindingKind::Annotation)
-                        })
+                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
                     {
                         let index = self.bindings.len();
                         self.bindings.push(Binding {
@@ -2113,6 +2194,10 @@ where
                 self.pop_scope();
             }
             StmtKind::ClassDef { name, .. } => {
+                // maybe E0203 goes here?
+                println!("Current scope for {name}");
+                let current_scope = self.current_scope();
+                println!("{current_scope:#?}");
                 self.pop_scope();
                 self.add_binding(
                     name,
@@ -2177,8 +2262,9 @@ where
         // Pre-visit.
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
-                // Ex) Optional[...]
-                if !self.in_deferred_string_type_definition
+                // Ex) Optional[...], Union[...]
+                if self.in_type_definition
+                    && !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(&Rule::TypingUnion)
                     && (self.settings.target_version >= PythonVersion::Py310
@@ -2279,7 +2365,7 @@ where
                     pylint::rules::used_prior_global_declaration(self, id, expr);
                 }
             }
-            ExprKind::Attribute { attr, value, .. } => {
+            ExprKind::Attribute { attr, value, ctx } => {
                 // Ex) typing.List[...]
                 if !self.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
@@ -2316,6 +2402,8 @@ where
                     flake8_self::rules::private_member_access(self, expr);
                 }
                 pandas_vet::rules::check_attr(self, attr, value, expr);
+                println!("attrib {attr} {value:?} {ctx:?}");
+                // push to scope?
             }
             ExprKind::Call {
                 func,
@@ -2931,6 +3019,11 @@ where
                 {
                     pylint::rules::logging_call(self, func, args, keywords);
                 }
+
+                // flake8-django
+                if self.settings.rules.enabled(&Rule::LocalsInRenderFunction) {
+                    flake8_django::rules::locals_in_render_function(self, func, args, keywords);
+                }
             }
             ExprKind::Dict { keys, values } => {
                 if self
@@ -3424,17 +3517,17 @@ where
                 if self.settings.rules.enabled(&Rule::CompareWithTuple) {
                     flake8_simplify::rules::compare_with_tuple(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AAndNotA) {
-                    flake8_simplify::rules::a_and_not_a(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprAndNotExpr) {
+                    flake8_simplify::rules::expr_and_not_expr(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AOrNotA) {
-                    flake8_simplify::rules::a_or_not_a(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprOrNotExpr) {
+                    flake8_simplify::rules::expr_or_not_expr(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::OrTrue) {
-                    flake8_simplify::rules::or_true(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprOrTrue) {
+                    flake8_simplify::rules::expr_or_true(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AndFalse) {
-                    flake8_simplify::rules::and_false(self, expr);
+                if self.settings.rules.enabled(&Rule::ExprAndFalse) {
+                    flake8_simplify::rules::expr_and_false(self, expr);
                 }
             }
             _ => {}
@@ -3920,6 +4013,21 @@ where
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
         }
 
+        if self.is_interface_definition {
+            if self
+                .settings
+                .rules
+                .enabled(&Rule::TypedArgumentSimpleDefaults)
+            {
+                flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
+            }
+        }
+        if self.is_interface_definition {
+            if self.settings.rules.enabled(&Rule::ArgumentSimpleDefaults) {
+                flake8_pyi::rules::argument_simple_defaults(self, arguments);
+            }
+        }
+
         // Bind, but intentionally avoid walking default expressions, as we handle them
         // upstream.
         for arg in &arguments.posonlyargs {
@@ -4136,7 +4244,7 @@ impl<'a> Checker<'a> {
             let existing_binding_index = self.scopes[*scope_index].bindings.get(&name).unwrap();
             let existing = &self.bindings[*existing_binding_index];
             let in_current_scope = stack_index == 0;
-            if !matches!(existing.kind, BindingKind::Builtin)
+            if !existing.kind.is_builtin()
                 && existing.source.as_ref().map_or(true, |left| {
                     binding.source.as_ref().map_or(true, |right| {
                         !branch_detection::different_forks(
@@ -4156,7 +4264,7 @@ impl<'a> Checker<'a> {
                         | BindingKind::StarImportation(..)
                         | BindingKind::FutureImportation
                 );
-                if matches!(binding.kind, BindingKind::LoopVar) && existing_is_import {
+                if binding.kind.is_loop_var() && existing_is_import {
                     if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::ImportShadowedByLoopVar {
@@ -4170,7 +4278,7 @@ impl<'a> Checker<'a> {
                     if !existing.used()
                         && binding.redefines(existing)
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
-                        && !(matches!(existing.kind, BindingKind::FunctionDefinition)
+                        && !(existing.kind.is_function_definition()
                             && visibility::is_overload(
                                 self,
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
@@ -4205,36 +4313,29 @@ impl<'a> Checker<'a> {
 
         let scope = self.current_scope();
         let binding = if let Some(index) = scope.bindings.get(&name) {
-            if matches!(self.bindings[*index].kind, BindingKind::Builtin) {
-                // Avoid overriding builtins.
-                binding
-            } else if matches!(self.bindings[*index].kind, BindingKind::Global) {
-                // If the original binding was a global, and the new binding conflicts within
-                // the current scope, then the new binding is also a global.
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
-                    kind: BindingKind::Global,
-                    ..binding
+            let existing = &self.bindings[*index];
+            match &existing.kind {
+                BindingKind::Builtin => {
+                    // Avoid overriding builtins.
+                    binding
                 }
-            } else if matches!(self.bindings[*index].kind, BindingKind::Nonlocal) {
-                // If the original binding was a nonlocal, and the new binding conflicts within
-                // the current scope, then the new binding is also a nonlocal.
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
-                    kind: BindingKind::Nonlocal,
-                    ..binding
+                kind @ (BindingKind::Global | BindingKind::Nonlocal) => {
+                    // If the original binding was a global or nonlocal, and the new binding conflicts within
+                    // the current scope, then the new binding is also as the same.
+                    Binding {
+                        runtime_usage: existing.runtime_usage,
+                        synthetic_usage: existing.synthetic_usage,
+                        typing_usage: existing.typing_usage,
+                        kind: kind.clone(),
+                        ..binding
+                    }
                 }
-            } else {
-                Binding {
-                    runtime_usage: self.bindings[*index].runtime_usage,
-                    synthetic_usage: self.bindings[*index].synthetic_usage,
-                    typing_usage: self.bindings[*index].typing_usage,
+                _ => Binding {
+                    runtime_usage: existing.runtime_usage,
+                    synthetic_usage: existing.synthetic_usage,
+                    typing_usage: existing.typing_usage,
                     ..binding
-                }
+                },
             }
         } else {
             binding
@@ -4243,7 +4344,7 @@ impl<'a> Checker<'a> {
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
         let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-        if !(matches!(binding.kind, BindingKind::Annotation) && scope.bindings.contains_key(name)) {
+        if !(binding.kind.is_annotation() && scope.bindings.contains_key(name)) {
             if let Some(rebound_index) = scope.bindings.insert(name, binding_index) {
                 scope
                     .rebounds
@@ -4282,7 +4383,7 @@ impl<'a> Checker<'a> {
                 let context = self.execution_context();
                 self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
 
-                if matches!(self.bindings[*index].kind, BindingKind::Annotation)
+                if self.bindings[*index].kind.is_annotation()
                     && !self.in_deferred_string_type_definition
                     && !self.in_deferred_type_definition
                 {
@@ -4430,9 +4531,7 @@ impl<'a> Checker<'a> {
                     .current_scope()
                     .bindings
                     .get(id)
-                    .map_or(false, |index| {
-                        matches!(self.bindings[*index].kind, BindingKind::Global)
-                    })
+                    .map_or(false, |index| self.bindings[*index].kind.is_global())
                 {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
@@ -4935,7 +5034,7 @@ impl<'a> Checker<'a> {
             {
                 for (name, index) in &scope.bindings {
                     let binding = &self.bindings[*index];
-                    if matches!(binding.kind, BindingKind::Global) {
+                    if binding.kind.is_global() {
                         if let Some(stmt) = &binding.source {
                             if matches!(stmt.node, StmtKind::Global { .. }) {
                                 diagnostics.push(Diagnostic::new(
@@ -5359,9 +5458,22 @@ impl<'a> Checker<'a> {
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
+            if self.is_interface_definition {
+                if self.settings.rules.enabled(&Rule::DocstringInStub) {
+                    flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
+                }
+            }
 
             // pydocstyle
             if enforce_docstrings {
+                if pydocstyle::helpers::should_ignore_definition(
+                    self,
+                    &definition,
+                    &self.settings.pydocstyle.ignore_decorators,
+                ) {
+                    continue;
+                }
+
                 if definition.docstring.is_none() {
                     pydocstyle::rules::not_missing(self, &definition, &visibility);
                     continue;

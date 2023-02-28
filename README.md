@@ -24,17 +24,17 @@ An extremely fast Python linter, written in Rust.
   <i>Linting the CPython codebase from scratch.</i>
 </p>
 
-* ⚡️  10-100x faster than existing linters
-* 🐍  Installable via `pip`
-* 🛠️  `pyproject.toml` support
-* 🤝  Python 3.11 compatibility
-* 📦  Built-in caching, to avoid re-analyzing unchanged files
-* 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-* 📏  Over [400 built-in rules](https://beta.ruff.rs/docs/rules/) (and growing)
-* ⚖️  [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
-* 🔌  Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
-* ⌨️  First-party editor integrations for [VS Code](https://github.com/charliermarsh/ruff-vscode) and [more](https://github.com/charliermarsh/ruff-lsp)
-* 🌎  Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
+- ⚡️  10-100x faster than existing linters
+- 🐍  Installable via `pip`
+- 🛠️  `pyproject.toml` support
+- 🤝  Python 3.11 compatibility
+- 📦  Built-in caching, to avoid re-analyzing unchanged files
+- 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
+- 📏  Over [500 built-in rules](https://beta.ruff.rs/docs/rules/) (and growing)
+- ⚖️  [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
+- 🔌  Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
+- ⌨️  First-party editor integrations for [VS Code](https://github.com/charliermarsh/ruff-vscode) and [more](https://github.com/charliermarsh/ruff-lsp)
+- 🌎  Monorepo-friendly, with [hierarchical and cascading configuration](https://beta.ruff.rs/docs/configuration/#pyprojecttoml-discovery)
 
 Ruff aims to be orders of magnitude faster than alternative tools while integrating more
 functionality behind a single, common interface.
@@ -47,11 +47,11 @@ all while executing tens or hundreds of times faster than any individual tool.
 
 Ruff is extremely actively developed and used in major open-source projects like:
 
-* [pandas](https://github.com/pandas-dev/pandas)
-* [FastAPI](https://github.com/tiangolo/fastapi)
-* [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
-* [Apache Airflow](https://github.com/apache/airflow)
-* [SciPy](https://github.com/scipy/scipy)
+- [pandas](https://github.com/pandas-dev/pandas)
+- [FastAPI](https://github.com/tiangolo/fastapi)
+- [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
+- [Apache Airflow](https://github.com/apache/airflow)
+- [SciPy](https://github.com/scipy/scipy)
 
 ...and many more.
 
@@ -98,13 +98,13 @@ developer of [Zulip](https://github.com/zulip/zulip):
 For more, see the [documentation](https://beta.ruff.rs/docs/).
 
 1. [Getting Started](#getting-started)
-2. [Configuration](#configuration)
-3. [Rules](#rules)
-4. [Contributing](#contributing)
-5. [Support](#support)
-6. [Acknowledgements](#acknowledgements)
-7. [Who's Using Ruff?](#whos-using-ruff)
-8. [License](#license)
+1. [Configuration](#configuration)
+1. [Rules](#rules)
+1. [Contributing](#contributing)
+1. [Support](#support)
+1. [Acknowledgements](#acknowledgements)
+1. [Who's Using Ruff?](#whos-using-ruff)
+1. [License](#license)
 
 ## Getting Started
 
@@ -137,7 +137,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.252'
+  rev: 'v0.0.253'
   hooks:
     - id: ruff
 ```
@@ -147,9 +147,9 @@ alongside any other editor through the [Ruff LSP](https://github.com/charliermar
 
 ### Configuration
 
-Ruff can be configured via a `pyproject.toml` file, a `ruff.toml` file, or through the command line
-(see: [_Configuration_](https://beta.ruff.rs/docs/configuration/), or
-[_Settings_](https://beta.ruff.rs/docs/settings/) for a complete list of all configuration options).
+Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (see:
+[_Configuration_](https://beta.ruff.rs/docs/configuration/), or [_Settings_](https://beta.ruff.rs/docs/settings/)
+for a complete list of all configuration options).
 
 If left unspecified, the default configuration is equivalent to:
 
@@ -216,7 +216,7 @@ linting command.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 400 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 500 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
@@ -269,41 +269,41 @@ Ruff is released under the MIT license.
 
 Ruff is used in a number of major open-source projects, including:
 
-* [pandas](https://github.com/pandas-dev/pandas)
-* [FastAPI](https://github.com/tiangolo/fastapi)
-* [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
-* [Diffusers (Hugging Face)](https://github.com/huggingface/diffusers)
-* [Apache Airflow](https://github.com/apache/airflow)
-* [SciPy](https://github.com/scipy/scipy)
-* [Zulip](https://github.com/zulip/zulip)
-* [Bokeh](https://github.com/bokeh/bokeh)
-* [Pydantic](https://github.com/pydantic/pydantic)
-* [Dagster](https://github.com/dagster-io/dagster)
-* [Dagger](https://github.com/dagger/dagger)
-* [Sphinx](https://github.com/sphinx-doc/sphinx)
-* [Hatch](https://github.com/pypa/hatch)
-* [PDM](https://github.com/pdm-project/pdm)
-* [Jupyter](https://github.com/jupyter-server/jupyter_server)
-* [Great Expectations](https://github.com/great-expectations/great_expectations)
-* [ONNX](https://github.com/onnx/onnx)
-* [Polars](https://github.com/pola-rs/polars)
-* [Ibis](https://github.com/ibis-project/ibis)
-* [Synapse (Matrix)](https://github.com/matrix-org/synapse)
-* [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
-* [Dispatch (Netflix)](https://github.com/Netflix/dispatch)
-* [Saleor](https://github.com/saleor/saleor)
-* [Pynecone](https://github.com/pynecone-io/pynecone)
-* [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
-* [Home Assistant](https://github.com/home-assistant/core)
-* [Pylint](https://github.com/PyCQA/pylint)
-* [Cryptography (PyCA)](https://github.com/pyca/cryptography)
-* [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
-* [build (PyPA)](https://github.com/pypa/build)
-* [Babel](https://github.com/python-babel/babel)
-* [featuretools](https://github.com/alteryx/featuretools)
-* [meson-python](https://github.com/mesonbuild/meson-python)
-* [ZenML](https://github.com/zenml-io/zenml)
-* [delta-rs](https://github.com/delta-io/delta-rs)
+- [pandas](https://github.com/pandas-dev/pandas)
+- [FastAPI](https://github.com/tiangolo/fastapi)
+- [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
+- [Diffusers (Hugging Face)](https://github.com/huggingface/diffusers)
+- [Apache Airflow](https://github.com/apache/airflow)
+- [SciPy](https://github.com/scipy/scipy)
+- [Zulip](https://github.com/zulip/zulip)
+- [Bokeh](https://github.com/bokeh/bokeh)
+- [Pydantic](https://github.com/pydantic/pydantic)
+- [Dagster](https://github.com/dagster-io/dagster)
+- [Dagger](https://github.com/dagger/dagger)
+- [Sphinx](https://github.com/sphinx-doc/sphinx)
+- [Hatch](https://github.com/pypa/hatch)
+- [PDM](https://github.com/pdm-project/pdm)
+- [Jupyter](https://github.com/jupyter-server/jupyter_server)
+- [Great Expectations](https://github.com/great-expectations/great_expectations)
+- [ONNX](https://github.com/onnx/onnx)
+- [Polars](https://github.com/pola-rs/polars)
+- [Ibis](https://github.com/ibis-project/ibis)
+- [Synapse (Matrix)](https://github.com/matrix-org/synapse)
+- [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
+- [Dispatch (Netflix)](https://github.com/Netflix/dispatch)
+- [Saleor](https://github.com/saleor/saleor)
+- [Pynecone](https://github.com/pynecone-io/pynecone)
+- [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
+- [Home Assistant](https://github.com/home-assistant/core)
+- [Pylint](https://github.com/PyCQA/pylint)
+- [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
+- [build (PyPA)](https://github.com/pypa/build)
+- [Babel](https://github.com/python-babel/babel)
+- [featuretools](https://github.com/alteryx/featuretools)
+- [meson-python](https://github.com/mesonbuild/meson-python)
+- [ZenML](https://github.com/zenml-io/zenml)
+- [delta-rs](https://github.com/delta-io/delta-rs)
 
 ## License
 

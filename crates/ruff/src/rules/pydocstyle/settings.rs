@@ -1,5 +1,7 @@
 //! Settings for the `pydocstyle` plugin.
 
+use std::collections::BTreeSet;
+
 use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -84,17 +86,30 @@ pub struct Options {
     /// Whether to use Google-style or NumPy-style conventions or the PEP257
     /// defaults when analyzing docstring sections.
     pub convention: Option<Convention>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            ignore-decorators = ["typing.overload"]
+        "#
+    )]
+    /// Ignore docstrings for functions or methods decorated with the
+    /// specified decorators. Unlike the `pydocstyle`, Ruff accepts an array
+    /// of fully-qualified module identifiers, instead of a regular expression.
+    pub ignore_decorators: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Hash)]
 pub struct Settings {
     pub convention: Option<Convention>,
+    pub ignore_decorators: BTreeSet<String>,
 }
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
             convention: options.convention,
+            ignore_decorators: BTreeSet::from_iter(options.ignore_decorators.unwrap_or_default()),
         }
     }
 }
@@ -103,6 +118,7 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             convention: settings.convention,
+            ignore_decorators: Some(settings.ignore_decorators.into_iter().collect()),
         }
     }
 }

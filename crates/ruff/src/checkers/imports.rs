@@ -55,12 +55,12 @@ pub fn check_imports(
     }
     let mut imports: FxHashMap<Option<PathBuf>, Vec<Import>> = FxHashMap::default();
     let mut imports_vec = vec![];
-    for &block in blocks.iter() {
+    for &block in &blocks {
         block.imports.iter().for_each(|&stmt| match &stmt.node {
             StmtKind::Import { names } => {
                 // from testing, seems this should only have one entry
                 imports_vec.push(Import {
-                    name: names[0].node.name.to_owned(),
+                    name: names[0].node.name.clone(),
                     location: stmt.location,
                     end_location: stmt.end_location.unwrap(),
                 });
@@ -69,8 +69,17 @@ pub fn check_imports(
                 names
                     .iter()
                     .map(|name| Import {
-                        name: format!("{}{}", { if let Some(n) = module {
-                            n } else { "" }}, name.node.name),
+                        name: format!(
+                            "{}{}",
+                            {
+                                if let Some(n) = module {
+                                    n
+                                } else {
+                                    ""
+                                }
+                            },
+                            name.node.name
+                        ),
                         location: name.location,
                         end_location: name.end_location.unwrap(),
                     })
@@ -81,11 +90,7 @@ pub fn check_imports(
     }
 
     // to avoid depedence on ref to python_ast
-    let package = if let Some(package_path) = package {
-        Some(package_path.to_path_buf())
-    } else {
-        None
-    };
+    let package = package.map(|package_path| package_path.to_path_buf());
 
     imports.insert(package, imports_vec);
     println!("imports.rs {imports:?}");

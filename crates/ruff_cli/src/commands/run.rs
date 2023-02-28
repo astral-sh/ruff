@@ -41,23 +41,22 @@ pub fn run(
 
     // Initialize the cache.
     if cache.into() {
+        fn init_cache(path: &std::path::Path) {
+            if let Err(e) = cache::init(path) {
+                error!(
+                    "Failed to initialize cache at {}: {e:?}",
+                    path.to_string_lossy()
+                );
+            }
+        }
+
         match &pyproject_strategy {
             PyprojectDiscovery::Fixed(settings) => {
-                if let Err(e) = cache::init(&settings.cli.cache_dir) {
-                    error!(
-                        "Failed to initialize cache at {}: {e:?}",
-                        settings.cli.cache_dir.to_string_lossy()
-                    );
-                }
+                init_cache(&settings.cli.cache_dir);
             }
             PyprojectDiscovery::Hierarchical(default) => {
                 for settings in std::iter::once(default).chain(resolver.iter()) {
-                    if let Err(e) = cache::init(&settings.cli.cache_dir) {
-                        error!(
-                            "Failed to initialize cache at {}: {e:?}",
-                            settings.cli.cache_dir.to_string_lossy()
-                        );
-                    }
+                    init_cache(&settings.cli.cache_dir);
                 }
             }
         }
@@ -108,14 +107,18 @@ pub fn run(
                     );
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(&Rule::IOError) {
-                        Diagnostics::new(vec![Message::from_diagnostic(
-                            Diagnostic::new(
-                                IOError { message },
-                                Range::new(Location::default(), Location::default()),
-                            ),
-                            format!("{}", path.display()),
-                            None,
-                        )], vec![])
+                        Diagnostics::new(
+                            vec![Message::from_diagnostic(
+                                Diagnostic::new(
+                                    IOError { message },
+                                    Range::new(Location::default(), Location::default()),
+                                ),
+                                format!("{}", path.display()),
+                                None,
+                                1,
+                            )],
+                            vec![],
+                        )
                     } else {
                         Diagnostics::default()
                     }

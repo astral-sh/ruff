@@ -1,6 +1,7 @@
 use anyhow::Result;
-use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
 use rustpython_parser::lexer::LexResult;
+
+use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
 
 use crate::attachment::attach;
 use crate::context::ASTFormatContext;
@@ -10,7 +11,6 @@ use crate::newlines::normalize_newlines;
 use crate::parentheses::normalize_parentheses;
 
 mod attachment;
-pub mod builders;
 pub mod cli;
 pub mod context;
 mod core;
@@ -35,7 +35,10 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
     let python_ast = ruff_rustpython::parse_program_tokens(tokens, "<filename>")?;
 
     // Convert to a CST.
-    let mut python_cst: Vec<Stmt> = python_ast.into_iter().map(Into::into).collect();
+    let mut python_cst: Vec<Stmt> = python_ast
+        .into_iter()
+        .map(|stmt| (stmt, &locator).into())
+        .collect();
 
     // Attach trivia.
     attach(&mut python_cst, trivia);
@@ -57,15 +60,16 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::{Formatter, Write};
     use std::fs;
     use std::path::Path;
 
     use anyhow::Result;
+    use similar::TextDiff;
+
+    use ruff_testing_macros::fixture;
 
     use crate::fmt;
-    use ruff_testing_macros::fixture;
-    use similar::TextDiff;
-    use std::fmt::{Formatter, Write};
 
     #[fixture(
         pattern = "resources/test/fixtures/black/**/*.py",

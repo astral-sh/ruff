@@ -78,11 +78,6 @@ fn create_property_assignment_stmt(property: &str, annotation: &ExprKind) -> Stm
     })
 }
 
-/// Generate a `StmtKind::Pass` statement.
-fn create_pass_stmt() -> Stmt {
-    create_stmt(StmtKind::Pass)
-}
-
 /// Generate a `StmtKind:ClassDef` statement based on the provided body,
 /// keywords and base class.
 fn create_class_def_stmt(
@@ -105,6 +100,10 @@ fn create_class_def_stmt(
 }
 
 fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
+    if keys.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
+
     keys.iter()
         .zip(values.iter())
         .map(|(key, value)| match key {
@@ -134,11 +133,19 @@ fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<St
     if id != "dict" {
         bail!("Expected `id` to be `\"dict\"`")
     }
+    if keywords.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
+
     properties_from_keywords(keywords)
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
 fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
+    if keywords.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
+
     keywords
         .iter()
         .map(|keyword| {
@@ -185,12 +192,12 @@ fn match_properties_and_total<'a>(
             ExprKind::Call { func, keywords, .. } => {
                 Ok((properties_from_dict_call(func, keywords)?, total))
             }
-            _ => Ok((vec![create_pass_stmt()], total)),
+            _ => bail!("Expected `arg` to be `ExprKind::Dict` or `ExprKind::Call`"),
         }
     } else if !keywords.is_empty() {
         Ok((properties_from_keywords(keywords)?, None))
     } else {
-        Ok((vec![create_pass_stmt()], None))
+        Ok((vec![create_stmt(StmtKind::Pass)], None))
     }
 }
 
