@@ -178,7 +178,7 @@ instruction()#comment with bad spacing
 ```diff
 --- Black
 +++ Ruff
-@@ -72,14 +72,20 @@
+@@ -72,7 +72,11 @@
              body,
              parameters.children[-1],  # )2
          ]
@@ -190,21 +190,8 @@ instruction()#comment with bad spacing
 +        ]  # type: ignore
      if (
          self._proc is not None
--        # has the child process finished?
--        and self._returncode is None
--        # the child process has finished, but the
-+        and # has the child process finished?
-+        self._returncode
-+        is None
-+        and # the child process has finished, but the
-         # transport hasn't been notified yet?
--        and self._proc.poll() is None
-+        self._proc.poll()
-+        is None
-     ):
-         pass
-     # no newline before or after
-@@ -103,35 +109,35 @@
+         # has the child process finished?
+@@ -103,35 +107,35 @@
      ############################################################################
  
      call2(
@@ -219,10 +206,8 @@ instruction()#comment with bad spacing
          """
  short
  """,
--        # yup
--        arg3=True,
-+        arg3=# yup
-+        True,
+         # yup
+         arg3=True,
      )
 -    lcomp = [
 -        element for element in collection if element is not None  # yup  # yup  # right
@@ -256,7 +241,7 @@ instruction()#comment with bad spacing
      ]
      while True:
          if False:
-@@ -167,7 +173,7 @@
+@@ -167,7 +171,7 @@
  #######################
  
  
@@ -351,13 +336,11 @@ def inline_comments_in_brackets_ruin_everything():
         ]  # type: ignore
     if (
         self._proc is not None
-        and # has the child process finished?
-        self._returncode
-        is None
-        and # the child process has finished, but the
+        # has the child process finished?
+        and self._returncode is None
+        # the child process has finished, but the
         # transport hasn't been notified yet?
-        self._proc.poll()
-        is None
+        and self._proc.poll() is None
     ):
         pass
     # no newline before or after
@@ -389,8 +372,8 @@ short
         """
 short
 """,
-        arg3=# yup
-        True,
+        # yup
+        arg3=True,
     )
     lcomp = [element for element in collection if element is not None]  # yup  # yup  # right
     lcomp2 = [

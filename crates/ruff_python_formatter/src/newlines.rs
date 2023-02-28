@@ -2,7 +2,10 @@ use rustpython_parser::ast::Constant;
 
 use crate::core::visitor;
 use crate::core::visitor::Visitor;
-use crate::cst::{ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind};
+use crate::cst::{
+    Alias, Arg, BoolOp, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Pattern,
+    SliceIndex, Stmt, StmtKind,
+};
 use crate::trivia::{Relationship, Trivia, TriviaKind};
 
 #[derive(Debug, Copy, Clone)]
@@ -296,8 +299,42 @@ struct ExprNormalizer;
 impl<'a> Visitor<'a> for ExprNormalizer {
     fn visit_expr(&mut self, expr: &'a mut Expr) {
         expr.trivia.retain(|c| !c.kind.is_empty_line());
-
         visitor::walk_expr(self, expr);
+    }
+
+    fn visit_alias(&mut self, alias: &'a mut Alias) {
+        alias.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_alias(self, alias);
+    }
+
+    fn visit_arg(&mut self, arg: &'a mut Arg) {
+        arg.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_arg(self, arg);
+    }
+
+    fn visit_excepthandler(&mut self, excepthandler: &'a mut Excepthandler) {
+        excepthandler.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_excepthandler(self, excepthandler);
+    }
+
+    fn visit_keyword(&mut self, keyword: &'a mut Keyword) {
+        keyword.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_keyword(self, keyword);
+    }
+
+    fn visit_bool_op(&mut self, bool_op: &'a mut BoolOp) {
+        bool_op.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_bool_op(self, bool_op);
+    }
+
+    fn visit_slice_index(&mut self, slice_index: &'a mut SliceIndex) {
+        slice_index.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_slice_index(self, slice_index);
+    }
+
+    fn visit_pattern(&mut self, pattern: &'a mut Pattern) {
+        pattern.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_pattern(self, pattern);
     }
 }
 
