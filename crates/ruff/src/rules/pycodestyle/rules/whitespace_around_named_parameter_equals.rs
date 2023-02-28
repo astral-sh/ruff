@@ -7,6 +7,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use ruff_macros::{define_violation, derive_message_formats};
 
+#[cfg(feature = "logical_lines")]
 use crate::rules::pycodestyle::helpers::is_op_token;
 
 use crate::registry::DiagnosticKind;
@@ -107,6 +108,7 @@ pub fn whitespace_around_named_parameter_equals(
 #[cfg(not(feature = "logical_lines"))]
 pub fn whitespace_around_named_parameter_equals(
     _tokens: &[(Location, &Tok, Location)],
-) -> Vec<(usize, DiagnosticKind)> {
+    _line: &str,
+) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }
