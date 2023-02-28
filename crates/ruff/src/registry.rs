@@ -59,6 +59,10 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
     rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,

@@ -127,10 +127,9 @@ pub fn is_op_token(token: &Tok) -> bool {
             | Tok::Percent
             | Tok::Lbrace
             | Tok::Rbrace
-            | Tok::Equal
             | Tok::NotEqual
             | Tok::LessEqual
-            | Tok::Greater
+            | Tok::GreaterEqual
             | Tok::Tilde
             | Tok::CircumFlex
             | Tok::LeftShift
@@ -154,5 +153,6 @@ pub fn is_op_token(token: &Tok) -> bool {
             | Tok::Rarrow
             | Tok::Ellipsis
             | Tok::ColonEqual
+            | Tok::Colon
     )
 }
