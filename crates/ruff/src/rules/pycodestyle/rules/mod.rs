@@ -31,6 +31,13 @@ pub use missing_whitespace_after_keyword::{
     missing_whitespace_after_keyword, MissingWhitespaceAfterKeyword,
 };
 pub use mixed_spaces_and_tabs::{mixed_spaces_and_tabs, MixedSpacesAndTabs};
+
+pub use missing_whitespace_around_operator::{
+    missing_whitespace_around_operator, MissingWhitespaceAroundArithmeticOperator,
+    MissingWhitespaceAroundBitwiseOrShiftOperator, MissingWhitespaceAroundModuloOperator,
+    MissingWhitespaceAroundOperator,
+};
+
 pub use no_newline_at_end_of_file::{no_newline_at_end_of_file, NoNewLineAtEndOfFile};
 pub use not_tests::{not_tests, NotInTest, NotIsTest};
 pub use space_around_operator::{
@@ -71,6 +78,7 @@ mod lambda_assignment;
 mod line_too_long;
 mod literal_comparisons;
 mod missing_whitespace_after_keyword;
+mod missing_whitespace_around_operator;
 mod mixed_spaces_and_tabs;
 mod no_newline_at_end_of_file;
 mod not_tests;

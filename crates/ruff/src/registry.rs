@@ -57,6 +57,14 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundArithmeticOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundBitwiseOrShiftOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundModuloOperator,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
@@ -856,6 +864,10 @@ impl Rule {
             | Rule::WhitespaceBeforeCloseBracket
             | Rule::UnexpectedSpacesAroundKeywordParameterEquals
             | Rule::MissingWhitespaceAroundParameterEquals
+            | Rule::MissingWhitespaceAroundOperator
+            | Rule::MissingWhitespaceAroundArithmeticOperator
+            | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
+            | Rule::MissingWhitespaceAroundModuloOperator
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }
