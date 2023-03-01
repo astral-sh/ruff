@@ -46,7 +46,7 @@ const DEBUGGERS: &[&[&str]] = &[
 
 /// Checks for the presence of a debugger call.
 pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let Some(target) = checker.resolve_call_path(func).and_then(|call_path| {
+    if let Some(target) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
         DEBUGGERS
             .iter()
             .find(|target| call_path.as_slice() == **target)

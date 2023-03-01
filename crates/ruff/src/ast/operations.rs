@@ -7,7 +7,7 @@ use crate::ast::helpers::any_over_expr;
 use crate::ast::types::{BindingKind, Scope};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::checkers::ast::Checker;
+use crate::checkers::context::AstContext;
 
 bitflags! {
     #[derive(Default)]
@@ -19,7 +19,7 @@ bitflags! {
 
 /// Extract the names bound to a given __all__ assignment.
 pub fn extract_all_names(
-    checker: &Checker,
+    ctx: &AstContext,
     stmt: &Stmt,
     scope: &Scope,
 ) -> (Vec<String>, AllNamesFlags) {
@@ -38,7 +38,7 @@ pub fn extract_all_names(
     }
 
     fn extract_elts<'a>(
-        checker: &'a Checker,
+        ctx: &'a AstContext,
         expr: &'a Expr,
     ) -> (Option<&'a Vec<Expr>>, AllNamesFlags) {
         match &expr.node {
@@ -60,7 +60,7 @@ pub fn extract_all_names(
             } => {
                 // Allow `tuple()` and `list()` calls.
                 if keywords.is_empty() && args.len() <= 1 {
-                    if checker.resolve_call_path(func).map_or(false, |call_path| {
+                    if ctx.resolve_call_path(func).map_or(false, |call_path| {
                         call_path.as_slice() == ["", "tuple"]
                             || call_path.as_slice() == ["", "list"]
                     }) {
@@ -96,7 +96,7 @@ pub fn extract_all_names(
     // Grab the existing bound __all__ values.
     if let StmtKind::AugAssign { .. } = &stmt.node {
         if let Some(index) = scope.bindings.get("__all__") {
-            if let BindingKind::Export(existing) = &checker.bindings[*index].kind {
+            if let BindingKind::Export(existing) = &ctx.bindings[*index].kind {
                 names.extend_from_slice(existing);
             }
         }
@@ -113,7 +113,7 @@ pub fn extract_all_names(
             let mut current_right = right;
             loop {
                 // Process the right side, which should be a "real" value.
-                let (elts, new_flags) = extract_elts(checker, current_right);
+                let (elts, new_flags) = extract_elts(ctx, current_right);
                 flags |= new_flags;
                 if let Some(elts) = elts {
                     add_to_names(&mut names, elts, &mut flags);
@@ -125,7 +125,7 @@ pub fn extract_all_names(
                     current_left = left;
                     current_right = right;
                 } else {
-                    let (elts, new_flags) = extract_elts(checker, current_left);
+                    let (elts, new_flags) = extract_elts(ctx, current_left);
                     flags |= new_flags;
                     if let Some(elts) = elts {
                         add_to_names(&mut names, elts, &mut flags);
@@ -134,7 +134,7 @@ pub fn extract_all_names(
                 }
             }
         } else {
-            let (elts, new_flags) = extract_elts(checker, value);
+            let (elts, new_flags) = extract_elts(ctx, value);
             flags |= new_flags;
             if let Some(elts) = elts {
                 add_to_names(&mut names, elts, &mut flags);

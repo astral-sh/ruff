@@ -44,7 +44,7 @@ pub fn request_with_no_cert_validation(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if let Some(target) = checker.resolve_call_path(func).and_then(|call_path| {
+    if let Some(target) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
         if call_path.len() == 2 {
             if call_path[0] == "requests" && REQUESTS_HTTP_VERBS.contains(&call_path[1]) {
                 return Some("requests");

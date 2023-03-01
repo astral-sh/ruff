@@ -36,9 +36,12 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
         // Look for, e.g., `import functools; @functools.lru_cache()`.
         if args.is_empty()
             && keywords.is_empty()
-            && checker.resolve_call_path(func).map_or(false, |call_path| {
-                call_path.as_slice() == ["functools", "lru_cache"]
-            })
+            && checker
+                .ctx
+                .resolve_call_path(func)
+                .map_or(false, |call_path| {
+                    call_path.as_slice() == ["functools", "lru_cache"]
+                })
         {
             let mut diagnostic = Diagnostic::new(
                 LRUCacheWithoutParameters,

@@ -242,11 +242,7 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                 Range::from_located(stmt),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                let deleted: Vec<&Stmt> = checker
-                    .deletions
-                    .iter()
-                    .map(std::convert::Into::into)
-                    .collect();
+                let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                 let locator = checker.locator;
                 match delete_stmt(
                     stmt,
@@ -281,6 +277,7 @@ where
 
     if !bases.iter().any(|expr| {
         checker
+            .ctx
             .resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == ["enum", "Enum"])
     }) {
@@ -295,6 +292,7 @@ where
 
         if let ExprKind::Call { func, .. } = &value.node {
             if checker
+                .ctx
                 .resolve_call_path(func)
                 .map_or(false, |call_path| call_path.as_slice() == ["enum", "auto"])
             {
@@ -337,7 +335,7 @@ pub fn unnecessary_comprehension_any_all(
 ) {
     if let ExprKind::Name { id, .. } = &func.node {
         if (id == "all" || id == "any") && args.len() == 1 {
-            if !checker.is_builtin(id) {
+            if !checker.ctx.is_builtin(id) {
                 return;
             }
             if let ExprKind::ListComp { .. } = args[0].node {

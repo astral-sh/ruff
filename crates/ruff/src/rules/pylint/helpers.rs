@@ -5,8 +5,8 @@ use crate::{
     checkers::ast::Checker,
 };
 
-pub fn in_dunder_init(checker: &mut Checker) -> bool {
-    let scope = checker.current_scope();
+pub fn in_dunder_init(checker: &Checker) -> bool {
+    let scope = checker.ctx.current_scope();
     let ScopeKind::Function(FunctionDef {
         name,
         decorator_list,
@@ -17,13 +17,13 @@ pub fn in_dunder_init(checker: &mut Checker) -> bool {
     if *name != "__init__" {
         return false;
     }
-    let Some(parent) = checker.current_scope_parent() else {
+    let Some(parent) = checker.ctx.current_scope_parent() else {
         return false;
     };
 
     if !matches!(
         function_type::classify(
-            checker,
+            &checker.ctx,
             parent,
             name,
             decorator_list,

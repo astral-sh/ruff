@@ -55,7 +55,7 @@ pub fn unnecessary_collection_call(
         }
         _ => return,
     };
-    if !checker.is_builtin(id) {
+    if !checker.ctx.is_builtin(id) {
         return;
     }
     let mut diagnostic = Diagnostic::new(

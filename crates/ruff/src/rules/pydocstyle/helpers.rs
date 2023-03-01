@@ -85,7 +85,7 @@ pub fn should_ignore_definition(
     | DefinitionKind::Method(parent) = definition.kind
     {
         for decorator in cast::decorator_list(parent) {
-            if let Some(call_path) = checker.resolve_call_path(map_callable(decorator)) {
+            if let Some(call_path) = checker.ctx.resolve_call_path(map_callable(decorator)) {
                 if ignore_decorators
                     .iter()
                     .any(|decorator| to_call_path(decorator) == call_path)

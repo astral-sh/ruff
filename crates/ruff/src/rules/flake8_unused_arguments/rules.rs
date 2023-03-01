@@ -178,7 +178,7 @@ pub fn unused_arguments(
             ..
         }) => {
             match function_type::classify(
-                checker,
+                &checker.ctx,
                 parent,
                 name,
                 decorator_list,

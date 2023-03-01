@@ -56,7 +56,7 @@ pub fn unnecessary_comprehension(
         ExprKind::SetComp { .. } => "set",
         _ => return,
     };
-    if !checker.is_builtin(id) {
+    if !checker.ctx.is_builtin(id) {
         return;
     }
     let mut diagnostic = Diagnostic::new(

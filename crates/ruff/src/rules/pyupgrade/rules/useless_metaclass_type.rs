@@ -48,16 +48,12 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
             return;
         };
     if checker.patch(diagnostic.kind.rule()) {
-        let deleted: Vec<&Stmt> = checker
-            .deletions
-            .iter()
-            .map(std::convert::Into::into)
-            .collect();
-        let defined_by = checker.current_stmt();
-        let defined_in = checker.current_stmt_parent();
+        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
+        let defined_by = checker.ctx.current_stmt();
+        let defined_in = checker.ctx.current_stmt_parent();
         match helpers::delete_stmt(
             defined_by.into(),
-            defined_in.map(std::convert::Into::into),
+            defined_in.map(Into::into),
             &deleted,
             checker.locator,
             checker.indexer,

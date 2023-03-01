@@ -24,9 +24,13 @@ pub fn logging_config_insecure_listen(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["logging", "config", "listen"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["logging", "config", "listen"]
+        })
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
 
         if call_args.get_argument("verify", None).is_none() {

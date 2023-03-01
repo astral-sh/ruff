@@ -192,11 +192,14 @@ const NORETURN_FUNCS: &[&[&str]] = &[
 
 /// Return `true` if the `func` is a known function that never returns.
 fn is_noreturn_func(checker: &Checker, func: &Expr) -> bool {
-    checker.resolve_call_path(func).map_or(false, |call_path| {
-        NORETURN_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-    })
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            NORETURN_FUNCS
+                .iter()
+                .any(|target| call_path.as_slice() == *target)
+        })
 }
 
 /// RET503

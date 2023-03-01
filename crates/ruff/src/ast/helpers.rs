@@ -16,7 +16,7 @@ use smallvec::{smallvec, SmallVec};
 use crate::ast::types::{Binding, BindingKind, CallPath, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::checkers::ast::Checker;
+use crate::checkers::context::AstContext;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 
 /// Create an `Expr` with default location from an `ExprKind`.
@@ -99,17 +99,16 @@ pub fn format_call_path(call_path: &[&str]) -> String {
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-pub fn contains_call_path(checker: &Checker, expr: &Expr, target: &[&str]) -> bool {
+pub fn contains_call_path(ctx: &AstContext, expr: &Expr, target: &[&str]) -> bool {
     any_over_expr(expr, &|expr| {
-        checker
-            .resolve_call_path(expr)
+        ctx.resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == target)
     })
 }
 
 /// Return `true` if the `Expr` contains an expression that appears to include a
 /// side-effect (like a function call).
-pub fn contains_effect(checker: &Checker, expr: &Expr) -> bool {
+pub fn contains_effect(ctx: &AstContext, expr: &Expr) -> bool {
     any_over_expr(expr, &|expr| {
         // Accept empty initializers.
         if let ExprKind::Call {
@@ -125,7 +124,7 @@ pub fn contains_effect(checker: &Checker, expr: &Expr) -> bool {
                         || id == "tuple"
                         || id == "dict"
                         || id == "frozenset")
-                        && checker.is_builtin(id);
+                        && ctx.is_builtin(id);
                     return !is_empty_initializer;
                 }
             }
@@ -669,10 +668,10 @@ pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
 }
 
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
-pub fn uses_magic_variable_access(checker: &Checker, body: &[Stmt]) -> bool {
+pub fn uses_magic_variable_access(ctx: &AstContext, body: &[Stmt]) -> bool {
     any_over_body(body, &|expr| {
         if let ExprKind::Call { func, .. } = &expr.node {
-            checker.resolve_call_path(func).map_or(false, |call_path| {
+            ctx.resolve_call_path(func).map_or(false, |call_path| {
                 call_path.as_slice() == ["", "locals"]
                     || call_path.as_slice() == ["", "globals"]
                     || call_path.as_slice() == ["", "vars"]

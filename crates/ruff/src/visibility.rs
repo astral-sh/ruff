@@ -33,6 +33,7 @@ pub struct VisibleScope {
 pub fn is_staticmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
         checker
+            .ctx
             .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "staticmethod"]
@@ -44,6 +45,7 @@ pub fn is_staticmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
 pub fn is_classmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
         checker
+            .ctx
             .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "classmethod"]
@@ -53,22 +55,27 @@ pub fn is_classmethod(checker: &Checker, decorator_list: &[Expr]) -> bool {
 
 /// Returns `true` if a function definition is an `@overload`.
 pub fn is_overload(checker: &Checker, decorator_list: &[Expr]) -> bool {
-    decorator_list
-        .iter()
-        .any(|expr| checker.match_typing_expr(map_callable(expr), "overload"))
+    decorator_list.iter().any(|expr| {
+        checker
+            .ctx
+            .match_typing_expr(map_callable(expr), "overload")
+    })
 }
 
 /// Returns `true` if a function definition is an `@override` (PEP 698).
 pub fn is_override(checker: &Checker, decorator_list: &[Expr]) -> bool {
-    decorator_list
-        .iter()
-        .any(|expr| checker.match_typing_expr(map_callable(expr), "override"))
+    decorator_list.iter().any(|expr| {
+        checker
+            .ctx
+            .match_typing_expr(map_callable(expr), "override")
+    })
 }
 
 /// Returns `true` if a function definition is an `@abstractmethod`.
 pub fn is_abstract(checker: &Checker, decorator_list: &[Expr]) -> bool {
     decorator_list.iter().any(|expr| {
         checker
+            .ctx
             .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["abc", "abstractmethod"]
@@ -87,6 +94,7 @@ pub fn is_property(
 ) -> bool {
     decorator_list.iter().any(|expr| {
         checker
+            .ctx
             .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "property"]

@@ -36,7 +36,7 @@ pub fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &
 }
 
 pub fn module_import_not_at_top_of_file(checker: &mut Checker, stmt: &Stmt) {
-    if checker.seen_import_boundary && stmt.location.column() == 0 {
+    if checker.ctx.seen_import_boundary && stmt.location.column() == 0 {
         checker.diagnostics.push(Diagnostic::new(
             ModuleImportNotAtTopOfFile,
             Range::from_located(stmt),

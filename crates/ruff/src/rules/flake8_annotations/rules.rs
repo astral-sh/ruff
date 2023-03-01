@@ -441,7 +441,7 @@ fn check_dynamically_typed<F>(
 ) where
     F: FnOnce() -> String,
 {
-    if checker.match_typing_expr(annotation, "Any") {
+    if checker.ctx.match_typing_expr(annotation, "Any") {
         diagnostics.push(Diagnostic::new(
             AnyType { name: func() },
             Range::from_located(annotation),

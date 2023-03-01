@@ -96,7 +96,7 @@ pub fn name_or_parent_is_banned<T>(
 
 /// TID251
 pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
-    if let Some((banned_path, ban)) = checker.resolve_call_path(expr).and_then(|call_path| {
+    if let Some((banned_path, ban)) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
         checker
             .settings
             .flake8_tidy_imports

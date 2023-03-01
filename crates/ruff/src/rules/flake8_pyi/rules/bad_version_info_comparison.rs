@@ -70,9 +70,13 @@ pub fn bad_version_info_comparison(
         return;
     };
 
-    if !checker.resolve_call_path(left).map_or(false, |call_path| {
-        call_path.as_slice() == ["sys", "version_info"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(left)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["sys", "version_info"]
+        })
+    {
         return;
     }
 

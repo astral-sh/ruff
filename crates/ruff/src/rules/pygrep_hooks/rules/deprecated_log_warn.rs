@@ -18,9 +18,13 @@ impl Violation for DeprecatedLogWarn {
 
 /// PGH002 - deprecated use of logging.warn
 pub fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["logging", "warn"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["logging", "warn"]
+        })
+    {
         checker.diagnostics.push(Diagnostic::new(
             DeprecatedLogWarn,
             Range::from_located(func),
