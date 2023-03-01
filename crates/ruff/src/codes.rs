@@ -492,6 +492,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-pyi
         (Flake8Pyi, "001") => Rule::PrefixTypeParams,
+        (Flake8Pyi, "006") => Rule::BadVersionInfoComparison,
         (Flake8Pyi, "007") => Rule::UnrecognizedPlatformCheck,
         (Flake8Pyi, "008") => Rule::UnrecognizedPlatformName,
         (Flake8Pyi, "009") => Rule::PassStatementStubBody,

@@ -233,6 +233,14 @@ impl<'a> Checker<'a> {
             .map_or(false, |binding| binding.kind.is_builtin())
     }
 
+    /// Resolves the call path, e.g. if you have a file
+    ///
+    /// ```python
+    /// from sys import version_info as python_version
+    /// print(python_version)
+    /// ```
+    ///
+    /// then `python_version` from the print statement will resolve to `sys.version_info`.
     pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
     where
         'b: 'a,
@@ -3384,6 +3392,16 @@ where
                         || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
                     {
                         flake8_pyi::rules::unrecognized_platform(
+                            self,
+                            expr,
+                            left,
+                            ops,
+                            comparators,
+                        );
+                    }
+
+                    if self.settings.rules.enabled(&Rule::BadVersionInfoComparison) {
+                        flake8_pyi::rules::bad_version_info_comparison(
                             self,
                             expr,
                             left,

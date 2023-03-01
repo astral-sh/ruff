@@ -15,6 +15,8 @@ mod tests {
 
     #[test_case(Rule::PrefixTypeParams, Path::new("PYI001.pyi"))]
     #[test_case(Rule::PrefixTypeParams, Path::new("PYI001.py"))]
+    #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
+    #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.py"))]
     #[test_case(Rule::UnrecognizedPlatformCheck, Path::new("PYI007.pyi"))]
     #[test_case(Rule::UnrecognizedPlatformCheck, Path::new("PYI007.py"))]
     #[test_case(Rule::UnrecognizedPlatformName, Path::new("PYI008.pyi"))]
