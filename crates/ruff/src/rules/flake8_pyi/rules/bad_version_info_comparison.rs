@@ -10,9 +10,12 @@ define_violation!(
     ///
     /// Ensures that you only `<` and `>=` for version info comparisons with
     /// `sys.version_info` in `.pyi` files. All other comparisons such as
-    /// `<`, `<=` and `==` are banned.
+    /// `>`, `<=` and `==` are banned.
     ///
     /// ## Why is this bad?
+    ///
+    /// `sys.version_info > (3, 8)` will also match `3.8.10`. Similarly,
+    /// `sys.version_info <= (3, 8)` will not match `3.8.10`.
     ///
     /// ```python
     /// >>> import sys
@@ -26,6 +29,24 @@ define_violation!(
     /// False
     /// >>> print(sys.version_info in (3, 8))
     /// False
+    /// ```
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// import sys
+    ///
+    /// if sys.version_info > (3, 8):
+    //     ...
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```python
+    /// import sys
+    ///
+    /// if sys.version_info >= (3, 9):
+    //     ...
     /// ```
     pub struct BadVersionInfoComparison;
 );
@@ -48,7 +69,6 @@ pub fn bad_version_info_comparison(
         return;
     };
 
-    let diagnostic = Diagnostic::new(BadVersionInfoComparison, Range::from_located(expr));
     if !checker.resolve_call_path(left).map_or(false, |call_path| {
         call_path.as_slice() == ["sys", "version_info"]
     }) {
@@ -56,6 +76,7 @@ pub fn bad_version_info_comparison(
     }
 
     if !matches!(op, Cmpop::Lt | Cmpop::GtE) {
+        let diagnostic = Diagnostic::new(BadVersionInfoComparison, Range::from_located(expr));
         checker.diagnostics.push(diagnostic);
     }
 }
