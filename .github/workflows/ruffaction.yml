@@ -7,4 +7,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: brucearctor/ruff@v0.0.0002
+      - uses: brucearctor/ruff@v0.0.0003
