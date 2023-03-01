@@ -908,6 +908,26 @@
             "type": "string"
           }
         },
+        "runtime-evaluated-baseclasses": {
+          "description": "Exempt type annotations of certain classes with base classes from needing to be moved into type-checking blocks.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "runtime-evaluated-decorators": {
+          "description": "Exempt type annotations of certain classes with decorators from needing to be moved into type-checking blocks.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "strict": {
           "description": "Enforce TC001, TC002, and TC003 rules even when valid runtime imports are present for the same module. See flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
           "type": [

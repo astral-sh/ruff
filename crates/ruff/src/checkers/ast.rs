@@ -364,7 +364,6 @@ where
                 }
             }
         }
-
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
@@ -4403,14 +4402,131 @@ impl<'a> Checker<'a> {
         for scope_index in self.scope_stack.iter().rev() {
             let scope = &self.scopes[*scope_index];
 
-            if matches!(scope.kind, ScopeKind::Class(_)) {
+            if let ScopeKind::Class(def) = &scope.kind {
                 if id == "__class__" {
                     return;
                 } else if !first_iter && !in_generator {
                     continue;
                 }
+                for base in def.bases.iter() {
+                    let mut base_class_name = None;
+                    match &base.node {
+                        ExprKind::Attribute {
+                            value,
+                            attr: class_name,
+                            ..
+                        } => {
+                            if let ExprKind::Name {
+                                id: module_name, ..
+                            } = &value.node
+                            {
+                                base_class_name = Some(format!("{module_name}.{class_name}"));
+                            }
+                        }
+                        ExprKind::Name { id: bcn, .. } => {
+                            base_class_name = Some(bcn.to_string());
+                        }
+                        _ => {}
+                    }
+                    if let Some(bcn) = base_class_name {
+                        if self
+                            .settings
+                            .flake8_type_checking
+                            .runtime_evaluated_baseclasses
+                            .iter()
+                            .any(|i| i == &bcn)
+                        {
+                            if let Some(index) =
+                                self.bindings
+                                    .iter()
+                                    .position(|Binding { kind, .. }| match kind {
+                                        &BindingKind::Importation(binding_name, _)
+                                        | &BindingKind::FromImportation(binding_name, _) => {
+                                            binding_name == id.as_str()
+                                        }
+                                        _ => false,
+                                    })
+                            {
+                                let context = ExecutionContext::Runtime;
+                                self.bindings[index].mark_used(
+                                    scope_id,
+                                    Range::from_located(expr),
+                                    context,
+                                );
+                            }
+                        }
+                    }
+                }
+                for decorator in def.decorator_list.iter() {
+                    let mut class_decorator_name = None;
+                    match &decorator.node {
+                        ExprKind::Call { func, .. } => match &func.node {
+                            ExprKind::Attribute {
+                                value,
+                                attr: decorator_name,
+                                ..
+                            } => {
+                                if let ExprKind::Name {
+                                    id: module_name, ..
+                                } = &value.node
+                                {
+                                    class_decorator_name =
+                                        Some(format!("{module_name}.{decorator_name}"));
+                                }
+                            }
+                            ExprKind::Name { id: cdn, .. } => {
+                                class_decorator_name = Some(cdn.to_string());
+                            }
+                            _ => {}
+                        },
+                        ExprKind::Attribute {
+                            value,
+                            attr: decorator_name,
+                            ..
+                        } => {
+                            if let ExprKind::Name {
+                                id: module_name, ..
+                            } = &value.node
+                            {
+                                class_decorator_name =
+                                    Some(format!("{module_name}.{decorator_name}"));
+                            }
+                        }
+                        ExprKind::Name { id: cdn, .. } => {
+                            class_decorator_name = Some(cdn.to_string());
+                        }
+                        _ => {}
+                    }
+                    if let Some(cdn) = class_decorator_name {
+                        if self
+                            .settings
+                            .flake8_type_checking
+                            .runtime_evaluated_decorators
+                            .iter()
+                            .any(|i| i == &cdn)
+                        {
+                            if let Some(index) =
+                                self.bindings
+                                    .iter()
+                                    .position(|Binding { kind, .. }| match kind {
+                                        &BindingKind::Importation(binding_name, _)
+                                        | &BindingKind::FromImportation(binding_name, _) => {
+                                            binding_name == id.as_str()
+                                        }
+                                        _ => false,
+                                    })
+                            {
+                                let context = ExecutionContext::Runtime;
+                                self.bindings[index].mark_used(
+                                    scope_id,
+                                    Range::from_located(expr),
+                                    context,
+                                );
+                            }
+                        }
+                    }
+                }
             }
-
             if let Some(index) = scope.bindings.get(&id.as_str()) {
                 // Mark the binding as used.
                 let context = self.execution_context();
@@ -5735,7 +5851,6 @@ pub fn check_ast(
     } else {
         python_ast
     };
-
     // Iterate over the AST.
     checker.visit_body(python_ast);
 

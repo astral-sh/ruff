@@ -1,0 +1,27 @@
+---
+source: crates/ruff/src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: geopandas
+  location:
+    row: 3
+    column: 7
+  end_location:
+    row: 3
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    TypingOnlyThirdPartyImport:
+      full_name: pyproj
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 13
+  fix: ~
+  parent: ~
+

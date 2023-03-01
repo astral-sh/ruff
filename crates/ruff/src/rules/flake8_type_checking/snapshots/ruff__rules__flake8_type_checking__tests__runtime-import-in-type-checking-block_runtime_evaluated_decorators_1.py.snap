@@ -1,0 +1,38 @@
+---
+source: crates/ruff/src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    RuntimeImportInTypeCheckingBlock:
+      full_name: datetime
+  location:
+    row: 12
+    column: 11
+  end_location:
+    row: 12
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    RuntimeImportInTypeCheckingBlock:
+      full_name: array.array
+  location:
+    row: 13
+    column: 22
+  end_location:
+    row: 13
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    RuntimeImportInTypeCheckingBlock:
+      full_name: pandas
+  location:
+    row: 15
+    column: 11
+  end_location:
+    row: 15
+    column: 17
+  fix: ~
+  parent: ~
+

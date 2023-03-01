@@ -75,4 +75,44 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("runtime_evaluated_baseclasses_1.py"); "runtime_evaluated_baseclasses_1")]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("runtime_evaluated_baseclasses_2.py"); "runtime_evaluated_baseclasses_2")]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("runtime_evaluated_baseclasses_3.py"); "runtime_evaluated_baseclasses_3")]
+    fn runtime_evaluated_baseclasses(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::Settings {
+                flake8_type_checking: super::settings::Settings {
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("runtime_evaluated_decorators_1.py"); "runtime_evaluated_decorators_1")]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("runtime_evaluated_decorators_2.py"); "runtime_evaluated_decorators_2")]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("runtime_evaluated_decorators_3.py"); "runtime_evaluated_decorators_3")]
+    fn runtime_evaluated_decorators(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::Settings {
+                flake8_type_checking: super::settings::Settings {
+                    runtime_evaluated_decorators: vec![
+                        "attrs.define".to_string(),
+                        "frozen".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
 }
