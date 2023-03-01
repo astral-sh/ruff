@@ -7,7 +7,7 @@ use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::registry::DiagnosticKind;
 use crate::rules::pycodestyle::helpers::{
-    is_arithmetic_token, is_keyword_token, is_singleton_token, is_skip_comment_token,
+    is_arithmetic_token, is_keyword_token, is_op_token, is_singleton_token, is_skip_comment_token,
     is_soft_keyword_token, is_unary_token, is_ws_needed_token, is_ws_optional_token,
 };
 use crate::violation::Violation;
@@ -61,8 +61,6 @@ impl Violation for MissingWhitespaceAroundModuloOperator {
 pub fn missing_whitespace_around_operator(
     tokens: &[(Location, &Tok, Location)],
 ) -> Vec<(Location, DiagnosticKind)> {
-    use crate::rules::pycodestyle::helpers::is_op_token;
-
     let mut diagnostics = vec![];
 
     let mut needs_space_main: Option<bool> = Some(false);

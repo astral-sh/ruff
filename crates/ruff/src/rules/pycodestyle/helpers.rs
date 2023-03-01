@@ -171,7 +171,7 @@ pub fn is_soft_keyword_token(token: &Tok) -> bool {
 pub fn is_arithmetic_token(token: &Tok) -> bool {
     matches!(
         token,
-        Tok::DoubleStar | Tok::Star | Tok::Plus | Tok::Minus | Tok::Star | Tok::Slash | Tok::At
+        Tok::DoubleStar | Tok::Star | Tok::Plus | Tok::Minus | Tok::Slash | Tok::At
     )
 }
 
