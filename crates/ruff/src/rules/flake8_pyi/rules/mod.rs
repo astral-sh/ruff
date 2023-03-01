@@ -11,11 +11,10 @@ pub use unrecognized_platform::{
     unrecognized_platform, UnrecognizedPlatformCheck, UnrecognizedPlatformName,
 };
 
+mod bad_version_info_comparison;
 mod docstring_in_stubs;
 mod non_empty_stub_body;
 mod pass_statement_stub_body;
 mod prefix_type_params;
-mod unrecognized_platform;
-
-mod bad_version_info_comparison;
 mod simple_defaults;
+mod unrecognized_platform;
