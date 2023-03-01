@@ -1,7 +1,9 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Located, Stmt, StmtKind};
 
+use ruff_macros::{define_violation, derive_message_formats};
+
 use crate::ast::helpers;
+use crate::ast::helpers::compose_call_path;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
@@ -52,9 +54,9 @@ pub fn use_contextlib_suppress(
     let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
     if body.len() == 1 {
         if matches!(body[0].node, StmtKind::Pass) {
-            let handler_names: Vec<_> = helpers::extract_handler_names(handlers)
+            let handler_names: Vec<String> = helpers::extract_handled_exceptions(handlers)
                 .into_iter()
-                .map(|call_path| helpers::format_call_path(&call_path))
+                .filter_map(compose_call_path)
                 .collect();
             let exception = if handler_names.is_empty() {
                 "Exception".to_string()

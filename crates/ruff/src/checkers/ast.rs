@@ -19,7 +19,8 @@ use rustpython_parser::ast::{
 use smallvec::smallvec;
 
 use crate::ast::helpers::{
-    binding_range, collect_call_path, extract_handler_names, from_relative_import, to_module_path,
+    binding_range, collect_call_path, extract_handled_exceptions, from_relative_import,
+    to_module_path, Exceptions,
 };
 use crate::ast::operations::{extract_all_names, AllNamesFlags};
 use crate::ast::relocate::relocate_expr;
@@ -109,7 +110,7 @@ pub struct Checker<'a> {
     pub(crate) seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
-    except_handlers: Vec<Vec<Vec<&'a str>>>,
+    handled_exceptions: Vec<Exceptions>,
     // Check-specific state.
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
 }
@@ -178,7 +179,7 @@ impl<'a> Checker<'a> {
             seen_import_boundary: false,
             futures_allowed: true,
             annotations_future_enabled: is_interface_definition,
-            except_handlers: vec![],
+            handled_exceptions: vec![],
             // Check-specific state.
             flake8_bugbear_seen: vec![],
         }
@@ -970,6 +971,13 @@ where
                     pyupgrade::rules::rewrite_mock_import(self, stmt);
                 }
 
+                // If a module is imported within a `ModuleNotFoundError` body, treat that as a
+                // synthetic usage.
+                let is_handled = self
+                    .handled_exceptions
+                    .iter()
+                    .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
+
                 for alias in names {
                     if alias.node.name == "__future__" {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -1012,7 +1020,18 @@ where
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(name, full_name),
                                 runtime_usage: None,
-                                synthetic_usage: None,
+                                synthetic_usage: if is_handled {
+                                    Some((
+                                        self.scopes[*(self
+                                            .scope_stack
+                                            .last()
+                                            .expect("No current scope found"))]
+                                        .id,
+                                        Range::from_located(alias),
+                                    ))
+                                } else {
+                                    None
+                                },
                                 typing_usage: None,
                                 range: Range::from_located(alias),
                                 source: Some(self.current_stmt().clone()),
@@ -1020,6 +1039,14 @@ where
                             },
                         );
                     } else {
+                        // Treat explicit re-export as usage (e.g., `from .applications
+                        // import FastAPI as FastAPI`).
+                        let is_explicit_reexport = alias
+                            .node
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.node.name);
+
                         // Given `import foo`, `name` and `full_name` would both be `foo`.
                         // Given `import foo as bar`, `name` would be `bar` and `full_name` would
                         // be `foo`.
@@ -1030,14 +1057,7 @@ where
                             Binding {
                                 kind: BindingKind::Importation(name, full_name),
                                 runtime_usage: None,
-                                // Treat explicit re-export as usage (e.g., `import applications
-                                // as applications`).
-                                synthetic_usage: if alias
-                                    .node
-                                    .asname
-                                    .as_ref()
-                                    .map_or(false, |asname| asname == &alias.node.name)
-                                {
+                                synthetic_usage: if is_handled || is_explicit_reexport {
                                     Some((
                                         self.scopes[*(self
                                             .scope_stack
@@ -1293,6 +1313,13 @@ where
                     }
                 }
 
+                // If a module is imported within a `ModuleNotFoundError` body, treat that as a
+                // synthetic usage.
+                let is_handled = self
+                    .handled_exceptions
+                    .iter()
+                    .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
+
                 for alias in names {
                     if let Some("__future__") = module.as_deref() {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -1339,7 +1366,18 @@ where
                             Binding {
                                 kind: BindingKind::StarImportation(*level, module.clone()),
                                 runtime_usage: None,
-                                synthetic_usage: None,
+                                synthetic_usage: if is_handled {
+                                    Some((
+                                        self.scopes[*(self
+                                            .scope_stack
+                                            .last()
+                                            .expect("No current scope found"))]
+                                        .id,
+                                        Range::from_located(alias),
+                                    ))
+                                } else {
+                                    None
+                                },
                                 typing_usage: None,
                                 range: Range::from_located(stmt),
                                 source: Some(self.current_stmt().clone()),
@@ -1383,6 +1421,14 @@ where
                             self.check_builtin_shadowing(asname, stmt, false);
                         }
 
+                        // Treat explicit re-export as usage (e.g., `from .applications
+                        // import FastAPI as FastAPI`).
+                        let is_explicit_reexport = alias
+                            .node
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.node.name);
+
                         // Given `from foo import bar`, `name` would be "bar" and `full_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `full_name` would be "foo.bar".
@@ -1392,33 +1438,25 @@ where
                             module.as_deref(),
                             &alias.node.name,
                         );
-                        let range = Range::from_located(alias);
                         self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::FromImportation(name, full_name),
                                 runtime_usage: None,
-                                // Treat explicit re-export as usage (e.g., `from .applications
-                                // import FastAPI as FastAPI`).
-                                synthetic_usage: if alias
-                                    .node
-                                    .asname
-                                    .as_ref()
-                                    .map_or(false, |asname| asname == &alias.node.name)
-                                {
+                                synthetic_usage: if is_handled || is_explicit_reexport {
                                     Some((
                                         self.scopes[*(self
                                             .scope_stack
                                             .last()
                                             .expect("No current scope found"))]
                                         .id,
-                                        range,
+                                        Range::from_located(alias),
                                     ))
                                 } else {
                                     None
                                 },
                                 typing_usage: None,
-                                range,
+                                range: Range::from_located(alias),
                                 source: Some(self.current_stmt().clone()),
                                 context: self.execution_context(),
                             },
@@ -2128,17 +2166,23 @@ where
                 orelse,
                 finalbody,
             } => {
-                // TODO(charlie): The use of `smallvec` here leads to a lifetime issue.
-                let handler_names = extract_handler_names(handlers)
-                    .into_iter()
-                    .map(|call_path| call_path.to_vec())
-                    .collect();
-                self.except_handlers.push(handler_names);
+                let mut handled_exceptions = Exceptions::empty();
+                for type_ in extract_handled_exceptions(handlers) {
+                    if let Some(call_path) = self.resolve_call_path(type_) {
+                        if call_path.as_slice() == ["", "NameError"] {
+                            handled_exceptions |= Exceptions::NAME_ERROR;
+                        } else if call_path.as_slice() == ["", "ModuleNotFoundError"] {
+                            handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                        }
+                    }
+                }
+
+                self.handled_exceptions.push(handled_exceptions);
                 if self.settings.rules.enabled(&Rule::JumpStatementInFinally) {
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
                 }
                 self.visit_body(body);
-                self.except_handlers.pop();
+                self.handled_exceptions.pop();
 
                 self.in_exception_handler = true;
                 for excepthandler in handlers {
@@ -4493,13 +4537,12 @@ impl<'a> Checker<'a> {
             }
 
             // Avoid flagging if NameError is handled.
-            if let Some(handler_names) = self.except_handlers.last() {
-                if handler_names
-                    .iter()
-                    .any(|call_path| call_path.as_slice() == ["NameError"])
-                {
-                    return;
-                }
+            if self
+                .handled_exceptions
+                .iter()
+                .any(|handler_names| handler_names.contains(Exceptions::NAME_ERROR))
+            {
+                return;
             }
 
             self.diagnostics.push(Diagnostic::new(

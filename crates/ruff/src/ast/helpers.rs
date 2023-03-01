@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use bitflags::bitflags;
 use itertools::Itertools;
 use log::error;
 use once_cell::sync::Lazy;
@@ -575,33 +576,32 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
     })
 }
 
+bitflags! {
+    pub struct Exceptions: u32 {
+        const NAME_ERROR = 0b0000_0001;
+        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
+    }
+}
+
 /// Extract the names of all handled exceptions.
-pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<CallPath> {
-    // TODO(charlie): Use `resolve_call_path` to avoid false positives for
-    // overridden builtins.
-    let mut handler_names = vec![];
+pub fn extract_handled_exceptions(handlers: &[Excepthandler]) -> Vec<&Expr> {
+    let mut handled_exceptions = Vec::new();
     for handler in handlers {
         match &handler.node {
             ExcepthandlerKind::ExceptHandler { type_, .. } => {
                 if let Some(type_) = type_ {
                     if let ExprKind::Tuple { elts, .. } = &type_.node {
                         for type_ in elts {
-                            let call_path = collect_call_path(type_);
-                            if !call_path.is_empty() {
-                                handler_names.push(call_path);
-                            }
+                            handled_exceptions.push(type_);
                         }
                     } else {
-                        let call_path = collect_call_path(type_);
-                        if !call_path.is_empty() {
-                            handler_names.push(call_path);
-                        }
+                        handled_exceptions.push(type_);
                     }
                 }
             }
         }
     }
-    handler_names
+    handled_exceptions
 }
 
 /// Return the set of all bound argument names.
