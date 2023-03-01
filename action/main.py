@@ -13,6 +13,7 @@ VERSION = os.getenv("INPUT_VERSION", default="")
 
 run([sys.executable, "-m", "venv", str(ENV_PATH)], check=True)
 
+version_specifier=""
 # TODO: some form of validation for user input VERSION
 if VERSION != "":
     version_specifier = f"=={VERSION}"
