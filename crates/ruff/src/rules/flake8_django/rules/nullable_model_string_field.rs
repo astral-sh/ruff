@@ -28,13 +28,15 @@ define_violation!(
     /// ```python
     /// from django.db import models
     ///
+    ///
     /// class MyModel(models.Model):
-    ///    field = models.CharField(max_length=255, null=True)
+    ///     field = models.CharField(max_length=255, null=True)
     /// ```
     ///
     /// Use instead:
     /// ```python
     /// from django.db import models
+    ///
     ///
     /// class MyModel(models.Model):
     ///     field = models.CharField(max_length=255, default="")

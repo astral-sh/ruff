@@ -4,25 +4,27 @@ expression: diagnostics
 ---
 - kind:
     ConvertNamedTupleFunctionalToClass:
-      name: NT1
+      name: MyType
+      fixable: true
   location:
     row: 5
     column: 0
   end_location:
     row: 5
-    column: 61
+    column: 67
   fix:
-    content: "class NT1(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
+    content: "class MyType(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
     location:
       row: 5
       column: 0
     end_location:
       row: 5
-      column: 61
+      column: 67
   parent: ~
 - kind:
     ConvertNamedTupleFunctionalToClass:
-      name: NT2
+      name: MyType
+      fixable: true
   location:
     row: 8
     column: 0
@@ -30,7 +32,7 @@ expression: diagnostics
     row: 12
     column: 1
   fix:
-    content: "class NT2(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
+    content: "class MyType(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
     location:
       row: 8
       column: 0
@@ -40,31 +42,59 @@ expression: diagnostics
   parent: ~
 - kind:
     ConvertNamedTupleFunctionalToClass:
-      name: NT3
+      name: MyType
+      fixable: true
   location:
     row: 15
     column: 0
   end_location:
     row: 15
-    column: 56
+    column: 62
   fix:
-    content: "class NT3(typing.NamedTuple):\n    a: int\n    b: str"
+    content: "class MyType(typing.NamedTuple):\n    a: int\n    b: str"
     location:
       row: 15
       column: 0
     end_location:
       row: 15
-      column: 56
+      column: 62
   parent: ~
 - kind:
     ConvertNamedTupleFunctionalToClass:
-      name: NT4
+      name: MyType
+      fixable: true
   location:
-    row: 18
+    row: 28
     column: 0
   end_location:
-    row: 22
-    column: 1
-  fix: ~
+    row: 28
+    column: 36
+  fix:
+    content: "class MyType(typing.NamedTuple):\n    pass"
+    location:
+      row: 28
+      column: 0
+    end_location:
+      row: 28
+      column: 36
+  parent: ~
+- kind:
+    ConvertNamedTupleFunctionalToClass:
+      name: MyType
+      fixable: true
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 31
+    column: 40
+  fix:
+    content: "class MyType(typing.NamedTuple):\n    pass"
+    location:
+      row: 31
+      column: 0
+    end_location:
+      row: 31
+      column: 40
   parent: ~
 

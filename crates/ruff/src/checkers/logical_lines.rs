@@ -7,7 +7,8 @@ use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
 use crate::rules::pycodestyle::rules::{
-    extraneous_whitespace, indentation, space_around_operator, whitespace_around_keywords,
+    extraneous_whitespace, indentation, missing_whitespace_after_keyword, space_around_operator,
+    whitespace_around_keywords, whitespace_around_named_parameter_equals,
     whitespace_before_comment,
 };
 use crate::settings::Settings;
@@ -106,6 +107,18 @@ pub fn check_logical_lines(
                     });
                 }
             }
+
+            for (location, kind) in missing_whitespace_after_keyword(&line.tokens) {
+                if settings.rules.enabled(kind.rule()) {
+                    diagnostics.push(Diagnostic {
+                        kind,
+                        location,
+                        end_location: location,
+                        fix: None,
+                        parent: None,
+                    });
+                }
+            }
         }
         if line.flags.contains(TokenFlags::COMMENT) {
             for (range, kind) in whitespace_before_comment(&line.tokens, locator) {
@@ -114,6 +127,21 @@ pub fn check_logical_lines(
                         kind,
                         location: range.location,
                         end_location: range.end_location,
+                        fix: None,
+                        parent: None,
+                    });
+                }
+            }
+        }
+        if line.flags.contains(TokenFlags::OPERATOR) {
+            for (location, kind) in
+                whitespace_around_named_parameter_equals(&line.tokens, &line.text)
+            {
+                if settings.rules.enabled(kind.rule()) {
+                    diagnostics.push(Diagnostic {
+                        kind,
+                        location,
+                        end_location: location,
                         fix: None,
                         parent: None,
                     });
@@ -152,8 +180,8 @@ pub fn check_logical_lines(
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::lexer;
     use rustpython_parser::lexer::LexResult;
+    use rustpython_parser::{lexer, Mode};
 
     use crate::checkers::logical_lines::iter_logical_lines;
     use crate::source_code::Locator;
@@ -164,7 +192,7 @@ mod tests {
 x = 1
 y = 2
 z = x + 1"#;
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
             .into_iter()
@@ -185,7 +213,7 @@ x = [
 ]
 y = 2
 z = x + 1"#;
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
             .into_iter()
@@ -199,7 +227,7 @@ z = x + 1"#;
         assert_eq!(actual, expected);
 
         let contents = "x = 'abc'";
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
             .into_iter()
@@ -212,7 +240,7 @@ z = x + 1"#;
 def f():
   x = 1
 f()"#;
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
             .into_iter()
@@ -227,7 +255,7 @@ def f():
   # Comment goes here.
   x = 1
 f()"#;
-        let lxr: Vec<LexResult> = lexer::make_tokenizer(contents).collect();
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
             .into_iter()

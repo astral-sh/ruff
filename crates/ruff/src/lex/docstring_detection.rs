@@ -4,7 +4,7 @@
 //!
 //! TODO(charlie): Consolidate with the existing AST-based docstring extraction.
 
-use rustpython_parser::lexer::Tok;
+use rustpython_parser::Tok;
 
 #[derive(Default)]
 enum State {

@@ -8,7 +8,8 @@ use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
 use crate::rules::pycodestyle::rules::{
-    doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
+    doc_line_too_long, indentation_contains_tabs, line_too_long, mixed_spaces_and_tabs,
+    no_newline_at_end_of_file, trailing_whitespace,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
@@ -41,11 +42,15 @@ pub fn check_physical_lines(
     let enforce_unnecessary_coding_comment = settings.rules.enabled(&Rule::UTF8EncodingDeclaration);
     let enforce_mixed_spaces_and_tabs = settings.rules.enabled(&Rule::MixedSpacesAndTabs);
     let enforce_bidirectional_unicode = settings.rules.enabled(&Rule::BidirectionalUnicode);
+    let enforce_trailing_whitespace = settings.rules.enabled(&Rule::TrailingWhitespace);
+    let enforce_blank_line_contains_whitespace =
+        settings.rules.enabled(&Rule::BlankLineContainsWhitespace);
+    let enforce_indentation_contains_tabs = settings.rules.enabled(&Rule::IndentationContainsTabs);
 
-    let fix_unnecessary_coding_comment = matches!(autofix, flags::Autofix::Enabled)
-        && settings.rules.should_fix(&Rule::UTF8EncodingDeclaration);
-    let fix_shebang_whitespace = matches!(autofix, flags::Autofix::Enabled)
-        && settings.rules.should_fix(&Rule::ShebangWhitespace);
+    let fix_unnecessary_coding_comment =
+        autofix.into() && settings.rules.should_fix(&Rule::UTF8EncodingDeclaration);
+    let fix_shebang_whitespace =
+        autofix.into() && settings.rules.should_fix(&Rule::ShebangWhitespace);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
@@ -139,14 +144,25 @@ pub fn check_physical_lines(
         if enforce_bidirectional_unicode {
             diagnostics.extend(pylint::rules::bidirectional_unicode(index, line));
         }
+
+        if enforce_trailing_whitespace || enforce_blank_line_contains_whitespace {
+            if let Some(diagnostic) = trailing_whitespace(index, line, settings, autofix) {
+                diagnostics.push(diagnostic);
+            }
+        }
+
+        if enforce_indentation_contains_tabs {
+            if let Some(diagnostic) = indentation_contains_tabs(index, line) {
+                diagnostics.push(diagnostic);
+            }
+        }
     }
 
     if enforce_no_newline_at_end_of_file {
         if let Some(diagnostic) = no_newline_at_end_of_file(
             stylist,
             contents,
-            matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
+            autofix.into() && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
         ) {
             diagnostics.push(diagnostic);
         }

@@ -164,48 +164,4 @@ expression: diagnostics
       row: 16
       column: 16
   parent: ~
-- kind:
-    NoneComparison: Eq
-  location:
-    row: 22
-    column: 12
-  end_location:
-    row: 22
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    NoneComparison: Eq
-  location:
-    row: 24
-    column: 3
-  end_location:
-    row: 24
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    TrueFalseComparison:
-      - false
-      - Eq
-  location:
-    row: 26
-    column: 12
-  end_location:
-    row: 26
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    TrueFalseComparison:
-      - false
-      - Eq
-  location:
-    row: 28
-    column: 3
-  end_location:
-    row: 28
-    column: 8
-  fix: ~
-  parent: ~
 

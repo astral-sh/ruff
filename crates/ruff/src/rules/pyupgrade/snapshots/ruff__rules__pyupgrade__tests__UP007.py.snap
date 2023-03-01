@@ -121,4 +121,21 @@ expression: diagnostics
       row: 26
       column: 40
   parent: ~
+- kind:
+    TypingUnion: ~
+  location:
+    row: 47
+    column: 7
+  end_location:
+    row: 47
+    column: 20
+  fix:
+    content: str | None
+    location:
+      row: 47
+      column: 7
+    end_location:
+      row: 47
+      column: 20
+  parent: ~
 

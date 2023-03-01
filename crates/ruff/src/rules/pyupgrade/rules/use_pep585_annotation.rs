@@ -26,7 +26,7 @@ impl AlwaysAutofixableViolation for DeprecatedCollectionType {
 
     fn autofix_title(&self) -> String {
         let DeprecatedCollectionType { name } = self;
-        format!("Replace `{name}` with `{}`", name.to_lowercase(),)
+        format!("Replace `{name}` with `{}`", name.to_lowercase())
     }
 }
 
@@ -43,11 +43,14 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
             Range::from_located(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Fix::replacement(
-                binding.to_lowercase(),
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
+            let binding = binding.to_lowercase();
+            if checker.is_builtin(&binding) {
+                diagnostic.amend(Fix::replacement(
+                    binding,
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ));
+            }
         }
         checker.diagnostics.push(diagnostic);
     }

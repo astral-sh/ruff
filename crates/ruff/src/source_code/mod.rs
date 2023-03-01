@@ -6,8 +6,8 @@ mod stylist;
 pub(crate) use generator::Generator;
 pub(crate) use indexer::Indexer;
 pub(crate) use locator::Locator;
-use rustpython_parser::error::ParseError;
-use rustpython_parser::parser;
+use rustpython_parser as parser;
+use rustpython_parser::ParseError;
 pub(crate) use stylist::{LineEnding, Stylist};
 
 /// Run round-trip source code generation on a given Python code.

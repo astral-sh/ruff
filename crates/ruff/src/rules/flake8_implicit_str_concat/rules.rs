@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
@@ -55,7 +56,7 @@ define_violation!(
     /// to `false`.
     ///
     /// ## Options
-    /// * `flake8-implicit-str-concat.allow-multiline`
+    /// - `flake8-implicit-str-concat.allow-multiline`
     ///
     /// ## Example
     /// ```python
@@ -72,7 +73,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [PEP 8](https://peps.python.org/pep-0008/#maximum-line-length)
+    /// - [PEP 8](https://peps.python.org/pep-0008/#maximum-line-length)
     pub struct MultiLineImplicitStringConcatenation;
 );
 impl Violation for MultiLineImplicitStringConcatenation {

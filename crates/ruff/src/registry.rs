@@ -53,9 +53,15 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
@@ -77,7 +83,10 @@ ruff_macros::register_rules!(
     rules::pycodestyle::rules::IOError,
     rules::pycodestyle::rules::SyntaxError,
     // pycodestyle warnings
+    rules::pycodestyle::rules::IndentationContainsTabs,
+    rules::pycodestyle::rules::TrailingWhitespace,
     rules::pycodestyle::rules::NoNewLineAtEndOfFile,
+    rules::pycodestyle::rules::BlankLineContainsWhitespace,
     rules::pycodestyle::rules::DocLineTooLong,
     rules::pycodestyle::rules::InvalidEscapeSequence,
     // pyflakes
@@ -131,6 +140,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::BadStrStripCall,
+    rules::pylint::rules::CollapsibleElseIf,
     rules::pylint::rules::UselessImportAlias,
     rules::pylint::rules::UnnecessaryDirectLambdaCall,
     rules::pylint::rules::NonlocalWithoutBinding,
@@ -144,11 +154,15 @@ ruff_macros::register_rules!(
     rules::pylint::rules::ConsiderUsingSysExit,
     rules::pylint::rules::MagicValueComparison,
     rules::pylint::rules::UselessElseOnLoop,
+    rules::pylint::rules::GlobalStatement,
     rules::pylint::rules::GlobalVariableNotAssigned,
     rules::pylint::rules::TooManyReturnStatements,
     rules::pylint::rules::TooManyArguments,
     rules::pylint::rules::TooManyBranches,
     rules::pylint::rules::TooManyStatements,
+    rules::pylint::rules::RedefinedLoopName,
+    rules::pylint::rules::LoggingTooFewArgs,
+    rules::pylint::rules::LoggingTooManyArgs,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -183,6 +197,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
     rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
+    rules::flake8_bugbear::rules::UnintentionalTypeAnnotation,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
     // flake8-comprehensions
@@ -274,10 +289,10 @@ ruff_macros::register_rules!(
     rules::flake8_simplify::rules::IfExprWithTrueFalse,
     rules::flake8_simplify::rules::IfExprWithFalseTrue,
     rules::flake8_simplify::rules::IfExprWithTwistedArms,
-    rules::flake8_simplify::rules::AAndNotA,
-    rules::flake8_simplify::rules::AOrNotA,
-    rules::flake8_simplify::rules::OrTrue,
-    rules::flake8_simplify::rules::AndFalse,
+    rules::flake8_simplify::rules::ExprAndNotExpr,
+    rules::flake8_simplify::rules::ExprOrNotExpr,
+    rules::flake8_simplify::rules::ExprOrTrue,
+    rules::flake8_simplify::rules::ExprAndFalse,
     rules::flake8_simplify::rules::YodaConditions,
     rules::flake8_simplify::rules::DictGetWithDefault,
     // pyupgrade
@@ -453,6 +468,11 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::PrefixTypeParams,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
+    rules::flake8_pyi::rules::PassStatementStubBody,
+    rules::flake8_pyi::rules::NonEmptyStubBody,
+    rules::flake8_pyi::rules::DocstringInStub,
+    rules::flake8_pyi::rules::TypedArgumentSimpleDefaults,
+    rules::flake8_pyi::rules::ArgumentSimpleDefaults,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     rules::flake8_pytest_style::rules::FixturePositionalArgs,
@@ -487,6 +507,7 @@ ruff_macros::register_rules!(
     rules::flake8_pie::rules::UnnecessaryDictKwargs,
     rules::flake8_pie::rules::PreferListBuiltin,
     rules::flake8_pie::rules::SingleStartsEndsWith,
+    rules::flake8_pie::rules::UnnecessaryComprehensionAnyAll,
     // flake8-commas
     rules::flake8_commas::rules::TrailingCommaMissing,
     rules::flake8_commas::rules::TrailingCommaOnBareTupleProhibited,
@@ -567,6 +588,9 @@ ruff_macros::register_rules!(
     rules::ruff::rules::UnusedNOQA,
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
+    rules::flake8_django::rules::LocalsInRenderFunction,
+    rules::flake8_django::rules::ExcludeWithModelForm,
+    rules::flake8_django::rules::AllWithModelForm,
     rules::flake8_django::rules::ModelWithoutDunderStr,
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
@@ -752,6 +776,7 @@ impl Linter {
     }
 }
 
+#[derive(is_macro::Is)]
 pub enum LintSource {
     Ast,
     Io,
@@ -759,7 +784,7 @@ pub enum LintSource {
     LogicalLines,
     Tokens,
     Imports,
-    NoQa,
+    Noqa,
     Filesystem,
 }
 
@@ -768,7 +793,7 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> &'static LintSource {
         match self {
-            Rule::UnusedNOQA => &LintSource::NoQa,
+            Rule::UnusedNOQA => &LintSource::Noqa,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::DocLineTooLong
@@ -781,7 +806,10 @@ impl Rule {
             | Rule::ShebangNewline
             | Rule::BidirectionalUnicode
             | Rule::ShebangPython
-            | Rule::ShebangWhitespace => &LintSource::PhysicalLines,
+            | Rule::ShebangWhitespace
+            | Rule::TrailingWhitespace
+            | Rule::IndentationContainsTabs
+            | Rule::BlankLineContainsWhitespace => &LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
@@ -811,6 +839,7 @@ impl Rule {
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
+            | Rule::MissingWhitespaceAfterKeyword
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
             | Rule::NoSpaceAfterBlockComment
@@ -825,6 +854,8 @@ impl Rule {
             | Rule::UnexpectedIndentationComment
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
+            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
+            | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }

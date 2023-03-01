@@ -37,6 +37,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E224") => Rule::TabAfterOperator,
         #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E251") => Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E252") => Rule::MissingWhitespaceAroundParameterEquals,
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E261") => Rule::TooFewSpacesBeforeInlineComment,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E262") => Rule::NoSpaceAfterInlineComment,
@@ -52,6 +56,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E273") => Rule::TabAfterKeyword,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E274") => Rule::TabBeforeKeyword,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E275") => Rule::MissingWhitespaceAfterKeyword,
         (Pycodestyle, "E401") => Rule::MultipleImportsOnOneLine,
         (Pycodestyle, "E402") => Rule::ModuleImportNotAtTopOfFile,
         (Pycodestyle, "E501") => Rule::LineTooLong,
@@ -72,7 +78,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E999") => Rule::SyntaxError,
 
         // pycodestyle warnings
+        (Pycodestyle, "W191") => Rule::IndentationContainsTabs,
+        (Pycodestyle, "W291") => Rule::TrailingWhitespace,
         (Pycodestyle, "W292") => Rule::NoNewLineAtEndOfFile,
+        (Pycodestyle, "W293") => Rule::BlankLineContainsWhitespace,
         (Pycodestyle, "W505") => Rule::DocLineTooLong,
         (Pycodestyle, "W605") => Rule::InvalidEscapeSequence,
 
@@ -126,6 +135,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "E0101") => Rule::ReturnInInit,
         (Pylint, "E0604") => Rule::InvalidAllObject,
         (Pylint, "E0605") => Rule::InvalidAllFormat,
+        (Pylint, "E1205") => Rule::LoggingTooManyArgs,
+        (Pylint, "E1206") => Rule::LoggingTooFewArgs,
         (Pylint, "E1307") => Rule::BadStringFormatType,
         (Pylint, "E2502") => Rule::BidirectionalUnicode,
         (Pylint, "E1310") => Rule::BadStrStripCall,
@@ -139,13 +150,16 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R0133") => Rule::ComparisonOfConstant,
         (Pylint, "R1701") => Rule::ConsiderMergingIsinstance,
         (Pylint, "R1722") => Rule::ConsiderUsingSysExit,
+        (Pylint, "R5501") => Rule::CollapsibleElseIf,
         (Pylint, "R2004") => Rule::MagicValueComparison,
         (Pylint, "W0120") => Rule::UselessElseOnLoop,
         (Pylint, "W0602") => Rule::GlobalVariableNotAssigned,
+        (Pylint, "W0603") => Rule::GlobalStatement,
         (Pylint, "R0911") => Rule::TooManyReturnStatements,
         (Pylint, "R0913") => Rule::TooManyArguments,
         (Pylint, "R0912") => Rule::TooManyBranches,
         (Pylint, "R0915") => Rule::TooManyStatements,
+        (Pylint, "W2901") => Rule::RedefinedLoopName,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
@@ -180,6 +194,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bugbear, "026") => Rule::StarArgUnpackingAfterKeywordArg,
         (Flake8Bugbear, "027") => Rule::EmptyMethodWithoutAbstractDecorator,
         (Flake8Bugbear, "029") => Rule::ExceptWithEmptyTuple,
+        (Flake8Bugbear, "032") => Rule::UnintentionalTypeAnnotation,
         (Flake8Bugbear, "904") => Rule::RaiseWithoutFromInsideExcept,
         (Flake8Bugbear, "905") => Rule::ZipWithoutExplicitStrict,
 
@@ -286,10 +301,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "210") => Rule::IfExprWithTrueFalse,
         (Flake8Simplify, "211") => Rule::IfExprWithFalseTrue,
         (Flake8Simplify, "212") => Rule::IfExprWithTwistedArms,
-        (Flake8Simplify, "220") => Rule::AAndNotA,
-        (Flake8Simplify, "221") => Rule::AOrNotA,
-        (Flake8Simplify, "222") => Rule::OrTrue,
-        (Flake8Simplify, "223") => Rule::AndFalse,
+        (Flake8Simplify, "220") => Rule::ExprAndNotExpr,
+        (Flake8Simplify, "221") => Rule::ExprOrNotExpr,
+        (Flake8Simplify, "222") => Rule::ExprOrTrue,
+        (Flake8Simplify, "223") => Rule::ExprAndFalse,
         (Flake8Simplify, "300") => Rule::YodaConditions,
         (Flake8Simplify, "401") => Rule::DictGetWithDefault,
 
@@ -479,6 +494,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "001") => Rule::PrefixTypeParams,
         (Flake8Pyi, "007") => Rule::UnrecognizedPlatformCheck,
         (Flake8Pyi, "008") => Rule::UnrecognizedPlatformName,
+        (Flake8Pyi, "009") => Rule::PassStatementStubBody,
+        (Flake8Pyi, "010") => Rule::NonEmptyStubBody,
+        (Flake8Pyi, "011") => Rule::TypedArgumentSimpleDefaults,
+        (Flake8Pyi, "014") => Rule::ArgumentSimpleDefaults,
+        (Flake8Pyi, "021") => Rule::DocstringInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::IncorrectFixtureParenthesesStyle,
@@ -512,6 +532,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pie, "794") => Rule::DupeClassFieldDefinitions,
         (Flake8Pie, "796") => Rule::PreferUniqueEnums,
         (Flake8Pie, "800") => Rule::UnnecessarySpread,
+        (Flake8Pie, "802") => Rule::UnnecessaryComprehensionAnyAll,
         (Flake8Pie, "804") => Rule::UnnecessaryDictKwargs,
         (Flake8Pie, "807") => Rule::PreferListBuiltin,
         (Flake8Pie, "810") => Rule::SingleStartsEndsWith,
@@ -607,6 +628,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-django
         (Flake8Django, "001") => Rule::NullableModelStringField,
+        (Flake8Django, "003") => Rule::LocalsInRenderFunction,
+        (Flake8Django, "006") => Rule::ExcludeWithModelForm,
+        (Flake8Django, "007") => Rule::AllWithModelForm,
         (Flake8Django, "008") => Rule::ModelWithoutDunderStr,
         (Flake8Django, "013") => Rule::NonLeadingReceiverDecorator,
 

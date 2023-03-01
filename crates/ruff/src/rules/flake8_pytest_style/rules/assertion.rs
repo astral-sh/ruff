@@ -1,17 +1,26 @@
+use anyhow::bail;
+use anyhow::Result;
+use libcst_native::{
+    Assert, BooleanOp, Codegen, CodegenState, CompoundStatement, Expression,
+    ParenthesizableWhitespace, ParenthesizedNode, SimpleStatementLine, SimpleWhitespace,
+    SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
+};
 use rustpython_parser::ast::{
-    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
+    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Location, Stmt, StmtKind,
+    Unaryop,
 };
 
 use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
+use crate::ast::helpers::{has_comments_in, unparse_stmt};
 use crate::ast::types::Range;
-use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
+use crate::ast::{visitor, whitespace};
 use crate::checkers::ast::Checker;
+use crate::cst::matchers::match_module;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
+use crate::source_code::{Locator, Stylist};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::helpers::is_falsy_constant;
@@ -30,6 +39,7 @@ define_violation!(
     /// def test_foo():
     ///     assert something and something_else
     ///
+    ///
     /// def test_bar():
     ///     assert not (something or something_else)
     /// ```
@@ -39,6 +49,7 @@ define_violation!(
     /// def test_foo():
     ///     assert something
     ///     assert something_else
+    ///
     ///
     /// def test_bar():
     ///     assert not something
@@ -57,12 +68,8 @@ impl Violation for CompositeAssertion {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let CompositeAssertion { fixable } = self;
-        if *fixable {
-            Some(|_| format!("Break down assertion into multiple parts"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|_| format!("Break down assertion into multiple parts"))
     }
 }
 
@@ -178,7 +185,7 @@ fn check_assert_in_except(name: &str, body: &[Stmt]) -> Vec<Diagnostic> {
 /// PT009
 pub fn unittest_assertion(
     checker: &Checker,
-    call: &Expr,
+    expr: &Expr,
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
@@ -189,7 +196,8 @@ pub fn unittest_assertion(
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
                 let fixable = checker.current_expr_parent().is_none()
-                    && matches!(checker.current_stmt().node, StmtKind::Expr { .. });
+                    && matches!(checker.current_stmt().node, StmtKind::Expr { .. })
+                    && !has_comments_in(Range::from_located(expr), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     UnittestAssertion {
                         assertion: unittest_assert.to_string(),
@@ -201,8 +209,8 @@ pub fn unittest_assertion(
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         diagnostic.amend(Fix::replacement(
                             unparse_stmt(&stmt, checker.stylist),
-                            call.location,
-                            call.end_location.unwrap(),
+                            expr.location,
+                            expr.end_location.unwrap(),
                         ));
                     }
                 }
@@ -295,77 +303,145 @@ fn is_composite_condition(test: &Expr) -> CompositionKind {
 }
 
 /// Negate a condition, i.e., `a` => `not a` and `not a` => `a`.
-fn negate(f: Expr) -> Expr {
-    match f.node {
-        ExprKind::UnaryOp {
-            op: Unaryop::Not,
-            operand,
-        } => *operand,
-        _ => create_expr(ExprKind::UnaryOp {
-            op: Unaryop::Not,
-            operand: Box::new(f),
-        }),
+fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
+    if let Expression::UnaryOperation(ref expression) = expression {
+        if matches!(expression.operator, UnaryOp::Not { .. }) {
+            return *expression.expression.clone();
+        }
     }
+    Expression::UnaryOperation(Box::new(UnaryOperation {
+        operator: UnaryOp::Not {
+            whitespace_after: ParenthesizableWhitespace::SimpleWhitespace(SimpleWhitespace(" ")),
+        },
+        expression: Box::new(expression.clone()),
+        lpar: vec![],
+        rpar: vec![],
+    }))
 }
 
 /// Replace composite condition `assert a == "hello" and b == "world"` with two statements
 /// `assert a == "hello"` and `assert b == "world"`.
-fn fix_composite_condition(stylist: &Stylist, stmt: &Stmt, test: &Expr) -> Fix {
-    let mut conditions: Vec<Expr> = vec![];
-    match &test.node {
-        ExprKind::BoolOp {
-            op: Boolop::And,
-            values,
-        } => {
-            // Compound, so split.
-            conditions.extend(values.clone());
-        }
-        ExprKind::UnaryOp {
-            op: Unaryop::Not,
-            operand,
-        } => {
-            match &operand.node {
-                ExprKind::BoolOp {
-                    op: Boolop::Or,
-                    values,
-                } => {
-                    // Split via `not (a or b)` equals `not a and not b`.
-                    conditions.extend(values.iter().map(|f| negate(f.clone())));
-                }
-                _ => {
-                    // Do not split.
-                    conditions.push(*operand.clone());
+fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Fix> {
+    // Infer the indentation of the outer block.
+    let Some(outer_indent) = whitespace::indentation(locator, stmt) else {
+        bail!("Unable to fix multiline statement");
+    };
+
+    // Extract the module text.
+    let contents = locator.slice(&Range::new(
+        Location::new(stmt.location.row(), 0),
+        Location::new(stmt.end_location.unwrap().row() + 1, 0),
+    ));
+
+    // "Embed" it in a function definition, to preserve indentation while retaining valid source
+    // code. (We'll strip the prefix later on.)
+    let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
+
+    // Parse the CST.
+    let mut tree = match_module(&module_text)?;
+
+    // Extract the assert statement.
+    let statements: &mut Vec<Statement> = {
+        let [Statement::Compound(CompoundStatement::FunctionDef(embedding))] = &mut *tree.body else {
+            bail!("Expected statement to be embedded in a function definition")
+        };
+
+        let Suite::IndentedBlock(indented_block) = &mut embedding.body else {
+            bail!("Expected indented block")
+        };
+        indented_block.indent = Some(outer_indent);
+
+        &mut indented_block.body
+    };
+    let [Statement::Simple(simple_statement_line)] = statements.as_mut_slice() else {
+        bail!("Expected one simple statement")
+    };
+    let [SmallStatement::Assert(assert_statement)] = &mut *simple_statement_line.body else {
+        bail!("Expected simple statement to be an assert")
+    };
+
+    if !(assert_statement.test.lpar().is_empty() && assert_statement.test.rpar().is_empty()) {
+        bail!("Unable to split parenthesized condition");
+    }
+
+    // Extract the individual conditions.
+    let mut conditions: Vec<Expression> = Vec::with_capacity(2);
+    match &assert_statement.test {
+        Expression::UnaryOperation(op) => {
+            if matches!(op.operator, UnaryOp::Not { .. }) {
+                if let Expression::BooleanOperation(op) = &*op.expression {
+                    if matches!(op.operator, BooleanOp::Or { .. }) {
+                        conditions.push(negate(&op.left));
+                        conditions.push(negate(&op.right));
+                    } else {
+                        bail!("Expected assert statement to be a composite condition");
+                    }
+                } else {
+                    bail!("Expected assert statement to be a composite condition");
                 }
             }
         }
-        _ => {}
-    };
-
-    // For each condition, create an `assert condition` statement.
-    let mut content: Vec<String> = Vec::with_capacity(conditions.len());
-    for condition in conditions {
-        content.push(unparse_stmt(
-            &create_stmt(StmtKind::Assert {
-                test: Box::new(condition.clone()),
-                msg: None,
-            }),
-            stylist,
-        ));
+        Expression::BooleanOperation(op) => {
+            if matches!(op.operator, BooleanOp::And { .. }) {
+                conditions.push(*op.left.clone());
+                conditions.push(*op.right.clone());
+            } else {
+                bail!("Expected assert statement to be a composite condition");
+            }
+        }
+        _ => bail!("Expected assert statement to be a composite condition"),
     }
 
-    let content = content.join(stylist.line_ending().as_str());
-    Fix::replacement(content, stmt.location, stmt.end_location.unwrap())
+    // For each condition, create an `assert condition` statement.
+    statements.clear();
+    for condition in conditions {
+        statements.push(Statement::Simple(SimpleStatementLine {
+            body: vec![SmallStatement::Assert(Assert {
+                test: condition,
+                msg: None,
+                comma: None,
+                whitespace_after_assert: SimpleWhitespace(" "),
+                semicolon: None,
+            })],
+            leading_lines: Vec::default(),
+            trailing_whitespace: TrailingWhitespace::default(),
+        }));
+    }
+
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
+    tree.codegen(&mut state);
+
+    // Reconstruct and reformat the code.
+    let module_text = state.to_string();
+    let contents = module_text
+        .strip_prefix(&format!("def f():{}", stylist.line_ending().as_str()))
+        .unwrap()
+        .to_string();
+
+    Ok(Fix::replacement(
+        contents,
+        Location::new(stmt.location.row(), 0),
+        Location::new(stmt.end_location.unwrap().row() + 1, 0),
+    ))
 }
 
 /// PT018
 pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option<&Expr>) {
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
-        let fixable = matches!(composite, CompositionKind::Simple) && msg.is_none();
+        let fixable = matches!(composite, CompositionKind::Simple)
+            && msg.is_none()
+            && !has_comments_in(Range::from_located(stmt), checker.locator);
         let mut diagnostic =
             Diagnostic::new(CompositeAssertion { fixable }, Range::from_located(stmt));
         if fixable && checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(fix_composite_condition(checker.stylist, stmt, test));
+            if let Ok(fix) = fix_composite_condition(stmt, checker.locator, checker.stylist) {
+                diagnostic.amend(fix);
+            }
         }
         checker.diagnostics.push(diagnostic);
     }

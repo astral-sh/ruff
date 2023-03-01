@@ -23,7 +23,7 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
-use crate::ast::types::{BindingKind, Range, RefEquality};
+use crate::ast::types::{Range, RefEquality};
 use crate::ast::visitor::Visitor;
 use crate::ast::{helpers, visitor};
 use crate::checkers::ast::Checker;
@@ -31,7 +31,7 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::{AutofixKind, Availability, Violation};
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, result_like::BoolLike)]
 pub enum Certainty {
     Certain,
     Uncertain,
@@ -59,7 +59,7 @@ impl Violation for UnusedLoopControlVariable {
         let UnusedLoopControlVariable {
             name, certainty, ..
         } = self;
-        if matches!(certainty, Certainty::Certain) {
+        if certainty.to_bool() {
             format!("Loop control variable `{name}` not used within loop body")
         } else {
             format!("Loop control variable `{name}` may not be used within loop body")
@@ -70,7 +70,7 @@ impl Violation for UnusedLoopControlVariable {
         let UnusedLoopControlVariable {
             certainty, rename, ..
         } = self;
-        if matches!(certainty, Certainty::Certain) && rename.is_some() {
+        if certainty.to_bool() && rename.is_some() {
             Some(|UnusedLoopControlVariable { name, rename, .. }| {
                 let rename = rename.as_ref().unwrap();
                 format!("Rename unused `{name}` to `{rename}`")
@@ -140,25 +140,17 @@ pub fn unused_loop_control_variable(
         }
 
         // Avoid fixing any variables that _may_ be used, but undetectably so.
-        let certainty = if helpers::uses_magic_variable_access(checker, body) {
-            Certainty::Uncertain
-        } else {
-            Certainty::Certain
-        };
+        let certainty = Certainty::from(!helpers::uses_magic_variable_access(checker, body));
 
         // Attempt to rename the variable by prepending an underscore, but avoid
         // applying the fix if doing so wouldn't actually cause us to ignore the
         // violation in the next pass.
         let rename = format!("_{name}");
-        let rename = if checker
+        let rename = checker
             .settings
             .dummy_variable_rgx
             .is_match(rename.as_str())
-        {
-            Some(rename)
-        } else {
-            None
-        };
+            .then_some(rename);
 
         let mut diagnostic = Diagnostic::new(
             UnusedLoopControlVariable {
@@ -169,7 +161,7 @@ pub fn unused_loop_control_variable(
             Range::from_located(expr),
         );
         if let Some(rename) = rename {
-            if matches!(certainty, Certainty::Certain) && checker.patch(diagnostic.kind.rule()) {
+            if certainty.into() && checker.patch(diagnostic.kind.rule()) {
                 // Find the `BindingKind::LoopVar` corresponding to the name.
                 let scope = checker.current_scope();
                 let binding = scope
@@ -185,7 +177,7 @@ pub fn unused_loop_control_variable(
                             .and_then(|source| (source == &RefEquality(stmt)).then_some(binding))
                     });
                 if let Some(binding) = binding {
-                    if matches!(binding.kind, BindingKind::LoopVar) {
+                    if binding.kind.is_loop_var() {
                         if !binding.used() {
                             diagnostic.amend(Fix::replacement(
                                 rename,

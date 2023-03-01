@@ -9,7 +9,7 @@ use super::helpers;
 use super::types::Argumentable;
 use crate::ast::function_type;
 use crate::ast::function_type::FunctionType;
-use crate::ast::types::{Binding, BindingKind, FunctionDef, Lambda, Scope, ScopeKind};
+use crate::ast::types::{Binding, FunctionDef, Lambda, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
@@ -89,8 +89,7 @@ fn function(
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-    for arg in args
+    let args = args
         .posonlyargs
         .iter()
         .chain(args.args.iter())
@@ -104,24 +103,8 @@ fn function(
             iter::once::<Option<&Arg>>(args.kwarg.as_deref())
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
-        )
-    {
-        if let Some(binding) = values
-            .get(&arg.node.arg.as_str())
-            .map(|index| &bindings[*index])
-        {
-            if !binding.used()
-                && matches!(binding.kind, BindingKind::Argument)
-                && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
-            {
-                diagnostics.push(Diagnostic::new(
-                    argumentable.check_for(arg.node.arg.to_string()),
-                    binding.range,
-                ));
-            }
-        }
-    }
-    diagnostics
+        );
+    call(argumentable, args, values, bindings, dummy_variable_rgx)
 }
 
 /// Check a method for unused arguments.
@@ -133,8 +116,7 @@ fn method(
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-    for arg in args
+    let args = args
         .posonlyargs
         .iter()
         .chain(args.args.iter())
@@ -149,14 +131,25 @@ fn method(
             iter::once::<Option<&Arg>>(args.kwarg.as_deref())
                 .flatten()
                 .skip(usize::from(ignore_variadic_names)),
-        )
-    {
+        );
+    call(argumentable, args, values, bindings, dummy_variable_rgx)
+}
+
+fn call<'a>(
+    argumentable: &Argumentable,
+    args: impl Iterator<Item = &'a Arg>,
+    values: &FxHashMap<&str, usize>,
+    bindings: &[Binding],
+    dummy_variable_rgx: &Regex,
+) -> Vec<Diagnostic> {
+    let mut diagnostics: Vec<Diagnostic> = vec![];
+    for arg in args {
         if let Some(binding) = values
             .get(&arg.node.arg.as_str())
             .map(|index| &bindings[*index])
         {
             if !binding.used()
-                && matches!(binding.kind, BindingKind::Argument)
+                && binding.kind.is_argument()
                 && !dummy_variable_rgx.is_match(arg.node.arg.as_str())
             {
                 diagnostics.push(Diagnostic::new(

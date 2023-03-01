@@ -2,36 +2,42 @@ from typing import TypedDict, NotRequired, Literal
 import typing
 
 # dict literal
-MyType1 = TypedDict("MyType1", {"a": int, "b": str})
+MyType = TypedDict("MyType", {"a": int, "b": str})
 
 # dict call
-MyType2 = TypedDict("MyType2", dict(a=int, b=str))
+MyType = TypedDict("MyType", dict(a=int, b=str))
 
 # kwargs
-MyType3 = TypedDict("MyType3", a=int, b=str)
+MyType = TypedDict("MyType", a=int, b=str)
 
 # Empty TypedDict
-MyType4 = TypedDict("MyType4")
+MyType = TypedDict("MyType")
 
 # Literal values
-MyType5 = TypedDict("MyType5", {"a": "hello"})
-MyType6 = TypedDict("MyType6", a="hello")
+MyType = TypedDict("MyType", {"a": "hello"})
+MyType = TypedDict("MyType", a="hello")
 
 # NotRequired
-MyType7 = TypedDict("MyType7", {"a": NotRequired[dict]})
+MyType = TypedDict("MyType", {"a": NotRequired[dict]})
 
 # total
-MyType8 = TypedDict("MyType8", {"x": int, "y": int}, total=False)
-
-# invalid identifiers
-MyType9 = TypedDict("MyType9", {"in": int, "x-y": int})
+MyType = TypedDict("MyType", {"x": int, "y": int}, total=False)
 
 # using Literal type
-MyType10 = TypedDict("MyType10", {"key": Literal["value"]})
+MyType = TypedDict("MyType", {"key": Literal["value"]})
 
 # using namespace TypedDict
-MyType11 = typing.TypedDict("MyType11", {"key": int})
+MyType = typing.TypedDict("MyType", {"key": int})
 
-# unpacking
+# invalid identifiers (OK)
+MyType = TypedDict("MyType", {"in": int, "x-y": int})
+
+# unpacking (OK)
 c = {"c": float}
-MyType12 = TypedDict("MyType1", {"a": int, "b": str, **c})
+MyType = TypedDict("MyType", {"a": int, "b": str, **c})
+
+# Empty dict literal
+MyType = TypedDict("MyType", {})
+
+# Empty dict call
+MyType = TypedDict("MyType", dict())

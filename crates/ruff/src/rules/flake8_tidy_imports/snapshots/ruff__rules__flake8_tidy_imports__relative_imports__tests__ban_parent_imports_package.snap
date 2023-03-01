@@ -84,7 +84,7 @@ expression: diagnostics
     row: 7
     column: 21
   fix:
-    content: from my_package.sublib.sublib import server
+    content: from my_package.sublib import server
     location:
       row: 7
       column: 0

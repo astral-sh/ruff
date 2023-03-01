@@ -28,7 +28,7 @@ define_violation!(
     /// ```
     ///
     /// ## References
-    /// * [CodeQL: `py-init-method-is-generator`](https://codeql.github.com/codeql-query-help/python/py-init-method-is-generator/)
+    /// - [CodeQL: `py-init-method-is-generator`](https://codeql.github.com/codeql-query-help/python/py-init-method-is-generator/)
     pub struct YieldInInit;
 );
 

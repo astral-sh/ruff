@@ -9,7 +9,6 @@ use colored::Colorize;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ::ruff::logging::{set_up_logging, LogLevel};
-use ::ruff::resolver::PyprojectDiscovery;
 use ::ruff::settings::types::SerializationFormat;
 use ::ruff::settings::CliSettings;
 use ::ruff::{fix, fs, warn_user_once};
@@ -151,10 +150,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         show_fixes,
         update_check,
         ..
-    } = match &pyproject_strategy {
-        PyprojectDiscovery::Fixed(settings) => settings.cli.clone(),
-        PyprojectDiscovery::Hierarchical(settings) => settings.cli.clone(),
-    };
+    } = pyproject_strategy.top_level_settings().cli.clone();
 
     // Autofix rules are as follows:
     // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
@@ -198,9 +194,10 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         let modifications =
             commands::add_noqa::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
+            let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("Added {modifications} noqa directives.");
+                eprintln!("Added {modifications} noqa directive{s}.");
             }
         }
         return Ok(ExitStatus::Success);

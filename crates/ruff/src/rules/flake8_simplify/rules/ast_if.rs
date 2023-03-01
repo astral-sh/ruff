@@ -48,12 +48,8 @@ impl Violation for CollapsibleIf {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let CollapsibleIf { fixable, .. } = self;
-        if *fixable {
-            Some(|_| format!("Combine `if` statements using `and`"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|_| format!("Combine `if` statements using `and`"))
     }
 }
 
@@ -73,30 +69,27 @@ impl Violation for NeedlessBool {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let NeedlessBool { fixable, .. } = self;
-        if *fixable {
-            Some(|NeedlessBool { condition, .. }| format!("Replace with `return {condition}`"))
-        } else {
-            None
-        }
+        self.fixable.then_some(|NeedlessBool { condition, .. }| {
+            format!("Replace with `return {condition}`")
+        })
     }
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for three or more consecutive if-statements with direct returns
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// These can be simplified by using a dictionary
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
-    /// if x = 1:
+    /// if x == 1:
     ///     return "Hello"
-    /// elif x = 2:
+    /// elif x == 2:
     ///     return "Goodbye"
     /// else:
-    ///    return "Goodnight"
+    ///     return "Goodnight"
     /// ```
     ///
     /// Use instead:
@@ -124,30 +117,26 @@ impl Violation for UseTernaryOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let UseTernaryOperator { contents, .. } = self;
-        format!("Use ternary operator `{contents}` instead of if-else-block")
+        format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UseTernaryOperator { fixable, .. } = self;
-        if *fixable {
-            Some(|UseTernaryOperator { contents, .. }| {
-                format!("Replace if-else-block with `{contents}`")
+        self.fixable
+            .then_some(|UseTernaryOperator { contents, .. }| {
+                format!("Replace `if`-`else`-block with `{contents}`")
             })
-        } else {
-            None
-        }
     }
 }
 
 define_violation!(
-    /// ### What it does
+    /// ## What it does
     /// Checks for `if` branches with identical arm bodies.
     ///
-    /// ### Why is this bad?
+    /// ## Why is this bad?
     /// If multiple arms of an `if` statement have the same body, using `or`
     /// better signals the intent of the statement.
     ///
-    /// ### Example
+    /// ## Example
     /// ```python
     /// if x == 1:
     ///     print("Hello")
@@ -185,12 +174,8 @@ impl Violation for DictGetWithDefault {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let DictGetWithDefault { fixable, .. } = self;
-        if *fixable {
-            Some(|DictGetWithDefault { contents, .. }| format!("Replace with `{contents}`"))
-        } else {
-            None
-        }
+        self.fixable
+            .then_some(|DictGetWithDefault { contents, .. }| format!("Replace with `{contents}`"))
     }
 }
 
@@ -344,7 +329,7 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
 }
 
 /// SIM103
-pub fn return_bool_condition_directly(checker: &mut Checker, stmt: &Stmt) {
+pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let StmtKind::If { test, body, orelse } = &stmt.node else {
         return;
     };
@@ -607,6 +592,7 @@ pub fn manual_dict_lookup(
     test: &Expr,
     body: &[Stmt],
     orelse: &[Stmt],
+    parent: Option<&Stmt>,
 ) {
     // Throughout this rule:
     // * Each if-statement's test must consist of a constant equality check with the same variable.
@@ -646,6 +632,36 @@ pub fn manual_dict_lookup(
         .map_or(false, |value| contains_effect(checker, value))
     {
         return;
+    }
+
+    // It's part of a bigger if-elif block:
+    // https://github.com/MartinThoma/flake8-simplify/issues/115
+    if let Some(StmtKind::If {
+        orelse: parent_orelse,
+        ..
+    }) = parent.map(|parent| &parent.node)
+    {
+        if parent_orelse.len() == 1 && stmt == &parent_orelse[0] {
+            // TODO(charlie): These two cases have the same AST:
+            //
+            // if True:
+            //     pass
+            // elif a:
+            //     b = 1
+            // else:
+            //     b = 2
+            //
+            // if True:
+            //     pass
+            // else:
+            //     if a:
+            //         b = 1
+            //     else:
+            //         b = 2
+            //
+            // We want to flag the latter, but not the former. Right now, we flag neither.
+            return;
+        }
     }
 
     let mut constants: FxHashSet<ComparableConstant> = FxHashSet::default();

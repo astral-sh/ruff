@@ -25,7 +25,7 @@ define_violation!(
     /// the absence of the `__init__.py` file is probably an oversight.
     ///
     /// ## Options
-    /// * `namespace-packages`
+    /// - `namespace-packages`
     pub struct ImplicitNamespacePackage {
         pub filename: String,
     }

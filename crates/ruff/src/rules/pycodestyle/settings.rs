@@ -27,8 +27,8 @@ pub struct Options {
         "#
     )]
     /// Whether line-length violations (`E501`) should be triggered for
-    /// comments starting with `task-tags` (by default: ["TODO", "FIXME",
-    /// and "XXX"]).
+    /// comments starting with `task-tags` (by default: \["TODO", "FIXME",
+    /// and "XXX"\]).
     pub ignore_overlong_task_comments: Option<bool>,
 }
 

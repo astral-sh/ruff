@@ -1,9 +1,9 @@
 use rustpython_parser::ast::Constant;
 
 use crate::cst::{
-    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Excepthandler, ExcepthandlerKind, Expr,
-    ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern, PatternKind, Stmt, StmtKind,
-    Unaryop, Withitem,
+    Alias, Arg, Arguments, Body, BoolOp, CmpOp, Comprehension, Excepthandler, ExcepthandlerKind,
+    Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern, PatternKind, SliceIndex,
+    SliceIndexKind, Stmt, StmtKind, UnaryOp, Withitem,
 };
 
 pub trait Visitor<'a> {
@@ -22,23 +22,26 @@ pub trait Visitor<'a> {
     fn visit_expr_context(&mut self, expr_context: &'a mut ExprContext) {
         walk_expr_context(self, expr_context);
     }
-    fn visit_boolop(&mut self, boolop: &'a mut Boolop) {
-        walk_boolop(self, boolop);
+    fn visit_bool_op(&mut self, bool_op: &'a mut BoolOp) {
+        walk_bool_op(self, bool_op);
     }
     fn visit_operator(&mut self, operator: &'a mut Operator) {
         walk_operator(self, operator);
     }
-    fn visit_unaryop(&mut self, unaryop: &'a mut Unaryop) {
-        walk_unaryop(self, unaryop);
+    fn visit_unary_op(&mut self, unary_op: &'a mut UnaryOp) {
+        walk_unary_op(self, unary_op);
     }
-    fn visit_cmpop(&mut self, cmpop: &'a mut Cmpop) {
-        walk_cmpop(self, cmpop);
+    fn visit_cmp_op(&mut self, cmp_op: &'a mut CmpOp) {
+        walk_cmp_op(self, cmp_op);
     }
     fn visit_comprehension(&mut self, comprehension: &'a mut Comprehension) {
         walk_comprehension(self, comprehension);
     }
     fn visit_excepthandler(&mut self, excepthandler: &'a mut Excepthandler) {
         walk_excepthandler(self, excepthandler);
+    }
+    fn visit_slice_index(&mut self, slice_index: &'a mut SliceIndex) {
+        walk_slice_index(self, slice_index);
     }
     fn visit_format_spec(&mut self, format_spec: &'a mut Expr) {
         walk_expr(self, format_spec);
@@ -64,13 +67,13 @@ pub trait Visitor<'a> {
     fn visit_pattern(&mut self, pattern: &'a mut Pattern) {
         walk_pattern(self, pattern);
     }
-    fn visit_body(&mut self, body: &'a mut [Stmt]) {
+    fn visit_body(&mut self, body: &'a mut Body) {
         walk_body(self, body);
     }
 }
 
-pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a mut [Stmt]) {
-    for stmt in body {
+pub fn walk_body<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, body: &'a mut Body) {
+    for stmt in &mut body.node {
         visitor.visit_stmt(stmt);
     }
 }
@@ -170,7 +173,9 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
             visitor.visit_expr(iter);
             visitor.visit_expr(target);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
         }
         StmtKind::AsyncFor {
             target,
@@ -182,17 +187,25 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
             visitor.visit_expr(iter);
             visitor.visit_expr(target);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
         }
         StmtKind::While { test, body, orelse } => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
         }
-        StmtKind::If { test, body, orelse } => {
+        StmtKind::If {
+            test, body, orelse, ..
+        } => {
             visitor.visit_expr(test);
             visitor.visit_body(body);
-            visitor.visit_body(orelse);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
         }
         StmtKind::With { items, body, .. } => {
             for withitem in items {
@@ -207,7 +220,6 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
             visitor.visit_body(body);
         }
         StmtKind::Match { subject, cases } => {
-            // TODO(charlie): Handle `cases`.
             visitor.visit_expr(subject);
             for match_case in cases {
                 visitor.visit_match_case(match_case);
@@ -231,8 +243,29 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
             for excepthandler in handlers {
                 visitor.visit_excepthandler(excepthandler);
             }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
+            if let Some(finalbody) = finalbody {
+                visitor.visit_body(finalbody);
+            }
+        }
+        StmtKind::TryStar {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+        } => {
+            visitor.visit_body(body);
+            for excepthandler in handlers {
+                visitor.visit_excepthandler(excepthandler);
+            }
+            if let Some(orelse) = orelse {
+                visitor.visit_body(orelse);
+            }
+            if let Some(finalbody) = finalbody {
+                visitor.visit_body(finalbody);
+            }
         }
         StmtKind::Assert { test, msg } => {
             visitor.visit_expr(test);
@@ -261,10 +294,12 @@ pub fn walk_stmt<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a mut Stm
 
 pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Expr) {
     match &mut expr.node {
-        ExprKind::BoolOp { op, values } => {
-            visitor.visit_boolop(op);
-            for expr in values {
-                visitor.visit_expr(expr);
+        ExprKind::BoolOp { ops, values } => {
+            for op in ops {
+                visitor.visit_bool_op(op);
+            }
+            for value in values {
+                visitor.visit_expr(value);
             }
         }
         ExprKind::NamedExpr { target, value } => {
@@ -277,7 +312,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Exp
             visitor.visit_expr(right);
         }
         ExprKind::UnaryOp { op, operand } => {
-            visitor.visit_unaryop(op);
+            visitor.visit_unary_op(op);
             visitor.visit_expr(operand);
         }
         ExprKind::Lambda { args, body } => {
@@ -345,7 +380,7 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Exp
         } => {
             visitor.visit_expr(left);
             for cmpop in ops {
-                visitor.visit_cmpop(cmpop);
+                visitor.visit_cmp_op(cmpop);
             }
             for expr in comparators {
                 visitor.visit_expr(expr);
@@ -407,14 +442,10 @@ pub fn walk_expr<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, expr: &'a mut Exp
             visitor.visit_expr_context(ctx);
         }
         ExprKind::Slice { lower, upper, step } => {
-            if let Some(expr) = lower {
-                visitor.visit_expr(expr);
-            }
-            if let Some(expr) = upper {
-                visitor.visit_expr(expr);
-            }
+            visitor.visit_slice_index(lower);
+            visitor.visit_slice_index(upper);
             if let Some(expr) = step {
-                visitor.visit_expr(expr);
+                visitor.visit_slice_index(expr);
             }
         }
     }
@@ -449,6 +480,18 @@ pub fn walk_excepthandler<'a, V: Visitor<'a> + ?Sized>(
                 visitor.visit_expr(expr);
             }
             visitor.visit_body(body);
+        }
+    }
+}
+
+pub fn walk_slice_index<'a, V: Visitor<'a> + ?Sized>(
+    visitor: &mut V,
+    slice_index: &'a mut SliceIndex,
+) {
+    match &mut slice_index.node {
+        SliceIndexKind::Empty => {}
+        SliceIndexKind::Index { value } => {
+            visitor.visit_expr(value);
         }
     }
 }
@@ -559,16 +602,16 @@ pub fn walk_expr_context<'a, V: Visitor<'a> + ?Sized>(
 }
 
 #[allow(unused_variables)]
-pub fn walk_boolop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, boolop: &'a mut Boolop) {}
+pub fn walk_bool_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, bool_op: &'a mut BoolOp) {}
 
 #[allow(unused_variables)]
 pub fn walk_operator<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, operator: &'a mut Operator) {}
 
 #[allow(unused_variables)]
-pub fn walk_unaryop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unaryop: &'a mut Unaryop) {}
+pub fn walk_unary_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, unary_op: &'a mut UnaryOp) {}
 
 #[allow(unused_variables)]
-pub fn walk_cmpop<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmpop: &'a mut Cmpop) {}
+pub fn walk_cmp_op<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, cmp_op: &'a mut CmpOp) {}
 
 #[allow(unused_variables)]
 pub fn walk_alias<'a, V: Visitor<'a> + ?Sized>(visitor: &mut V, alias: &'a mut Alias) {}

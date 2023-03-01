@@ -1,9 +1,10 @@
 use anyhow::{bail, Result};
 use log::debug;
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
+
 use ruff_macros::{define_violation, derive_message_formats};
 use ruff_python::identifiers::is_identifier;
 use ruff_python::keyword::KWLIST;
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;
@@ -11,23 +12,29 @@ use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::violation::{Availability, Violation};
+use crate::AutofixKind;
 
 define_violation!(
     pub struct ConvertTypedDictFunctionalToClass {
         pub name: String,
+        pub fixable: bool,
     }
 );
-impl AlwaysAutofixableViolation for ConvertTypedDictFunctionalToClass {
+impl Violation for ConvertTypedDictFunctionalToClass {
+    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConvertTypedDictFunctionalToClass { name } = self;
+        let ConvertTypedDictFunctionalToClass { name, .. } = self;
         format!("Convert `{name}` from `TypedDict` functional to class syntax")
     }
 
-    fn autofix_title(&self) -> String {
-        let ConvertTypedDictFunctionalToClass { name } = self;
-        format!("Convert `{name}` to class syntax")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable
+            .then_some(|ConvertTypedDictFunctionalToClass { name, .. }| {
+                format!("Convert `{name}` to class syntax")
+            })
     }
 }
 
@@ -71,11 +78,6 @@ fn create_property_assignment_stmt(property: &str, annotation: &ExprKind) -> Stm
     })
 }
 
-/// Generate a `StmtKind::Pass` statement.
-fn create_pass_stmt() -> Stmt {
-    create_stmt(StmtKind::Pass)
-}
-
 /// Generate a `StmtKind:ClassDef` statement based on the provided body,
 /// keywords and base class.
 fn create_class_def_stmt(
@@ -98,6 +100,10 @@ fn create_class_def_stmt(
 }
 
 fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
+    if keys.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
+
     keys.iter()
         .zip(values.iter())
         .map(|(key, value)| match key {
@@ -127,11 +133,19 @@ fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<St
     if id != "dict" {
         bail!("Expected `id` to be `\"dict\"`")
     }
+    if keywords.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
+
     properties_from_keywords(keywords)
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
 fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
+    if keywords.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
+
     keywords
         .iter()
         .map(|keyword| {
@@ -178,12 +192,12 @@ fn match_properties_and_total<'a>(
             ExprKind::Call { func, keywords, .. } => {
                 Ok((properties_from_dict_call(func, keywords)?, total))
             }
-            _ => Ok((vec![create_pass_stmt()], total)),
+            _ => bail!("Expected `arg` to be `ExprKind::Dict` or `ExprKind::Call`"),
         }
     } else if !keywords.is_empty() {
         Ok((properties_from_keywords(keywords)?, None))
     } else {
-        Ok((vec![create_pass_stmt()], None))
+        Ok((vec![create_stmt(StmtKind::Pass)], None))
     }
 }
 
@@ -219,27 +233,31 @@ pub fn convert_typed_dict_functional_to_class(
         return;
     };
 
+    let (body, total_keyword) = match match_properties_and_total(args, keywords) {
+        Ok((body, total_keyword)) => (body, total_keyword),
+        Err(err) => {
+            debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}");
+            return;
+        }
+    };
+    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
+    let fixable = stmt.location.column() == 0;
     let mut diagnostic = Diagnostic::new(
         ConvertTypedDictFunctionalToClass {
             name: class_name.to_string(),
+            fixable,
         },
         Range::from_located(stmt),
     );
-    // TODO(charlie): Preserve indentation, to remove the first-column requirement.
-    if checker.patch(diagnostic.kind.rule()) && stmt.location.column() == 0 {
-        match match_properties_and_total(args, keywords) {
-            Ok((body, total_keyword)) => {
-                diagnostic.amend(convert_to_class(
-                    stmt,
-                    class_name,
-                    body,
-                    total_keyword,
-                    base_class,
-                    checker.stylist,
-                ));
-            }
-            Err(err) => debug!("Skipping ineligible `TypedDict` \"{class_name}\": {err}"),
-        };
+    if fixable && checker.patch(diagnostic.kind.rule()) {
+        diagnostic.amend(convert_to_class(
+            stmt,
+            class_name,
+            body,
+            total_keyword,
+            base_class,
+            checker.stylist,
+        ));
     }
     checker.diagnostics.push(diagnostic);
 }

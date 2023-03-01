@@ -26,7 +26,6 @@ impl Violation for TooManyStatements {
 fn num_statements(stmts: &[Stmt]) -> usize {
     let mut count = 0;
     for stmt in stmts {
-        // TODO(charlie): Account for pattern match statement.
         match &stmt.node {
             StmtKind::If { body, orelse, .. } => {
                 count += 1;
@@ -49,7 +48,19 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                 count += num_statements(body);
                 count += num_statements(orelse);
             }
+            StmtKind::Match { cases, .. } => {
+                count += 1;
+                for case in cases {
+                    count += num_statements(&case.body);
+                }
+            }
             StmtKind::Try {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+            }
+            | StmtKind::TryStar {
                 body,
                 handlers,
                 orelse,
@@ -112,7 +123,7 @@ pub fn too_many_statements(
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use rustpython_parser::parser;
+    use rustpython_parser as parser;
 
     use super::num_statements;
 

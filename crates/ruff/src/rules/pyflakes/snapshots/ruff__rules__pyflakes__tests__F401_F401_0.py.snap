@@ -144,4 +144,44 @@ expression: diagnostics
       row: 52
       column: 21
   parent: ~
+- kind:
+    UnusedImport:
+      name: x
+      ignore_init: false
+      multiple: false
+  location:
+    row: 93
+    column: 15
+  end_location:
+    row: 93
+    column: 16
+  fix:
+    content: ""
+    location:
+      row: 93
+      column: 0
+    end_location:
+      row: 94
+      column: 0
+  parent: ~
+- kind:
+    UnusedImport:
+      name: y
+      ignore_init: false
+      multiple: false
+  location:
+    row: 94
+    column: 15
+  end_location:
+    row: 94
+    column: 16
+  fix:
+    content: pass
+    location:
+      row: 94
+      column: 8
+    end_location:
+      row: 94
+      column: 16
+  parent: ~
 

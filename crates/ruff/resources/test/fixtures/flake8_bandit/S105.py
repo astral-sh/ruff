@@ -19,6 +19,8 @@ token = "s3cr3t"
 secrete = "s3cr3t"
 safe = password = "s3cr3t"
 password = safe = "s3cr3t"
+PASSWORD = "s3cr3t"
+PassWord = "s3cr3t"
 
 d["password"] = "s3cr3t"
 d["pass"] = "s3cr3t"
@@ -61,3 +63,15 @@ if token == "3\t4":
 
 if token == "5\r6":
     pass
+
+
+# These should not be flagged
+passed_msg = "You have passed!"
+compassion = "Please don't match!"
+impassable = "You shall not pass!"
+passwords = ""
+PASSWORDS = ""
+passphrases = ""
+PassPhrases = ""
+tokens = ""
+secrets = ""

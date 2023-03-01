@@ -1730,9 +1730,7 @@ pub fn ambiguous_unicode_character(
                         Range::new(location, end_location),
                     );
                     if settings.rules.enabled(diagnostic.kind.rule()) {
-                        if matches!(autofix, flags::Autofix::Enabled)
-                            && settings.rules.should_fix(diagnostic.kind.rule())
-                        {
+                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
                                 representant.to_string(),
                                 location,

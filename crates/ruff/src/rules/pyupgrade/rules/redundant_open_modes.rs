@@ -4,8 +4,7 @@ use anyhow::{anyhow, Result};
 use log::error;
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
-use rustpython_parser::lexer;
-use rustpython_parser::token::Tok;
+use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::ast::helpers::find_keyword;
 use crate::ast::types::Range;
@@ -142,7 +141,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
     let mut fix_end: Option<Location> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (start, tok, end) in lexer::make_tokenizer_located(content, expr.location).flatten() {
+    for (start, tok, end) in lexer::lex_located(content, Mode::Module, expr.location).flatten() {
         if start == mode_param.location {
             if is_first_arg {
                 delete_first_arg = true;

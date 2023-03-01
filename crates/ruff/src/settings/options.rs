@@ -80,10 +80,10 @@ pub struct Options {
     ///
     /// Exclusions are based on globs, and can be either:
     ///
-    /// * Single-path patterns, like `.mypy_cache` (to exclude any directory
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
     ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
     ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
-    /// * Relative patterns, like `directory/foo.py` (to exclude that specific
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
     ///   file) or `directory/*.py` (to exclude any Python files in
     ///   `directory`). Note that these paths are relative to the project root
     ///   (e.g., the directory containing your `pyproject.toml`).
@@ -124,10 +124,10 @@ pub struct Options {
     ///
     /// Exclusions are based on globs, and can be either:
     ///
-    /// * Single-path patterns, like `.mypy_cache` (to exclude any directory
+    /// - Single-path patterns, like `.mypy_cache` (to exclude any directory
     ///   named `.mypy_cache` in the tree), `foo.py` (to exclude any file named
     ///   `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ).
-    /// * Relative patterns, like `directory/foo.py` (to exclude that specific
+    /// - Relative patterns, like `directory/foo.py` (to exclude that specific
     ///   file) or `directory/*.py` (to exclude any Python files in
     ///   `directory`). Note that these paths are relative to the project root
     ///   (e.g., the directory containing your `pyproject.toml`).
@@ -346,13 +346,13 @@ pub struct Options {
     ///       bar.py
     /// ```
     ///
-    /// The `src` directory should be included in the `src` option (e.g., `src =
-    /// ["src"]`), such that when resolving imports, `my_package.foo` is
-    /// considered a first-party import.
+    /// The `src` directory should be included in the `src` option
+    /// (e.g., `src = ["src"]`), such that when resolving imports,
+    /// `my_package.foo` is considered a first-party import.
     ///
     /// This field supports globs. For example, if you have a series of Python
-    /// packages in a `python_modules` directory, `src =
-    /// ["python_modules/*"]` would expand to incorporate all of the
+    /// packages in a `python_modules` directory, `src = ["python_modules/*"]`
+    /// would expand to incorporate all of the
     /// packages in that directory. User home directory and environment
     /// variables will also be expanded.
     pub src: Option<Vec<String>>,

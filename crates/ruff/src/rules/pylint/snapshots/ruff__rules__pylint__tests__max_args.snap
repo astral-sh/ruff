@@ -1,5 +1,5 @@
 ---
-source: src/rules/pylint/mod.rs
+source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -8,10 +8,10 @@ expression: diagnostics
       max_args: 4
   location:
     row: 3
-    column: 0
+    column: 4
   end_location:
-    row: 4
-    column: 8
+    row: 3
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -20,10 +20,10 @@ expression: diagnostics
       max_args: 4
   location:
     row: 9
-    column: 0
+    column: 4
   end_location:
-    row: 10
-    column: 8
+    row: 9
+    column: 5
   fix: ~
   parent: ~
 

@@ -17,6 +17,8 @@ mod tests {
     use crate::settings::Settings;
     use crate::test::test_path;
 
+    #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"); "PLE1205")]
+    #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"); "PLE1206")]
     #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"); "PLE0101")]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
@@ -37,16 +39,19 @@ mod tests {
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
+    #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"); "PLW0603")]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
     #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
+    #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"); "PLR5501")]
     #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"); "PLE1307")]
     #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"); "PLE2502")]
     #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"); "PLE0100")]
+    #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"); "PLW2901")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -15,6 +15,8 @@ use crate::message::Location;
 use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
+use super::fixes;
+
 define_violation!(
     pub struct UnnecessaryPass;
 );
@@ -55,6 +57,50 @@ impl Violation for PreferUniqueEnums {
     fn message(&self) -> String {
         let PreferUniqueEnums { value } = self;
         format!("Enum contains duplicate value: `{value}`")
+    }
+}
+
+define_violation!(
+    /// ## What it does
+    /// Checks for unnecessary list comprehensions passed to `any` and `all`.
+    ///
+    /// ## Why is this bad?
+    /// `any` and `all` take any iterators, including generators. Converting a generator to a list
+    /// by way of a list comprehension is unnecessary and reduces performance due to the
+    /// overhead of creating the list.
+    ///
+    /// For example, compare the performance of `all` with a list comprehension against that
+    /// of a generator (~40x faster here):
+    ///
+    /// ```console
+    /// In [1]: %timeit all([i for i in range(1000)])
+    /// 8.14 µs ± 25.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
+    ///
+    /// In [2]: %timeit all(i for i in range(1000))
+    /// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
+    /// ```
+    ///
+    /// ## Examples
+    /// ```python
+    /// any([x.id for x in bar])
+    /// all([x.id for x in bar])
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// any(x.id for x in bar)
+    /// all(x.id for x in bar)
+    /// ```
+    pub struct UnnecessaryComprehensionAnyAll;
+);
+impl AlwaysAutofixableViolation for UnnecessaryComprehensionAnyAll {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Unnecessary list comprehension.")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Remove unnecessary list comprehension".to_string()
     }
 }
 
@@ -282,6 +328,39 @@ pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], value
     }
 }
 
+/// PIE802
+pub fn unnecessary_comprehension_any_all(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+) {
+    if let ExprKind::Name { id, .. } = &func.node {
+        if (id == "all" || id == "any") && args.len() == 1 {
+            if !checker.is_builtin(id) {
+                return;
+            }
+            if let ExprKind::ListComp { .. } = args[0].node {
+                let mut diagnostic =
+                    Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from_located(expr));
+                if checker.patch(diagnostic.kind.rule()) {
+                    match fixes::fix_unnecessary_comprehension_any_all(
+                        checker.locator,
+                        checker.stylist,
+                        &args[0],
+                    ) {
+                        Ok(fix) => {
+                            diagnostic.amend(fix);
+                        }
+                        Err(e) => error!("Failed to generate fix: {e}"),
+                    }
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+        }
+    }
+}
+
 /// Return `true` if a key is a valid keyword argument name.
 fn is_valid_kwarg_name(key: &Expr) -> bool {
     if let ExprKind::Constant {
@@ -358,7 +437,12 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Lambda { args, body } = &expr.node else {
         unreachable!("Expected ExprKind::Lambda");
     };
-    if args.args.is_empty() {
+    if args.args.is_empty()
+        && args.kwonlyargs.is_empty()
+        && args.posonlyargs.is_empty()
+        && args.vararg.is_none()
+        && args.kwarg.is_none()
+    {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(PreferListBuiltin, Range::from_located(expr));

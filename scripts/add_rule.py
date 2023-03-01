@@ -46,7 +46,8 @@ def main(*, name: str, code: str, linter: str) -> None:
             if line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {":
                 indent = get_indent(line)
                 fp.write(
-                    f'{indent}#[test_case(Rule::{name}, Path::new("{code}.py"); "{code}")]',
+                    f'{indent}#[test_case(Rule::{name}, Path::new("{code}.py"); '
+                    f'"{code}")]',
                 )
                 fp.write("\n")
 
@@ -140,7 +141,7 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
             text += line
         text += line
         linter_variant = pascal_case(linter)
-        text += " "*8 + f'({linter_variant}, "{code}") => Rule::{name},\n'
+        text += " " * 8 + f'({linter_variant}, "{code}") => Rule::{name},\n'
         text += fp.read()
 
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
@@ -150,7 +151,10 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Generate boilerplate for a new rule.",
-        epilog="python scripts/add_rule.py --name PreferListBuiltin --code PIE807 --linter flake8-pie",
+        epilog=(
+            "python scripts/add_rule.py "
+            "--name PreferListBuiltin --code PIE807 --linter flake8-pie"
+        ),
     )
     parser.add_argument(
         "--name",

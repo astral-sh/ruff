@@ -2,21 +2,30 @@ from typing import NamedTuple
 import typing
 
 # with complex annotations
-NT1 = NamedTuple("NT1", [("a", int), ("b", tuple[str, ...])])
+MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
 
 # with default values as list
-NT2 = NamedTuple(
-    "NT2",
+MyType = NamedTuple(
+    "MyType",
     [("a", int), ("b", str), ("c", list[bool])],
     defaults=["foo", [True]],
 )
 
 # with namespace
-NT3 = typing.NamedTuple("NT3", [("a", int), ("b", str)])
+MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
 
-# with too many default values
-NT4 = NamedTuple(
-    "NT4",
+# too many default values (OK)
+MyType = NamedTuple(
+    "MyType",
     [("a", int), ("b", str)],
     defaults=[1, "bar", "baz"],
 )
+
+# invalid identifiers (OK)
+MyType = NamedTuple("MyType", [("x-y", int), ("b", tuple[str, ...])])
+
+# no fields
+MyType = typing.NamedTuple("MyType")
+
+# empty fields
+MyType = typing.NamedTuple("MyType", [])

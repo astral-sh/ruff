@@ -24,6 +24,7 @@ mod tests {
     #[test_case(Rule::AmbiguousVariableName, Path::new("E741.py"))]
     #[test_case(Rule::LambdaAssignment, Path::new("E731.py"))]
     #[test_case(Rule::BareExcept, Path::new("E722.py"))]
+    #[test_case(Rule::BlankLineContainsWhitespace, Path::new("W29.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_0.py"))]
     #[test_case(Rule::InvalidEscapeSequence, Path::new("W605_1.py"))]
     #[test_case(Rule::LineTooLong, Path::new("E501.py"))]
@@ -41,6 +42,8 @@ mod tests {
     #[test_case(Rule::NotInTest, Path::new("E713.py"))]
     #[test_case(Rule::NotIsTest, Path::new("E714.py"))]
     #[test_case(Rule::SyntaxError, Path::new("E999.py"))]
+    #[test_case(Rule::IndentationContainsTabs, Path::new("W19.py"))]
+    #[test_case(Rule::TrailingWhitespace, Path::new("W29.py"))]
     #[test_case(Rule::TrueFalseComparison, Path::new("E712.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
     #[test_case(Rule::UselessSemicolon, Path::new("E70.py"))]
@@ -81,6 +84,7 @@ mod tests {
     #[test_case(Rule::MultipleSpacesAfterKeyword, Path::new("E27.py"))]
     #[test_case(Rule::MultipleSpacesAfterOperator, Path::new("E22.py"))]
     #[test_case(Rule::MultipleSpacesBeforeKeyword, Path::new("E27.py"))]
+    #[test_case(Rule::MissingWhitespaceAfterKeyword, Path::new("E27.py"))]
     #[test_case(Rule::MultipleSpacesBeforeOperator, Path::new("E22.py"))]
     #[test_case(Rule::NoIndentedBlock, Path::new("E11.py"))]
     #[test_case(Rule::NoIndentedBlockComment, Path::new("E11.py"))]
@@ -97,6 +101,11 @@ mod tests {
     #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
+    #[test_case(
+        Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+        Path::new("E25.py")
+    )]
+    #[test_case(Rule::MissingWhitespaceAroundParameterEquals, Path::new("E25.py"))]
     fn logical(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

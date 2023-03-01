@@ -1,6 +1,7 @@
 use itertools::Itertools;
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind};
+
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Located};
 
 use crate::ast::helpers::compose_call_path;
 use crate::ast::types::Range;
@@ -97,7 +98,7 @@ fn handle_name_or_attribute(
 }
 
 /// Handles one block of an except (use a loop if there are multiple blocks)
-fn handle_except_block(checker: &mut Checker, handler: &Located<ExcepthandlerKind>) {
+fn handle_except_block(checker: &mut Checker, handler: &Excepthandler) {
     let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
     let Some(error_handlers) = type_.as_ref() else {
         return;

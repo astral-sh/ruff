@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::fs;
 use crate::settings::options::Options;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,13 +29,13 @@ impl Pyproject {
 
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
-    let contents = fs::read_file(path)?;
+    let contents = std::fs::read_to_string(path)?;
     toml::from_str(&contents).map_err(Into::into)
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
-    let contents = fs::read_file(path)?;
+    let contents = std::fs::read_to_string(path)?;
     toml::from_str(&contents).map_err(Into::into)
 }
 
@@ -49,6 +48,12 @@ pub fn ruff_enabled<P: AsRef<Path>>(path: P) -> Result<bool> {
 /// Return the path to the `pyproject.toml` or `ruff.toml` file in a given
 /// directory.
 pub fn settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
+    // Check for `.ruff.toml`.
+    let ruff_toml = path.as_ref().join(".ruff.toml");
+    if ruff_toml.is_file() {
+        return Ok(Some(ruff_toml));
+    }
+
     // Check for `ruff.toml`.
     let ruff_toml = path.as_ref().join("ruff.toml");
     if ruff_toml.is_file() {
@@ -78,6 +83,14 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
 /// Find the path to the user-specific `pyproject.toml` or `ruff.toml`, if it
 /// exists.
 pub fn find_user_settings_toml() -> Option<PathBuf> {
+    // Search for a user-specific `.ruff.toml`.
+    let mut path = dirs::config_dir()?;
+    path.push("ruff");
+    path.push(".ruff.toml");
+    if path.is_file() {
+        return Some(path);
+    }
+
     // Search for a user-specific `ruff.toml`.
     let mut path = dirs::config_dir()?;
     path.push("ruff");

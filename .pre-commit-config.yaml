@@ -5,6 +5,14 @@ repos:
     hooks:
       - id: validate-pyproject
 
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.16
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-black
+          - black==23.1.0 # Must be the latest version of Black
+
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.33.0
     hooks:
@@ -13,7 +21,6 @@ repos:
           - --disable
           - MD013 # line-length
           - MD033 # no-inline-html
-          - MD041 # first-line-h1
           - --
 
   - repo: local
@@ -45,6 +52,17 @@ repos:
         language: rust
         pass_filenames: false
         exclude: target
+
+  # Black
+  - repo: https://github.com/psf/black
+    rev: 23.1.0
+    hooks:
+      - id: black
+        exclude: |
+          (?x)^(
+            crates/ruff/resources/.*|
+            crates/ruff_python_formatter/resources/.*
+          )$
 
 ci:
   skip: [cargo-fmt, clippy, dev-generate-all]

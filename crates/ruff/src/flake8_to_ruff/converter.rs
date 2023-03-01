@@ -576,6 +576,7 @@ mod tests {
         let expected = Pyproject::new(Options {
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
+                ignore_decorators: None,
             }),
             ..default_options([Linter::Pydocstyle.into()])
         });

@@ -85,3 +85,10 @@ else:
 
 
 CustomInt: TypeAlias = "np.int8 | np.int16"
+
+
+# Test: match statements.
+match *0, 1, *2:
+    case 0,:
+        import x
+        import y

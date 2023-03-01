@@ -180,8 +180,8 @@ pub struct Options {
     ///
     /// The default ("furthest-to-closest") is equivalent to isort's
     /// `reverse-relative` default (`reverse-relative = false`); setting
-    /// this to "closest-to-furthest" is equivalent to isort's `reverse-relative
-    /// = true`.
+    /// this to "closest-to-furthest" is equivalent to isort's
+    /// `reverse-relative = true`.
     pub relative_imports_order: Option<RelativeImportsOrder>,
     #[option(
         default = r#"[]"#,

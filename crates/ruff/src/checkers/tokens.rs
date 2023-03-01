@@ -1,6 +1,7 @@
 //! Lint rules based on token traversal.
 
-use rustpython_parser::lexer::{LexResult, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};
@@ -107,8 +108,7 @@ pub fn check_tokens(
                     locator,
                     *start,
                     *end,
-                    matches!(autofix, flags::Autofix::Enabled)
-                        && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
+                    autofix.into() && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
                 ));
             }
         }
@@ -147,7 +147,7 @@ pub fn check_tokens(
     // COM812, COM818, COM819
     if enforce_trailing_comma {
         diagnostics.extend(
-            flake8_commas::rules::trailing_commas(tokens, settings, autofix)
+            flake8_commas::rules::trailing_commas(tokens, locator, settings, autofix)
                 .into_iter()
                 .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
         );

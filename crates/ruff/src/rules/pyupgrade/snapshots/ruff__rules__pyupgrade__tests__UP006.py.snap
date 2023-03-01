@@ -74,4 +74,15 @@ expression: diagnostics
       row: 25
       column: 14
   parent: ~
+- kind:
+    DeprecatedCollectionType:
+      name: List
+  location:
+    row: 36
+    column: 9
+  end_location:
+    row: 36
+    column: 13
+  fix: ~
+  parent: ~
 
