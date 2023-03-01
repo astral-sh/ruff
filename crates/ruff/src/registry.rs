@@ -466,6 +466,7 @@ ruff_macros::register_rules!(
     rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pyi
     rules::flake8_pyi::rules::PrefixTypeParams,
+    rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
     rules::flake8_pyi::rules::PassStatementStubBody,
