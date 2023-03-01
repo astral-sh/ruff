@@ -17,7 +17,6 @@ mod tests {
     use crate::settings::types::PerFileIgnore;
     use crate::test::test_path;
 
-    #[test_case(Rule::KeywordArgumentBeforeStarArgument, Path::new("RUF004.py"); "RUF004")]
     #[test_case(Rule::UnpackInsteadOfConcatenatingToCollectionLiteral, Path::new("RUF005.py"); "RUF005")]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"); "RUF006")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

@@ -2954,18 +2954,6 @@ where
                     flake8_pytest_style::rules::fail_call(self, func, args, keywords);
                 }
 
-                // ruff
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::KeywordArgumentBeforeStarArgument)
-                {
-                    self.diagnostics
-                        .extend(ruff::rules::keyword_argument_before_star_argument(
-                            args, keywords,
-                        ));
-                }
-
                 // flake8-simplify
                 if self
                     .settings

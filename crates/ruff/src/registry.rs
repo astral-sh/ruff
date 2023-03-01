@@ -583,7 +583,6 @@ ruff_macros::register_rules!(
     rules::ruff::rules::AmbiguousUnicodeCharacterString,
     rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,
     rules::ruff::rules::AmbiguousUnicodeCharacterComment,
-    rules::ruff::rules::KeywordArgumentBeforeStarArgument,
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,

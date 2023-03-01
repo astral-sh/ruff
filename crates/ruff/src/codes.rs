@@ -622,7 +622,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "001") => Rule::AmbiguousUnicodeCharacterString,
         (Ruff, "002") => Rule::AmbiguousUnicodeCharacterDocstring,
         (Ruff, "003") => Rule::AmbiguousUnicodeCharacterComment,
-        (Ruff, "004") => Rule::KeywordArgumentBeforeStarArgument,
         (Ruff, "005") => Rule::UnpackInsteadOfConcatenatingToCollectionLiteral,
         (Ruff, "006") => Rule::AsyncioDanglingTask,
         (Ruff, "100") => Rule::UnusedNOQA,

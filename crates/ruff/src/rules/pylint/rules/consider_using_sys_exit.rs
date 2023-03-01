@@ -95,7 +95,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
     })
 }
 
-/// RUF004
+/// PLR1722
 pub fn consider_using_sys_exit(checker: &mut Checker, func: &Expr) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
