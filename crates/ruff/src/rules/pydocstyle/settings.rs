@@ -97,12 +97,25 @@ pub struct Options {
     /// specified decorators. Unlike the `pydocstyle`, Ruff accepts an array
     /// of fully-qualified module identifiers, instead of a regular expression.
     pub ignore_decorators: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            property-decorators = ["gi.repository.GObject.Property"]
+        "#
+    )]
+    /// Consider any method decorated with one of these decorators as a property,
+    /// and consequently allow a docstring which is not in imperative mood.
+    /// Unlike pydocstyle, supplying this option doesn't disable standard
+    /// property decorators - `@property` and `@cached_property`.
+    pub property_decorators: Option<Vec<String>>,
 }
 
 #[derive(Debug, Default, Hash)]
 pub struct Settings {
     pub convention: Option<Convention>,
     pub ignore_decorators: BTreeSet<String>,
+    pub property_decorators: BTreeSet<String>,
 }
 
 impl From<Options> for Settings {
@@ -110,6 +123,9 @@ impl From<Options> for Settings {
         Self {
             convention: options.convention,
             ignore_decorators: BTreeSet::from_iter(options.ignore_decorators.unwrap_or_default()),
+            property_decorators: BTreeSet::from_iter(
+                options.property_decorators.unwrap_or_default(),
+            ),
         }
     }
 }
@@ -119,6 +135,7 @@ impl From<Settings> for Options {
         Self {
             convention: settings.convention,
             ignore_decorators: Some(settings.ignore_decorators.into_iter().collect()),
+            property_decorators: Some(settings.property_decorators.into_iter().collect()),
         }
     }
 }

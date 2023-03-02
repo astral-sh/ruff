@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use imperative::Mood;
 use once_cell::sync::Lazy;
 use ruff_macros::{define_violation, derive_message_formats};
@@ -7,14 +9,18 @@ use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
-use crate::rules::pydocstyle::helpers::normalize_word;
+use crate::rules::pydocstyle::{self, helpers::normalize_word};
 use crate::violation::Violation;
 use crate::visibility::{is_property, is_test};
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 
 /// D401
-pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
+pub fn non_imperative_mood(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    property_decorators: &BTreeSet<String>,
+) {
     let (
         DefinitionKind::Function(parent)
         | DefinitionKind::NestedFunction(parent)
@@ -22,7 +28,15 @@ pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
     ) = &docstring.kind else {
         return;
     };
-    if is_test(cast::name(parent)) || is_property(checker, cast::decorator_list(parent)) {
+
+    if is_test(cast::name(parent))
+        || is_property(checker, cast::decorator_list(parent))
+        || pydocstyle::helpers::is_property(
+            checker,
+            cast::decorator_list(parent),
+            property_decorators,
+        )
+    {
         return;
     }
 

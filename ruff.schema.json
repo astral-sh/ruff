@@ -1268,6 +1268,16 @@
           "items": {
             "type": "string"
           }
+        },
+        "property-decorators": {
+          "description": "Consider any method decorated with one of these decorators as a property, and consequently allow a docstring which is not in imperative mood. Unlike pydocstyle, supplying this option doesn't disable standard property decorators - `@property` and `@cached_property`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
