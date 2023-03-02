@@ -1268,6 +1268,16 @@
           "items": {
             "type": "string"
           }
+        },
+        "property-decorators": {
+          "description": "Consider any method decorated with one of these decorators as a property, and consequently allow a docstring which is not in imperative mood. Unlike pydocstyle, supplying this option doesn't disable standard property decorators - `@property` and `@cached_property`.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -1928,6 +1938,7 @@
         "PYI0",
         "PYI00",
         "PYI001",
+        "PYI006",
         "PYI007",
         "PYI008",
         "PYI009",
@@ -1965,7 +1976,6 @@
         "RUF001",
         "RUF002",
         "RUF003",
-        "RUF004",
         "RUF005",
         "RUF006",
         "RUF1",
@@ -2122,6 +2132,7 @@
         "UP035",
         "UP036",
         "UP037",
+        "UP038",
         "W",
         "W1",
         "W19",

@@ -77,6 +77,9 @@ mod tests {
                 pydocstyle: Settings {
                     convention: None,
                     ignore_decorators: BTreeSet::from_iter(["functools.wraps".to_string()]),
+                    property_decorators: BTreeSet::from_iter([
+                        "gi.repository.GObject.Property".to_string()
+                    ]),
                 },
                 ..settings::Settings::for_rule(rule_code)
             },
@@ -95,6 +98,7 @@ mod tests {
                 pydocstyle: Settings {
                     convention: None,
                     ignore_decorators: BTreeSet::new(),
+                    property_decorators: BTreeSet::new(),
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
@@ -112,6 +116,7 @@ mod tests {
                 pydocstyle: Settings {
                     convention: Some(Convention::Google),
                     ignore_decorators: BTreeSet::new(),
+                    property_decorators: BTreeSet::new(),
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
@@ -129,6 +134,7 @@ mod tests {
                 pydocstyle: Settings {
                     convention: Some(Convention::Numpy),
                     ignore_decorators: BTreeSet::new(),
+                    property_decorators: BTreeSet::new(),
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },

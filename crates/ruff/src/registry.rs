@@ -339,6 +339,7 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::ImportReplacements,
     rules::pyupgrade::rules::OutdatedVersionBlock,
     rules::pyupgrade::rules::QuotedAnnotation,
+    rules::pyupgrade::rules::IsinstanceWithTuple,
     // pydocstyle
     rules::pydocstyle::rules::PublicModule,
     rules::pydocstyle::rules::PublicClass,
@@ -474,6 +475,7 @@ ruff_macros::register_rules!(
     rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pyi
     rules::flake8_pyi::rules::PrefixTypeParams,
+    rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
     rules::flake8_pyi::rules::PassStatementStubBody,
@@ -590,7 +592,6 @@ ruff_macros::register_rules!(
     rules::ruff::rules::AmbiguousUnicodeCharacterString,
     rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,
     rules::ruff::rules::AmbiguousUnicodeCharacterComment,
-    rules::ruff::rules::KeywordArgumentBeforeStarArgument,
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,

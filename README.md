@@ -30,7 +30,7 @@ An extremely fast Python linter, written in Rust.
 - 🤝  Python 3.11 compatibility
 - 📦  Built-in caching, to avoid re-analyzing unchanged files
 - 🔧  Autofix support, for automatic error correction (e.g., automatically remove unused imports)
-- 📏  Over [500 built-in rules](https://beta.ruff.rs/docs/rules/) (and growing)
+- 📏  Over [500 built-in rules](https://beta.ruff.rs/docs/rules/)
 - ⚖️  [Near-parity](https://beta.ruff.rs/docs/faq/#how-does-ruff-compare-to-flake8) with the built-in Flake8 rule set
 - 🔌  Native re-implementations of dozens of Flake8 plugins, like flake8-bugbear
 - ⌨️  First-party editor integrations for [VS Code](https://github.com/charliermarsh/ruff-vscode) and [more](https://github.com/charliermarsh/ruff-lsp)
@@ -186,7 +186,6 @@ exclude = [
     "node_modules",
     "venv",
 ]
-per-file-ignores = {}
 
 # Same as Black.
 line-length = 88
@@ -224,6 +223,9 @@ By default, Ruff enables Flake8's `E` and `F` rules. Ruff supports all rules fro
 and a [subset](https://beta.ruff.rs/docs/rules/#error-e) of the `E` category, omitting those
 stylistic rules made obsolete by the use of an autoformatter, like
 [Black](https://github.com/psf/black).
+
+If you're just getting started with Ruff, **the default rule set is a great place to start**: it
+catches a wide variety of common errors (like unused imports) with zero configuration.
 
 <!-- End section: Rules -->
 

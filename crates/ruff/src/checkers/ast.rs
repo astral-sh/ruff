@@ -19,7 +19,8 @@ use rustpython_parser::ast::{
 use smallvec::smallvec;
 
 use crate::ast::helpers::{
-    binding_range, collect_call_path, extract_handler_names, from_relative_import, to_module_path,
+    binding_range, collect_call_path, extract_handled_exceptions, from_relative_import,
+    to_module_path, Exceptions,
 };
 use crate::ast::operations::{extract_all_names, AllNamesFlags};
 use crate::ast::relocate::relocate_expr;
@@ -109,7 +110,7 @@ pub struct Checker<'a> {
     pub(crate) seen_import_boundary: bool,
     futures_allowed: bool,
     annotations_future_enabled: bool,
-    except_handlers: Vec<Vec<Vec<&'a str>>>,
+    handled_exceptions: Vec<Exceptions>,
     // Check-specific state.
     pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
 }
@@ -178,7 +179,7 @@ impl<'a> Checker<'a> {
             seen_import_boundary: false,
             futures_allowed: true,
             annotations_future_enabled: is_interface_definition,
-            except_handlers: vec![],
+            handled_exceptions: vec![],
             // Check-specific state.
             flake8_bugbear_seen: vec![],
         }
@@ -233,6 +234,14 @@ impl<'a> Checker<'a> {
             .map_or(false, |binding| binding.kind.is_builtin())
     }
 
+    /// Resolves the call path, e.g. if you have a file
+    ///
+    /// ```python
+    /// from sys import version_info as python_version
+    /// print(python_version)
+    /// ```
+    ///
+    /// then `python_version` from the print statement will resolve to `sys.version_info`.
     pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
     where
         'b: 'a,
@@ -299,6 +308,26 @@ impl<'a> Checker<'a> {
         }
         noqa::rule_is_ignored(code, lineno, self.noqa_line_for, self.locator)
     }
+}
+
+/// Visit an [`Expr`], and treat it as a type definition.
+macro_rules! visit_type_definition {
+    ($self:ident, $expr:expr) => {{
+        let prev_in_type_definition = $self.in_type_definition;
+        $self.in_type_definition = true;
+        $self.visit_expr($expr);
+        $self.in_type_definition = prev_in_type_definition;
+    }};
+}
+
+/// Visit an [`Expr`], and treat it as _not_ a type definition.
+macro_rules! visit_non_type_definition {
+    ($self:ident, $expr:expr) => {{
+        let prev_in_type_definition = $self.in_type_definition;
+        $self.in_type_definition = false;
+        $self.visit_expr($expr);
+        $self.in_type_definition = prev_in_type_definition;
+    }};
 }
 
 impl<'a, 'b> Visitor<'b> for Checker<'a>
@@ -746,33 +775,67 @@ where
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
+
+                // If we're in a class or module scope, then the annotation needs to be
+                // available at runtime.
+                // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
+                let runtime_annotation = !self.annotations_future_enabled
+                    && matches!(
+                        self.current_scope().kind,
+                        ScopeKind::Class(..) | ScopeKind::Module
+                    );
+
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 for arg in &args.args {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 if let Some(arg) = &args.vararg {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 for arg in &args.kwonlyargs {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 if let Some(arg) = &args.kwarg {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 for expr in returns {
-                    self.visit_annotation(expr);
+                    if runtime_annotation {
+                        visit_type_definition!(self, expr);
+                    } else {
+                        self.visit_annotation(expr);
+                    };
                 }
                 for expr in &args.kw_defaults {
                     self.visit_expr(expr);
@@ -962,6 +1025,13 @@ where
                     pyupgrade::rules::rewrite_mock_import(self, stmt);
                 }
 
+                // If a module is imported within a `ModuleNotFoundError` body, treat that as a
+                // synthetic usage.
+                let is_handled = self
+                    .handled_exceptions
+                    .iter()
+                    .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
+
                 for alias in names {
                     if alias.node.name == "__future__" {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -1004,7 +1074,18 @@ where
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(name, full_name),
                                 runtime_usage: None,
-                                synthetic_usage: None,
+                                synthetic_usage: if is_handled {
+                                    Some((
+                                        self.scopes[*(self
+                                            .scope_stack
+                                            .last()
+                                            .expect("No current scope found"))]
+                                        .id,
+                                        Range::from_located(alias),
+                                    ))
+                                } else {
+                                    None
+                                },
                                 typing_usage: None,
                                 range: Range::from_located(alias),
                                 source: Some(self.current_stmt().clone()),
@@ -1012,6 +1093,14 @@ where
                             },
                         );
                     } else {
+                        // Treat explicit re-export as usage (e.g., `from .applications
+                        // import FastAPI as FastAPI`).
+                        let is_explicit_reexport = alias
+                            .node
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.node.name);
+
                         // Given `import foo`, `name` and `full_name` would both be `foo`.
                         // Given `import foo as bar`, `name` would be `bar` and `full_name` would
                         // be `foo`.
@@ -1022,14 +1111,7 @@ where
                             Binding {
                                 kind: BindingKind::Importation(name, full_name),
                                 runtime_usage: None,
-                                // Treat explicit re-export as usage (e.g., `import applications
-                                // as applications`).
-                                synthetic_usage: if alias
-                                    .node
-                                    .asname
-                                    .as_ref()
-                                    .map_or(false, |asname| asname == &alias.node.name)
-                                {
+                                synthetic_usage: if is_handled || is_explicit_reexport {
                                     Some((
                                         self.scopes[*(self
                                             .scope_stack
@@ -1285,6 +1367,13 @@ where
                     }
                 }
 
+                // If a module is imported within a `ModuleNotFoundError` body, treat that as a
+                // synthetic usage.
+                let is_handled = self
+                    .handled_exceptions
+                    .iter()
+                    .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
+
                 for alias in names {
                     if let Some("__future__") = module.as_deref() {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -1331,7 +1420,18 @@ where
                             Binding {
                                 kind: BindingKind::StarImportation(*level, module.clone()),
                                 runtime_usage: None,
-                                synthetic_usage: None,
+                                synthetic_usage: if is_handled {
+                                    Some((
+                                        self.scopes[*(self
+                                            .scope_stack
+                                            .last()
+                                            .expect("No current scope found"))]
+                                        .id,
+                                        Range::from_located(alias),
+                                    ))
+                                } else {
+                                    None
+                                },
                                 typing_usage: None,
                                 range: Range::from_located(stmt),
                                 source: Some(self.current_stmt().clone()),
@@ -1375,6 +1475,14 @@ where
                             self.check_builtin_shadowing(asname, stmt, false);
                         }
 
+                        // Treat explicit re-export as usage (e.g., `from .applications
+                        // import FastAPI as FastAPI`).
+                        let is_explicit_reexport = alias
+                            .node
+                            .asname
+                            .as_ref()
+                            .map_or(false, |asname| asname == &alias.node.name);
+
                         // Given `from foo import bar`, `name` would be "bar" and `full_name` would
                         // be "foo.bar". Given `from foo import bar as baz`, `name` would be "baz"
                         // and `full_name` would be "foo.bar".
@@ -1384,33 +1492,25 @@ where
                             module.as_deref(),
                             &alias.node.name,
                         );
-                        let range = Range::from_located(alias);
                         self.add_binding(
                             name,
                             Binding {
                                 kind: BindingKind::FromImportation(name, full_name),
                                 runtime_usage: None,
-                                // Treat explicit re-export as usage (e.g., `from .applications
-                                // import FastAPI as FastAPI`).
-                                synthetic_usage: if alias
-                                    .node
-                                    .asname
-                                    .as_ref()
-                                    .map_or(false, |asname| asname == &alias.node.name)
-                                {
+                                synthetic_usage: if is_handled || is_explicit_reexport {
                                     Some((
                                         self.scopes[*(self
                                             .scope_stack
                                             .last()
                                             .expect("No current scope found"))]
                                         .id,
-                                        range,
+                                        Range::from_located(alias),
                                     ))
                                 } else {
                                     None
                                 },
                                 typing_usage: None,
-                                range,
+                                range: Range::from_located(alias),
                                 source: Some(self.current_stmt().clone()),
                                 context: self.execution_context(),
                             },
@@ -2120,17 +2220,23 @@ where
                 orelse,
                 finalbody,
             } => {
-                // TODO(charlie): The use of `smallvec` here leads to a lifetime issue.
-                let handler_names = extract_handler_names(handlers)
-                    .into_iter()
-                    .map(|call_path| call_path.to_vec())
-                    .collect();
-                self.except_handlers.push(handler_names);
+                let mut handled_exceptions = Exceptions::empty();
+                for type_ in extract_handled_exceptions(handlers) {
+                    if let Some(call_path) = self.resolve_call_path(type_) {
+                        if call_path.as_slice() == ["", "NameError"] {
+                            handled_exceptions |= Exceptions::NAME_ERROR;
+                        } else if call_path.as_slice() == ["", "ModuleNotFoundError"] {
+                            handled_exceptions |= Exceptions::MODULE_NOT_FOUND_ERROR;
+                        }
+                    }
+                }
+
+                self.handled_exceptions.push(handled_exceptions);
                 if self.settings.rules.enabled(&Rule::JumpStatementInFinally) {
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
                 }
                 self.visit_body(body);
-                self.except_handlers.pop();
+                self.handled_exceptions.pop();
 
                 self.in_exception_handler = true;
                 for excepthandler in handlers {
@@ -2150,23 +2256,20 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                if !self.annotations_future_enabled
+                let runtime_annotation = !self.annotations_future_enabled
                     && matches!(
                         self.current_scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
-                    )
-                {
-                    self.in_type_definition = true;
-                    self.visit_expr(annotation);
-                    self.in_type_definition = false;
+                    );
+
+                if runtime_annotation {
+                    visit_type_definition!(self, annotation);
                 } else {
                     self.visit_annotation(annotation);
                 }
                 if let Some(expr) = value {
                     if self.match_typing_expr(annotation, "TypeAlias") {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = false;
+                        visit_type_definition!(self, expr);
                     } else {
                         self.visit_expr(expr);
                     }
@@ -2223,12 +2326,9 @@ where
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
         let prev_in_annotation = self.in_annotation;
-        let prev_in_type_definition = self.in_type_definition;
         self.in_annotation = true;
-        self.in_type_definition = true;
-        self.visit_expr(expr);
+        visit_type_definition!(self, expr);
         self.in_annotation = prev_in_annotation;
-        self.in_type_definition = prev_in_type_definition;
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
@@ -2260,7 +2360,6 @@ where
         self.push_expr(expr);
 
         let prev_in_literal = self.in_literal;
-        let prev_in_type_definition = self.in_type_definition;
 
         // Pre-visit.
         match &expr.node {
@@ -2531,6 +2630,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias(self, &expr);
+                }
+                if self.settings.rules.enabled(&Rule::IsinstanceWithTuple) {
+                    pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
                 }
 
                 // flake8-print
@@ -2944,18 +3046,6 @@ where
 
                 if self.settings.rules.enabled(&Rule::FailWithoutMessage) {
                     flake8_pytest_style::rules::fail_call(self, func, args, keywords);
-                }
-
-                // ruff
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::KeywordArgumentBeforeStarArgument)
-                {
-                    self.diagnostics
-                        .extend(ruff::rules::keyword_argument_before_star_argument(
-                            args, keywords,
-                        ));
                 }
 
                 // flake8-simplify
@@ -3391,6 +3481,16 @@ where
                             comparators,
                         );
                     }
+
+                    if self.settings.rules.enabled(&Rule::BadVersionInfoComparison) {
+                        flake8_pyi::rules::bad_version_info_comparison(
+                            self,
+                            expr,
+                            left,
+                            ops,
+                            comparators,
+                        );
+                    }
                 }
             }
             ExprKind::Constant {
@@ -3435,32 +3535,7 @@ where
                     flake8_pie::rules::prefer_list_builtin(self, expr);
                 }
 
-                // Visit the arguments, but avoid the body, which will be deferred.
-                for arg in &args.posonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
-                for arg in &args.args {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
-                if let Some(arg) = &args.vararg {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
-                for arg in &args.kwonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
-                if let Some(arg) = &args.kwarg {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
+                // Visit the default arguments, but avoid the body, which will be deferred.
                 for expr in &args.kw_defaults {
                     self.visit_expr(expr);
                 }
@@ -3571,17 +3646,13 @@ where
                     Some(Callable::ForwardRef) => {
                         self.visit_expr(func);
                         for expr in args {
-                            self.in_type_definition = true;
-                            self.visit_expr(expr);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, expr);
                         }
                     }
                     Some(Callable::Cast) => {
                         self.visit_expr(func);
                         if !args.is_empty() {
-                            self.in_type_definition = true;
-                            self.visit_expr(&args[0]);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, &args[0]);
                         }
                         for expr in args.iter().skip(1) {
                             self.visit_expr(expr);
@@ -3590,29 +3661,21 @@ where
                     Some(Callable::NewType) => {
                         self.visit_expr(func);
                         for expr in args.iter().skip(1) {
-                            self.in_type_definition = true;
-                            self.visit_expr(expr);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, expr);
                         }
                     }
                     Some(Callable::TypeVar) => {
                         self.visit_expr(func);
                         for expr in args.iter().skip(1) {
-                            self.in_type_definition = true;
-                            self.visit_expr(expr);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, expr);
                         }
                         for keyword in keywords {
                             let KeywordData { arg, value } = &keyword.node;
                             if let Some(id) = arg {
                                 if id == "bound" {
-                                    self.in_type_definition = true;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_type_definition!(self, value);
                                 } else {
-                                    self.in_type_definition = false;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_non_type_definition!(self, value);
                                 }
                             }
                         }
@@ -3629,16 +3692,8 @@ where
                                             ExprKind::List { elts, .. }
                                             | ExprKind::Tuple { elts, .. } => {
                                                 if elts.len() == 2 {
-                                                    self.in_type_definition = false;
-
-                                                    self.visit_expr(&elts[0]);
-                                                    self.in_type_definition =
-                                                        prev_in_type_definition;
-
-                                                    self.in_type_definition = true;
-                                                    self.visit_expr(&elts[1]);
-                                                    self.in_type_definition =
-                                                        prev_in_type_definition;
+                                                    visit_non_type_definition!(self, &elts[0]);
+                                                    visit_type_definition!(self, &elts[1]);
                                                 }
                                             }
                                             _ => {}
@@ -3652,9 +3707,7 @@ where
                         // Ex) NamedTuple("a", a=int)
                         for keyword in keywords {
                             let KeywordData { value, .. } = &keyword.node;
-                            self.in_type_definition = true;
-                            self.visit_expr(value);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, value);
                         }
                     }
                     Some(Callable::TypedDict) => {
@@ -3664,14 +3717,10 @@ where
                         if args.len() > 1 {
                             if let ExprKind::Dict { keys, values } = &args[1].node {
                                 for key in keys.iter().flatten() {
-                                    self.in_type_definition = false;
-                                    self.visit_expr(key);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_non_type_definition!(self, key);
                                 }
                                 for value in values {
-                                    self.in_type_definition = true;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_type_definition!(self, value);
                                 }
                             }
                         }
@@ -3679,9 +3728,7 @@ where
                         // Ex) TypedDict("a", a=int)
                         for keyword in keywords {
                             let KeywordData { value, .. } = &keyword.node;
-                            self.in_type_definition = true;
-                            self.visit_expr(value);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, value);
                         }
                     }
                     Some(Callable::MypyExtension) => {
@@ -3689,33 +3736,23 @@ where
 
                         if let Some(arg) = args.first() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
-                            self.in_type_definition = true;
-                            self.visit_expr(arg);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, arg);
 
                             for arg in args.iter().skip(1) {
-                                self.in_type_definition = false;
-                                self.visit_expr(arg);
-                                self.in_type_definition = prev_in_type_definition;
+                                visit_non_type_definition!(self, arg);
                             }
                             for keyword in keywords {
                                 let KeywordData { value, .. } = &keyword.node;
-                                self.in_type_definition = false;
-                                self.visit_expr(value);
-                                self.in_type_definition = prev_in_type_definition;
+                                visit_non_type_definition!(self, value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
                             for keyword in keywords {
                                 let KeywordData { value, arg, .. } = &keyword.node;
                                 if arg.as_ref().map_or(false, |arg| arg == "type") {
-                                    self.in_type_definition = true;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_type_definition!(self, value);
                                 } else {
-                                    self.in_type_definition = false;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_non_type_definition!(self, value);
                                 }
                             }
                         }
@@ -3747,9 +3784,7 @@ where
                                 // Ex) Optional[int]
                                 SubscriptKind::AnnotatedSubscript => {
                                     self.visit_expr(value);
-                                    self.in_type_definition = true;
-                                    self.visit_expr(slice);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_type_definition!(self, slice);
                                     self.visit_expr_context(ctx);
                                 }
                                 // Ex) Annotated[int, "Hello, world!"]
@@ -3760,11 +3795,9 @@ where
                                     if let ExprKind::Tuple { elts, ctx } = &slice.node {
                                         if let Some(expr) = elts.first() {
                                             self.visit_expr(expr);
-                                            self.in_type_definition = false;
                                             for expr in elts.iter().skip(1) {
-                                                self.visit_expr(expr);
+                                                visit_non_type_definition!(self, expr);
                                             }
-                                            self.in_type_definition = prev_in_type_definition;
                                             self.visit_expr_context(ctx);
                                         }
                                     } else {
@@ -3799,7 +3832,6 @@ where
             _ => {}
         };
 
-        self.in_type_definition = prev_in_type_definition;
         self.in_literal = prev_in_literal;
 
         self.pop_expr();
@@ -4487,13 +4519,12 @@ impl<'a> Checker<'a> {
             }
 
             // Avoid flagging if NameError is handled.
-            if let Some(handler_names) = self.except_handlers.last() {
-                if handler_names
-                    .iter()
-                    .any(|call_path| call_path.as_slice() == ["NameError"])
-                {
-                    return;
-                }
+            if self
+                .handled_exceptions
+                .iter()
+                .any(|handler_names| handler_names.contains(Exceptions::NAME_ERROR))
+            {
+                return;
             }
 
             self.diagnostics.push(Diagnostic::new(
@@ -5562,7 +5593,11 @@ impl<'a> Checker<'a> {
                     pydocstyle::rules::ends_with_period(self, &docstring);
                 }
                 if self.settings.rules.enabled(&Rule::NonImperativeMood) {
-                    pydocstyle::rules::non_imperative_mood(self, &docstring);
+                    pydocstyle::rules::non_imperative_mood(
+                        self,
+                        &docstring,
+                        &self.settings.pydocstyle.property_decorators,
+                    );
                 }
                 if self.settings.rules.enabled(&Rule::NoSignature) {
                     pydocstyle::rules::no_signature(self, &docstring);

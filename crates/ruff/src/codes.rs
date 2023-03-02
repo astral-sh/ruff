@@ -352,6 +352,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pyupgrade, "035") => Rule::ImportReplacements,
         (Pyupgrade, "036") => Rule::OutdatedVersionBlock,
         (Pyupgrade, "037") => Rule::QuotedAnnotation,
+        (Pyupgrade, "038") => Rule::IsinstanceWithTuple,
 
         // pydocstyle
         (Pydocstyle, "100") => Rule::PublicModule,
@@ -500,6 +501,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-pyi
         (Flake8Pyi, "001") => Rule::PrefixTypeParams,
+        (Flake8Pyi, "006") => Rule::BadVersionInfoComparison,
         (Flake8Pyi, "007") => Rule::UnrecognizedPlatformCheck,
         (Flake8Pyi, "008") => Rule::UnrecognizedPlatformName,
         (Flake8Pyi, "009") => Rule::PassStatementStubBody,
@@ -629,7 +631,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "001") => Rule::AmbiguousUnicodeCharacterString,
         (Ruff, "002") => Rule::AmbiguousUnicodeCharacterDocstring,
         (Ruff, "003") => Rule::AmbiguousUnicodeCharacterComment,
-        (Ruff, "004") => Rule::KeywordArgumentBeforeStarArgument,
         (Ruff, "005") => Rule::UnpackInsteadOfConcatenatingToCollectionLiteral,
         (Ruff, "006") => Rule::AsyncioDanglingTask,
         (Ruff, "100") => Rule::UnusedNOQA,

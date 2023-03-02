@@ -172,6 +172,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         fix::FixMode::None
     };
     let cache = !cli.no_cache;
+    let noqa = !cli.ignore_noqa;
     let mut printer_flags = PrinterFlags::empty();
     if !(cli.diff || fix_only) {
         printer_flags |= PrinterFlags::SHOW_VIOLATIONS;
@@ -194,9 +195,10 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         let modifications =
             commands::add_noqa::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
+            let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("Added {modifications} noqa directives.");
+                eprintln!("Added {modifications} noqa directive{s}.");
             }
         }
         return Ok(ExitStatus::Success);
@@ -221,6 +223,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             &pyproject_strategy,
             &overrides,
             cache.into(),
+            noqa.into(),
             fix::FixMode::None,
         )?;
         printer.write_continuously(&messages)?;
@@ -250,6 +253,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                             &pyproject_strategy,
                             &overrides,
                             cache.into(),
+                            noqa.into(),
                             fix::FixMode::None,
                         )?;
                         printer.write_continuously(&messages)?;
@@ -267,6 +271,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
                 &pyproject_strategy,
                 &overrides,
+                noqa.into(),
                 autofix,
             )?
         } else {
@@ -275,6 +280,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                 &pyproject_strategy,
                 &overrides,
                 cache.into(),
+                noqa.into(),
                 autofix,
             )?
         };
