@@ -151,11 +151,14 @@ pub fn check_logical_lines(
         }
 
         if line.flags.contains(TokenFlags::BRACKET) {
-            for diagnostic in whitespace_before_parameters(
-                &line.tokens,
-                matches!(autofix, flags::Autofix::Enabled)
-                    && settings.rules.should_fix(&Rule::WhitespaceBeforeParameters),
-            ) {
+            #[cfg(feature = "logical_lines")]
+            let should_fix = matches!(autofix, flags::Autofix::Enabled)
+                && settings.rules.should_fix(&Rule::WhitespaceBeforeParameters);
+
+            #[cfg(not(feature = "logical_lines"))]
+            let should_fix = false;
+
+            for diagnostic in whitespace_before_parameters(&line.tokens, should_fix) {
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
