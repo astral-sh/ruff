@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code, unused_imports, unused_variables)]
 
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
@@ -6,14 +6,11 @@ use rustpython_parser::Tok;
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::registry::DiagnosticKind;
-
-use crate::violation::Violation;
-
-#[cfg(feature = "logical_lines")]
 use crate::rules::pycodestyle::helpers::{
     is_arithmetic_token, is_keyword_token, is_op_token, is_singleton_token, is_skip_comment_token,
     is_soft_keyword_token, is_unary_token, is_ws_needed_token, is_ws_optional_token,
 };
+use crate::violation::Violation;
 
 // E225
 define_violation!(

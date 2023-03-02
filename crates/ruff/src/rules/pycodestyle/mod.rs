@@ -13,11 +13,12 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use super::settings::Settings;
     use crate::registry::Rule;
     use crate::settings;
     use crate::source_code::LineEnding;
     use crate::test::test_path;
+
+    use super::settings::Settings;
 
     #[test_case(Rule::AmbiguousClassName, Path::new("E742.py"))]
     #[test_case(Rule::AmbiguousFunctionName, Path::new("E743.py"))]
@@ -108,6 +109,7 @@ mod tests {
     #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
+    #[test_case(Rule::WhitespaceBeforeParameters, Path::new("E21.py"))]
     #[test_case(
         Rule::UnexpectedSpacesAroundKeywordParameterEquals,
         Path::new("E25.py")

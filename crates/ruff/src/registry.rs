@@ -71,6 +71,8 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::WhitespaceBeforeParameters,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
     rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
@@ -843,12 +845,17 @@ impl Rule {
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MissingWhitespaceAfterKeyword
+            | Rule::MissingWhitespaceAroundArithmeticOperator
+            | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
+            | Rule::MissingWhitespaceAroundModuloOperator
+            | Rule::MissingWhitespaceAroundOperator
+            | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::MultipleLeadingHashesForBlockComment
             | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
-            | Rule::MissingWhitespaceAfterKeyword
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
             | Rule::NoSpaceAfterBlockComment
@@ -861,14 +868,10 @@ impl Rule {
             | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
+            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
-            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
-            | Rule::MissingWhitespaceAroundParameterEquals
-            | Rule::MissingWhitespaceAroundOperator
-            | Rule::MissingWhitespaceAroundArithmeticOperator
-            | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
-            | Rule::MissingWhitespaceAroundModuloOperator
+            | Rule::WhitespaceBeforeParameters
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }

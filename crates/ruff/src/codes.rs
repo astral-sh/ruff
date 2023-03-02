@@ -29,6 +29,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E203") => Rule::WhitespaceBeforePunctuation,
         #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E211") => Rule::WhitespaceBeforeParameters,
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E221") => Rule::MultipleSpacesBeforeOperator,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E222") => Rule::MultipleSpacesAfterOperator,
