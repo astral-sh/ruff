@@ -38,22 +38,21 @@ pub fn whitespace_before_parameters(
     let mut diagnostics = vec![];
     let (_, mut prev_token, mut prev_end) = tokens.first().unwrap();
     for (idx, (start, tok, end)) in tokens.iter().enumerate() {
-        if is_op_token(*tok)
+        if is_op_token(tok)
             && (**tok == Tok::Lpar || **tok == Tok::Lsqb)
             && *start != prev_end
             && (matches!(prev_token, Tok::Name { .. })
                 || matches!(prev_token, Tok::Rpar | Tok::Rsqb | Tok::Rbrace))
             && (idx < 2 || *(tokens[idx - 2].1) != Tok::Class)
-            && !is_keyword_token(*tok)
-            && !is_soft_keyword_token(*tok)
+            && !is_keyword_token(tok)
+            && !is_soft_keyword_token(tok)
         {
             let start = Location::new(prev_end.row(), prev_end.column());
             let end = Location::new(end.row(), end.column() - 1);
 
             let kind: WhitespaceBeforeParameters = WhitespaceBeforeParameters {
                 bracket: tok.to_string(),
-            }
-            .into();
+            };
 
             let mut diagnostic = Diagnostic::new(kind, Range::new(start, end));
 
