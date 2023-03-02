@@ -10,6 +10,7 @@ edition = "2021"
 
 [features]
 default = ["lalrpop"]  # removing this causes potential build failure
+serde = ["dep:serde", "rustpython-compiler-core/serde"]
 
 [build-dependencies]
 anyhow = { workspace = true }
@@ -33,6 +34,7 @@ unic-ucd-ident  = "0.9.0"
 lalrpop-util = "0.19.8"
 phf = "0.11.1"
 rustc-hash = "1.1.0"
+serde = { version = "1.0.133", optional = true, default-features = false }
 
 [dev-dependencies]
 insta = { workspace = true }
