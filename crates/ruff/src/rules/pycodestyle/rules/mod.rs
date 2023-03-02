@@ -55,6 +55,8 @@ pub use whitespace_around_named_parameter_equals::{
     UnexpectedSpacesAroundKeywordParameterEquals,
 };
 
+pub use whitespace_before_parameters::{whitespace_before_parameters, WhitespaceBeforeParameters};
+
 mod ambiguous_class_name;
 mod ambiguous_function_name;
 mod ambiguous_variable_name;
@@ -80,3 +82,4 @@ mod type_comparison;
 mod whitespace_around_keywords;
 mod whitespace_around_named_parameter_equals;
 mod whitespace_before_comment;
+mod whitespace_before_parameters;

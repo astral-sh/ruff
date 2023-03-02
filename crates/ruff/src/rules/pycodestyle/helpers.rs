@@ -156,3 +156,7 @@ pub fn is_op_token(token: &Tok) -> bool {
             | Tok::Colon
     )
 }
+
+pub fn is_soft_keyword_token(token: &Tok) -> bool {
+    matches!(token, Tok::Match | Tok::Case)
+}

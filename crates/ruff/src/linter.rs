@@ -101,7 +101,13 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
-        diagnostics.extend(check_logical_lines(&tokens, locator, stylist, settings));
+        diagnostics.extend(check_logical_lines(
+            &tokens,
+            locator,
+            stylist,
+            settings,
+            flags::Autofix::Enabled,
+        ));
     }
 
     // Run the AST-based rules.
