@@ -1,6 +1,6 @@
 use std::hash::{BuildHasherDefault, Hash};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Expr, ExprKind};
 
@@ -12,12 +12,12 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AutofixKind, Availability, Violation};
 
-define_violation!(
-    pub struct MultiValueRepeatedKeyLiteral {
-        pub name: String,
-        pub repeated_value: bool,
-    }
-);
+#[violation]
+pub struct MultiValueRepeatedKeyLiteral {
+    pub name: String,
+    pub repeated_value: bool,
+}
+
 impl Violation for MultiValueRepeatedKeyLiteral {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -38,12 +38,12 @@ impl Violation for MultiValueRepeatedKeyLiteral {
         }
     }
 }
-define_violation!(
-    pub struct MultiValueRepeatedKeyVariable {
-        pub name: String,
-        pub repeated_value: bool,
-    }
-);
+#[violation]
+pub struct MultiValueRepeatedKeyVariable {
+    pub name: String,
+    pub repeated_value: bool,
+}
+
 impl Violation for MultiValueRepeatedKeyVariable {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

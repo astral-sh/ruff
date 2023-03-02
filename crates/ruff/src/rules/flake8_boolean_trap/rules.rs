@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::collect_call_path;
 use crate::ast::types::Range;
@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct BooleanPositionalArgInFunctionDefinition;
-);
+#[violation]
+pub struct BooleanPositionalArgInFunctionDefinition;
+
 impl Violation for BooleanPositionalArgInFunctionDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +18,9 @@ impl Violation for BooleanPositionalArgInFunctionDefinition {
     }
 }
 
-define_violation!(
-    pub struct BooleanDefaultValueInFunctionDefinition;
-);
+#[violation]
+pub struct BooleanDefaultValueInFunctionDefinition;
+
 impl Violation for BooleanDefaultValueInFunctionDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +28,9 @@ impl Violation for BooleanDefaultValueInFunctionDefinition {
     }
 }
 
-define_violation!(
-    pub struct BooleanPositionalValueInFunctionCall;
-);
+#[violation]
+pub struct BooleanPositionalValueInFunctionCall;
+
 impl Violation for BooleanPositionalValueInFunctionCall {
     #[derive_message_formats]
     fn message(&self) -> String {

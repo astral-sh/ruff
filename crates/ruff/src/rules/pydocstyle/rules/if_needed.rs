@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::cast;
 use crate::ast::helpers::identifier_range;
@@ -8,9 +8,9 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use crate::visibility::is_overload;
 
-define_violation!(
-    pub struct OverloadWithDocstring;
-);
+#[violation]
+pub struct OverloadWithDocstring;
+
 impl Violation for OverloadWithDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {

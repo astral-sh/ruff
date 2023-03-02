@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
@@ -13,39 +13,39 @@ use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for the presence of unused variables in function scopes.
-    ///
-    /// ## Why is this bad?
-    /// A variable that is defined but not used is likely a mistake, and should
-    /// be removed to avoid confusion.
-    ///
-    /// If a variable is intentionally defined-but-not-used, it should be
-    /// prefixed with an underscore, or some other value that adheres to the
-    /// [`dummy-variable-rgx`] pattern.
-    ///
-    /// ## Options
-    /// - `dummy-variable-rgx`
-    ///
-    /// ## Example
-    /// ```python
-    /// def foo():
-    ///     x = 1
-    ///     y = 2
-    ///     return x
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// def foo():
-    ///     x = 1
-    ///     return x
-    /// ```
-    pub struct UnusedVariable {
-        pub name: String,
-    }
-);
+/// ## What it does
+/// Checks for the presence of unused variables in function scopes.
+///
+/// ## Why is this bad?
+/// A variable that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// If a variable is intentionally defined-but-not-used, it should be
+/// prefixed with an underscore, or some other value that adheres to the
+/// [`dummy-variable-rgx`] pattern.
+///
+/// ## Options
+/// - `dummy-variable-rgx`
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     x = 1
+///     y = 2
+///     return x
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo():
+///     x = 1
+///     return x
+/// ```
+#[violation]
+pub struct UnusedVariable {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for UnusedVariable {
     #[derive_message_formats]
     fn message(&self) -> String {

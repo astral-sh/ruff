@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use crate::ast::types::{BindingKind, Range};
@@ -7,11 +7,11 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::{AutofixKind, Availability, Violation};
 
-define_violation!(
-    pub struct ConsiderUsingSysExit {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct ConsiderUsingSysExit {
+    pub name: String,
+}
+
 impl Violation for ConsiderUsingSysExit {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

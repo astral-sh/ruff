@@ -18,7 +18,7 @@
 //!     method()
 //! ```
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
@@ -37,20 +37,20 @@ pub enum Certainty {
     Uncertain,
 }
 
-define_violation!(
-    pub struct UnusedLoopControlVariable {
-        /// The name of the loop control variable.
-        pub name: String,
-        /// The name to which the variable should be renamed, if it can be
-        /// safely renamed.
-        pub rename: Option<String>,
-        /// Whether the variable is certain to be unused in the loop body, or
-        /// merely suspect. A variable _may_ be used, but undetectably
-        /// so, if the loop incorporates by magic control flow (e.g.,
-        /// `locals()`).
-        pub certainty: Certainty,
-    }
-);
+#[violation]
+pub struct UnusedLoopControlVariable {
+    /// The name of the loop control variable.
+    pub name: String,
+    /// The name to which the variable should be renamed, if it can be
+    /// safely renamed.
+    pub rename: Option<String>,
+    /// Whether the variable is certain to be unused in the loop body, or
+    /// merely suspect. A variable _may_ be used, but undetectably
+    /// so, if the loop incorporates by magic control flow (e.g.,
+    /// `locals()`).
+    pub certainty: Certainty,
+}
+
 impl Violation for UnusedLoopControlVariable {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

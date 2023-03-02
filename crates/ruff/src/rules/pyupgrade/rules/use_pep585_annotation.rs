@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Expr;
 
 use crate::ast::types::Range;
@@ -7,12 +7,12 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    // TODO: document referencing [PEP 585]: https://peps.python.org/pep-0585/
-    pub struct DeprecatedCollectionType {
-        pub name: String,
-    }
-);
+// TODO: document referencing [PEP 585]: https://peps.python.org/pep-0585/
+#[violation]
+pub struct DeprecatedCollectionType {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for DeprecatedCollectionType {
     #[derive_message_formats]
     fn message(&self) -> String {

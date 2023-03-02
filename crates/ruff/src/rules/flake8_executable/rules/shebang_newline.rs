@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
@@ -6,9 +6,9 @@ use crate::registry::Diagnostic;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct ShebangNewline;
-);
+#[violation]
+pub struct ShebangNewline;
+
 impl Violation for ShebangNewline {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,5 +1,5 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Keyword};
 
 use super::helpers;
@@ -10,11 +10,11 @@ use crate::rules::flake8_comprehensions::fixes;
 use crate::rules::flake8_comprehensions::settings::Settings;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct UnnecessaryCollectionCall {
-        pub obj_type: String,
-    }
-);
+#[violation]
+pub struct UnnecessaryCollectionCall {
+    pub obj_type: String,
+}
+
 impl AlwaysAutofixableViolation for UnnecessaryCollectionCall {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::debug;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python::identifiers::is_identifier;
 use ruff_python::keyword::KWLIST;
 
@@ -15,12 +15,12 @@ use crate::source_code::Stylist;
 use crate::violation::{Availability, Violation};
 use crate::AutofixKind;
 
-define_violation!(
-    pub struct ConvertTypedDictFunctionalToClass {
-        pub name: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct ConvertTypedDictFunctionalToClass {
+    pub name: String,
+    pub fixable: bool,
+}
+
 impl Violation for ConvertTypedDictFunctionalToClass {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

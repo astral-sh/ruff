@@ -10,7 +10,7 @@ use rustpython_parser::ast::{
     Unaryop,
 };
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::{has_comments_in, unparse_stmt};
 use crate::ast::types::Range;
@@ -26,39 +26,39 @@ use crate::violation::{AutofixKind, Availability, Violation};
 use super::helpers::is_falsy_constant;
 use super::unittest_assert::UnittestAssert;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for assertions that combine multiple independent conditions.
-    ///
-    /// ## Why is this bad?
-    /// Composite assertion statements are harder debug upon failure, as the
-    /// failure message will not indicate which condition failed.
-    ///
-    /// ## Example
-    /// ```python
-    /// def test_foo():
-    ///     assert something and something_else
-    ///
-    ///
-    /// def test_bar():
-    ///     assert not (something or something_else)
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// def test_foo():
-    ///     assert something
-    ///     assert something_else
-    ///
-    ///
-    /// def test_bar():
-    ///     assert not something
-    ///     assert not something_else
-    /// ```
-    pub struct CompositeAssertion {
-        pub fixable: bool,
-    }
-);
+/// ## What it does
+/// Checks for assertions that combine multiple independent conditions.
+///
+/// ## Why is this bad?
+/// Composite assertion statements are harder debug upon failure, as the
+/// failure message will not indicate which condition failed.
+///
+/// ## Example
+/// ```python
+/// def test_foo():
+///     assert something and something_else
+///
+///
+/// def test_bar():
+///     assert not (something or something_else)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_foo():
+///     assert something
+///     assert something_else
+///
+///
+/// def test_bar():
+///     assert not something
+///     assert not something_else
+/// ```
+#[violation]
+pub struct CompositeAssertion {
+    pub fixable: bool,
+}
+
 impl Violation for CompositeAssertion {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -73,11 +73,11 @@ impl Violation for CompositeAssertion {
     }
 }
 
-define_violation!(
-    pub struct AssertInExcept {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct AssertInExcept {
+    pub name: String,
+}
+
 impl Violation for AssertInExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -88,9 +88,9 @@ impl Violation for AssertInExcept {
     }
 }
 
-define_violation!(
-    pub struct AssertAlwaysFalse;
-);
+#[violation]
+pub struct AssertAlwaysFalse;
+
 impl Violation for AssertAlwaysFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -98,12 +98,12 @@ impl Violation for AssertAlwaysFalse {
     }
 }
 
-define_violation!(
-    pub struct UnittestAssertion {
-        pub assertion: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct UnittestAssertion {
+    pub assertion: String,
+    pub fixable: bool,
+}
+
 impl Violation for UnittestAssertion {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

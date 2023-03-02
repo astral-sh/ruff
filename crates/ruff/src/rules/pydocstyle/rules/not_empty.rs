@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -6,9 +6,9 @@ use crate::docstrings::definition::Docstring;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct EmptyDocstring;
-);
+#[violation]
+pub struct EmptyDocstring;
+
 impl Violation for EmptyDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {

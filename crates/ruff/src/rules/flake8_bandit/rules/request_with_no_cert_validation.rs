@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::helpers::SimpleCallArgs;
@@ -7,11 +7,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct RequestWithNoCertValidation {
-        pub string: String,
-    }
-);
+#[violation]
+pub struct RequestWithNoCertValidation {
+    pub string: String,
+}
+
 impl Violation for RequestWithNoCertValidation {
     #[derive_message_formats]
     fn message(&self) -> String {

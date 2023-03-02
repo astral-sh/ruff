@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
@@ -7,9 +7,9 @@ use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct TrailingWhitespace;
-);
+#[violation]
+pub struct TrailingWhitespace;
+
 impl AlwaysAutofixableViolation for TrailingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -21,9 +21,9 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
     }
 }
 
-define_violation!(
-    pub struct BlankLineContainsWhitespace;
-);
+#[violation]
+pub struct BlankLineContainsWhitespace;
+
 impl AlwaysAutofixableViolation for BlankLineContainsWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {

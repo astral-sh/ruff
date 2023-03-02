@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
@@ -8,12 +8,12 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct NegateEqualOp {
-        pub left: String,
-        pub right: String,
-    }
-);
+#[violation]
+pub struct NegateEqualOp {
+    pub left: String,
+    pub right: String,
+}
+
 impl AlwaysAutofixableViolation for NegateEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -26,12 +26,12 @@ impl AlwaysAutofixableViolation for NegateEqualOp {
     }
 }
 
-define_violation!(
-    pub struct NegateNotEqualOp {
-        pub left: String,
-        pub right: String,
-    }
-);
+#[violation]
+pub struct NegateNotEqualOp {
+    pub left: String,
+    pub right: String,
+}
+
 impl AlwaysAutofixableViolation for NegateNotEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -44,11 +44,11 @@ impl AlwaysAutofixableViolation for NegateNotEqualOp {
     }
 }
 
-define_violation!(
-    pub struct DoubleNegation {
-        pub expr: String,
-    }
-);
+#[violation]
+pub struct DoubleNegation {
+    pub expr: String,
+}
+
 impl AlwaysAutofixableViolation for DoubleNegation {
     #[derive_message_formats]
     fn message(&self) -> String {

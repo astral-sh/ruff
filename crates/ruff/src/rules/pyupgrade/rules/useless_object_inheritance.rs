@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
 
 use super::super::fixes;
@@ -7,11 +7,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct UselessObjectInheritance {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UselessObjectInheritance {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for UselessObjectInheritance {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
 use crate::ast::helpers::identifier_range;
@@ -6,34 +6,34 @@ use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::Violation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for custom exception definitions that omit the `Error` suffix.
-    ///
-    /// ## Why is this bad?
-    /// The `Error` suffix is recommended by [PEP 8]:
-    ///
-    /// > Because exceptions should be classes, the class naming convention
-    /// > applies here. However, you should use the suffix `"Error"` on your
-    /// > exception names (if the exception actually is an error).
-    ///
-    /// ## Example
-    /// ```python
-    /// class Validation(Exception):
-    ///     ...
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// class ValidationError(Exception):
-    ///     ...
-    /// ```
-    ///
-    /// [PEP 8]: https://peps.python.org/pep-0008/#exception-names
-    pub struct ErrorSuffixOnExceptionName {
-        pub name: String,
-    }
-);
+/// ## What it does
+/// Checks for custom exception definitions that omit the `Error` suffix.
+///
+/// ## Why is this bad?
+/// The `Error` suffix is recommended by [PEP 8]:
+///
+/// > Because exceptions should be classes, the class naming convention
+/// > applies here. However, you should use the suffix `"Error"` on your
+/// > exception names (if the exception actually is an error).
+///
+/// ## Example
+/// ```python
+/// class Validation(Exception):
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class ValidationError(Exception):
+///     ...
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#exception-names
+#[violation]
+pub struct ErrorSuffixOnExceptionName {
+    pub name: String,
+}
+
 impl Violation for ErrorSuffixOnExceptionName {
     #[derive_message_formats]
     fn message(&self) -> String {

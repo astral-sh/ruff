@@ -1,13 +1,13 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UseOfPdMerge;
-);
+#[violation]
+pub struct UseOfPdMerge;
+
 impl Violation for UseOfPdMerge {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind};
 
@@ -9,11 +9,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct LoopVariableOverridesIterator {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct LoopVariableOverridesIterator {
+    pub name: String,
+}
+
 impl Violation for LoopVariableOverridesIterator {
     #[derive_message_formats]
     fn message(&self) -> String {

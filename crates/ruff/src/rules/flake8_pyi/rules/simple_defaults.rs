@@ -1,15 +1,15 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unaryop};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct TypedArgumentSimpleDefaults;
-);
+#[violation]
+pub struct TypedArgumentSimpleDefaults;
+
 /// PYI011
 impl Violation for TypedArgumentSimpleDefaults {
     #[derive_message_formats]
@@ -18,9 +18,9 @@ impl Violation for TypedArgumentSimpleDefaults {
     }
 }
 
-define_violation!(
-    pub struct ArgumentSimpleDefaults;
-);
+#[violation]
+pub struct ArgumentSimpleDefaults;
+
 /// PYI014
 impl Violation for ArgumentSimpleDefaults {
     #[derive_message_formats]

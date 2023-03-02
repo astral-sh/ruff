@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::lexer::{LexResult, Spanned};
 use rustpython_parser::Tok;
 
@@ -109,9 +109,9 @@ impl Context {
     }
 }
 
-define_violation!(
-    pub struct TrailingCommaMissing;
-);
+#[violation]
+pub struct TrailingCommaMissing;
+
 impl AlwaysAutofixableViolation for TrailingCommaMissing {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -123,9 +123,9 @@ impl AlwaysAutofixableViolation for TrailingCommaMissing {
     }
 }
 
-define_violation!(
-    pub struct TrailingCommaOnBareTupleProhibited;
-);
+#[violation]
+pub struct TrailingCommaOnBareTupleProhibited;
+
 impl Violation for TrailingCommaOnBareTupleProhibited {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -133,9 +133,9 @@ impl Violation for TrailingCommaOnBareTupleProhibited {
     }
 }
 
-define_violation!(
-    pub struct TrailingCommaProhibited;
-);
+#[violation]
+pub struct TrailingCommaProhibited;
+
 impl AlwaysAutofixableViolation for TrailingCommaProhibited {
     #[derive_message_formats]
     fn message(&self) -> String {

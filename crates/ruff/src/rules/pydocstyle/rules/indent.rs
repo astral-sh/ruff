@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace;
@@ -10,9 +10,9 @@ use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
-define_violation!(
-    pub struct IndentWithSpaces;
-);
+#[violation]
+pub struct IndentWithSpaces;
+
 impl Violation for IndentWithSpaces {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -20,9 +20,9 @@ impl Violation for IndentWithSpaces {
     }
 }
 
-define_violation!(
-    pub struct NoUnderIndentation;
-);
+#[violation]
+pub struct NoUnderIndentation;
+
 impl AlwaysAutofixableViolation for NoUnderIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -34,9 +34,9 @@ impl AlwaysAutofixableViolation for NoUnderIndentation {
     }
 }
 
-define_violation!(
-    pub struct NoOverIndentation;
-);
+#[violation]
+pub struct NoOverIndentation;
+
 impl AlwaysAutofixableViolation for NoOverIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {

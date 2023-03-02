@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -6,9 +6,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UnreliableCallableCheck;
-);
+#[violation]
+pub struct UnreliableCallableCheck;
+
 impl Violation for UnreliableCallableCheck {
     #[derive_message_formats]
     fn message(&self) -> String {

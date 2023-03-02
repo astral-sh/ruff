@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
@@ -10,9 +10,9 @@ use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::leading_quote;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct NoSurroundingWhitespace;
-);
+#[violation]
+pub struct NoSurroundingWhitespace;
+
 impl AlwaysAutofixableViolation for NoSurroundingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {

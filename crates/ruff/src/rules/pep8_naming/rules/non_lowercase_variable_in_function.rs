@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Stmt};
 
 use crate::ast::types::Range;
@@ -7,40 +7,40 @@ use crate::registry::Diagnostic;
 use crate::rules::pep8_naming::helpers;
 use crate::violation::Violation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for the use of non-lowercase variable names in functions.
-    ///
-    /// ## Why is this bad?
-    /// [PEP 8] recommends that all function variables use lowercase names:
-    ///
-    /// > Function names should be lowercase, with words separated by underscores as necessary to
-    /// > improve readability. Variable names follow the same convention as function names. mixedCase
-    /// > is allowed only in contexts where that's already the prevailing style (e.g. threading.py),
-    /// > to retain backwards compatibility.
-    ///
-    /// ## Options
-    /// - `pep8-naming.ignore-names`
-    ///
-    /// ## Example
-    /// ```python
-    /// def my_function(a):
-    ///     B = a + 3
-    ///     return B
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// def my_function(a):
-    ///     b = a + 3
-    ///     return b
-    /// ```
-    ///
-    /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
-    pub struct NonLowercaseVariableInFunction {
-        pub name: String,
-    }
-);
+/// ## What it does
+/// Checks for the use of non-lowercase variable names in functions.
+///
+/// ## Why is this bad?
+/// [PEP 8] recommends that all function variables use lowercase names:
+///
+/// > Function names should be lowercase, with words separated by underscores as necessary to
+/// > improve readability. Variable names follow the same convention as function names. mixedCase
+/// > is allowed only in contexts where that's already the prevailing style (e.g. threading.py),
+/// > to retain backwards compatibility.
+///
+/// ## Options
+/// - `pep8-naming.ignore-names`
+///
+/// ## Example
+/// ```python
+/// def my_function(a):
+///     B = a + 3
+///     return B
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def my_function(a):
+///     b = a + 3
+///     return b
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#function-and-variable-names
+#[violation]
+pub struct NonLowercaseVariableInFunction {
+    pub name: String,
+}
+
 impl Violation for NonLowercaseVariableInFunction {
     #[derive_message_formats]
     fn message(&self) -> String {

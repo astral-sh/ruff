@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Result};
 use libcst_native::{Arg, Codegen, CodegenState, Expression};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Expr;
 
 use crate::ast::types::Range;
@@ -14,9 +14,9 @@ use crate::rules::pyflakes::format::FormatSummary;
 use crate::source_code::{Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct FormatLiterals;
-);
+#[violation]
+pub struct FormatLiterals;
+
 impl AlwaysAutofixableViolation for FormatLiterals {
     #[derive_message_formats]
     fn message(&self) -> String {

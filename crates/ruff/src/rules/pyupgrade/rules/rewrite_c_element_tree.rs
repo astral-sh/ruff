@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Located, Stmt, StmtKind};
 
 use crate::ast::types::Range;
@@ -7,9 +7,9 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct RewriteCElementTree;
-);
+#[violation]
+pub struct RewriteCElementTree;
+
 impl AlwaysAutofixableViolation for RewriteCElementTree {
     #[derive_message_formats]
     fn message(&self) -> String {

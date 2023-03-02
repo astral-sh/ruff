@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Stmt};
 
 use crate::ast::types::Range;
@@ -7,11 +7,11 @@ use crate::registry::Diagnostic;
 use crate::rules::pep8_naming::helpers;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct MixedCaseVariableInGlobalScope {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct MixedCaseVariableInGlobalScope {
+    pub name: String,
+}
+
 impl Violation for MixedCaseVariableInGlobalScope {
     #[derive_message_formats]
     fn message(&self) -> String {

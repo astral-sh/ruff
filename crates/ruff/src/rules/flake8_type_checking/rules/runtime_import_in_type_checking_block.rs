@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::{Binding, BindingKind, ExecutionContext};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct RuntimeImportInTypeCheckingBlock {
-        pub full_name: String,
-    }
-);
+#[violation]
+pub struct RuntimeImportInTypeCheckingBlock {
+    pub full_name: String,
+}
+
 impl Violation for RuntimeImportInTypeCheckingBlock {
     #[derive_message_formats]
     fn message(&self) -> String {

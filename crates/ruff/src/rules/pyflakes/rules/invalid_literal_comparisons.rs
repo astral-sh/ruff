@@ -1,7 +1,7 @@
 use itertools::izip;
 use log::error;
 use once_cell::unsync::Lazy;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Cmpop, Expr};
 use serde::{Deserialize, Serialize};
 
@@ -29,11 +29,11 @@ impl From<&Cmpop> for IsCmpop {
     }
 }
 
-define_violation!(
-    pub struct IsLiteral {
-        pub cmpop: IsCmpop,
-    }
-);
+#[violation]
+pub struct IsLiteral {
+    pub cmpop: IsCmpop,
+}
+
 impl AlwaysAutofixableViolation for IsLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {

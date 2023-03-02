@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Expr;
 
 use crate::ast::helpers::collect_call_path;
@@ -8,11 +8,11 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::{AutofixKind, Availability, Violation};
 
-define_violation!(
-    pub struct DatetimeTimezoneUTC {
-        pub straight_import: bool,
-    }
-);
+#[violation]
+pub struct DatetimeTimezoneUTC {
+    pub straight_import: bool,
+}
+
 impl Violation for DatetimeTimezoneUTC {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

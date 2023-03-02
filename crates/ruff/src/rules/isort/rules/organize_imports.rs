@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Location, Stmt};
 use textwrap::indent;
 
@@ -18,27 +18,27 @@ use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    /// ## What it does
-    /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
-    ///
-    /// ## Why is this bad?
-    /// Consistency is good. Use a common convention for imports to make your code
-    /// more readable and idiomatic.
-    ///
-    /// ## Example
-    /// ```python
-    /// import pandas
-    /// import numpy as np
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// import numpy as np
-    /// import pandas
-    /// ```
-    pub struct UnsortedImports;
-);
+/// ## What it does
+/// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
+///
+/// ## Why is this bad?
+/// Consistency is good. Use a common convention for imports to make your code
+/// more readable and idiomatic.
+///
+/// ## Example
+/// ```python
+/// import pandas
+/// import numpy as np
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import numpy as np
+/// import pandas
+/// ```
+#[violation]
+pub struct UnsortedImports;
+
 impl AlwaysAutofixableViolation for UnsortedImports {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
@@ -8,9 +8,9 @@ use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UseOfDotIx;
-);
+#[violation]
+pub struct UseOfDotIx;
+
 impl Violation for UseOfDotIx {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +18,9 @@ impl Violation for UseOfDotIx {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotAt;
-);
+#[violation]
+pub struct UseOfDotAt;
+
 impl Violation for UseOfDotAt {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +28,9 @@ impl Violation for UseOfDotAt {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotIat;
-);
+#[violation]
+pub struct UseOfDotIat;
+
 impl Violation for UseOfDotIat {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -38,9 +38,9 @@ impl Violation for UseOfDotIat {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotValues;
-);
+#[violation]
+pub struct UseOfDotValues;
+
 impl Violation for UseOfDotValues {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Stmt};
 
 use super::types::DebuggerUsingType;
@@ -10,11 +10,11 @@ use crate::violation::Violation;
 
 // flake8-debugger
 
-define_violation!(
-    pub struct Debugger {
-        pub using_type: DebuggerUsingType,
-    }
-);
+#[violation]
+pub struct Debugger {
+    pub using_type: DebuggerUsingType,
+}
+
 impl Violation for Debugger {
     #[derive_message_formats]
     fn message(&self) -> String {

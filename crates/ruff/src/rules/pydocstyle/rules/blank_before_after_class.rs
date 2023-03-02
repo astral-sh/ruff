@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -8,11 +8,11 @@ use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct OneBlankLineBeforeClass {
-        pub lines: usize,
-    }
-);
+#[violation]
+pub struct OneBlankLineBeforeClass {
+    pub lines: usize,
+}
+
 impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -24,11 +24,11 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
     }
 }
 
-define_violation!(
-    pub struct OneBlankLineAfterClass {
-        pub lines: usize,
-    }
-);
+#[violation]
+pub struct OneBlankLineAfterClass {
+    pub lines: usize,
+}
+
 impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,11 +40,11 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
     }
 }
 
-define_violation!(
-    pub struct NoBlankLineBeforeClass {
-        pub lines: usize,
-    }
-);
+#[violation]
+pub struct NoBlankLineBeforeClass {
+    pub lines: usize,
+}
+
 impl AlwaysAutofixableViolation for NoBlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {

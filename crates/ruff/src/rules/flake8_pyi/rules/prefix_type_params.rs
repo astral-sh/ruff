@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -25,32 +25,32 @@ impl fmt::Display for VarKind {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks that type `TypeVar`, `ParamSpec`, and `TypeVarTuple` definitions in
-    /// stubs are prefixed with `_`.
-    ///
-    /// ## Why is this bad?
-    /// By prefixing type parameters with `_`, we can avoid accidentally exposing
-    /// names internal to the stub.
-    ///
-    /// ## Example
-    /// ```python
-    /// from typing import TypeVar
-    ///
-    /// T = TypeVar("T")
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// from typing import TypeVar
-    ///
-    /// _T = TypeVar("_T")
-    /// ```
-    pub struct PrefixTypeParams {
-        pub kind: VarKind,
-    }
-);
+/// ## What it does
+/// Checks that type `TypeVar`, `ParamSpec`, and `TypeVarTuple` definitions in
+/// stubs are prefixed with `_`.
+///
+/// ## Why is this bad?
+/// By prefixing type parameters with `_`, we can avoid accidentally exposing
+/// names internal to the stub.
+///
+/// ## Example
+/// ```python
+/// from typing import TypeVar
+///
+/// T = TypeVar("T")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import TypeVar
+///
+/// _T = TypeVar("_T")
+/// ```
+#[violation]
+pub struct PrefixTypeParams {
+    pub kind: VarKind,
+}
+
 impl Violation for PrefixTypeParams {
     #[derive_message_formats]
     fn message(&self) -> String {

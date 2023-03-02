@@ -2,14 +2,14 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::registry::DiagnosticKind;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct WhitespaceAfterOpenBracket;
-);
+#[violation]
+pub struct WhitespaceAfterOpenBracket;
+
 impl Violation for WhitespaceAfterOpenBracket {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -17,9 +17,9 @@ impl Violation for WhitespaceAfterOpenBracket {
     }
 }
 
-define_violation!(
-    pub struct WhitespaceBeforeCloseBracket;
-);
+#[violation]
+pub struct WhitespaceBeforeCloseBracket;
+
 impl Violation for WhitespaceBeforeCloseBracket {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -27,9 +27,9 @@ impl Violation for WhitespaceBeforeCloseBracket {
     }
 }
 
-define_violation!(
-    pub struct WhitespaceBeforePunctuation;
-);
+#[violation]
+pub struct WhitespaceBeforePunctuation;
+
 impl Violation for WhitespaceBeforePunctuation {
     #[derive_message_formats]
     fn message(&self) -> String {

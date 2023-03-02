@@ -1,5 +1,5 @@
 use num_traits::{One, Zero};
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::helpers::SimpleCallArgs;
@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct SnmpInsecureVersion;
-);
+#[violation]
+pub struct SnmpInsecureVersion;
+
 impl Violation for SnmpInsecureVersion {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,5 +1,5 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use super::helpers;
@@ -9,11 +9,11 @@ use crate::registry::Diagnostic;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct UnnecessaryLiteralWithinTupleCall {
-        pub literal: String,
-    }
-);
+#[violation]
+pub struct UnnecessaryLiteralWithinTupleCall {
+    pub literal: String,
+}
+
 impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
     #[derive_message_formats]
     fn message(&self) -> String {

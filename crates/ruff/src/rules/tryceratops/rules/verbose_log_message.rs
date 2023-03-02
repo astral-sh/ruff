@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::ast::visitor;
@@ -10,32 +10,32 @@ use crate::registry::Diagnostic;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 use crate::violation::Violation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for excessive logging of exception objects.
-    ///
-    /// ## Why is this bad?
-    /// When logging exceptions via `logging.exception`, the exception object
-    /// is logged automatically. Including the exception object in the log
-    /// message is redundant and can lead to excessive logging.
-    ///
-    /// ## Example
-    /// ```python
-    /// try:
-    ///     ...
-    /// except ValueError as e:
-    ///     logger.exception(f"Found an error: {e}")
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// try:
-    ///     ...
-    /// except ValueError as e:
-    ///     logger.exception(f"Found an error")
-    /// ```
-    pub struct VerboseLogMessage;
-);
+/// ## What it does
+/// Checks for excessive logging of exception objects.
+///
+/// ## Why is this bad?
+/// When logging exceptions via `logging.exception`, the exception object
+/// is logged automatically. Including the exception object in the log
+/// message is redundant and can lead to excessive logging.
+///
+/// ## Example
+/// ```python
+/// try:
+///     ...
+/// except ValueError as e:
+///     logger.exception(f"Found an error: {e}")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// try:
+///     ...
+/// except ValueError as e:
+///     logger.exception(f"Found an error")
+/// ```
+#[violation]
+pub struct VerboseLogMessage;
+
 impl Violation for VerboseLogMessage {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python::identifiers::is_identifier;
 use ruff_python::keyword::KWLIST;
 use rustpython_common::cformat::{
@@ -18,9 +18,9 @@ use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct PrintfStringFormatting;
-);
+#[violation]
+pub struct PrintfStringFormatting;
+
 impl AlwaysAutofixableViolation for PrintfStringFormatting {
     #[derive_message_formats]
     fn message(&self) -> String {

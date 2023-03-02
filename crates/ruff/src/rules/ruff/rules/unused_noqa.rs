@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use serde::{Deserialize, Serialize};
 
 use crate::violation::AlwaysAutofixableViolation;
@@ -11,11 +11,11 @@ pub struct UnusedCodes {
     pub unmatched: Vec<String>,
 }
 
-define_violation!(
-    pub struct UnusedNOQA {
-        pub codes: Option<UnusedCodes>,
-    }
-);
+#[violation]
+pub struct UnusedNOQA {
+    pub codes: Option<UnusedCodes>,
+}
+
 impl AlwaysAutofixableViolation for UnusedNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {

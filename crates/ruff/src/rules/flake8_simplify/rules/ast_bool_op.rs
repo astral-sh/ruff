@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use itertools::Either::{Left, Right};
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
 use crate::ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
@@ -12,37 +12,37 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for multiple `isinstance` calls on the same target.
-    ///
-    /// ## Why is this bad?
-    /// To check if an object is an instance of any one of multiple types
-    /// or classes, it is unnecessary to use multiple `isinstance` calls, as
-    /// the second argument of the `isinstance` built-in function accepts a
-    /// tuple of types and classes.
-    ///
-    /// Using a single `isinstance` call implements the same behavior with more
-    /// concise code and clearer intent.
-    ///
-    /// ## Example
-    /// ```python
-    /// if isinstance(obj, int) or isinstance(obj, float):
-    ///     pass
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// if isinstance(obj, (int, float)):
-    ///     pass
-    /// ```
-    ///
-    /// ## References
-    /// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
-    pub struct DuplicateIsinstanceCall {
-        pub name: String,
-    }
-);
+/// ## What it does
+/// Checks for multiple `isinstance` calls on the same target.
+///
+/// ## Why is this bad?
+/// To check if an object is an instance of any one of multiple types
+/// or classes, it is unnecessary to use multiple `isinstance` calls, as
+/// the second argument of the `isinstance` built-in function accepts a
+/// tuple of types and classes.
+///
+/// Using a single `isinstance` call implements the same behavior with more
+/// concise code and clearer intent.
+///
+/// ## Example
+/// ```python
+/// if isinstance(obj, int) or isinstance(obj, float):
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if isinstance(obj, (int, float)):
+///     pass
+/// ```
+///
+/// ## References
+/// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
+#[violation]
+pub struct DuplicateIsinstanceCall {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for DuplicateIsinstanceCall {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -56,11 +56,11 @@ impl AlwaysAutofixableViolation for DuplicateIsinstanceCall {
     }
 }
 
-define_violation!(
-    pub struct CompareWithTuple {
-        pub replacement: String,
-    }
-);
+#[violation]
+pub struct CompareWithTuple {
+    pub replacement: String,
+}
+
 impl AlwaysAutofixableViolation for CompareWithTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -74,11 +74,11 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
     }
 }
 
-define_violation!(
-    pub struct ExprAndNotExpr {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct ExprAndNotExpr {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for ExprAndNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -91,11 +91,11 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
     }
 }
 
-define_violation!(
-    pub struct ExprOrNotExpr {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct ExprOrNotExpr {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for ExprOrNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -108,9 +108,9 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
     }
 }
 
-define_violation!(
-    pub struct ExprOrTrue;
-);
+#[violation]
+pub struct ExprOrTrue;
+
 impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -122,9 +122,9 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
     }
 }
 
-define_violation!(
-    pub struct ExprAndFalse;
-);
+#[violation]
+pub struct ExprAndFalse;
+
 impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {

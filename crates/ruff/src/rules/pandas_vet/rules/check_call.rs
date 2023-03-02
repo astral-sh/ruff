@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
@@ -8,9 +8,9 @@ use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UseOfDotIsNull;
-);
+#[violation]
+pub struct UseOfDotIsNull;
+
 impl Violation for UseOfDotIsNull {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +18,9 @@ impl Violation for UseOfDotIsNull {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotNotNull;
-);
+#[violation]
+pub struct UseOfDotNotNull;
+
 impl Violation for UseOfDotNotNull {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +28,9 @@ impl Violation for UseOfDotNotNull {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotPivotOrUnstack;
-);
+#[violation]
+pub struct UseOfDotPivotOrUnstack;
+
 impl Violation for UseOfDotPivotOrUnstack {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,9 +40,9 @@ impl Violation for UseOfDotPivotOrUnstack {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotReadTable;
-);
+#[violation]
+pub struct UseOfDotReadTable;
+
 impl Violation for UseOfDotReadTable {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -50,9 +50,9 @@ impl Violation for UseOfDotReadTable {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotStack;
-);
+#[violation]
+pub struct UseOfDotStack;
+
 impl Violation for UseOfDotStack {
     #[derive_message_formats]
     fn message(&self) -> String {

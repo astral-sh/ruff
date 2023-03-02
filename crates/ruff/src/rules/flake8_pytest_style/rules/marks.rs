@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Location};
 
 use super::helpers::{get_mark_decorators, get_mark_name};
@@ -8,13 +8,13 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct IncorrectMarkParenthesesStyle {
-        pub mark_name: String,
-        pub expected_parens: String,
-        pub actual_parens: String,
-    }
-);
+#[violation]
+pub struct IncorrectMarkParenthesesStyle {
+    pub mark_name: String,
+    pub expected_parens: String,
+    pub actual_parens: String,
+}
+
 impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -34,9 +34,9 @@ impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
     }
 }
 
-define_violation!(
-    pub struct UseFixturesWithoutParameters;
-);
+#[violation]
+pub struct UseFixturesWithoutParameters;
+
 impl AlwaysAutofixableViolation for UseFixturesWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {

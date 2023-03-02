@@ -3,14 +3,14 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::registry::DiagnosticKind;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct MultipleSpacesAfterKeyword;
-);
+#[violation]
+pub struct MultipleSpacesAfterKeyword;
+
 impl Violation for MultipleSpacesAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +18,9 @@ impl Violation for MultipleSpacesAfterKeyword {
     }
 }
 
-define_violation!(
-    pub struct MultipleSpacesBeforeKeyword;
-);
+#[violation]
+pub struct MultipleSpacesBeforeKeyword;
+
 impl Violation for MultipleSpacesBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +28,9 @@ impl Violation for MultipleSpacesBeforeKeyword {
     }
 }
 
-define_violation!(
-    pub struct TabAfterKeyword;
-);
+#[violation]
+pub struct TabAfterKeyword;
+
 impl Violation for TabAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -38,9 +38,9 @@ impl Violation for TabAfterKeyword {
     }
 }
 
-define_violation!(
-    pub struct TabBeforeKeyword;
-);
+#[violation]
+pub struct TabBeforeKeyword;
+
 impl Violation for TabBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind};
 use serde::{Deserialize, Serialize};
 
@@ -26,11 +26,11 @@ impl fmt::Display for DeferralKeyword {
     }
 }
 
-define_violation!(
-    pub struct YieldOutsideFunction {
-        pub keyword: DeferralKeyword,
-    }
-);
+#[violation]
+pub struct YieldOutsideFunction {
+    pub keyword: DeferralKeyword,
+}
+
 impl Violation for YieldOutsideFunction {
     #[derive_message_formats]
     fn message(&self) -> String {

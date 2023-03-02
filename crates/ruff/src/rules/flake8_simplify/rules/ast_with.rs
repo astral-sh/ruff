@@ -1,7 +1,7 @@
 use log::error;
 use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::{first_colon_range, has_comments_in};
 use crate::ast::types::Range;
@@ -11,38 +11,38 @@ use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::fix_with;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for the unnecessary nesting of multiple consecutive context
-    /// managers.
-    ///
-    /// ## Why is this bad?
-    /// In Python 3, a single `with` block can include multiple context
-    /// managers.
-    ///
-    /// Combining multiple context managers into a single `with` statement
-    /// will minimize the indentation depth of the code, making it more
-    /// readable.
-    ///
-    /// ## Example
-    /// ```python
-    /// with A() as a:
-    ///     with B() as b:
-    ///         pass
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// with A() as a, B() as b:
-    ///     pass
-    /// ```
-    ///
-    /// ## References
-    /// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
-    pub struct MultipleWithStatements {
-        pub fixable: bool,
-    }
-);
+/// ## What it does
+/// Checks for the unnecessary nesting of multiple consecutive context
+/// managers.
+///
+/// ## Why is this bad?
+/// In Python 3, a single `with` block can include multiple context
+/// managers.
+///
+/// Combining multiple context managers into a single `with` statement
+/// will minimize the indentation depth of the code, making it more
+/// readable.
+///
+/// ## Example
+/// ```python
+/// with A() as a:
+///     with B() as b:
+///         pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// with A() as a, B() as b:
+///     pass
+/// ```
+///
+/// ## References
+/// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
+#[violation]
+pub struct MultipleWithStatements {
+    pub fixable: bool,
+}
+
 impl Violation for MultipleWithStatements {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

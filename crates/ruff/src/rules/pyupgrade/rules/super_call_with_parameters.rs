@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::ast::types::{Range, ScopeKind};
@@ -7,9 +7,9 @@ use crate::registry::Diagnostic;
 use crate::rules::pyupgrade::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct SuperCallWithParameters;
-);
+#[violation]
+pub struct SuperCallWithParameters;
+
 impl AlwaysAutofixableViolation for SuperCallWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {

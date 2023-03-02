@@ -1,13 +1,13 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Stmt;
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct IncorrectPytestImport;
-);
+#[violation]
+pub struct IncorrectPytestImport;
+
 impl Violation for IncorrectPytestImport {
     #[derive_message_formats]
     fn message(&self) -> String {

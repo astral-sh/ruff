@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Alias;
 
 use crate::ast::types::Range;
@@ -7,9 +7,9 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct UselessImportAlias;
-);
+#[violation]
+pub struct UselessImportAlias;
+
 impl AlwaysAutofixableViolation for UselessImportAlias {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::cast;
 use crate::ast::helpers::identifier_range;
@@ -10,9 +10,9 @@ use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 use crate::visibility::{is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility};
 
-define_violation!(
-    pub struct PublicModule;
-);
+#[violation]
+pub struct PublicModule;
+
 impl Violation for PublicModule {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -20,9 +20,9 @@ impl Violation for PublicModule {
     }
 }
 
-define_violation!(
-    pub struct PublicClass;
-);
+#[violation]
+pub struct PublicClass;
+
 impl Violation for PublicClass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -30,9 +30,9 @@ impl Violation for PublicClass {
     }
 }
 
-define_violation!(
-    pub struct PublicMethod;
-);
+#[violation]
+pub struct PublicMethod;
+
 impl Violation for PublicMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,9 +40,9 @@ impl Violation for PublicMethod {
     }
 }
 
-define_violation!(
-    pub struct PublicFunction;
-);
+#[violation]
+pub struct PublicFunction;
+
 impl Violation for PublicFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -50,9 +50,9 @@ impl Violation for PublicFunction {
     }
 }
 
-define_violation!(
-    pub struct PublicPackage;
-);
+#[violation]
+pub struct PublicPackage;
+
 impl Violation for PublicPackage {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -60,9 +60,9 @@ impl Violation for PublicPackage {
     }
 }
 
-define_violation!(
-    pub struct MagicMethod;
-);
+#[violation]
+pub struct MagicMethod;
+
 impl Violation for MagicMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -70,9 +70,9 @@ impl Violation for MagicMethod {
     }
 }
 
-define_violation!(
-    pub struct PublicNestedClass;
-);
+#[violation]
+pub struct PublicNestedClass;
+
 impl Violation for PublicNestedClass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -80,9 +80,9 @@ impl Violation for PublicNestedClass {
     }
 }
 
-define_violation!(
-    pub struct PublicInit;
-);
+#[violation]
+pub struct PublicInit;
+
 impl Violation for PublicInit {
     #[derive_message_formats]
     fn message(&self) -> String {

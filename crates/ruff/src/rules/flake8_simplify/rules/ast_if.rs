@@ -2,7 +2,7 @@ use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use crate::ast::helpers::{
@@ -34,11 +34,11 @@ fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
         .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
 }
 
-define_violation!(
-    pub struct CollapsibleIf {
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct CollapsibleIf {
+    pub fixable: bool,
+}
+
 impl Violation for CollapsibleIf {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -53,12 +53,12 @@ impl Violation for CollapsibleIf {
     }
 }
 
-define_violation!(
-    pub struct NeedlessBool {
-        pub condition: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct NeedlessBool {
+    pub condition: String,
+    pub fixable: bool,
+}
+
 impl Violation for NeedlessBool {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -75,29 +75,29 @@ impl Violation for NeedlessBool {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for three or more consecutive if-statements with direct returns
-    ///
-    /// ## Why is this bad?
-    /// These can be simplified by using a dictionary
-    ///
-    /// ## Example
-    /// ```python
-    /// if x == 1:
-    ///     return "Hello"
-    /// elif x == 2:
-    ///     return "Goodbye"
-    /// else:
-    ///     return "Goodnight"
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
-    /// ```
-    pub struct ManualDictLookup;
-);
+/// ## What it does
+/// Checks for three or more consecutive if-statements with direct returns
+///
+/// ## Why is this bad?
+/// These can be simplified by using a dictionary
+///
+/// ## Example
+/// ```python
+/// if x == 1:
+///     return "Hello"
+/// elif x == 2:
+///     return "Goodbye"
+/// else:
+///     return "Goodnight"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
+/// ```
+#[violation]
+pub struct ManualDictLookup;
+
 impl Violation for ManualDictLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -105,12 +105,12 @@ impl Violation for ManualDictLookup {
     }
 }
 
-define_violation!(
-    pub struct UseTernaryOperator {
-        pub contents: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct UseTernaryOperator {
+    pub contents: String,
+    pub fixable: bool,
+}
+
 impl Violation for UseTernaryOperator {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -128,29 +128,29 @@ impl Violation for UseTernaryOperator {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for `if` branches with identical arm bodies.
-    ///
-    /// ## Why is this bad?
-    /// If multiple arms of an `if` statement have the same body, using `or`
-    /// better signals the intent of the statement.
-    ///
-    /// ## Example
-    /// ```python
-    /// if x == 1:
-    ///     print("Hello")
-    /// elif x == 2:
-    ///     print("Hello")
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// if x == 1 or x == 2:
-    ///     print("Hello")
-    /// ```
-    pub struct IfWithSameArms;
-);
+/// ## What it does
+/// Checks for `if` branches with identical arm bodies.
+///
+/// ## Why is this bad?
+/// If multiple arms of an `if` statement have the same body, using `or`
+/// better signals the intent of the statement.
+///
+/// ## Example
+/// ```python
+/// if x == 1:
+///     print("Hello")
+/// elif x == 2:
+///     print("Hello")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if x == 1 or x == 2:
+///     print("Hello")
+/// ```
+#[violation]
+pub struct IfWithSameArms;
+
 impl Violation for IfWithSameArms {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -158,12 +158,12 @@ impl Violation for IfWithSameArms {
     }
 }
 
-define_violation!(
-    pub struct DictGetWithDefault {
-        pub contents: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct DictGetWithDefault {
+    pub contents: String,
+    pub fixable: bool,
+}
+
 impl Violation for DictGetWithDefault {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

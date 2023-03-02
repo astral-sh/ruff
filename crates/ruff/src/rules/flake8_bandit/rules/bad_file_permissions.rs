@@ -1,6 +1,6 @@
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
 
@@ -10,11 +10,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct BadFilePermissions {
-        pub mask: u16,
-    }
-);
+#[violation]
+pub struct BadFilePermissions {
+    pub mask: u16,
+}
+
 impl Violation for BadFilePermissions {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,5 +1,5 @@
 use itertools::izip;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 use serde::{Deserialize, Serialize};
@@ -28,9 +28,9 @@ impl From<&Cmpop> for EqCmpop {
     }
 }
 
-define_violation!(
-    pub struct NoneComparison(pub EqCmpop);
-);
+#[violation]
+pub struct NoneComparison(pub EqCmpop);
+
 impl AlwaysAutofixableViolation for NoneComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -50,9 +50,9 @@ impl AlwaysAutofixableViolation for NoneComparison {
     }
 }
 
-define_violation!(
-    pub struct TrueFalseComparison(pub bool, pub EqCmpop);
-);
+#[violation]
+pub struct TrueFalseComparison(pub bool, pub EqCmpop);
+
 impl AlwaysAutofixableViolation for TrueFalseComparison {
     #[derive_message_formats]
     fn message(&self) -> String {

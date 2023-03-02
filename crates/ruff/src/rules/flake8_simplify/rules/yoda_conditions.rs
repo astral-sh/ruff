@@ -1,6 +1,6 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python::str::{self};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
@@ -12,11 +12,11 @@ use crate::registry::Diagnostic;
 use crate::source_code::{Locator, Stylist};
 use crate::violation::{AutofixKind, Availability, Violation};
 
-define_violation!(
-    pub struct YodaConditions {
-        pub suggestion: Option<String>,
-    }
-);
+#[violation]
+pub struct YodaConditions {
+    pub suggestion: Option<String>,
+}
+
 impl Violation for YodaConditions {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

@@ -1,7 +1,7 @@
 use std::iter;
 
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arg, Arguments};
 
@@ -15,11 +15,11 @@ use crate::registry::Diagnostic;
 use crate::violation::Violation;
 use crate::visibility;
 
-define_violation!(
-    pub struct UnusedFunctionArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedFunctionArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedFunctionArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,11 +28,11 @@ impl Violation for UnusedFunctionArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedMethodArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedMethodArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -41,11 +41,11 @@ impl Violation for UnusedMethodArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedClassMethodArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedClassMethodArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedClassMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -54,11 +54,11 @@ impl Violation for UnusedClassMethodArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedStaticMethodArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedStaticMethodArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedStaticMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -67,11 +67,11 @@ impl Violation for UnusedStaticMethodArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedLambdaArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedLambdaArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedLambdaArgument {
     #[derive_message_formats]
     fn message(&self) -> String {

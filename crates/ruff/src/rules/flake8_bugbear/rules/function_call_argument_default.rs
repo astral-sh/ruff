@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
 use super::mutable_argument_default::is_mutable_func;
@@ -10,11 +10,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct FunctionCallArgumentDefault {
-        pub name: Option<String>,
-    }
-);
+#[violation]
+pub struct FunctionCallArgumentDefault {
+    pub name: Option<String>,
+}
+
 impl Violation for FunctionCallArgumentDefault {
     #[derive_message_formats]
     fn message(&self) -> String {

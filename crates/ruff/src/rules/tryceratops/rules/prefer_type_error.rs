@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::ast::visitor;
@@ -9,9 +9,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct PreferTypeError;
-);
+#[violation]
+pub struct PreferTypeError;
+
 impl Violation for PreferTypeError {
     #[derive_message_formats]
     fn message(&self) -> String {

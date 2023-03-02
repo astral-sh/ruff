@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
@@ -7,9 +7,9 @@ use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct NoNewLineAtEndOfFile;
-);
+#[violation]
+pub struct NoNewLineAtEndOfFile;
+
 impl AlwaysAutofixableViolation for NoNewLineAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -4,7 +4,7 @@ use libcst_native::{
     ImportAlias, ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 use serde::{Deserialize, Serialize};
 
@@ -24,11 +24,11 @@ pub enum MockReference {
     Attribute,
 }
 
-define_violation!(
-    pub struct RewriteMockImport {
-        pub reference_type: MockReference,
-    }
-);
+#[violation]
+pub struct RewriteMockImport {
+    pub reference_type: MockReference,
+}
+
 impl AlwaysAutofixableViolation for RewriteMockImport {
     #[derive_message_formats]
     fn message(&self) -> String {

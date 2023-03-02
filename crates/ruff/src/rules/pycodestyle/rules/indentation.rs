@@ -1,16 +1,16 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::registry::DiagnosticKind;
 use crate::rules::pycodestyle::logical_lines::LogicalLine;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct IndentationWithInvalidMultiple {
-        pub indent_size: usize,
-    }
-);
+#[violation]
+pub struct IndentationWithInvalidMultiple {
+    pub indent_size: usize,
+}
+
 impl Violation for IndentationWithInvalidMultiple {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -19,11 +19,11 @@ impl Violation for IndentationWithInvalidMultiple {
     }
 }
 
-define_violation!(
-    pub struct IndentationWithInvalidMultipleComment {
-        pub indent_size: usize,
-    }
-);
+#[violation]
+pub struct IndentationWithInvalidMultipleComment {
+    pub indent_size: usize,
+}
+
 impl Violation for IndentationWithInvalidMultipleComment {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -32,9 +32,9 @@ impl Violation for IndentationWithInvalidMultipleComment {
     }
 }
 
-define_violation!(
-    pub struct NoIndentedBlock;
-);
+#[violation]
+pub struct NoIndentedBlock;
+
 impl Violation for NoIndentedBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -42,9 +42,9 @@ impl Violation for NoIndentedBlock {
     }
 }
 
-define_violation!(
-    pub struct NoIndentedBlockComment;
-);
+#[violation]
+pub struct NoIndentedBlockComment;
+
 impl Violation for NoIndentedBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -52,9 +52,9 @@ impl Violation for NoIndentedBlockComment {
     }
 }
 
-define_violation!(
-    pub struct UnexpectedIndentation;
-);
+#[violation]
+pub struct UnexpectedIndentation;
+
 impl Violation for UnexpectedIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -62,9 +62,9 @@ impl Violation for UnexpectedIndentation {
     }
 }
 
-define_violation!(
-    pub struct UnexpectedIndentationComment;
-);
+#[violation]
+pub struct UnexpectedIndentationComment;
+
 impl Violation for UnexpectedIndentationComment {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -72,9 +72,9 @@ impl Violation for UnexpectedIndentationComment {
     }
 }
 
-define_violation!(
-    pub struct OverIndented;
-);
+#[violation]
+pub struct OverIndented;
+
 impl Violation for OverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {

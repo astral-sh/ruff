@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Alias, Stmt};
 
 use crate::ast::types::Range;
@@ -6,9 +6,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct MultipleImportsOnOneLine;
-);
+#[violation]
+pub struct MultipleImportsOnOneLine;
+
 impl Violation for MultipleImportsOnOneLine {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -16,9 +16,9 @@ impl Violation for MultipleImportsOnOneLine {
     }
 }
 
-define_violation!(
-    pub struct ModuleImportNotAtTopOfFile;
-);
+#[violation]
+pub struct ModuleImportNotAtTopOfFile;
+
 impl Violation for ModuleImportNotAtTopOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {

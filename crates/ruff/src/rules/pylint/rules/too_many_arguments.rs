@@ -1,18 +1,17 @@
 use rustpython_parser::ast::{Arguments, Stmt};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::identifier_range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct TooManyArguments {
-        pub c_args: usize,
-        pub max_args: usize,
-    }
-);
+#[violation]
+pub struct TooManyArguments {
+    pub c_args: usize,
+    pub max_args: usize,
+}
 
 impl Violation for TooManyArguments {
     #[derive_message_formats]

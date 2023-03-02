@@ -4,7 +4,7 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::StmtKind;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::identifier_range;
 use crate::ast::types::Range;
@@ -21,11 +21,11 @@ use crate::rules::pydocstyle::settings::Convention;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 use crate::visibility::is_staticmethod;
 
-define_violation!(
-    pub struct SectionNotOverIndented {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionNotOverIndented {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionNotOverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -39,11 +39,11 @@ impl AlwaysAutofixableViolation for SectionNotOverIndented {
     }
 }
 
-define_violation!(
-    pub struct SectionUnderlineNotOverIndented {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionUnderlineNotOverIndented {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -57,11 +57,11 @@ impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
     }
 }
 
-define_violation!(
-    pub struct CapitalizeSectionName {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct CapitalizeSectionName {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for CapitalizeSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -75,11 +75,11 @@ impl AlwaysAutofixableViolation for CapitalizeSectionName {
     }
 }
 
-define_violation!(
-    pub struct NewLineAfterSectionName {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct NewLineAfterSectionName {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for NewLineAfterSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -93,11 +93,11 @@ impl AlwaysAutofixableViolation for NewLineAfterSectionName {
     }
 }
 
-define_violation!(
-    pub struct DashedUnderlineAfterSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct DashedUnderlineAfterSection {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -111,11 +111,11 @@ impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
     }
 }
 
-define_violation!(
-    pub struct SectionUnderlineAfterName {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionUnderlineAfterName {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -129,11 +129,11 @@ impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
     }
 }
 
-define_violation!(
-    pub struct SectionUnderlineMatchesSectionLength {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionUnderlineMatchesSectionLength {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -147,11 +147,11 @@ impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
     }
 }
 
-define_violation!(
-    pub struct BlankLineAfterSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct BlankLineAfterSection {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for BlankLineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -165,11 +165,11 @@ impl AlwaysAutofixableViolation for BlankLineAfterSection {
     }
 }
 
-define_violation!(
-    pub struct BlankLineBeforeSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct BlankLineBeforeSection {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for BlankLineBeforeSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -183,11 +183,11 @@ impl AlwaysAutofixableViolation for BlankLineBeforeSection {
     }
 }
 
-define_violation!(
-    pub struct BlankLineAfterLastSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct BlankLineAfterLastSection {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -201,11 +201,11 @@ impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
     }
 }
 
-define_violation!(
-    pub struct EmptyDocstringSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct EmptyDocstringSection {
+    pub name: String,
+}
+
 impl Violation for EmptyDocstringSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -214,11 +214,11 @@ impl Violation for EmptyDocstringSection {
     }
 }
 
-define_violation!(
-    pub struct SectionNameEndsInColon {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionNameEndsInColon {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionNameEndsInColon {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -232,11 +232,11 @@ impl AlwaysAutofixableViolation for SectionNameEndsInColon {
     }
 }
 
-define_violation!(
-    pub struct UndocumentedParam {
-        pub names: Vec<String>,
-    }
-);
+#[violation]
+pub struct UndocumentedParam {
+    pub names: Vec<String>,
+}
+
 impl Violation for UndocumentedParam {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -251,11 +251,11 @@ impl Violation for UndocumentedParam {
     }
 }
 
-define_violation!(
-    pub struct NoBlankLinesBetweenHeaderAndContent {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct NoBlankLinesBetweenHeaderAndContent {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for NoBlankLinesBetweenHeaderAndContent {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -796,7 +796,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         | DefinitionKind::NestedFunction(parent)
         | DefinitionKind::Method(parent)
     ) = docstring.kind else {
-        return
+        return;
     };
     let (
         StmtKind::FunctionDef {
@@ -806,7 +806,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             args: arguments, ..
         }
     ) = &parent.node else {
-        return
+        return;
     };
 
     // Look for arguments that weren't included in the docstring.

@@ -1,7 +1,7 @@
 use std::fmt;
 
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Located};
 use serde::{Deserialize, Serialize};
 
@@ -60,13 +60,13 @@ impl fmt::Display for ViolationsCmpop {
     }
 }
 
-define_violation!(
-    pub struct ComparisonOfConstant {
-        pub left_constant: String,
-        pub op: ViolationsCmpop,
-        pub right_constant: String,
-    }
-);
+#[violation]
+pub struct ComparisonOfConstant {
+    pub left_constant: String,
+    pub op: ViolationsCmpop,
+    pub right_constant: String,
+}
+
 impl Violation for ComparisonOfConstant {
     #[derive_message_formats]
     fn message(&self) -> String {

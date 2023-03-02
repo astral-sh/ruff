@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python::str::TRIPLE_QUOTE_PREFIXES;
 
 use crate::ast::types::Range;
@@ -11,9 +11,9 @@ use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::helpers::leading_quote;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct MultiLineSummaryFirstLine;
-);
+#[violation]
+pub struct MultiLineSummaryFirstLine;
+
 impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -25,9 +25,9 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
     }
 }
 
-define_violation!(
-    pub struct MultiLineSummarySecondLine;
-);
+#[violation]
+pub struct MultiLineSummarySecondLine;
+
 impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
     #[derive_message_formats]
     fn message(&self) -> String {
