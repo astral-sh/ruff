@@ -7,8 +7,8 @@ use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
-    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_quotes, pycodestyle, pyupgrade,
-    ruff,
+    eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, pycodestyle,
+    pyupgrade, ruff,
 };
 use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
@@ -18,6 +18,7 @@ pub fn check_tokens(
     tokens: &[LexResult],
     settings: &Settings,
     autofix: flags::Autofix,
+    is_interface_definition: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -55,6 +56,7 @@ pub fn check_tokens(
             .enabled(&Rule::TrailingCommaOnBareTupleProhibited)
         || settings.rules.enabled(&Rule::TrailingCommaProhibited);
     let enforce_extraneous_parenthesis = settings.rules.enabled(&Rule::ExtraneousParentheses);
+    let enforce_type_comment_in_stub = settings.rules.enabled(&Rule::TypeCommentInStub);
 
     // RUF001, RUF002, RUF003
     if enforce_ambiguous_unicode_character {
@@ -159,6 +161,11 @@ pub fn check_tokens(
             pyupgrade::rules::extraneous_parentheses(tokens, locator, settings, autofix)
                 .into_iter(),
         );
+    }
+
+    // PYI033
+    if enforce_type_comment_in_stub && is_interface_definition {
+        diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(tokens));
     }
 
     diagnostics

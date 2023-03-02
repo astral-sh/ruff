@@ -1,0 +1,25 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    TypeCommentInStub: ~
+  location:
+    row: 2
+    column: 6
+  end_location:
+    row: 2
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    TypeCommentInStub: ~
+  location:
+    row: 6
+    column: 17
+  end_location:
+    row: 6
+    column: 36
+  fix: ~
+  parent: ~
+
