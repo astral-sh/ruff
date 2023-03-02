@@ -192,7 +192,7 @@ pub fn missing_whitespace_around_operator(
 }
 
 #[cfg(not(feature = "logical_lines"))]
-pub fn missing_whitespace_after_keyword(
+pub fn missing_whitespace_around_operator(
     _tokens: &[(Location, &Tok, Location)],
 ) -> Vec<(Location, DiagnosticKind)> {
     vec![]
