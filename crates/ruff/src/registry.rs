@@ -63,6 +63,8 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::WhitespaceBeforeParameters,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
     rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
@@ -856,6 +858,7 @@ impl Rule {
             | Rule::WhitespaceBeforeCloseBracket
             | Rule::UnexpectedSpacesAroundKeywordParameterEquals
             | Rule::MissingWhitespaceAroundParameterEquals
+            | Rule::WhitespaceBeforeParameters
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }
