@@ -1,7 +1,9 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use std::fmt;
+
 use rustpython_parser::ast::{Expr, ExprKind, Location, Operator};
 use serde::{Deserialize, Serialize};
-use std::fmt;
+
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
@@ -35,12 +37,12 @@ impl CallKind {
     }
 }
 
-define_violation!(
-    // TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
-    pub struct IsinstanceWithTuple {
-        pub kind: CallKind,
-    }
-);
+// TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
+#[violation]
+pub struct IsinstanceWithTuple {
+    pub kind: CallKind,
+}
+
 impl AlwaysAutofixableViolation for IsinstanceWithTuple {
     #[derive_message_formats]
     fn message(&self) -> String {

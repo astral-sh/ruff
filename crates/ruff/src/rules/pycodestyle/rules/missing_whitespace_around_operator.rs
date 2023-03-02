@@ -3,7 +3,7 @@
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::registry::DiagnosticKind;
 use crate::rules::pycodestyle::helpers::{
@@ -13,9 +13,9 @@ use crate::rules::pycodestyle::helpers::{
 use crate::violation::Violation;
 
 // E225
-define_violation!(
-    pub struct MissingWhitespaceAroundOperator;
-);
+#[violation]
+pub struct MissingWhitespaceAroundOperator;
+
 impl Violation for MissingWhitespaceAroundOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -24,9 +24,9 @@ impl Violation for MissingWhitespaceAroundOperator {
 }
 
 // E226
-define_violation!(
-    pub struct MissingWhitespaceAroundArithmeticOperator;
-);
+#[violation]
+pub struct MissingWhitespaceAroundArithmeticOperator;
+
 impl Violation for MissingWhitespaceAroundArithmeticOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -35,9 +35,9 @@ impl Violation for MissingWhitespaceAroundArithmeticOperator {
 }
 
 // E227
-define_violation!(
-    pub struct MissingWhitespaceAroundBitwiseOrShiftOperator;
-);
+#[violation]
+pub struct MissingWhitespaceAroundBitwiseOrShiftOperator;
+
 impl Violation for MissingWhitespaceAroundBitwiseOrShiftOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -46,9 +46,9 @@ impl Violation for MissingWhitespaceAroundBitwiseOrShiftOperator {
 }
 
 // E228
-define_violation!(
-    pub struct MissingWhitespaceAroundModuloOperator;
-);
+#[violation]
+pub struct MissingWhitespaceAroundModuloOperator;
+
 impl Violation for MissingWhitespaceAroundModuloOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
