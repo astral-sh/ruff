@@ -6,11 +6,14 @@ use rustpython_parser::Tok;
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::registry::DiagnosticKind;
+
+use crate::violation::Violation;
+
+#[cfg(feature = "logical_lines")]
 use crate::rules::pycodestyle::helpers::{
     is_arithmetic_token, is_keyword_token, is_op_token, is_singleton_token, is_skip_comment_token,
     is_soft_keyword_token, is_unary_token, is_ws_needed_token, is_ws_optional_token,
 };
-use crate::violation::Violation;
 
 // E225
 define_violation!(
@@ -79,18 +82,22 @@ pub fn missing_whitespace_around_operator(
         } else if **token == Tok::Rpar {
             parens -= 1;
         }
-        if (needs_space_main.is_some() && needs_space_main.unwrap())
+        let needs_space = (needs_space_main.is_some() && needs_space_main.unwrap())
             || needs_space_aux_2.is_some()
-            || prev_end_aux.is_some()
-        {
+            || prev_end_aux.is_some();
+        if needs_space {
             if Some(start) != prev_end {
                 if !(needs_space_main.is_some() && needs_space_main.unwrap())
                     && (needs_space_aux_2.is_none() || !needs_space_aux_2.unwrap())
                 {
-                    diagnostics
-                        .push((*(prev_end.unwrap()), MissingWhitespaceAroundOperator.into()));
+                    diagnostics.push((
+                        *(prev_end_aux.unwrap()),
+                        MissingWhitespaceAroundOperator.into(),
+                    ));
                 }
                 needs_space_main = Some(false);
+                needs_space_aux_2 = None;
+                prev_end_aux = None;
             } else if **token == Tok::Greater
                 && (prev_type == Some(&Tok::Less) || prev_type == Some(&Tok::Minus))
             {
@@ -104,30 +111,39 @@ pub fn missing_whitespace_around_operator(
                 // For more info see PEP570
             } else {
                 if (needs_space_main.is_some() && needs_space_main.unwrap())
-                    || prev_end_aux.is_some()
+                    || (needs_space_aux_2.is_some() && needs_space_aux_2.unwrap())
                 {
                     diagnostics
                         .push((*(prev_end.unwrap()), MissingWhitespaceAroundOperator.into()));
                 } else if prev_type != Some(&Tok::DoubleStar) {
                     if prev_type == Some(&Tok::Percent) {
                         diagnostics.push((
-                            *(prev_end.unwrap()),
-                            MissingWhitespaceAroundArithmeticOperator.into(),
+                            *(prev_end_aux.unwrap()),
+                            MissingWhitespaceAroundModuloOperator.into(),
                         ));
-                    } else if !is_arithmetic_token(*token) {
+                    } else if !is_arithmetic_token(prev_type.unwrap()) {
                         diagnostics.push((
-                            *(prev_end.unwrap()),
+                            *(prev_end_aux.unwrap()),
                             MissingWhitespaceAroundBitwiseOrShiftOperator.into(),
+                        ));
+                    } else {
+                        diagnostics.push((
+                            *(prev_end_aux.unwrap()),
+                            MissingWhitespaceAroundArithmeticOperator.into(),
                         ));
                     }
                 }
                 needs_space_main = Some(false);
+                needs_space_aux_2 = None;
+                prev_end_aux = None;
             }
         } else if (is_op_token(*token) || matches!(token, Tok::Name { .. })) && prev_end.is_some() {
             if **token == Tok::Equal && parens > 0 {
                 // Allow keyword args or defaults: foo(bar=None).
             } else if is_ws_needed_token(*token) {
                 needs_space_main = Some(true);
+                needs_space_aux_2 = None;
+                prev_end_aux = None;
             } else if is_unary_token(*token) {
                 // Check if the operator is used as a binary operator
                 // Allow unary operators: -123, -x, +1.
@@ -141,23 +157,30 @@ pub fn missing_whitespace_around_operator(
                         && (!is_soft_keyword_token(&prev_type.unwrap()))
                 {
                     needs_space_main = None;
+                    needs_space_aux_2 = None;
+                    prev_end_aux = None;
                 }
             } else if is_ws_optional_token(*token) {
                 needs_space_main = None;
+                needs_space_aux_2 = None;
+                prev_end_aux = None;
             }
 
             if needs_space_main.is_none() {
                 // Surrounding space is optional, but ensure that
-                // trailing space matches opening spac
+                // trailing space matches opening space
+                needs_space_main = None;
                 prev_end_aux = prev_end;
                 needs_space_aux_2 = Some(Some(start) != prev_end_aux);
             } else if needs_space_main.is_some()
                 && needs_space_main.unwrap()
-                && Some(start) != prev_end_aux
+                && Some(start) == prev_end_aux
             {
                 // A needed opening space was not found
-                diagnostics.push((*(prev_end.unwrap()), MissingWhitespaceAroundOperator.into())); // E225
+                diagnostics.push((*(prev_end.unwrap()), MissingWhitespaceAroundOperator.into()));
                 needs_space_main = Some(false);
+                needs_space_aux_2 = None;
+                prev_end_aux = None;
             }
         }
         prev_type = Some(*token);
