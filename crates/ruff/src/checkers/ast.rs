@@ -2255,14 +2255,21 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = !self.annotations_future_enabled
+                if (!self.annotations_future_enabled
                     && matches!(
                         self.current_scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
-                    );
-
-                if runtime_annotation {
-                    visit_type_definition!(self, annotation);
+                    ))
+                    || (self.annotations_future_enabled
+                        && matches!(self.current_scope().kind, ScopeKind::Class(..))
+                        && flake8_type_checking::helpers::runtime_evaluated(
+                            self,
+                            self.current_scope(),
+                        ))
+                {
+                    self.in_type_definition = true;
+                    self.visit_expr(annotation);
+                    self.in_type_definition = false;
                 } else {
                     self.visit_annotation(annotation);
                 }
@@ -4402,131 +4409,14 @@ impl<'a> Checker<'a> {
         for scope_index in self.scope_stack.iter().rev() {
             let scope = &self.scopes[*scope_index];
 
-            if let ScopeKind::Class(def) = &scope.kind {
+            if matches!(scope.kind, ScopeKind::Class(_)) {
                 if id == "__class__" {
                     return;
                 } else if !first_iter && !in_generator {
                     continue;
                 }
-                for base in def.bases.iter() {
-                    let mut base_class_name = None;
-                    match &base.node {
-                        ExprKind::Attribute {
-                            value,
-                            attr: class_name,
-                            ..
-                        } => {
-                            if let ExprKind::Name {
-                                id: module_name, ..
-                            } = &value.node
-                            {
-                                base_class_name = Some(format!("{module_name}.{class_name}"));
-                            }
-                        }
-                        ExprKind::Name { id: bcn, .. } => {
-                            base_class_name = Some(bcn.to_string());
-                        }
-                        _ => {}
-                    }
-                    if let Some(bcn) = base_class_name {
-                        if self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_baseclasses
-                            .iter()
-                            .any(|i| i == &bcn)
-                        {
-                            if let Some(index) =
-                                self.bindings
-                                    .iter()
-                                    .position(|Binding { kind, .. }| match kind {
-                                        &BindingKind::Importation(binding_name, _)
-                                        | &BindingKind::FromImportation(binding_name, _) => {
-                                            binding_name == id.as_str()
-                                        }
-                                        _ => false,
-                                    })
-                            {
-                                let context = ExecutionContext::Runtime;
-                                self.bindings[index].mark_used(
-                                    scope_id,
-                                    Range::from_located(expr),
-                                    context,
-                                );
-                            }
-                        }
-                    }
-                }
-                for decorator in def.decorator_list.iter() {
-                    let mut class_decorator_name = None;
-                    match &decorator.node {
-                        ExprKind::Call { func, .. } => match &func.node {
-                            ExprKind::Attribute {
-                                value,
-                                attr: decorator_name,
-                                ..
-                            } => {
-                                if let ExprKind::Name {
-                                    id: module_name, ..
-                                } = &value.node
-                                {
-                                    class_decorator_name =
-                                        Some(format!("{module_name}.{decorator_name}"));
-                                }
-                            }
-                            ExprKind::Name { id: cdn, .. } => {
-                                class_decorator_name = Some(cdn.to_string());
-                            }
-                            _ => {}
-                        },
-                        ExprKind::Attribute {
-                            value,
-                            attr: decorator_name,
-                            ..
-                        } => {
-                            if let ExprKind::Name {
-                                id: module_name, ..
-                            } = &value.node
-                            {
-                                class_decorator_name =
-                                    Some(format!("{module_name}.{decorator_name}"));
-                            }
-                        }
-                        ExprKind::Name { id: cdn, .. } => {
-                            class_decorator_name = Some(cdn.to_string());
-                        }
-                        _ => {}
-                    }
-                    if let Some(cdn) = class_decorator_name {
-                        if self
-                            .settings
-                            .flake8_type_checking
-                            .runtime_evaluated_decorators
-                            .iter()
-                            .any(|i| i == &cdn)
-                        {
-                            if let Some(index) =
-                                self.bindings
-                                    .iter()
-                                    .position(|Binding { kind, .. }| match kind {
-                                        &BindingKind::Importation(binding_name, _)
-                                        | &BindingKind::FromImportation(binding_name, _) => {
-                                            binding_name == id.as_str()
-                                        }
-                                        _ => false,
-                                    })
-                            {
-                                let context = ExecutionContext::Runtime;
-                                self.bindings[index].mark_used(
-                                    scope_id,
-                                    Range::from_located(expr),
-                                    context,
-                                );
-                            }
-                        }
-                    }
-                }
             }
+
             if let Some(index) = scope.bindings.get(&id.as_str()) {
                 // Mark the binding as used.
                 let context = self.execution_context();

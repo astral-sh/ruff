@@ -1,7 +1,8 @@
 use num_traits::Zero;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use crate::ast::types::{Binding, BindingKind, ExecutionContext};
+use crate::ast::helpers::{map_callable, to_call_path};
+use crate::ast::types::{Binding, BindingKind, ExecutionContext, Scope, ScopeKind};
 use crate::checkers::ast::Checker;
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
@@ -49,4 +50,45 @@ pub const fn is_valid_runtime_import(binding: &Binding) -> bool {
     } else {
         false
     }
+}
+
+pub fn runtime_evaluated(checker: &Checker, scope: &Scope) -> bool {
+    runtime_evaluated_due_to_baseclass(checker, scope)
+        || runtime_evaluated_due_to_decorator(checker, scope)
+}
+pub fn runtime_evaluated_due_to_baseclass(checker: &Checker, scope: &Scope) -> bool {
+    if let ScopeKind::Class(def) = &scope.kind {
+        for base_class in def.bases.iter() {
+            if let Some(call_path) = checker.resolve_call_path(map_callable(base_class)) {
+                if checker
+                    .settings
+                    .flake8_type_checking
+                    .runtime_evaluated_baseclasses
+                    .iter()
+                    .any(|base_class| to_call_path(base_class) == call_path)
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+pub fn runtime_evaluated_due_to_decorator(checker: &Checker, scope: &Scope) -> bool {
+    if let ScopeKind::Class(def) = &scope.kind {
+        for decorator in def.decorator_list.iter() {
+            if let Some(call_path) = checker.resolve_call_path(map_callable(decorator)) {
+                if checker
+                    .settings
+                    .flake8_type_checking
+                    .runtime_evaluated_decorators
+                    .iter()
+                    .any(|decorator| to_call_path(decorator) == call_path)
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }

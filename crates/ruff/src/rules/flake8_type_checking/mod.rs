@@ -105,7 +105,7 @@ mod tests {
                 flake8_type_checking: super::settings::Settings {
                     runtime_evaluated_decorators: vec![
                         "attrs.define".to_string(),
-                        "frozen".to_string(),
+                        "attrs.frozen".to_string(),
                     ],
                     ..Default::default()
                 },
