@@ -1,3 +1,5 @@
+use once_cell::sync::Lazy;
+use regex::Regex;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -34,16 +36,18 @@ impl Violation for TypeCommentInStub {
     }
 }
 
+static TYPE_COMMENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^#\s*type:\s*([^#]+)(\s*#.*?)?$").unwrap());
+static TYPE_IGNORE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^#\s*type:\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());
+
 /// PYI033
 pub fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     for token in tokens.iter().flatten() {
         if let (location, Tok::Comment(comment), end_location) = token {
-            // I couldn't find any PEP on the exact syntax (the closest being
-            // https://peps.python.org/pep-0484/#type-comments), but every case I saw used
-            // `# type:` verbatim so this seems to be the right thing to pick
-            if comment.starts_with("# type:") {
+            if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
                 diagnostics.push(Diagnostic::new(
                     TypeCommentInStub,
                     Range {
