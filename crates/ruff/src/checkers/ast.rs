@@ -2255,7 +2255,7 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                if (!self.annotations_future_enabled
+                let runtime_annotation = (!self.annotations_future_enabled
                     && matches!(
                         self.current_scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
@@ -2265,11 +2265,10 @@ where
                         && flake8_type_checking::helpers::runtime_evaluated(
                             self,
                             self.current_scope(),
-                        ))
-                {
-                    self.in_type_definition = true;
-                    self.visit_expr(annotation);
-                    self.in_type_definition = false;
+                        ));
+
+                if runtime_annotation {
+                    visit_type_definition!(self, annotation);
                 } else {
                     self.visit_annotation(annotation);
                 }
