@@ -218,6 +218,27 @@ impl OpArgType for bool {
     }
 }
 
+macro_rules! oparg_enum {
+    ($(#[$attr:meta])* $vis:vis enum $name:ident { $($(#[$var_attr:meta])* $var:ident = $discr:literal,)* }) => {
+        $(#[$attr])*
+        $vis enum $name {
+            $($(#[$var_attr])* $var = $discr,)*
+        }
+
+        impl OpArgType for $name {
+            fn to_oparg(self) -> u32 {
+                self as u32
+            }
+            fn from_oparg(x: u32) -> Option<Self> {
+                Some(match u8::try_from(x).ok()? {
+                    $($discr => Self::$var,)*
+                    _ => return None,
+                })
+            }
+        }
+    };
+}
+
 #[derive(Copy, Clone)]
 pub struct Arg<T: OpArgType>(PhantomData<T>);
 
@@ -292,34 +313,21 @@ impl fmt::Display for Label {
     }
 }
 
-/// Transforms a value prior to formatting it.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[repr(u8)]
-pub enum ConversionFlag {
-    /// No conversion
-    None = 0, // CPython uses -1 but not pleasure for us
-    /// Converts by calling `str(<value>)`.
-    Str = b's',
-    /// Converts by calling `ascii(<value>)`.
-    Ascii = b'a',
-    /// Converts by calling `repr(<value>)`.
-    Repr = b'r',
-}
-
-impl OpArgType for ConversionFlag {
-    fn to_oparg(self) -> u32 {
-        self as u32
+oparg_enum!(
+    /// Transforms a value prior to formatting it.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[repr(u8)]
+    pub enum ConversionFlag {
+        /// No conversion
+        None = 0, // CPython uses -1 but not pleasure for us
+        /// Converts by calling `str(<value>)`.
+        Str = b's',
+        /// Converts by calling `ascii(<value>)`.
+        Ascii = b'a',
+        /// Converts by calling `repr(<value>)`.
+        Repr = b'r',
     }
-    fn from_oparg(x: u32) -> Option<Self> {
-        Some(match u8::try_from(x).ok()? {
-            0 => Self::None,
-            b's' => Self::Str,
-            b'a' => Self::Ascii,
-            b'r' => Self::Repr,
-            _ => return None,
-        })
-    }
-}
+);
 
 impl TryFrom<usize> for ConversionFlag {
     type Error = usize;
@@ -328,28 +336,16 @@ impl TryFrom<usize> for ConversionFlag {
     }
 }
 
-/// The kind of Raise that occurred.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[repr(u8)]
-pub enum RaiseKind {
-    Reraise,
-    Raise,
-    RaiseCause,
-}
-
-impl OpArgType for RaiseKind {
-    fn to_oparg(self) -> u32 {
-        self as u32
+oparg_enum!(
+    /// The kind of Raise that occurred.
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[repr(u8)]
+    pub enum RaiseKind {
+        Reraise = 0,
+        Raise = 1,
+        RaiseCause = 2,
     }
-    fn from_oparg(x: u32) -> Option<Self> {
-        Some(match x {
-            0 => Self::Reraise,
-            1 => Self::Raise,
-            2 => Self::RaiseCause,
-            _ => return None,
-        })
-    }
-}
+);
 
 pub type NameIdx = u32;
 
@@ -785,138 +781,74 @@ impl<C: Constant> BorrowedConstant<'_, C> {
     }
 }
 
-/// The possible comparison operators
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[repr(u8)]
-pub enum ComparisonOperator {
-    // be intentional with bits so that we can do eval_ord with just a bitwise and
-    // bits: | Equal | Greater | Less |
-    Less = 0b001,
-    Greater = 0b010,
-    NotEqual = 0b011,
-    Equal = 0b100,
-    LessOrEqual = 0b101,
-    GreaterOrEqual = 0b110,
-}
+oparg_enum!(
+    /// The possible comparison operators
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    #[repr(u8)]
+    pub enum ComparisonOperator {
+        // be intentional with bits so that we can do eval_ord with just a bitwise and
+        // bits: | Equal | Greater | Less |
+        Less = 0b001,
+        Greater = 0b010,
+        NotEqual = 0b011,
+        Equal = 0b100,
+        LessOrEqual = 0b101,
+        GreaterOrEqual = 0b110,
+    }
+);
 
-impl OpArgType for ComparisonOperator {
-    fn to_oparg(self) -> u32 {
-        self as u32
+oparg_enum!(
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    #[repr(u8)]
+    pub enum TestOperator {
+        In = 0,
+        NotIn = 1,
+        Is = 2,
+        IsNot = 3,
+        /// two exceptions that match?
+        ExceptionMatch = 4,
     }
-    fn from_oparg(x: u32) -> Option<Self> {
-        Some(match x {
-            0b001 => Self::Less,
-            0b010 => Self::Greater,
-            0b011 => Self::NotEqual,
-            0b100 => Self::Equal,
-            0b101 => Self::LessOrEqual,
-            0b110 => Self::GreaterOrEqual,
-            _ => return None,
-        })
-    }
-}
+);
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[repr(u8)]
-pub enum TestOperator {
-    In,
-    NotIn,
-    Is,
-    IsNot,
-    /// two exceptions that match?
-    ExceptionMatch,
-}
+oparg_enum!(
+    /// The possible Binary operators
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use rustpython_compiler_core::Instruction::BinaryOperation;
+    /// use rustpython_compiler_core::BinaryOperator::Add;
+    /// let op = BinaryOperation {op: Add};
+    /// ```
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    #[repr(u8)]
+    pub enum BinaryOperator {
+        Power = 0,
+        Multiply = 1,
+        MatrixMultiply = 2,
+        Divide = 3,
+        FloorDivide = 4,
+        Modulo = 5,
+        Add = 6,
+        Subtract = 7,
+        Lshift = 8,
+        Rshift = 9,
+        And = 10,
+        Xor = 11,
+        Or = 12,
+    }
+);
 
-impl OpArgType for TestOperator {
-    fn to_oparg(self) -> u32 {
-        self as u32
+oparg_enum!(
+    /// The possible unary operators
+    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+    #[repr(u8)]
+    pub enum UnaryOperator {
+        Not = 0,
+        Invert = 1,
+        Minus = 2,
+        Plus = 3,
     }
-    fn from_oparg(x: u32) -> Option<Self> {
-        Some(match x {
-            0 => Self::In,
-            1 => Self::NotIn,
-            2 => Self::Is,
-            3 => Self::IsNot,
-            4 => Self::ExceptionMatch,
-            _ => return None,
-        })
-    }
-}
-
-/// The possible Binary operators
-/// # Examples
-///
-/// ```ignore
-/// use rustpython_compiler_core::Instruction::BinaryOperation;
-/// use rustpython_compiler_core::BinaryOperator::Add;
-/// let op = BinaryOperation {op: Add};
-/// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[repr(u8)]
-pub enum BinaryOperator {
-    Power,
-    Multiply,
-    MatrixMultiply,
-    Divide,
-    FloorDivide,
-    Modulo,
-    Add,
-    Subtract,
-    Lshift,
-    Rshift,
-    And,
-    Xor,
-    Or,
-}
-
-impl OpArgType for BinaryOperator {
-    fn to_oparg(self) -> u32 {
-        self as u32
-    }
-    fn from_oparg(x: u32) -> Option<Self> {
-        Some(match x {
-            0 => Self::Power,
-            1 => Self::Multiply,
-            2 => Self::MatrixMultiply,
-            3 => Self::Divide,
-            4 => Self::FloorDivide,
-            5 => Self::Modulo,
-            6 => Self::Add,
-            7 => Self::Subtract,
-            8 => Self::Lshift,
-            9 => Self::Rshift,
-            10 => Self::And,
-            11 => Self::Xor,
-            12 => Self::Or,
-            _ => return None,
-        })
-    }
-}
-
-/// The possible unary operators
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[repr(u8)]
-pub enum UnaryOperator {
-    Not,
-    Invert,
-    Minus,
-    Plus,
-}
-
-impl OpArgType for UnaryOperator {
-    fn to_oparg(self) -> u32 {
-        self as u32
-    }
-    fn from_oparg(x: u32) -> Option<Self> {
-        Some(match x {
-            0 => Self::Not,
-            1 => Self::Invert,
-            2 => Self::Minus,
-            3 => Self::Plus,
-            _ => return None,
-        })
-    }
-}
+);
 
 #[derive(Copy, Clone)]
 pub struct UnpackExArgs {
