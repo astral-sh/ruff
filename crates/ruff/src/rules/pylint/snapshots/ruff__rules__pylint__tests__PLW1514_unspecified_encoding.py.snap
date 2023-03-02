@@ -1,0 +1,226 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 12
+    column: 0
+  end_location:
+    row: 12
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 25
+    column: 5
+  end_location:
+    row: 25
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 28
+    column: 5
+  end_location:
+    row: 28
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 93
+    column: 0
+  end_location:
+    row: 93
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 101
+    column: 0
+  end_location:
+    row: 101
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 124
+    column: 0
+  end_location:
+    row: 124
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 125
+    column: 0
+  end_location:
+    row: 125
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 126
+    column: 0
+  end_location:
+    row: 126
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 127
+    column: 0
+  end_location:
+    row: 127
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 129
+    column: 0
+  end_location:
+    row: 129
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 148
+    column: 0
+  end_location:
+    row: 148
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 160
+    column: 0
+  end_location:
+    row: 160
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: UnspecifiedEncoding
+    body: Using open without explicitly specifying an encoding
+    suggestion: ~
+    fixable: false
+  location:
+    row: 163
+    column: 0
+  end_location:
+    row: 163
+    column: 4
+  fix: ~
+  parent: ~
+

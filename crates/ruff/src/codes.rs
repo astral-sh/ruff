@@ -172,6 +172,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R0912") => Rule::TooManyBranches,
         (Pylint, "R0915") => Rule::TooManyStatements,
         (Pylint, "W2901") => Rule::RedefinedLoopName,
+        (Pylint, "W1514") => Rule::UnspecifiedEncoding,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,

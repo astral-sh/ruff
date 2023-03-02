@@ -23,6 +23,7 @@ pub use too_many_statements::{too_many_statements, TooManyStatements};
 pub use unnecessary_direct_lambda_call::{
     unnecessary_direct_lambda_call, UnnecessaryDirectLambdaCall,
 };
+pub use unspecified_encoding::{unspecified_encoding, UnspecifiedEncoding};
 pub use use_from_import::{use_from_import, ConsiderUsingFromImport};
 pub use used_prior_global_declaration::{
     used_prior_global_declaration, UsedPriorGlobalDeclaration,
@@ -54,6 +55,7 @@ mod too_many_branches;
 mod too_many_return_statements;
 mod too_many_statements;
 mod unnecessary_direct_lambda_call;
+mod unspecified_encoding;
 mod use_from_import;
 mod used_prior_global_declaration;
 mod useless_else_on_loop;

@@ -2866,6 +2866,10 @@ where
                     pylint::rules::bad_str_strip_call(self, func, args);
                 }
 
+                if self.settings.rules.enabled(&Rule::UnspecifiedEncoding) {
+                    pylint::rules::unspecified_encoding(self, func, args, keywords);
+                }
+
                 // flake8-pytest-style
                 if self.settings.rules.enabled(&Rule::PatchWithLambda) {
                     if let Some(diagnostic) =
