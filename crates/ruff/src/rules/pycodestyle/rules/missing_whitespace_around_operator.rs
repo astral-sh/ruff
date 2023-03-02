@@ -68,7 +68,7 @@ pub fn missing_whitespace_around_operator(
     let mut diagnostics = vec![];
 
     let mut needs_space_main: Option<bool> = Some(false);
-    let mut needs_space_aux_2: Option<bool> = None;
+    let mut needs_space_aux: Option<bool> = None;
     let mut prev_end_aux: Option<&Location> = None;
     let mut parens = 0;
     let mut prev_type: Option<&Tok> = None;
@@ -84,12 +84,12 @@ pub fn missing_whitespace_around_operator(
             parens -= 1;
         }
         let needs_space = (needs_space_main.is_some() && needs_space_main.unwrap())
-            || needs_space_aux_2.is_some()
+            || needs_space_aux.is_some()
             || prev_end_aux.is_some();
         if needs_space {
             if Some(start) != prev_end {
                 if !(needs_space_main.is_some() && needs_space_main.unwrap())
-                    && (needs_space_aux_2.is_none() || !needs_space_aux_2.unwrap())
+                    && (needs_space_aux.is_none() || !needs_space_aux.unwrap())
                 {
                     diagnostics.push((
                         *(prev_end_aux.unwrap()),
@@ -97,7 +97,7 @@ pub fn missing_whitespace_around_operator(
                     ));
                 }
                 needs_space_main = Some(false);
-                needs_space_aux_2 = None;
+                needs_space_aux = None;
                 prev_end_aux = None;
             } else if **token == Tok::Greater
                 && (prev_type == Some(&Tok::Less) || prev_type == Some(&Tok::Minus))
@@ -112,7 +112,7 @@ pub fn missing_whitespace_around_operator(
                 // For more info see PEP570
             } else {
                 if (needs_space_main.is_some() && needs_space_main.unwrap())
-                    || (needs_space_aux_2.is_some() && needs_space_aux_2.unwrap())
+                    || (needs_space_aux.is_some() && needs_space_aux.unwrap())
                 {
                     diagnostics
                         .push((*(prev_end.unwrap()), MissingWhitespaceAroundOperator.into()));
@@ -135,7 +135,7 @@ pub fn missing_whitespace_around_operator(
                     }
                 }
                 needs_space_main = Some(false);
-                needs_space_aux_2 = None;
+                needs_space_aux = None;
                 prev_end_aux = None;
             }
         } else if (is_op_token(token) || matches!(token, Tok::Name { .. })) && prev_end.is_some() {
@@ -143,7 +143,7 @@ pub fn missing_whitespace_around_operator(
                 // Allow keyword args or defaults: foo(bar=None).
             } else if is_ws_needed_token(token) {
                 needs_space_main = Some(true);
-                needs_space_aux_2 = None;
+                needs_space_aux = None;
                 prev_end_aux = None;
             } else if is_unary_token(token) {
                 // Check if the operator is used as a binary operator
@@ -158,12 +158,12 @@ pub fn missing_whitespace_around_operator(
                         && (!is_soft_keyword_token(prev_type.unwrap()))
                 {
                     needs_space_main = None;
-                    needs_space_aux_2 = None;
+                    needs_space_aux = None;
                     prev_end_aux = None;
                 }
             } else if is_ws_optional_token(token) {
                 needs_space_main = None;
-                needs_space_aux_2 = None;
+                needs_space_aux = None;
                 prev_end_aux = None;
             }
 
@@ -172,7 +172,7 @@ pub fn missing_whitespace_around_operator(
                 // trailing space matches opening space
                 needs_space_main = None;
                 prev_end_aux = prev_end;
-                needs_space_aux_2 = Some(Some(start) != prev_end_aux);
+                needs_space_aux = Some(Some(start) != prev_end_aux);
             } else if needs_space_main.is_some()
                 && needs_space_main.unwrap()
                 && Some(start) == prev_end_aux
@@ -180,7 +180,7 @@ pub fn missing_whitespace_around_operator(
                 // A needed opening space was not found
                 diagnostics.push((*(prev_end.unwrap()), MissingWhitespaceAroundOperator.into()));
                 needs_space_main = Some(false);
-                needs_space_aux_2 = None;
+                needs_space_aux = None;
                 prev_end_aux = None;
             }
         }
