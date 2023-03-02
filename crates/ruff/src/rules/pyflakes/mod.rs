@@ -263,8 +263,8 @@ mod tests {
             &indexer,
             &directives,
             &settings,
-            flags::Autofix::Enabled,
             flags::Noqa::Enabled,
+            flags::Autofix::Enabled,
         );
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         let actual = diagnostics

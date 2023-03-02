@@ -43,8 +43,8 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
         &indexer,
         &directives,
         settings,
-        flags::Autofix::Enabled,
         flags::Noqa::Enabled,
+        flags::Autofix::Enabled,
     );
 
     // Detect autofixes that don't converge after multiple iterations.
@@ -76,8 +76,8 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
                 &indexer,
                 &directives,
                 settings,
-                flags::Autofix::Enabled,
                 flags::Noqa::Enabled,
+                flags::Autofix::Enabled,
             );
             if let Some((fixed_contents, _)) = fix_file(&diagnostics, &locator) {
                 if iterations < max_iterations {

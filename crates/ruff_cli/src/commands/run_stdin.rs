@@ -4,6 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 
 use ruff::resolver::PyprojectDiscovery;
+use ruff::settings::flags;
 use ruff::{fix, packaging, resolver};
 
 use crate::args::Overrides;
@@ -21,6 +22,7 @@ pub fn run_stdin(
     filename: Option<&Path>,
     pyproject_strategy: &PyprojectDiscovery,
     overrides: &Overrides,
+    noqa: flags::Noqa,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     if let Some(filename) = filename {
@@ -33,7 +35,7 @@ pub fn run_stdin(
         .and_then(Path::parent)
         .and_then(|path| packaging::detect_package_root(path, &settings.lib.namespace_packages));
     let stdin = read_from_stdin()?;
-    let mut diagnostics = lint_stdin(filename, package_root, &stdin, &settings.lib, autofix)?;
+    let mut diagnostics = lint_stdin(filename, package_root, &stdin, &settings.lib, noqa, autofix)?;
     diagnostics.messages.sort_unstable();
     Ok(diagnostics)
 }
