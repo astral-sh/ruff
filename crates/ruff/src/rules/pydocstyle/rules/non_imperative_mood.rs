@@ -36,11 +36,7 @@ pub fn non_imperative_mood(
         .collect::<Vec<CallPath>>();
 
     if is_test(cast::name(parent))
-        || is_property(
-            checker,
-            cast::decorator_list(parent),
-            Some(&property_decorators),
-        )
+        || is_property(checker, cast::decorator_list(parent), &property_decorators)
     {
         return;
     }

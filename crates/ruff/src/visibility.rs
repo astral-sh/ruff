@@ -83,7 +83,7 @@ pub fn is_abstract(checker: &Checker, decorator_list: &[Expr]) -> bool {
 pub fn is_property(
     checker: &Checker,
     decorator_list: &[Expr],
-    extra_properties: Option<&[CallPath]>,
+    extra_properties: &[CallPath],
 ) -> bool {
     decorator_list.iter().any(|expr| {
         checker
@@ -91,13 +91,9 @@ pub fn is_property(
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "property"]
                     || call_path.as_slice() == ["functools", "cached_property"]
-                    || if let Some(extra_properties) = extra_properties {
-                        extra_properties
-                            .iter()
-                            .any(|extra_property| extra_property.as_slice() == call_path.as_slice())
-                    } else {
-                        false
-                    }
+                    || extra_properties
+                        .iter()
+                        .any(|extra_property| extra_property.as_slice() == call_path.as_slice())
             })
     })
 }
