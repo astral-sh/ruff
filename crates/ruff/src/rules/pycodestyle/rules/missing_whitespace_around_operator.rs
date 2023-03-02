@@ -61,6 +61,7 @@ impl Violation for MissingWhitespaceAroundModuloOperator {
 
 /// E225, E226, E227, E228
 #[cfg(feature = "logical_lines")]
+#[allow(clippy::if_same_then_else)]
 pub fn missing_whitespace_around_operator(
     tokens: &[(Location, &Tok, Location)],
 ) -> Vec<(Location, DiagnosticKind)> {
@@ -74,7 +75,7 @@ pub fn missing_whitespace_around_operator(
     let mut prev_end: Option<&Location> = None;
 
     for (start, token, end) in tokens {
-        if is_skip_comment_token(*token) {
+        if is_skip_comment_token(token) {
             continue;
         }
         if **token == Tok::Lpar || **token == Tok::Lambda {
@@ -137,30 +138,30 @@ pub fn missing_whitespace_around_operator(
                 needs_space_aux_2 = None;
                 prev_end_aux = None;
             }
-        } else if (is_op_token(*token) || matches!(token, Tok::Name { .. })) && prev_end.is_some() {
+        } else if (is_op_token(token) || matches!(token, Tok::Name { .. })) && prev_end.is_some() {
             if **token == Tok::Equal && parens > 0 {
                 // Allow keyword args or defaults: foo(bar=None).
-            } else if is_ws_needed_token(*token) {
+            } else if is_ws_needed_token(token) {
                 needs_space_main = Some(true);
                 needs_space_aux_2 = None;
                 prev_end_aux = None;
-            } else if is_unary_token(*token) {
+            } else if is_unary_token(token) {
                 // Check if the operator is used as a binary operator
                 // Allow unary operators: -123, -x, +1.
                 // Allow argument unpacking: foo(*args, **kwargs)
                 if (prev_type.is_some()
-                    && is_op_token(&prev_type.unwrap())
+                    && is_op_token(prev_type.unwrap())
                     && (prev_type == Some(&Tok::Rpar)
                         || prev_type == Some(&Tok::Rsqb)
                         || prev_type == Some(&Tok::Rbrace)))
-                    || (!is_op_token(&prev_type.unwrap()) && !is_keyword_token(&prev_type.unwrap()))
-                        && (!is_soft_keyword_token(&prev_type.unwrap()))
+                    || (!is_op_token(prev_type.unwrap()) && !is_keyword_token(prev_type.unwrap()))
+                        && (!is_soft_keyword_token(prev_type.unwrap()))
                 {
                     needs_space_main = None;
                     needs_space_aux_2 = None;
                     prev_end_aux = None;
                 }
-            } else if is_ws_optional_token(*token) {
+            } else if is_ws_optional_token(token) {
                 needs_space_main = None;
                 needs_space_aux_2 = None;
                 prev_end_aux = None;
