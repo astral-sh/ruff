@@ -310,6 +310,26 @@ impl<'a> Checker<'a> {
     }
 }
 
+/// Visit an [`Expr`], and treat it as a type definition.
+macro_rules! visit_type_definition {
+    ($self:ident, $expr:expr) => {{
+        let prev_in_type_definition = $self.in_type_definition;
+        $self.in_type_definition = true;
+        $self.visit_expr($expr);
+        $self.in_type_definition = prev_in_type_definition;
+    }};
+}
+
+/// Visit an [`Expr`], and treat it as _not_ a type definition.
+macro_rules! visit_non_type_definition {
+    ($self:ident, $expr:expr) => {{
+        let prev_in_type_definition = $self.in_type_definition;
+        $self.in_type_definition = false;
+        $self.visit_expr($expr);
+        $self.in_type_definition = prev_in_type_definition;
+    }};
+}
+
 impl<'a, 'b> Visitor<'b> for Checker<'a>
 where
     'b: 'a,
@@ -755,33 +775,67 @@ where
                 for expr in decorator_list {
                     self.visit_expr(expr);
                 }
+
+                // If we're in a class or module scope, then the annotation needs to be
+                // available at runtime.
+                // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
+                let runtime_annotation = !self.annotations_future_enabled
+                    && matches!(
+                        self.current_scope().kind,
+                        ScopeKind::Class(..) | ScopeKind::Module
+                    );
+
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 for arg in &args.args {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 if let Some(arg) = &args.vararg {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 for arg in &args.kwonlyargs {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 if let Some(arg) = &args.kwarg {
                     if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
+                        if runtime_annotation {
+                            visit_type_definition!(self, expr);
+                        } else {
+                            self.visit_annotation(expr);
+                        };
                     }
                 }
                 for expr in returns {
-                    self.visit_annotation(expr);
+                    if runtime_annotation {
+                        visit_type_definition!(self, expr);
+                    } else {
+                        self.visit_annotation(expr);
+                    };
                 }
                 for expr in &args.kw_defaults {
                     self.visit_expr(expr);
@@ -2202,23 +2256,20 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                if !self.annotations_future_enabled
+                let runtime_annotation = !self.annotations_future_enabled
                     && matches!(
                         self.current_scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
-                    )
-                {
-                    self.in_type_definition = true;
-                    self.visit_expr(annotation);
-                    self.in_type_definition = false;
+                    );
+
+                if runtime_annotation {
+                    visit_type_definition!(self, annotation);
                 } else {
                     self.visit_annotation(annotation);
                 }
                 if let Some(expr) = value {
                     if self.match_typing_expr(annotation, "TypeAlias") {
-                        self.in_type_definition = true;
-                        self.visit_expr(expr);
-                        self.in_type_definition = false;
+                        visit_type_definition!(self, expr);
                     } else {
                         self.visit_expr(expr);
                     }
@@ -2275,12 +2326,9 @@ where
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
         let prev_in_annotation = self.in_annotation;
-        let prev_in_type_definition = self.in_type_definition;
         self.in_annotation = true;
-        self.in_type_definition = true;
-        self.visit_expr(expr);
+        visit_type_definition!(self, expr);
         self.in_annotation = prev_in_annotation;
-        self.in_type_definition = prev_in_type_definition;
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
@@ -2312,7 +2360,6 @@ where
         self.push_expr(expr);
 
         let prev_in_literal = self.in_literal;
-        let prev_in_type_definition = self.in_type_definition;
 
         // Pre-visit.
         match &expr.node {
@@ -3488,32 +3535,7 @@ where
                     flake8_pie::rules::prefer_list_builtin(self, expr);
                 }
 
-                // Visit the arguments, but avoid the body, which will be deferred.
-                for arg in &args.posonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
-                for arg in &args.args {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
-                if let Some(arg) = &args.vararg {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
-                for arg in &args.kwonlyargs {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
-                if let Some(arg) = &args.kwarg {
-                    if let Some(expr) = &arg.node.annotation {
-                        self.visit_annotation(expr);
-                    }
-                }
+                // Visit the default arguments, but avoid the body, which will be deferred.
                 for expr in &args.kw_defaults {
                     self.visit_expr(expr);
                 }
@@ -3624,17 +3646,13 @@ where
                     Some(Callable::ForwardRef) => {
                         self.visit_expr(func);
                         for expr in args {
-                            self.in_type_definition = true;
-                            self.visit_expr(expr);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, expr);
                         }
                     }
                     Some(Callable::Cast) => {
                         self.visit_expr(func);
                         if !args.is_empty() {
-                            self.in_type_definition = true;
-                            self.visit_expr(&args[0]);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, &args[0]);
                         }
                         for expr in args.iter().skip(1) {
                             self.visit_expr(expr);
@@ -3643,29 +3661,21 @@ where
                     Some(Callable::NewType) => {
                         self.visit_expr(func);
                         for expr in args.iter().skip(1) {
-                            self.in_type_definition = true;
-                            self.visit_expr(expr);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, expr);
                         }
                     }
                     Some(Callable::TypeVar) => {
                         self.visit_expr(func);
                         for expr in args.iter().skip(1) {
-                            self.in_type_definition = true;
-                            self.visit_expr(expr);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, expr);
                         }
                         for keyword in keywords {
                             let KeywordData { arg, value } = &keyword.node;
                             if let Some(id) = arg {
                                 if id == "bound" {
-                                    self.in_type_definition = true;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_type_definition!(self, value);
                                 } else {
-                                    self.in_type_definition = false;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_non_type_definition!(self, value);
                                 }
                             }
                         }
@@ -3682,16 +3692,8 @@ where
                                             ExprKind::List { elts, .. }
                                             | ExprKind::Tuple { elts, .. } => {
                                                 if elts.len() == 2 {
-                                                    self.in_type_definition = false;
-
-                                                    self.visit_expr(&elts[0]);
-                                                    self.in_type_definition =
-                                                        prev_in_type_definition;
-
-                                                    self.in_type_definition = true;
-                                                    self.visit_expr(&elts[1]);
-                                                    self.in_type_definition =
-                                                        prev_in_type_definition;
+                                                    visit_non_type_definition!(self, &elts[0]);
+                                                    visit_type_definition!(self, &elts[1]);
                                                 }
                                             }
                                             _ => {}
@@ -3705,9 +3707,7 @@ where
                         // Ex) NamedTuple("a", a=int)
                         for keyword in keywords {
                             let KeywordData { value, .. } = &keyword.node;
-                            self.in_type_definition = true;
-                            self.visit_expr(value);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, value);
                         }
                     }
                     Some(Callable::TypedDict) => {
@@ -3717,14 +3717,10 @@ where
                         if args.len() > 1 {
                             if let ExprKind::Dict { keys, values } = &args[1].node {
                                 for key in keys.iter().flatten() {
-                                    self.in_type_definition = false;
-                                    self.visit_expr(key);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_non_type_definition!(self, key);
                                 }
                                 for value in values {
-                                    self.in_type_definition = true;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_type_definition!(self, value);
                                 }
                             }
                         }
@@ -3732,9 +3728,7 @@ where
                         // Ex) TypedDict("a", a=int)
                         for keyword in keywords {
                             let KeywordData { value, .. } = &keyword.node;
-                            self.in_type_definition = true;
-                            self.visit_expr(value);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, value);
                         }
                     }
                     Some(Callable::MypyExtension) => {
@@ -3742,33 +3736,23 @@ where
 
                         if let Some(arg) = args.first() {
                             // Ex) DefaultNamedArg(bool | None, name="some_prop_name")
-                            self.in_type_definition = true;
-                            self.visit_expr(arg);
-                            self.in_type_definition = prev_in_type_definition;
+                            visit_type_definition!(self, arg);
 
                             for arg in args.iter().skip(1) {
-                                self.in_type_definition = false;
-                                self.visit_expr(arg);
-                                self.in_type_definition = prev_in_type_definition;
+                                visit_non_type_definition!(self, arg);
                             }
                             for keyword in keywords {
                                 let KeywordData { value, .. } = &keyword.node;
-                                self.in_type_definition = false;
-                                self.visit_expr(value);
-                                self.in_type_definition = prev_in_type_definition;
+                                visit_non_type_definition!(self, value);
                             }
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
                             for keyword in keywords {
                                 let KeywordData { value, arg, .. } = &keyword.node;
                                 if arg.as_ref().map_or(false, |arg| arg == "type") {
-                                    self.in_type_definition = true;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_type_definition!(self, value);
                                 } else {
-                                    self.in_type_definition = false;
-                                    self.visit_expr(value);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_non_type_definition!(self, value);
                                 }
                             }
                         }
@@ -3800,9 +3784,7 @@ where
                                 // Ex) Optional[int]
                                 SubscriptKind::AnnotatedSubscript => {
                                     self.visit_expr(value);
-                                    self.in_type_definition = true;
-                                    self.visit_expr(slice);
-                                    self.in_type_definition = prev_in_type_definition;
+                                    visit_type_definition!(self, slice);
                                     self.visit_expr_context(ctx);
                                 }
                                 // Ex) Annotated[int, "Hello, world!"]
@@ -3813,11 +3795,9 @@ where
                                     if let ExprKind::Tuple { elts, ctx } = &slice.node {
                                         if let Some(expr) = elts.first() {
                                             self.visit_expr(expr);
-                                            self.in_type_definition = false;
                                             for expr in elts.iter().skip(1) {
-                                                self.visit_expr(expr);
+                                                visit_non_type_definition!(self, expr);
                                             }
-                                            self.in_type_definition = prev_in_type_definition;
                                             self.visit_expr_context(ctx);
                                         }
                                     } else {
@@ -3852,7 +3832,6 @@ where
             _ => {}
         };
 
-        self.in_type_definition = prev_in_type_definition;
         self.in_literal = prev_in_literal;
 
         self.pop_expr();
