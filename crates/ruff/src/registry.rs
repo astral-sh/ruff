@@ -57,6 +57,14 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundArithmeticOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundBitwiseOrShiftOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundModuloOperator,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
@@ -837,12 +845,17 @@ impl Rule {
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MissingWhitespaceAfterKeyword
+            | Rule::MissingWhitespaceAroundArithmeticOperator
+            | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
+            | Rule::MissingWhitespaceAroundModuloOperator
+            | Rule::MissingWhitespaceAroundOperator
+            | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::MultipleLeadingHashesForBlockComment
             | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
-            | Rule::MissingWhitespaceAfterKeyword
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
             | Rule::NoSpaceAfterBlockComment
@@ -855,10 +868,9 @@ impl Rule {
             | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
+            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
-            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
-            | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::WhitespaceBeforeParameters
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,

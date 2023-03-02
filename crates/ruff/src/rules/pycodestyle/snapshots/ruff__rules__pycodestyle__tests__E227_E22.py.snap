@@ -1,0 +1,55 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+  location:
+    row: 121
+    column: 11
+  end_location:
+    row: 121
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+  location:
+    row: 123
+    column: 11
+  end_location:
+    row: 123
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+  location:
+    row: 125
+    column: 5
+  end_location:
+    row: 125
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+  location:
+    row: 127
+    column: 5
+  end_location:
+    row: 127
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+  location:
+    row: 129
+    column: 5
+  end_location:
+    row: 129
+    column: 5
+  fix: ~
+  parent: ~
+

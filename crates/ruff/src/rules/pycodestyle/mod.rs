@@ -13,11 +13,12 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use super::settings::Settings;
     use crate::registry::Rule;
     use crate::settings;
     use crate::source_code::LineEnding;
     use crate::test::test_path;
+
+    use super::settings::Settings;
 
     #[test_case(Rule::AmbiguousClassName, Path::new("E742.py"))]
     #[test_case(Rule::AmbiguousFunctionName, Path::new("E743.py"))]
@@ -95,6 +96,13 @@ mod tests {
     #[test_case(Rule::TabAfterOperator, Path::new("E22.py"))]
     #[test_case(Rule::TabBeforeKeyword, Path::new("E27.py"))]
     #[test_case(Rule::TabBeforeOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MissingWhitespaceAroundOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MissingWhitespaceAroundArithmeticOperator, Path::new("E22.py"))]
+    #[test_case(
+        Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
+        Path::new("E22.py")
+    )]
+    #[test_case(Rule::MissingWhitespaceAroundModuloOperator, Path::new("E22.py"))]
     #[test_case(Rule::TooFewSpacesBeforeInlineComment, Path::new("E26.py"))]
     #[test_case(Rule::UnexpectedIndentation, Path::new("E11.py"))]
     #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]
