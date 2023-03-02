@@ -1,14 +1,15 @@
+#![allow(dead_code, unused_imports, unused_variables)]
+
+use rustpython_parser::ast::Location;
+use rustpython_parser::Tok;
+
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
-use rustpython_parser::ast::Location;
-use rustpython_parser::Tok;
-
-#[cfg(feature = "logical_lines")]
 use crate::rules::pycodestyle::helpers::{is_keyword_token, is_op_token, is_soft_keyword_token};
+use crate::violation::AlwaysAutofixableViolation;
 
 define_violation!(
     pub struct WhitespaceBeforeParameters {
@@ -70,7 +71,7 @@ pub fn whitespace_before_parameters(
 #[cfg(not(feature = "logical_lines"))]
 pub fn whitespace_before_parameters(
     _tokens: &[(Location, &Tok, Location)],
-    autofix: bool,
+    _autofix: bool,
 ) -> Vec<Diagnostic> {
     vec![]
 }

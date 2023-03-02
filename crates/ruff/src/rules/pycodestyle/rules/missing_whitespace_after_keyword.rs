@@ -1,4 +1,4 @@
-#![allow(dead_code, unused_imports)]
+#![allow(dead_code, unused_imports, unused_variables)]
 
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;

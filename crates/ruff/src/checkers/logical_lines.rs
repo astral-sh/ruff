@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports, unused_variables)]
+
 use bisection::bisect_left;
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
@@ -152,8 +154,8 @@ pub fn check_logical_lines(
 
         if line.flags.contains(TokenFlags::BRACKET) {
             #[cfg(feature = "logical_lines")]
-            let should_fix = matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(&Rule::WhitespaceBeforeParameters);
+            let should_fix =
+                autofix.into() && settings.rules.should_fix(&Rule::WhitespaceBeforeParameters);
 
             #[cfg(not(feature = "logical_lines"))]
             let should_fix = false;
