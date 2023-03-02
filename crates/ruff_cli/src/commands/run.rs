@@ -26,6 +26,7 @@ pub fn run(
     pyproject_strategy: &PyprojectDiscovery,
     overrides: &Overrides,
     cache: flags::Cache,
+    noqa: flags::Noqa,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
@@ -84,7 +85,7 @@ pub fn run(
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
                     let settings = resolver.resolve_all(path, pyproject_strategy);
-                    lint_path(path, package, settings, cache, autofix)
+                    lint_path(path, package, settings, cache, noqa, autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
                 Err(e) => Err((

@@ -62,8 +62,8 @@ pub fn check_path(
     indexer: &Indexer,
     directives: &Directives,
     settings: &Settings,
-    autofix: flags::Autofix,
     noqa: flags::Noqa,
+    autofix: flags::Autofix,
 ) -> LinterResult<Vec<Diagnostic>> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -255,8 +255,8 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
         &indexer,
         &directives,
         settings,
-        flags::Autofix::Disabled,
         flags::Noqa::Disabled,
+        flags::Autofix::Disabled,
     );
 
     // Log any parse errors.
@@ -287,6 +287,7 @@ pub fn lint_only(
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
+    noqa: flags::Noqa,
     autofix: flags::Autofix,
 ) -> LinterResult<Vec<Message>> {
     // Tokenize once.
@@ -316,8 +317,8 @@ pub fn lint_only(
         &indexer,
         &directives,
         settings,
+        noqa,
         autofix,
-        flags::Noqa::Enabled,
     );
 
     // Convert from diagnostics to messages.
@@ -345,6 +346,7 @@ pub fn lint_fix<'a>(
     contents: &'a str,
     path: &Path,
     package: Option<&Path>,
+    noqa: flags::Noqa,
     settings: &Settings,
 ) -> Result<(LinterResult<Vec<Message>>, Cow<'a, str>, FixTable)> {
     let mut transformed = Cow::Borrowed(contents);
@@ -387,8 +389,8 @@ pub fn lint_fix<'a>(
             &indexer,
             &directives,
             settings,
+            noqa,
             flags::Autofix::Enabled,
-            flags::Noqa::Enabled,
         );
 
         if iterations == 0 {
