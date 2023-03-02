@@ -1178,7 +1178,7 @@
       "type": "object",
       "properties": {
         "classmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method. For example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method (in addition to the builtin `@classmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
           "type": [
             "array",
             "null"
@@ -1198,7 +1198,7 @@
           }
         },
         "staticmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method. For example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method (in addition to the builtin `@staticmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
           "type": [
             "array",
             "null"
@@ -1260,7 +1260,7 @@
           ]
         },
         "ignore-decorators": {
-          "description": "Ignore docstrings for functions or methods decorated with the specified decorators. Unlike the `pydocstyle`, Ruff accepts an array of fully-qualified module identifiers, instead of a regular expression.",
+          "description": "Ignore docstrings for functions or methods decorated with the specified fully-qualified decorators.",
           "type": [
             "array",
             "null"
@@ -1270,7 +1270,7 @@
           }
         },
         "property-decorators": {
-          "description": "Consider any method decorated with one of these decorators as a property, and consequently allow a docstring which is not in imperative mood. Unlike pydocstyle, supplying this option doesn't disable standard property decorators - `@property` and `@cached_property`.",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a property (in addition to the builtin `@property` and standard-library `@functools.cached_property`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list can use a non-imperative summary line.",
           "type": [
             "array",
             "null"
