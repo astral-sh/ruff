@@ -3,7 +3,8 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IsInstanceTypingUnion: ~
+    IsinstanceWithTuple:
+      kind: Isinstance
   location:
     row: 1
     column: 0
@@ -20,7 +21,8 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    IsInstanceTypingUnion: ~
+    IsinstanceWithTuple:
+      kind: Issubclass
   location:
     row: 2
     column: 0
