@@ -331,6 +331,7 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::ImportReplacements,
     rules::pyupgrade::rules::OutdatedVersionBlock,
     rules::pyupgrade::rules::QuotedAnnotation,
+    rules::pyupgrade::rules::IsinstanceWithTuple,
     // pydocstyle
     rules::pydocstyle::rules::PublicModule,
     rules::pydocstyle::rules::PublicClass,
