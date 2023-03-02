@@ -167,7 +167,7 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
         match part {
             FormatPart::Field {
                 field_name,
-                preconversion_spec,
+                conversion_spec,
                 format_spec,
             } => {
                 converted.push('{');
@@ -213,9 +213,9 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
                     }
                 }
 
-                if let Some(preconversion_spec) = preconversion_spec {
+                if let Some(conversion_spec) = conversion_spec {
                     converted.push('!');
-                    converted.push(preconversion_spec);
+                    converted.push(conversion_spec);
                 }
 
                 if !format_spec.is_empty() {
