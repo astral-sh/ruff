@@ -3,7 +3,6 @@ use std::collections::BTreeSet;
 use ruff_python::str::{
     SINGLE_QUOTE_PREFIXES, SINGLE_QUOTE_SUFFIXES, TRIPLE_QUOTE_PREFIXES, TRIPLE_QUOTE_SUFFIXES,
 };
-use rustpython_parser::ast::Expr;
 
 use crate::ast::cast;
 use crate::ast::helpers::{map_callable, to_call_path};
@@ -97,26 +96,4 @@ pub fn should_ignore_definition(
         }
     }
     false
-}
-
-/// Returns `true` if a method is defined as one of supplied decorators in
-/// `property_decorators`.
-pub fn is_property(
-    checker: &Checker,
-    decorator_list: &[Expr],
-    property_decorators: &BTreeSet<String>,
-) -> bool {
-    if property_decorators.is_empty() {
-        return false;
-    }
-
-    decorator_list.iter().any(|expr| {
-        checker
-            .resolve_call_path(map_callable(expr))
-            .map_or(false, |call_path| {
-                property_decorators
-                    .iter()
-                    .any(|decorator| to_call_path(decorator) == call_path)
-            })
-    })
 }

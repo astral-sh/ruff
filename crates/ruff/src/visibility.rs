@@ -6,6 +6,7 @@ use std::path::Path;
 use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 
 use crate::ast::helpers::{collect_call_path, map_callable};
+use crate::ast::types::CallPath;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Documentable;
 
@@ -77,13 +78,26 @@ pub fn is_abstract(checker: &Checker, decorator_list: &[Expr]) -> bool {
 }
 
 /// Returns `true` if a function definition is a `@property`.
-pub fn is_property(checker: &Checker, decorator_list: &[Expr]) -> bool {
+/// `extra_properties` can be used to check additional non-standard
+/// `@property`-like decorators.
+pub fn is_property(
+    checker: &Checker,
+    decorator_list: &[Expr],
+    extra_properties: Option<&[CallPath]>,
+) -> bool {
     decorator_list.iter().any(|expr| {
         checker
             .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["", "property"]
                     || call_path.as_slice() == ["functools", "cached_property"]
+                    || if let Some(extra_properties) = extra_properties {
+                        extra_properties
+                            .iter()
+                            .any(|extra_property| extra_property.as_slice() == call_path.as_slice())
+                    } else {
+                        false
+                    }
             })
     })
 }

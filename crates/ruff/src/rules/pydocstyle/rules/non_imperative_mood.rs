@@ -5,11 +5,12 @@ use once_cell::sync::Lazy;
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::cast;
-use crate::ast::types::Range;
+use crate::ast::helpers::to_call_path;
+use crate::ast::types::{CallPath, Range};
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
-use crate::rules::pydocstyle::{self, helpers::normalize_word};
+use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::violation::Violation;
 use crate::visibility::{is_property, is_test};
 
@@ -29,12 +30,16 @@ pub fn non_imperative_mood(
         return;
     };
 
+    let property_decorators = property_decorators
+        .iter()
+        .map(|decorator| to_call_path(decorator))
+        .collect::<Vec<CallPath>>();
+
     if is_test(cast::name(parent))
-        || is_property(checker, cast::decorator_list(parent))
-        || pydocstyle::helpers::is_property(
+        || is_property(
             checker,
             cast::decorator_list(parent),
-            property_decorators,
+            Some(&property_decorators),
         )
     {
         return;
