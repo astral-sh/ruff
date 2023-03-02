@@ -2,6 +2,8 @@
 
 from functools import cached_property
 
+from gi.repository import GObject
+
 # Bad examples
 
 def bad_liouiwnlkjl():
@@ -73,6 +75,11 @@ class Thingy:
 
     @property
     def good_property(self):
+        """This property method docstring does not need to be written in imperative mood."""
+        return self._beep
+
+    @GObject.Property
+    def good_custom_property(self):
         """This property method docstring does not need to be written in imperative mood."""
         return self._beep
 
