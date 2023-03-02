@@ -1,17 +1,19 @@
+#![allow(dead_code, unused_imports, unused_variables)]
+
 use bisection::bisect_left;
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
 use crate::ast::types::Range;
-use crate::registry::Diagnostic;
+use crate::registry::{Diagnostic, Rule};
 use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
 use crate::rules::pycodestyle::rules::{
     extraneous_whitespace, indentation, missing_whitespace_after_keyword, space_around_operator,
     whitespace_around_keywords, whitespace_around_named_parameter_equals,
-    whitespace_before_comment,
+    whitespace_before_comment, whitespace_before_parameters,
 };
-use crate::settings::Settings;
+use crate::settings::{flags, Settings};
 use crate::source_code::{Locator, Stylist};
 
 /// Return the amount of indentation, expanding tabs to the next multiple of 8.
@@ -40,6 +42,7 @@ pub fn check_logical_lines(
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
+    autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
@@ -145,6 +148,21 @@ pub fn check_logical_lines(
                         fix: None,
                         parent: None,
                     });
+                }
+            }
+        }
+
+        if line.flags.contains(TokenFlags::BRACKET) {
+            #[cfg(feature = "logical_lines")]
+            let should_fix =
+                autofix.into() && settings.rules.should_fix(&Rule::WhitespaceBeforeParameters);
+
+            #[cfg(not(feature = "logical_lines"))]
+            let should_fix = false;
+
+            for diagnostic in whitespace_before_parameters(&line.tokens, should_fix) {
+                if settings.rules.enabled(diagnostic.kind.rule()) {
+                    diagnostics.push(diagnostic);
                 }
             }
         }
