@@ -206,6 +206,8 @@ Options:
           Run in watch mode by re-running whenever files change
       --fix-only
           Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
+      --ignore-noqa
+          Ignore any `# noqa` comments
       --format <FORMAT>
           Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
       --target-version <TARGET_VERSION>
