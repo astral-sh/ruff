@@ -99,13 +99,13 @@ pub fn main(args: &Args) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::{main, Args};
+    use anyhow::Result;
 
     #[test]
-    fn test_generate_json_schema() {
+    fn test_generate_json_schema() -> Result<()> {
         main(&Args {
             dry_run: false,
             check: true,
         })
-        .unwrap();
     }
 }
