@@ -94,6 +94,10 @@ fn fix_banned_relative_import(
 ) -> Option<Fix> {
     // Only fix is the module path is known.
     if let Some(mut parts) = module_path.cloned() {
+        if *level? >= parts.len() {
+            return None;
+        }
+
         // Remove relative level from module path.
         for _ in 0..*level? {
             parts.pop();
