@@ -1,7 +1,6 @@
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 use std::collections::hash_map::DefaultHasher;
-use std::env::var;
 use std::hash::{Hash, Hasher};
 
 #[derive(CacheKey, Hash)]
@@ -18,9 +17,9 @@ struct UnnamedFieldsStruct(String, String);
 
 #[derive(CacheKey, Hash)]
 enum Enum {
-    UnitVariant,
-    UnnamedFieldsVariant(String, String),
-    NamedFieldsVariant { a: String, b: String },
+    Unit,
+    UnnamedFields(String, String),
+    NamedFields { a: String, b: String },
 }
 
 #[test]
@@ -70,7 +69,7 @@ fn unnamed_field_struct() {
 fn enum_unit_variant() {
     let mut key = CacheKeyHasher::new();
 
-    let variant = Enum::UnitVariant;
+    let variant = Enum::Unit;
     variant.cache_key(&mut key);
 
     let mut hash = DefaultHasher::new();
@@ -83,7 +82,7 @@ fn enum_unit_variant() {
 fn enum_named_fields_variant() {
     let mut key = CacheKeyHasher::new();
 
-    let variant = Enum::NamedFieldsVariant {
+    let variant = Enum::NamedFields {
         a: "Hello".to_string(),
         b: "World".to_string(),
     };
@@ -99,7 +98,7 @@ fn enum_named_fields_variant() {
 fn enum_unnamed_fields_variant() {
     let mut key = CacheKeyHasher::new();
 
-    let variant = Enum::UnnamedFieldsVariant("Hello".to_string(), "World".to_string());
+    let variant = Enum::UnnamedFields("Hello".to_string(), "World".to_string());
     variant.cache_key(&mut key);
 
     let mut hash = DefaultHasher::new();
