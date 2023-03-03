@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind}
 
 use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::helpers::elif_else_range;
+use crate::ast::helpers::{elif_else_range, end_of_statement};
 use crate::ast::types::Range;
 use crate::ast::visitor::Visitor;
 use crate::ast::whitespace::indentation;
@@ -216,7 +216,12 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Fix::insertion(content, stmt.end_location.unwrap()));
+                        // This is the last statement in the function. So it has to be followed by
+                        // a newline, or comments, or nothing.
+                        diagnostic.amend(Fix::insertion(
+                            content,
+                            end_of_statement(stmt, checker.locator),
+                        ));
                     }
                 }
                 checker.diagnostics.push(diagnostic);
@@ -251,7 +256,10 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Fix::insertion(content, stmt.end_location.unwrap()));
+                        diagnostic.amend(Fix::insertion(
+                            content,
+                            end_of_statement(stmt, checker.locator),
+                        ));
                     }
                 }
                 checker.diagnostics.push(diagnostic);
@@ -287,7 +295,10 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     content.push_str(checker.stylist.line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
-                    diagnostic.amend(Fix::insertion(content, stmt.end_location.unwrap()));
+                    diagnostic.amend(Fix::insertion(
+                        content,
+                        end_of_statement(stmt, checker.locator),
+                    ));
                 }
             }
             checker.diagnostics.push(diagnostic);
