@@ -68,7 +68,10 @@ pub fn derive_cache_key(item: &DeriveInput) -> syn::Result<TokenStream> {
             let fields = item_struct.fields.iter().enumerate().map(|(i, field)| {
                 let field_attr = match &field.ident {
                     Some(ident) => quote!(self.#ident),
-                    None => quote!(self.#i),
+                    None => {
+                        let index = syn::Index::from(i);
+                        quote!(self.#index)
+                    }
                 };
 
                 quote!(#field_attr.cache_key(key);)
