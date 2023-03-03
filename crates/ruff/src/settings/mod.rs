@@ -28,7 +28,6 @@ use ruff_macros::CacheKey;
 pub mod configuration;
 pub mod defaults;
 pub mod flags;
-pub mod hashable;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
