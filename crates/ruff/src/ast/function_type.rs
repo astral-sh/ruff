@@ -1,8 +1,8 @@
 use rustpython_parser::ast::Expr;
 
+use crate::ast::context::Context;
 use crate::ast::helpers::{map_callable, to_call_path};
 use crate::ast::types::{Scope, ScopeKind};
-use crate::checkers::context::AstContext;
 
 const CLASS_METHODS: [&str; 3] = ["__new__", "__init_subclass__", "__class_getitem__"];
 const METACLASS_BASES: [(&str, &str); 2] = [("", "type"), ("abc", "ABCMeta")];
@@ -16,7 +16,7 @@ pub enum FunctionType {
 
 /// Classify a function based on its scope, name, and decorators.
 pub fn classify(
-    ctx: &AstContext,
+    ctx: &Context,
     scope: &Scope,
     name: &str,
     decorator_list: &[Expr],

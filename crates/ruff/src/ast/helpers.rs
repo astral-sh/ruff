@@ -13,10 +13,10 @@ use rustpython_parser::ast::{
 use rustpython_parser::{lexer, Mode, StringKind, Tok};
 use smallvec::{smallvec, SmallVec};
 
+use crate::ast::context::Context;
 use crate::ast::types::{Binding, BindingKind, CallPath, Range};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::checkers::context::AstContext;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 
 /// Create an `Expr` with default location from an `ExprKind`.
@@ -99,7 +99,7 @@ pub fn format_call_path(call_path: &[&str]) -> String {
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-pub fn contains_call_path(ctx: &AstContext, expr: &Expr, target: &[&str]) -> bool {
+pub fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
     any_over_expr(expr, &|expr| {
         ctx.resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == target)
@@ -108,7 +108,7 @@ pub fn contains_call_path(ctx: &AstContext, expr: &Expr, target: &[&str]) -> boo
 
 /// Return `true` if the `Expr` contains an expression that appears to include a
 /// side-effect (like a function call).
-pub fn contains_effect(ctx: &AstContext, expr: &Expr) -> bool {
+pub fn contains_effect(ctx: &Context, expr: &Expr) -> bool {
     any_over_expr(expr, &|expr| {
         // Accept empty initializers.
         if let ExprKind::Call {
@@ -668,7 +668,7 @@ pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
 }
 
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
-pub fn uses_magic_variable_access(ctx: &AstContext, body: &[Stmt]) -> bool {
+pub fn uses_magic_variable_access(ctx: &Context, body: &[Stmt]) -> bool {
     any_over_body(body, &|expr| {
         if let ExprKind::Call { func, .. } = &expr.node {
             ctx.resolve_call_path(func).map_or(false, |call_path| {

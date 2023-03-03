@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use nohash_hasher::IntMap;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
@@ -7,12 +9,12 @@ use ruff_python::typing::TYPING_EXTENSIONS;
 
 use crate::ast::helpers::{collect_call_path, from_relative_import, Exceptions};
 use crate::ast::types::{Binding, BindingKind, CallPath, ExecutionContext, RefEquality, Scope};
-use crate::settings::Settings;
-use crate::visibility::VisibleScope;
+use crate::resolver::is_interface_definition_path;
+use crate::visibility::{module_visibility, Modifier, VisibleScope};
 
 #[allow(clippy::struct_excessive_bools)]
-pub struct AstContext<'a> {
-    pub settings: &'a Settings,
+pub struct Context<'a> {
+    pub typing_modules: &'a [String],
     pub module_path: Option<Vec<String>>,
     // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
     // at various points in time.
@@ -46,7 +48,45 @@ pub struct AstContext<'a> {
     pub handled_exceptions: Vec<Exceptions>,
 }
 
-impl<'a> AstContext<'a> {
+impl<'a> Context<'a> {
+    pub fn new(
+        typing_modules: &'a [String],
+        path: &'a Path,
+        module_path: Option<Vec<String>>,
+    ) -> Self {
+        Self {
+            typing_modules,
+            module_path,
+            parents: Vec::default(),
+            depths: FxHashMap::default(),
+            child_to_parent: FxHashMap::default(),
+            bindings: Vec::default(),
+            redefinitions: IntMap::default(),
+            exprs: Vec::default(),
+            scopes: Vec::default(),
+            scope_stack: Vec::default(),
+            dead_scopes: Vec::default(),
+            body: &[],
+            body_index: 0,
+            visible_scope: VisibleScope {
+                modifier: Modifier::Module,
+                visibility: module_visibility(path),
+            },
+            in_annotation: false,
+            in_type_definition: false,
+            in_deferred_string_type_definition: false,
+            in_deferred_type_definition: false,
+            in_exception_handler: false,
+            in_literal: false,
+            in_subscript: false,
+            in_type_checking_block: false,
+            seen_import_boundary: false,
+            futures_allowed: true,
+            annotations_future_enabled: is_interface_definition_path(path),
+            handled_exceptions: Vec::default(),
+        }
+    }
+
     /// Return `true` if the `Expr` is a reference to `typing.${target}`.
     pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
         self.resolve_call_path(expr).map_or(false, |call_path| {
@@ -66,7 +106,7 @@ impl<'a> AstContext<'a> {
             }
         }
 
-        if self.settings.typing_modules.iter().any(|module| {
+        if self.typing_modules.iter().any(|module| {
             let mut module: CallPath = module.split('.').collect();
             module.push(target);
             *call_path == module

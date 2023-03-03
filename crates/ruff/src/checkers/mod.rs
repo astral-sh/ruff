@@ -1,5 +1,4 @@
 pub mod ast;
-pub mod context;
 pub mod filesystem;
 pub mod imports;
 pub mod logical_lines;

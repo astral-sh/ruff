@@ -3,11 +3,11 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use crate::ast::context::Context;
 use crate::ast::helpers::any_over_expr;
 use crate::ast::types::{BindingKind, Scope};
 use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
-use crate::checkers::context::AstContext;
 
 bitflags! {
     #[derive(Default)]
@@ -19,7 +19,7 @@ bitflags! {
 
 /// Extract the names bound to a given __all__ assignment.
 pub fn extract_all_names(
-    ctx: &AstContext,
+    ctx: &Context,
     stmt: &Stmt,
     scope: &Scope,
 ) -> (Vec<String>, AllNamesFlags) {
@@ -38,7 +38,7 @@ pub fn extract_all_names(
     }
 
     fn extract_elts<'a>(
-        ctx: &'a AstContext,
+        ctx: &'a Context,
         expr: &'a Expr,
     ) -> (Option<&'a Vec<Expr>>, AllNamesFlags) {
         match &expr.node {

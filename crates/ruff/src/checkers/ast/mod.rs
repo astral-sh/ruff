@@ -1,5 +1,3 @@
-//! Lint rules based on AST traversal.
-
 use std::iter;
 use std::path::Path;
 
@@ -17,6 +15,7 @@ use rustpython_parser::ast::{
 
 use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
 
+use crate::ast::context::Context;
 use crate::ast::helpers::{binding_range, extract_handled_exceptions, to_module_path, Exceptions};
 use crate::ast::operations::{extract_all_names, AllNamesFlags};
 use crate::ast::relocate::relocate_expr;
@@ -27,7 +26,7 @@ use crate::ast::types::{
 use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use crate::ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
-use crate::checkers::context::AstContext;
+use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::registry::{Diagnostic, Rule};
 use crate::resolver::is_interface_definition_path;
@@ -43,44 +42,36 @@ use crate::rules::{
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
+use crate::visibility::transition_scope;
 use crate::{autofix, docstrings, noqa, visibility};
+
+mod deferred;
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
-type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 type AnnotationContext = (bool, bool);
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
     // Settings, static metadata, etc.
-    pub(crate) path: &'a Path,
+    pub path: &'a Path,
     module_path: Option<Vec<String>>,
     package: Option<&'a Path>,
     is_interface_definition: bool,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
-    pub(crate) settings: &'a Settings,
-    pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
-    pub(crate) locator: &'a Locator<'a>,
-    pub(crate) stylist: &'a Stylist<'a>,
-    pub(crate) indexer: &'a Indexer,
+    pub settings: &'a Settings,
+    pub noqa_line_for: &'a IntMap<usize, usize>,
+    pub locator: &'a Locator<'a>,
+    pub stylist: &'a Stylist<'a>,
+    pub indexer: &'a Indexer,
     // Stateful fields.
-    pub(crate) ctx: AstContext<'a>,
-    pub(crate) diagnostics: Vec<Diagnostic>,
-    // TODO(charlie): Instead of exposing deletions, wrap in a public API.
-    pub(crate) deletions: FxHashSet<RefEquality<'a, Stmt>>,
+    pub ctx: Context<'a>,
+    pub deferred: Deferred<'a>,
+    pub diagnostics: Vec<Diagnostic>,
+    pub deletions: FxHashSet<RefEquality<'a, Stmt>>,
     // Check-specific state.
-    pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
-    // Traversal state.
-    pub definitions: Vec<(Definition<'a>, Visibility, DeferralContext<'a>)>,
-    pub deferred_string_type_definitions:
-        Vec<(Range, &'a str, AnnotationContext, DeferralContext<'a>)>,
-    pub deferred_type_definitions: Vec<(&'a Expr, AnnotationContext, DeferralContext<'a>)>,
-    pub deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
-    pub deferred_lambdas: Vec<(&'a Expr, DeferralContext<'a>)>,
-    pub deferred_for_loops: Vec<(&'a Stmt, DeferralContext<'a>)>,
-    pub deferred_assignments: Vec<DeferralContext<'a>>,
+    pub flake8_bugbear_seen: Vec<&'a Expr>,
 }
 
 impl<'a> Checker<'a> {
@@ -97,7 +88,6 @@ impl<'a> Checker<'a> {
         style: &'a Stylist,
         indexer: &'a Indexer,
     ) -> Checker<'a> {
-        let is_interface_definition = is_interface_definition_path(path);
         Checker {
             settings,
             noqa_line_for,
@@ -106,53 +96,14 @@ impl<'a> Checker<'a> {
             path,
             package,
             module_path: module_path.clone(),
-            is_interface_definition,
+            is_interface_definition: is_interface_definition_path(path),
             locator,
             stylist: style,
             indexer,
-            ctx: AstContext {
-                settings,
-                module_path,
-                parents: vec![],
-                depths: FxHashMap::default(),
-                child_to_parent: FxHashMap::default(),
-                bindings: vec![],
-                redefinitions: IntMap::default(),
-                exprs: vec![],
-                scopes: vec![],
-                scope_stack: vec![],
-                dead_scopes: vec![],
-                body: &[],
-                body_index: 0,
-                visible_scope: VisibleScope {
-                    modifier: Modifier::Module,
-                    visibility: module_visibility(path),
-                },
-                in_annotation: false,
-                in_type_definition: false,
-                in_deferred_string_type_definition: false,
-                in_deferred_type_definition: false,
-                in_exception_handler: false,
-                in_literal: false,
-                in_subscript: false,
-                in_type_checking_block: false,
-                seen_import_boundary: false,
-                futures_allowed: true,
-                annotations_future_enabled: is_interface_definition,
-                handled_exceptions: vec![],
-            },
-            // Computed diagnostics.
+            ctx: Context::new(&settings.typing_modules, path, module_path),
+            deferred: Deferred::default(),
             diagnostics: vec![],
             deletions: FxHashSet::default(),
-            // Traversal
-            definitions: vec![],
-            deferred_string_type_definitions: vec![],
-            deferred_type_definitions: vec![],
-            deferred_functions: vec![],
-            deferred_lambdas: vec![],
-            deferred_for_loops: vec![],
-            deferred_assignments: vec![],
-            // Check-specific state.
             flake8_bugbear_seen: vec![],
         }
     }
@@ -184,20 +135,20 @@ impl<'a> Checker<'a> {
 /// Visit an [`Expr`], and treat it as a type definition.
 macro_rules! visit_type_definition {
     ($self:ident, $expr:expr) => {{
-        let prev_in_type_definition = $self.in_type_definition;
-        $self.in_type_definition = true;
+        let prev_in_type_definition = $self.ctx.in_type_definition;
+        $self.ctx.in_type_definition = true;
         $self.visit_expr($expr);
-        $self.in_type_definition = prev_in_type_definition;
+        $self.ctx.in_type_definition = prev_in_type_definition;
     }};
 }
 
 /// Visit an [`Expr`], and treat it as _not_ a type definition.
 macro_rules! visit_non_type_definition {
     ($self:ident, $expr:expr) => {{
-        let prev_in_type_definition = $self.in_type_definition;
-        $self.in_type_definition = false;
+        let prev_in_type_definition = $self.ctx.in_type_definition;
+        $self.ctx.in_type_definition = false;
         $self.visit_expr($expr);
-        $self.in_type_definition = prev_in_type_definition;
+        $self.ctx.in_type_definition = prev_in_type_definition;
     }};
 }
 
@@ -640,9 +591,9 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = !self.annotations_future_enabled
+                let runtime_annotation = !self.ctx.annotations_future_enabled
                     && matches!(
-                        self.current_scope().kind,
+                        self.ctx.current_scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
                     );
 
@@ -939,7 +890,8 @@ where
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled {
                                     Some((
-                                        self.scopes[*(self
+                                        self.ctx.scopes[*(self
+                                            .ctx
                                             .scope_stack
                                             .last()
                                             .expect("No current scope found"))]
@@ -1288,7 +1240,8 @@ where
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled {
                                     Some((
-                                        self.scopes[*(self
+                                        self.ctx.scopes[*(self
+                                            .ctx
                                             .scope_stack
                                             .last()
                                             .expect("No current scope found"))]
@@ -1725,7 +1678,7 @@ where
                     .rules
                     .enabled(&Rule::UnusedLoopControlVariable)
                 {
-                    self.deferred_for_loops.push((
+                    self.deferred.for_loops.push((
                         stmt,
                         (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                     ));
@@ -1978,7 +1931,7 @@ where
                 }
                 let scope =
                     transition_scope(&self.ctx.visible_scope, stmt, &Documentable::Function);
-                self.definitions.push((
+                self.deferred.definitions.push((
                     definition,
                     scope.visibility.clone(),
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
@@ -2019,7 +1972,7 @@ where
                         globals,
                     })));
 
-                self.deferred_functions.push((
+                self.deferred.functions.push((
                     stmt,
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                     self.ctx.visible_scope.clone(),
@@ -2043,7 +1996,7 @@ where
                     &Documentable::Class,
                 );
                 let scope = transition_scope(&self.ctx.visible_scope, stmt, &Documentable::Class);
-                self.definitions.push((
+                self.deferred.definitions.push((
                     definition,
                     scope.visibility.clone(),
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
@@ -2098,7 +2051,7 @@ where
             } => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(call_path) = self.resolve_call_path(type_) {
+                    if let Some(call_path) = self.ctx.resolve_call_path(type_) {
                         if call_path.as_slice() == ["", "NameError"] {
                             handled_exceptions |= Exceptions::NAME_ERROR;
                         } else if call_path.as_slice() == ["", "ModuleNotFoundError"] {
@@ -2144,7 +2097,7 @@ where
                     self.visit_annotation(annotation);
                 }
                 if let Some(expr) = value {
-                    if self.match_typing_expr(annotation, "TypeAlias") {
+                    if self.ctx.match_typing_expr(annotation, "TypeAlias") {
                         visit_type_definition!(self, expr);
                     } else {
                         self.visit_expr(expr);
@@ -2217,14 +2170,14 @@ where
                 ..
             } = &expr.node
             {
-                self.deferred_string_type_definitions.push((
+                self.deferred.string_type_definitions.push((
                     Range::from_located(expr),
                     value,
                     (self.ctx.in_annotation, self.ctx.in_type_checking_block),
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
             } else {
-                self.deferred_type_definitions.push((
+                self.deferred.type_definitions.push((
                     expr,
                     (self.ctx.in_annotation, self.ctx.in_type_checking_block),
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
@@ -3379,7 +3332,7 @@ where
                 kind,
             } => {
                 if self.ctx.in_type_definition && !self.ctx.in_literal {
-                    self.deferred_string_type_definitions.push((
+                    self.deferred.string_type_definitions.push((
                         Range::from_located(expr),
                         value,
                         (self.ctx.in_annotation, self.ctx.in_type_checking_block),
@@ -3494,7 +3447,7 @@ where
         // Recurse.
         match &expr.node {
             ExprKind::Lambda { .. } => {
-                self.deferred_lambdas.push((
+                self.deferred.lambdas.push((
                     expr,
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
@@ -4103,7 +4056,7 @@ impl<'a> Checker<'a> {
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
                         && !(existing.kind.is_function_definition()
                             && visibility::is_overload(
-                                self,
+                                &self.ctx,
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))
                     {
@@ -4582,7 +4535,7 @@ impl<'a> Checker<'a> {
             flake8_bugbear::rules::f_string_docstring(self, python_ast);
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);
-        self.definitions.push((
+        self.deferred.definitions.push((
             Definition {
                 kind: if self.path.ends_with("__init__.py") {
                     DefinitionKind::Package
@@ -4598,9 +4551,9 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_type_definitions(&mut self) {
-        self.deferred_type_definitions.reverse();
+        self.deferred.type_definitions.reverse();
         while let Some((expr, (in_annotation, in_type_checking_block), (scopes, parents))) =
-            self.deferred_type_definitions.pop()
+            self.deferred.type_definitions.pop()
         {
             self.ctx.scope_stack = scopes;
             self.ctx.parents = parents;
@@ -4619,9 +4572,9 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         let mut stacks = vec![];
-        self.deferred_string_type_definitions.reverse();
+        self.deferred.string_type_definitions.reverse();
         while let Some((range, expression, (in_annotation, in_type_checking_block), deferral)) =
-            self.deferred_string_type_definitions.pop()
+            self.deferred.string_type_definitions.pop()
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 if in_annotation && self.ctx.annotations_future_enabled {
@@ -4663,8 +4616,8 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_functions(&mut self) {
-        self.deferred_functions.reverse();
-        while let Some((stmt, (scopes, parents), visibility)) = self.deferred_functions.pop() {
+        self.deferred.functions.reverse();
+        while let Some((stmt, (scopes, parents), visibility)) = self.deferred.functions.pop() {
             self.ctx.scope_stack = scopes.clone();
             self.ctx.parents = parents.clone();
             self.ctx.visible_scope = visibility;
@@ -4678,13 +4631,13 @@ impl<'a> Checker<'a> {
                 _ => unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef"),
             }
 
-            self.deferred_assignments.push((scopes, parents));
+            self.deferred.assignments.push((scopes, parents));
         }
     }
 
     fn check_deferred_lambdas(&mut self) {
-        self.deferred_lambdas.reverse();
-        while let Some((expr, (scopes, parents))) = self.deferred_lambdas.pop() {
+        self.deferred.lambdas.reverse();
+        while let Some((expr, (scopes, parents))) = self.deferred.lambdas.pop() {
             self.ctx.scope_stack = scopes.clone();
             self.ctx.parents = parents.clone();
 
@@ -4695,13 +4648,13 @@ impl<'a> Checker<'a> {
                 unreachable!("Expected ExprKind::Lambda");
             }
 
-            self.deferred_assignments.push((scopes, parents));
+            self.deferred.assignments.push((scopes, parents));
         }
     }
 
     fn check_deferred_assignments(&mut self) {
-        self.deferred_assignments.reverse();
-        while let Some((scopes, ..)) = self.deferred_assignments.pop() {
+        self.deferred.assignments.reverse();
+        while let Some((scopes, ..)) = self.deferred.assignments.pop() {
             let scope_index = scopes[scopes.len() - 1];
             let parent_scope_index = scopes[scopes.len() - 2];
             if self.settings.rules.enabled(&Rule::UnusedVariable) {
@@ -4734,8 +4687,8 @@ impl<'a> Checker<'a> {
     }
 
     fn check_deferred_for_loops(&mut self) {
-        self.deferred_for_loops.reverse();
-        while let Some((stmt, (scopes, parents))) = self.deferred_for_loops.pop() {
+        self.deferred.for_loops.reverse();
+        while let Some((stmt, (scopes, parents))) = self.deferred.for_loops.pop() {
             self.ctx.scope_stack = scopes.clone();
             self.ctx.parents = parents.clone();
 
@@ -5286,8 +5239,10 @@ impl<'a> Checker<'a> {
             || self.settings.rules.enabled(&Rule::EmptyDocstring);
 
         let mut overloaded_name: Option<String> = None;
-        self.definitions.reverse();
-        while let Some((definition, visibility, (scopes, parents))) = self.definitions.pop() {
+        self.deferred.definitions.reverse();
+        while let Some((definition, visibility, (scopes, parents))) =
+            self.deferred.definitions.pop()
+        {
             self.ctx.scope_stack = scopes.clone();
             self.ctx.parents = parents.clone();
 

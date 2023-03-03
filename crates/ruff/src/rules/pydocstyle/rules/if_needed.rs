@@ -27,7 +27,7 @@ pub fn if_needed(checker: &mut Checker, docstring: &Docstring) {
     ) = docstring.kind else {
         return
     };
-    if !is_overload(checker, cast::decorator_list(stmt)) {
+    if !is_overload(&checker.ctx, cast::decorator_list(stmt)) {
         return;
     }
     checker.diagnostics.push(Diagnostic::new(
