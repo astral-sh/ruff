@@ -293,3 +293,30 @@ def x(y):
 
 def foo(baz: str) -> str:
     return baz
+
+
+def end_of_statement():
+    def example():
+        if True:
+            return ""
+
+
+    def example():
+        if True:
+            return ""
+
+
+    def example():
+        if True:
+            return ""  # type: ignore
+
+
+    def example():
+        if True:
+            return ""  ;
+
+
+    def example():
+        if True:
+            return "" \
+                ;  # type: ignore
