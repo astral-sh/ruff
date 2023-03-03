@@ -2,8 +2,12 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::fs;
+use std::path::PathBuf;
 
-use anyhow::Result;
+use crate::generate_all::REGENERATE_ALL_COMMAND;
+use crate::ROOT_DIR;
+use anyhow::{bail, Context, Result};
+use pretty_assertions::StrComparison;
 use regex::{Captures, Regex};
 use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::settings::options::Options;
@@ -16,6 +20,9 @@ pub struct Args {
     /// Write the generated docs to stdout (rather than to the filesystem).
     #[arg(long)]
     pub(crate) dry_run: bool,
+    /// Don't write to the docs, check if the file is up-to-date and error if not
+    #[arg(long)]
+    pub(crate) check: bool,
 }
 
 pub fn main(args: &Args) -> Result<()> {
@@ -44,11 +51,33 @@ pub fn main(args: &Args) -> Result<()> {
 
             process_documentation(explanation.trim(), &mut output);
 
+            let filename = PathBuf::from(ROOT_DIR)
+                .join("docs")
+                .join("rules")
+                .join(rule.as_ref())
+                .with_extension("md");
+
             if args.dry_run {
                 println!("{output}");
+            } else if args.check {
+                let current = fs::read_to_string(&filename).with_context(|| {
+                    format!(
+                        "Missing doc file {}. Please run `{REGENERATE_ALL_COMMAND}`",
+                        filename.display()
+                    )
+                })?;
+                if current == output {
+                    println!("up-to-date: {}", filename.display());
+                } else {
+                    let comparison = StrComparison::new(&current, &output);
+                    bail!(
+                        "{} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}",
+                        filename.display()
+                    );
+                }
             } else {
                 fs::create_dir_all("docs/rules")?;
-                fs::write(format!("docs/rules/{}.md", rule.as_ref()), output)?;
+                fs::write(filename, output)?;
             }
         }
     }
@@ -105,7 +134,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
 
 #[cfg(test)]
 mod tests {
-    use super::process_documentation;
+    use super::{main, process_documentation, Args};
 
     #[test]
     fn test_process_documentation() {
@@ -136,5 +165,14 @@ Something [`else`][other].
 
 [mccabe.max-complexity]: ../../settings#max-complexity\n"
         );
+    }
+
+    #[test]
+    fn test_generate_json_schema() {
+        main(&Args {
+            dry_run: false,
+            check: true,
+        })
+        .unwrap()
     }
 }
