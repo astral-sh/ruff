@@ -485,6 +485,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::DocstringInStub,
     rules::flake8_pyi::rules::TypedArgumentSimpleDefaults,
     rules::flake8_pyi::rules::ArgumentSimpleDefaults,
+    rules::flake8_pyi::rules::TypeCommentInStub,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     rules::flake8_pytest_style::rules::FixturePositionalArgs,
@@ -838,7 +839,8 @@ impl Rule {
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::TrailingCommaProhibited => &LintSource::Tokens,
+            | Rule::TrailingCommaProhibited
+            | Rule::TypeCommentInStub => &LintSource::Tokens,
             Rule::IOError => &LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => &LintSource::Filesystem,

@@ -511,6 +511,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "011") => Rule::TypedArgumentSimpleDefaults,
         (Flake8Pyi, "014") => Rule::ArgumentSimpleDefaults,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
+        (Flake8Pyi, "033") => Rule::TypeCommentInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::IncorrectFixtureParenthesesStyle,
