@@ -1,9 +1,11 @@
+use strum::IntoEnumIterator;
+
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::sections::SectionKind;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
@@ -40,15 +42,13 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
         }
 
         // Avoid false-positives: `Args:`, etc.
-        for style in [SectionStyle::Google, SectionStyle::Numpy] {
-            for section_name in style.section_names().iter() {
-                if let Some(suffix) = trimmed.strip_suffix(section_name) {
-                    if suffix.is_empty() {
-                        return;
-                    }
-                    if suffix == ":" {
-                        return;
-                    }
+        for section_kind in SectionKind::iter() {
+            if let Some(suffix) = trimmed.strip_suffix(section_kind.as_str()) {
+                if suffix.is_empty() {
+                    return;
+                }
+                if suffix == ":" {
+                    return;
                 }
             }
         }

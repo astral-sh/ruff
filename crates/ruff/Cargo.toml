@@ -59,7 +59,6 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 textwrap = { version = "0.16.0" }
 thiserror = { version = "1.0" }
-titlecase = { version = "2.2.1" }
 toml = { workspace = true }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
