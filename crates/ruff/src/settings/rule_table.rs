@@ -53,8 +53,6 @@ impl<I: IntoIterator<Item = Rule>> From<I> for RuleTable {
         for code in codes {
             enabled.insert(code, true);
         }
-        Self {
-            enabled,
-        }
+        Self { enabled }
     }
 }
