@@ -3635,9 +3635,16 @@ where
                         Some(Callable::NamedTuple)
                     } else if self.match_typing_call_path(&call_path, "TypedDict") {
                         Some(Callable::TypedDict)
-                    } else if ["Arg", "DefaultArg", "NamedArg", "DefaultNamedArg"]
-                        .iter()
-                        .any(|target| call_path.as_slice() == ["mypy_extensions", target])
+                    } else if [
+                        "Arg",
+                        "DefaultArg",
+                        "NamedArg",
+                        "DefaultNamedArg",
+                        "VarArg",
+                        "KwArg",
+                    ]
+                    .iter()
+                    .any(|target| call_path.as_slice() == ["mypy_extensions", target])
                     {
                         Some(Callable::MypyExtension)
                     } else {
@@ -3760,7 +3767,17 @@ where
                         }
                     }
                     None => {
-                        visitor::walk_expr(self, expr);
+                        // If we're in a type definition, we need to treat the arguments to any
+                        // other callables as non-type definitions (i.e., we don't want to treat
+                        // any strings as deferred type definitions).
+                        self.visit_expr(func);
+                        for arg in args {
+                            visit_non_type_definition!(self, arg);
+                        }
+                        for keyword in keywords {
+                            let KeywordData { value, .. } = &keyword.node;
+                            visit_non_type_definition!(self, value);
+                        }
                     }
                 }
             }
