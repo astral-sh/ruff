@@ -2631,7 +2631,10 @@ where
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias(self, &expr);
                 }
-                if self.settings.rules.enabled(&Rule::IsinstanceWithTuple) {
+                if self.settings.rules.enabled(&Rule::IsinstanceWithTuple)
+                    && !self.settings.pyupgrade.keep_runtime_typing
+                    && self.settings.target_version >= PythonVersion::Py310
+                {
                     pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
                 }
 
