@@ -14,8 +14,8 @@ libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "80e4c1399f95e
 once_cell = { version = "1.16.0" }
 regex = { version = "1.6.0" }
 rustc-hash = { version = "1.1.0" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "aa8336ee94492b52458ed8e1517238e5c6c2914c" }
-rustpython-parser = { features = ["lalrpop"], git = "https://github.com/RustPython/RustPython.git", rev = "aa8336ee94492b52458ed8e1517238e5c6c2914c" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "822f6a9fa6b9142413634858c4c6908f678ce887" }
+rustpython-parser = { features = ["lalrpop", "serde"], git = "https://github.com/RustPython/RustPython.git", rev = "822f6a9fa6b9142413634858c4c6908f678ce887" }
 schemars = { version = "0.8.11" }
 serde = { version = "1.0.147", features = ["derive"] }
 serde_json = { version = "1.0.87" }
