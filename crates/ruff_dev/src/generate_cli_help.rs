@@ -106,6 +106,6 @@ mod test {
             dry_run: false,
             check: true,
         })
-        .unwrap()
+        .unwrap();
     }
 }
