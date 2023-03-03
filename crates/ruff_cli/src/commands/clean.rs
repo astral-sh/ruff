@@ -6,9 +6,9 @@ use colored::Colorize;
 use path_absolutize::path_dedot;
 use walkdir::WalkDir;
 
-use ruff::cache::CACHE_DIR_NAME;
 use ruff::fs;
 use ruff::logging::LogLevel;
+use ruff_cache::CACHE_DIR_NAME;
 
 /// Clear any caches in the current directory or any subdirectories.
 pub fn clean(level: LogLevel) -> Result<()> {

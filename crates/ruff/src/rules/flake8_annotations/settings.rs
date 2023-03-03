@@ -1,5 +1,6 @@
 //! Settings for the `flake-annotations` plugin.
 
+use ruff_macros::CacheKey;
 use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -60,7 +61,7 @@ pub struct Options {
     pub ignore_fully_untyped: Option<bool>,
 }
 
-#[derive(Debug, Default, Hash)]
+#[derive(Debug, Default, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub mypy_init_return: bool,

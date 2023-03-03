@@ -1,23 +1,23 @@
-use std::collections::hash_map;
+use std::collections::{hash_map, HashMap};
 
+use ruff_macros::CacheKey;
 use rustc_hash::FxHashMap;
 
-use super::hashable::HashableHashMap;
 use crate::registry::Rule;
 
 /// A table to keep track of which rules are enabled
 /// and Whether they should be autofixed.
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct RuleTable {
     /// Maps rule codes to a boolean indicating if the rule should be autofixed.
-    enabled: HashableHashMap<Rule, bool>,
+    enabled: FxHashMap<Rule, bool>,
 }
 
 impl RuleTable {
     /// Creates a new empty rule table.
     pub fn empty() -> Self {
         Self {
-            enabled: HashableHashMap::default(),
+            enabled: HashMap::default(),
         }
     }
 
@@ -54,7 +54,7 @@ impl<I: IntoIterator<Item = Rule>> From<I> for RuleTable {
             enabled.insert(code, true);
         }
         Self {
-            enabled: enabled.into(),
+            enabled,
         }
     }
 }

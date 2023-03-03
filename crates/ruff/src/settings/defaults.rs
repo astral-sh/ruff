@@ -2,8 +2,8 @@ use once_cell::sync::Lazy;
 use path_absolutize::path_dedot;
 use regex::Regex;
 use rustc_hash::FxHashSet;
+use std::collections::HashSet;
 
-use super::hashable::{HashableGlobSet, HashableHashSet};
 use super::types::{FilePattern, PythonVersion};
 use super::Settings;
 use crate::codes::{self, RuleCodePrefix};
@@ -15,6 +15,7 @@ use crate::rules::{
     flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
     isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
+use crate::settings::types::FilePatternSet;
 
 pub const PREFIXES: &[RuleSelector] = &[
     prefix_to_selector(RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E)),
@@ -59,12 +60,12 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             rules: PREFIXES.iter().flat_map(IntoIterator::into_iter).into(),
-            allowed_confusables: FxHashSet::from_iter([]).into(),
+            allowed_confusables: FxHashSet::from_iter([]),
             builtins: vec![],
-            dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone().into(),
-            exclude: HashableGlobSet::new(EXCLUDE.clone()).unwrap(),
-            extend_exclude: HashableGlobSet::empty(),
-            external: HashableHashSet::default(),
+            dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
+            exclude: FilePatternSet::try_from_vec(EXCLUDE.clone()).unwrap(),
+            extend_exclude: FilePatternSet::default(),
+            external: HashSet::default(),
             force_exclude: false,
             ignore_init_module_imports: false,
             line_length: LINE_LENGTH,

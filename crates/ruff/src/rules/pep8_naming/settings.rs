@@ -1,6 +1,6 @@
 //! Settings for the `pep8-naming` plugin.
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -69,7 +69,7 @@ pub struct Options {
     pub staticmethod_decorators: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
     pub ignore_names: Vec<String>,
     pub classmethod_decorators: Vec<String>,

@@ -1982,6 +1982,7 @@ dependencies = [
  "path-absolutize",
  "regex",
  "result-like",
+ "ruff_cache",
  "ruff_macros",
  "ruff_python",
  "ruff_rustpython",
@@ -2003,6 +2004,17 @@ dependencies = [
  "toml",
  "wasm-bindgen",
  "wasm-bindgen-test",
+]
+
+[[package]]
+name = "ruff_cache"
+version = "0.1.0"
+dependencies = [
+ "filetime",
+ "globset",
+ "itertools",
+ "regex",
+ "ruff_macros",
 ]
 
 [[package]]
@@ -2033,6 +2045,7 @@ dependencies = [
  "rayon",
  "regex",
  "ruff",
+ "ruff_cache",
  "rustc-hash",
  "serde",
  "serde_json",

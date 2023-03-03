@@ -1,6 +1,5 @@
-use std::collections::hash_map::DefaultHasher;
 use std::fs;
-use std::hash::{Hash, Hasher};
+use std::hash::Hasher;
 use std::io::Write;
 use std::path::Path;
 
@@ -10,6 +9,7 @@ use log::error;
 use path_absolutize::Absolutize;
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
+use ruff_cache::{CacheKey, CacheKeyHasher};
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -37,18 +37,18 @@ fn cache_key<P: AsRef<Path>>(
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    CARGO_PKG_VERSION.hash(&mut hasher);
-    path.as_ref().absolutize().unwrap().hash(&mut hasher);
+    let mut hasher = CacheKeyHasher::new();
+    CARGO_PKG_VERSION.cache_key(&mut hasher);
+    path.as_ref().absolutize().unwrap().cache_key(&mut hasher);
     package
         .as_ref()
         .map(|path| path.as_ref().absolutize().unwrap())
-        .hash(&mut hasher);
-    FileTime::from_last_modification_time(metadata).hash(&mut hasher);
+        .cache_key(&mut hasher);
+    FileTime::from_last_modification_time(metadata).cache_key(&mut hasher);
     #[cfg(unix)]
-    metadata.permissions().mode().hash(&mut hasher);
-    settings.hash(&mut hasher);
-    autofix.hash(&mut hasher);
+    metadata.permissions().mode().cache_key(&mut hasher);
+    settings.cache_key(&mut hasher);
+    autofix.cache_key(&mut hasher);
     hasher.finish()
 }
 

@@ -56,6 +56,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             Hash,
             PartialOrd,
             Ord,
+            ::ruff_macros::CacheKey,
             AsRefStr,
             ::strum_macros::IntoStaticStr,
         )]
