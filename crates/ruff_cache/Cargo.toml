@@ -1,7 +1,9 @@
 [package]
 name = "ruff_cache"
-version = "0.1.0"
-edition = "2021"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
 
 [dependencies]
 itertools = { workspace = true }
