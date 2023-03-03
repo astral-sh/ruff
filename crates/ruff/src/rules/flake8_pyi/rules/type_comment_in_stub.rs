@@ -11,12 +11,13 @@ use crate::Range;
 
 define_violation!(
     /// ## What it does
-    /// Do not use type comments (e.g. `x = 1 # type: int`) in stubs, even if
-    /// the stub supports Python 2. Always use annotations instead (e.g.
-    /// `x: int = 1`).
+    /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
+    /// files.
     ///
     /// ## Why is this bad?
-    /// You should use type annotation directly in pyi files.
+    /// Stub (`.pyi`) files should use type annotations directly, rather
+    /// than type comments, even if they're intended to support Python 2, since
+    /// stub files are not executed at runtime. The one exception is `# type: ignore`.
     ///
     /// ## Example
     /// ```python
