@@ -29,7 +29,7 @@ jobs:
       - run: ./target/debug/ruff_dev generate-all
       - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo dev generate-all'."
       - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo dev generate-all'."
-      - run: git diff --exit-code -- README.md ruff.schema.json
+      - run: git diff --exit-code -- README.md ruff.schema.json docs
 
   cargo-fmt:
     name: "cargo fmt"
@@ -108,21 +108,6 @@ jobs:
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
           ./scripts/add_rule.py --name FirstRule --code TST001 --linter test
       - run: cargo check
-
-  maturin-build:
-    name: "maturin build"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - run: pip install maturin
-      - run: maturin build -b bin
-      - run: python scripts/transform_readme.py --target pypi
 
   typos:
     name: "spell check"

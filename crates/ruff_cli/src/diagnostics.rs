@@ -64,6 +64,7 @@ pub fn lint_path(
     package: Option<&Path>,
     settings: &AllSettings,
     cache: flags::Cache,
+    noqa: flags::Noqa,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Check the cache.
@@ -72,7 +73,9 @@ pub fn lint_path(
     // to cache `fixer::Mode::Apply`, since a file either has no fixes, or we'll
     // write the fixes to disk, thus invalidating the cache. But it's a bit hard
     // to reason about. We need to come up with a better solution here.)
-    let metadata = if cache.into() && matches!(autofix, fix::FixMode::None | fix::FixMode::Generate)
+    let metadata = if cache.into()
+        && noqa.into()
+        && matches!(autofix, fix::FixMode::None | fix::FixMode::Generate)
     {
         let metadata = path.metadata()?;
         if let Some((messages, imports)) =
@@ -97,7 +100,8 @@ pub fn lint_path(
         },
         fixed,
     ) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
-        if let Ok((result, transformed, fixed)) = lint_fix(&contents, path, package, &settings.lib)
+        if let Ok((result, transformed, fixed)) =
+            lint_fix(&contents, path, package, noqa, &settings.lib)
         {
             if !fixed.is_empty() {
                 if matches!(autofix, fix::FixMode::Apply) {
@@ -115,12 +119,26 @@ pub fn lint_path(
             (result, fixed)
         } else {
             // If we fail to autofix, lint the original source code.
-            let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
+            let result = lint_only(
+                &contents,
+                path,
+                package,
+                &settings.lib,
+                noqa,
+                autofix.into(),
+            );
             let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
-        let result = lint_only(&contents, path, package, &settings.lib, autofix.into());
+        let result = lint_only(
+            &contents,
+            path,
+            package,
+            &settings.lib,
+            noqa,
+            autofix.into(),
+        );
         let fixed = FxHashMap::default();
         (result, fixed)
     };
@@ -167,6 +185,7 @@ pub fn lint_stdin(
     package: Option<&Path>,
     contents: &str,
     settings: &Settings,
+    noqa: flags::Noqa,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Lint the inputs.
@@ -181,6 +200,7 @@ pub fn lint_stdin(
             contents,
             path.unwrap_or_else(|| Path::new("-")),
             package,
+            noqa,
             settings,
         ) {
             if matches!(autofix, fix::FixMode::Apply) {
@@ -210,6 +230,7 @@ pub fn lint_stdin(
                 path.unwrap_or_else(|| Path::new("-")),
                 package,
                 settings,
+                noqa,
                 autofix.into(),
             );
             let fixed = FxHashMap::default();
@@ -227,6 +248,7 @@ pub fn lint_stdin(
             path.unwrap_or_else(|| Path::new("-")),
             package,
             settings,
+            noqa,
             autofix.into(),
         );
         let fixed = FxHashMap::default();

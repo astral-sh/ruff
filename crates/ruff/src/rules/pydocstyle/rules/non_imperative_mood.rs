@@ -1,9 +1,12 @@
+use std::collections::BTreeSet;
+
 use imperative::Mood;
 use once_cell::sync::Lazy;
 use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::cast;
-use crate::ast::types::Range;
+use crate::ast::helpers::to_call_path;
+use crate::ast::types::{CallPath, Range};
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
@@ -14,7 +17,11 @@ use crate::visibility::{is_property, is_test};
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 
 /// D401
-pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
+pub fn non_imperative_mood(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    property_decorators: &BTreeSet<String>,
+) {
     let (
         DefinitionKind::Function(parent)
         | DefinitionKind::NestedFunction(parent)
@@ -22,7 +29,15 @@ pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
     ) = &docstring.kind else {
         return;
     };
-    if is_test(cast::name(parent)) || is_property(checker, cast::decorator_list(parent)) {
+
+    let property_decorators = property_decorators
+        .iter()
+        .map(|decorator| to_call_path(decorator))
+        .collect::<Vec<CallPath>>();
+
+    if is_test(cast::name(parent))
+        || is_property(checker, cast::decorator_list(parent), &property_decorators)
+    {
         return;
     }
 

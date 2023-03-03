@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use log::debug;
+use ruff_macros::CacheKey;
 use ruff_python::sys::KNOWN_STANDARD_LIBRARY;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -12,7 +13,17 @@ use super::types::{ImportBlock, Importable};
 use crate::settings::types::PythonVersion;
 
 #[derive(
-    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, Hash, EnumIter,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Clone,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    CacheKey,
+    EnumIter,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ImportType {

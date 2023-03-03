@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports, unused_variables)]
 
 use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;

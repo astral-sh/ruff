@@ -201,8 +201,8 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         &indexer,
         &directives,
         &settings,
-        flags::Autofix::Enabled,
         flags::Noqa::Enabled,
+        flags::Autofix::Enabled,
     );
 
     let messages: Vec<ExpandedMessage> = diagnostics

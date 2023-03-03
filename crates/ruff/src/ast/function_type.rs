@@ -32,9 +32,10 @@ pub fn classify(
         checker
             .resolve_call_path(map_callable(expr))
             .map_or(false, |call_path| {
-                staticmethod_decorators
-                    .iter()
-                    .any(|decorator| call_path == to_call_path(decorator))
+                call_path.as_slice() == ["", "staticmethod"]
+                    || staticmethod_decorators
+                        .iter()
+                        .any(|decorator| call_path == to_call_path(decorator))
             })
     }) {
         FunctionType::StaticMethod
@@ -51,6 +52,7 @@ pub fn classify(
         || decorator_list.iter().any(|expr| {
             // The method is decorated with a class method decorator (like `@classmethod`).
             checker.resolve_call_path(map_callable(expr)).map_or(false, |call_path| {
+                call_path.as_slice() == ["", "classmethod"] ||
                 classmethod_decorators
                     .iter()
                     .any(|decorator| call_path == to_call_path(decorator))

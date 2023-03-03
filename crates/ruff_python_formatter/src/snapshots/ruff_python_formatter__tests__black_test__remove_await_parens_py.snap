@@ -123,10 +123,9 @@ async def main():
 +    await (asyncio.sleep(1))  # Hello
  
  
--async def main():
+ async def main():
 -    await asyncio.sleep(1)  # Hello
-+async def main():  # Hello
-+    await (asyncio.sleep(1))
++    await (asyncio.sleep(1))  # Hello
  
  
  # Long lines
@@ -231,8 +230,8 @@ async def main():
     await (asyncio.sleep(1))  # Hello
 
 
-async def main():  # Hello
-    await (asyncio.sleep(1))
+async def main():
+    await (asyncio.sleep(1))  # Hello
 
 
 # Long lines

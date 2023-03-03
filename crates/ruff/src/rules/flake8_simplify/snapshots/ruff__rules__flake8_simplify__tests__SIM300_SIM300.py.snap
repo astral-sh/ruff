@@ -216,6 +216,24 @@ expression: diagnostics
       column: 0
     end_location:
       row: 13
-      column: 17
+      column: 18
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: (60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 52
+  fix:
+    content: (60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 14
+      column: 52
   parent: ~
 

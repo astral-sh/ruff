@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{define_violation, derive_message_formats, CacheKey};
 use ruff_python::identifiers::is_module_name;
 
 use crate::ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
@@ -15,7 +15,7 @@ use crate::violation::{AutofixKind, Availability, Violation};
 
 pub type Settings = Strictness;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Strictness {
     /// Ban imports that extend into the parent module or beyond.
@@ -94,6 +94,10 @@ fn fix_banned_relative_import(
 ) -> Option<Fix> {
     // Only fix is the module path is known.
     if let Some(mut parts) = module_path.cloned() {
+        if *level? >= parts.len() {
+            return None;
+        }
+
         // Remove relative level from module path.
         for _ in 0..*level? {
             parts.pop();

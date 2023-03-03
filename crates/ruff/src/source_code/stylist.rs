@@ -180,7 +180,9 @@ fn detect_quote(contents: &str, locator: &Locator) -> Option<Quote> {
         if let Tok::String { .. } = tok {
             let content = locator.slice(&Range::new(start, end));
             if let Some(pattern) = leading_quote(content) {
-                if pattern.contains('\'') {
+                if pattern.contains("\"\"\"") {
+                    continue;
+                } else if pattern.contains('\'') {
                     return Some(Quote::Single);
                 } else if pattern.contains('"') {
                     return Some(Quote::Double);
@@ -276,13 +278,27 @@ x = (
         let locator = Locator::new(contents);
         assert_eq!(detect_quote(contents, &locator), Some(Quote::Double));
 
+        let contents = r#"s = "It's done.""#;
+        let locator = Locator::new(contents);
+        assert_eq!(detect_quote(contents, &locator), Some(Quote::Double));
+
+        // No style if only double quoted docstring (will take default Double)
         let contents = r#"
 def f():
     """Docstring."""
     pass
 "#;
         let locator = Locator::new(contents);
-        assert_eq!(detect_quote(contents, &locator), Some(Quote::Double));
+        assert_eq!(detect_quote(contents, &locator), None);
+
+        // Detect from string literal appearing after docstring
+        let contents = r#"
+"""Module docstring."""
+
+a = 'v'
+"#;
+        let locator = Locator::new(contents);
+        assert_eq!(detect_quote(contents, &locator), Some(Quote::Single));
     }
 
     #[test]

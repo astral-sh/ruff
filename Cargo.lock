@@ -1405,7 +1405,6 @@ dependencies = [
  "autocfg",
  "num-integer",
  "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -1415,7 +1414,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "02e0d21255c828d6f128a1e41534206671e8c3ea0c62f32291e808dc82cff17d"
 dependencies = [
  "num-traits",
- "serde",
 ]
 
 [[package]]
@@ -1445,27 +1443,6 @@ checksum = "0fac9e2da13b5eb447a6ce3d392f23a29d8694bff781bf03a16cd9ac8697593b"
 dependencies = [
  "hermit-abi 0.2.6",
  "libc",
-]
-
-[[package]]
-name = "num_enum"
-version = "0.5.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e0072973714303aa6e3631c7e8e777970cf4bdd25dc4932e41031027b8bcc4e"
-dependencies = [
- "num_enum_derive",
-]
-
-[[package]]
-name = "num_enum_derive"
-version = "0.5.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0629cbd6b897944899b1f10496d9c4a7ac5878d45fd61bc22e9e79bfbbc29597"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -1758,16 +1735,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro-crate"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66618389e4ec1c7afe67d51a9bf34ff9236480f8d51e7489b7d5ab0303c13f34"
-dependencies = [
- "once_cell",
- "toml_edit",
-]
-
-[[package]]
 name = "proc-macro-error"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2015,6 +1982,7 @@ dependencies = [
  "path-absolutize",
  "regex",
  "result-like",
+ "ruff_cache",
  "ruff_macros",
  "ruff_python",
  "ruff_rustpython",
@@ -2036,6 +2004,17 @@ dependencies = [
  "toml",
  "wasm-bindgen",
  "wasm-bindgen-test",
+]
+
+[[package]]
+name = "ruff_cache"
+version = "0.0.0"
+dependencies = [
+ "filetime",
+ "globset",
+ "itertools",
+ "regex",
+ "ruff_macros",
 ]
 
 [[package]]
@@ -2066,6 +2045,7 @@ dependencies = [
  "rayon",
  "regex",
  "ruff",
+ "ruff_cache",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2141,6 +2121,7 @@ dependencies = [
  "clap 4.1.6",
  "insta",
  "is-macro",
+ "itertools",
  "once_cell",
  "ruff_formatter",
  "ruff_python",
@@ -2230,7 +2211,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
+source = "git+https://github.com/RustPython/RustPython.git?rev=822f6a9fa6b9142413634858c4c6908f678ce887#822f6a9fa6b9142413634858c4c6908f678ce887"
 dependencies = [
  "num-bigint",
  "rustpython-compiler-core",
@@ -2239,7 +2220,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
+source = "git+https://github.com/RustPython/RustPython.git?rev=822f6a9fa6b9142413634858c4c6908f678ce887#822f6a9fa6b9142413634858c4c6908f678ce887"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2264,24 +2245,21 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
+source = "git+https://github.com/RustPython/RustPython.git?rev=822f6a9fa6b9142413634858c4c6908f678ce887#822f6a9fa6b9142413634858c4c6908f678ce887"
 dependencies = [
- "bincode",
  "bitflags",
  "bstr 0.2.17",
  "itertools",
  "lz4_flex",
  "num-bigint",
  "num-complex",
- "num_enum",
  "serde",
- "thiserror",
 ]
 
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=351d464448607413dc12de6905f1165f8d45af54#351d464448607413dc12de6905f1165f8d45af54"
+source = "git+https://github.com/RustPython/RustPython.git?rev=822f6a9fa6b9142413634858c4c6908f678ce887#822f6a9fa6b9142413634858c4c6908f678ce887"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2296,7 +2274,7 @@ dependencies = [
  "rustc-hash",
  "rustpython-ast",
  "rustpython-compiler-core",
- "thiserror",
+ "serde",
  "tiny-keccak",
  "unic-emoji-char",
  "unic-ucd-ident",
@@ -2947,9 +2925,11 @@ checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
 name = "unicode_names2"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "029df4cc8238cefc911704ff8fa210853a0f3bce2694d8f51181dd41ee0f3301"
+version = "0.6.0"
+source = "git+https://github.com/youknowone/unicode_names2.git?rev=4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde#4ce16aa85cbcdd9cc830410f1a72ef9a235f2fde"
+dependencies = [
+ "phf",
+]
 
 [[package]]
 name = "untrusted"

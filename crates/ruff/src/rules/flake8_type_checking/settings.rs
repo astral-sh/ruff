@@ -1,6 +1,6 @@
 //! Settings for the `flake8-type-checking` plugin.
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -36,7 +36,7 @@ pub struct Options {
     pub exempt_modules: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
     pub strict: bool,
     pub exempt_modules: Vec<String>,

@@ -57,7 +57,21 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundArithmeticOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundBitwiseOrShiftOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundModuloOperator,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::WhitespaceBeforeParameters,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
@@ -327,6 +341,7 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::ImportReplacements,
     rules::pyupgrade::rules::OutdatedVersionBlock,
     rules::pyupgrade::rules::QuotedAnnotation,
+    rules::pyupgrade::rules::IsinstanceWithTuple,
     // pydocstyle
     rules::pydocstyle::rules::PublicModule,
     rules::pydocstyle::rules::PublicClass,
@@ -462,6 +477,7 @@ ruff_macros::register_rules!(
     rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pyi
     rules::flake8_pyi::rules::PrefixTypeParams,
+    rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
     rules::flake8_pyi::rules::PassStatementStubBody,
@@ -469,6 +485,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::DocstringInStub,
     rules::flake8_pyi::rules::TypedArgumentSimpleDefaults,
     rules::flake8_pyi::rules::ArgumentSimpleDefaults,
+    rules::flake8_pyi::rules::TypeCommentInStub,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     rules::flake8_pytest_style::rules::FixturePositionalArgs,
@@ -578,7 +595,6 @@ ruff_macros::register_rules!(
     rules::ruff::rules::AmbiguousUnicodeCharacterString,
     rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,
     rules::ruff::rules::AmbiguousUnicodeCharacterComment,
-    rules::ruff::rules::KeywordArgumentBeforeStarArgument,
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
@@ -823,19 +839,25 @@ impl Rule {
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::TrailingCommaProhibited => &LintSource::Tokens,
+            | Rule::TrailingCommaProhibited
+            | Rule::TypeCommentInStub => &LintSource::Tokens,
             Rule::IOError => &LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => &LintSource::Filesystem,
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MissingWhitespaceAfterKeyword
+            | Rule::MissingWhitespaceAroundArithmeticOperator
+            | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
+            | Rule::MissingWhitespaceAroundModuloOperator
+            | Rule::MissingWhitespaceAroundOperator
+            | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::MultipleLeadingHashesForBlockComment
             | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
-            | Rule::MissingWhitespaceAfterKeyword
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
             | Rule::NoSpaceAfterBlockComment
@@ -848,8 +870,10 @@ impl Rule {
             | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
+            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
+            | Rule::WhitespaceBeforeParameters
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }

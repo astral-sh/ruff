@@ -29,6 +29,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E203") => Rule::WhitespaceBeforePunctuation,
         #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E211") => Rule::WhitespaceBeforeParameters,
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E221") => Rule::MultipleSpacesBeforeOperator,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E222") => Rule::MultipleSpacesAfterOperator,
@@ -36,6 +38,18 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E223") => Rule::TabBeforeOperator,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E224") => Rule::TabAfterOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E225") => Rule::MissingWhitespaceAroundOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E226") => Rule::MissingWhitespaceAroundArithmeticOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E227") => Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E228") => Rule::MissingWhitespaceAroundModuloOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E251") => Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E252") => Rule::MissingWhitespaceAroundParameterEquals,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E261") => Rule::TooFewSpacesBeforeInlineComment,
         #[cfg(feature = "logical_lines")]
@@ -340,6 +354,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pyupgrade, "035") => Rule::ImportReplacements,
         (Pyupgrade, "036") => Rule::OutdatedVersionBlock,
         (Pyupgrade, "037") => Rule::QuotedAnnotation,
+        (Pyupgrade, "038") => Rule::IsinstanceWithTuple,
 
         // pydocstyle
         (Pydocstyle, "100") => Rule::PublicModule,
@@ -488,6 +503,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-pyi
         (Flake8Pyi, "001") => Rule::PrefixTypeParams,
+        (Flake8Pyi, "006") => Rule::BadVersionInfoComparison,
         (Flake8Pyi, "007") => Rule::UnrecognizedPlatformCheck,
         (Flake8Pyi, "008") => Rule::UnrecognizedPlatformName,
         (Flake8Pyi, "009") => Rule::PassStatementStubBody,
@@ -495,6 +511,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "011") => Rule::TypedArgumentSimpleDefaults,
         (Flake8Pyi, "014") => Rule::ArgumentSimpleDefaults,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
+        (Flake8Pyi, "033") => Rule::TypeCommentInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::IncorrectFixtureParenthesesStyle,
@@ -617,7 +634,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "001") => Rule::AmbiguousUnicodeCharacterString,
         (Ruff, "002") => Rule::AmbiguousUnicodeCharacterDocstring,
         (Ruff, "003") => Rule::AmbiguousUnicodeCharacterComment,
-        (Ruff, "004") => Rule::KeywordArgumentBeforeStarArgument,
         (Ruff, "005") => Rule::UnpackInsteadOfConcatenatingToCollectionLiteral,
         (Ruff, "006") => Rule::AsyncioDanglingTask,
         (Ruff, "100") => Rule::UnusedNOQA,

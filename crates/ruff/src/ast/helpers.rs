@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use bitflags::bitflags;
 use itertools::Itertools;
 use log::error;
 use once_cell::sync::Lazy;
@@ -575,33 +576,32 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
     })
 }
 
+bitflags! {
+    pub struct Exceptions: u32 {
+        const NAME_ERROR = 0b0000_0001;
+        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
+    }
+}
+
 /// Extract the names of all handled exceptions.
-pub fn extract_handler_names(handlers: &[Excepthandler]) -> Vec<CallPath> {
-    // TODO(charlie): Use `resolve_call_path` to avoid false positives for
-    // overridden builtins.
-    let mut handler_names = vec![];
+pub fn extract_handled_exceptions(handlers: &[Excepthandler]) -> Vec<&Expr> {
+    let mut handled_exceptions = Vec::new();
     for handler in handlers {
         match &handler.node {
             ExcepthandlerKind::ExceptHandler { type_, .. } => {
                 if let Some(type_) = type_ {
                     if let ExprKind::Tuple { elts, .. } = &type_.node {
                         for type_ in elts {
-                            let call_path = collect_call_path(type_);
-                            if !call_path.is_empty() {
-                                handler_names.push(call_path);
-                            }
+                            handled_exceptions.push(type_);
                         }
                     } else {
-                        let call_path = collect_call_path(type_);
-                        if !call_path.is_empty() {
-                            handler_names.push(call_path);
-                        }
+                        handled_exceptions.push(type_);
                     }
                 }
             }
         }
     }
-    handler_names
+    handled_exceptions
 }
 
 /// Return the set of all bound argument names.
@@ -765,7 +765,7 @@ pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath
     call_path
 }
 
-/// A [`Visitor`] that collects all return statements in a function or method.
+/// A [`Visitor`] that collects all `return` statements in a function or method.
 #[derive(Default)]
 pub struct ReturnStatementVisitor<'a> {
     pub returns: Vec<Option<&'a Expr>>,
@@ -782,6 +782,48 @@ where
             }
             StmtKind::Return { value } => self.returns.push(value.as_deref()),
             _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+}
+
+/// A [`Visitor`] that collects all `raise` statements in a function or method.
+#[derive(Default)]
+pub struct RaiseStatementVisitor<'a> {
+    pub raises: Vec<(Range, Option<&'a Expr>, Option<&'a Expr>)>,
+}
+
+impl<'a, 'b> Visitor<'b> for RaiseStatementVisitor<'b>
+where
+    'b: 'a,
+{
+    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+        match &stmt.node {
+            StmtKind::Raise { exc, cause } => {
+                self.raises
+                    .push((Range::from_located(stmt), exc.as_deref(), cause.as_deref()));
+            }
+            StmtKind::ClassDef { .. }
+            | StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+            | StmtKind::Try { .. }
+            | StmtKind::TryStar { .. } => {}
+            StmtKind::If { body, orelse, .. } => {
+                visitor::walk_body(self, body);
+                visitor::walk_body(self, orelse);
+            }
+            StmtKind::While { body, .. }
+            | StmtKind::With { body, .. }
+            | StmtKind::AsyncWith { body, .. }
+            | StmtKind::For { body, .. }
+            | StmtKind::AsyncFor { body, .. } => {
+                visitor::walk_body(self, body);
+            }
+            StmtKind::Match { cases, .. } => {
+                for case in cases {
+                    visitor::walk_body(self, &case.body);
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -1069,6 +1111,32 @@ pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
             end_location,
         });
     range
+}
+
+/// Given a statement, find its "logical end".
+///
+/// For example: the statement could be following by a trailing semicolon, by an end-of-line
+/// comment, or by any number of continuation lines (and then by a comment, and so on).
+pub fn end_of_statement(stmt: &Stmt, locator: &Locator) -> Location {
+    let contents = locator.skip(stmt.end_location.unwrap());
+
+    // End-of-file, so just return the end of the statement.
+    if contents.is_empty() {
+        return stmt.end_location.unwrap();
+    }
+
+    // Otherwise, find the end of the last line that's "part of" the statement.
+    for (lineno, line) in contents.lines().enumerate() {
+        if line.ends_with('\\') {
+            continue;
+        }
+        return to_absolute(
+            Location::new(lineno + 1, line.chars().count()),
+            stmt.end_location.unwrap(),
+        );
+    }
+
+    unreachable!("Expected to find end-of-statement")
 }
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.

@@ -42,8 +42,8 @@ mod tests {
             &indexer,
             &directives,
             &settings,
-            flags::Autofix::Enabled,
             flags::Noqa::Enabled,
+            flags::Autofix::Enabled,
         );
         let actual = diagnostics
             .iter()

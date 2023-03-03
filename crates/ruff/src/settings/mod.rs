@@ -5,13 +5,13 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use globset::Glob;
+use globset::{Glob, GlobMatcher};
+use regex::Regex;
+use ruff_cache::cache_dir;
 use rustc_hash::{FxHashMap, FxHashSet};
 use strum::IntoEnumIterator;
 
-use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
 use self::rule_table::RuleTable;
-use crate::cache::cache_dir;
 use crate::registry::{Rule, RuleNamespace, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
@@ -21,13 +21,13 @@ use crate::rules::{
     isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat};
+use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
 use crate::warn_user_once;
+use ruff_macros::CacheKey;
 
 pub mod configuration;
 pub mod defaults;
 pub mod flags;
-pub mod hashable;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
@@ -74,31 +74,27 @@ pub struct CliSettings {
     pub update_check: bool,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub rules: RuleTable,
-    pub per_file_ignores: Vec<(
-        HashableGlobMatcher,
-        HashableGlobMatcher,
-        HashableHashSet<Rule>,
-    )>,
+    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<Rule>)>,
 
     pub show_source: bool,
     pub target_version: PythonVersion,
 
     // Resolver settings
-    pub exclude: HashableGlobSet,
-    pub extend_exclude: HashableGlobSet,
+    pub exclude: FilePatternSet,
+    pub extend_exclude: FilePatternSet,
     pub force_exclude: bool,
     pub respect_gitignore: bool,
     pub project_root: PathBuf,
 
     // Rule-specific settings
-    pub allowed_confusables: HashableHashSet<char>,
+    pub allowed_confusables: FxHashSet<char>,
     pub builtins: Vec<String>,
-    pub dummy_variable_rgx: HashableRegex,
-    pub external: HashableHashSet<String>,
+    pub dummy_variable_rgx: Regex,
+    pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub namespace_packages: Vec<PathBuf>,
@@ -146,18 +142,16 @@ impl Settings {
             allowed_confusables: config
                 .allowed_confusables
                 .map(FxHashSet::from_iter)
-                .unwrap_or_default()
-                .into(),
+                .unwrap_or_default(),
             builtins: config.builtins.unwrap_or_default(),
             dummy_variable_rgx: config
                 .dummy_variable_rgx
-                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone())
-                .into(),
-            exclude: HashableGlobSet::new(
+                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone()),
+            exclude: FilePatternSet::try_from_vec(
                 config.exclude.unwrap_or_else(|| defaults::EXCLUDE.clone()),
             )?,
-            extend_exclude: HashableGlobSet::new(config.extend_exclude)?,
-            external: FxHashSet::from_iter(config.external.unwrap_or_default()).into(),
+            extend_exclude: FilePatternSet::try_from_vec(config.extend_exclude)?,
+            external: FxHashSet::from_iter(config.external.unwrap_or_default()),
 
             force_exclude: config.force_exclude.unwrap_or(false),
 
@@ -414,13 +408,7 @@ impl From<&Configuration> for RuleTable {
 /// Given a list of patterns, create a `GlobSet`.
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
-) -> Result<
-    Vec<(
-        HashableGlobMatcher,
-        HashableGlobMatcher,
-        HashableHashSet<Rule>,
-    )>,
-> {
+) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<Rule>)>> {
     per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {
@@ -431,7 +419,7 @@ pub fn resolve_per_file_ignores(
             // Construct basename matcher.
             let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-            Ok((absolute.into(), basename.into(), per_file_ignore.rules))
+            Ok((absolute, basename, per_file_ignore.rules))
         })
         .collect()
 }

@@ -16,8 +16,8 @@ pub struct Args {
 
 pub fn main(args: &Args) -> Result<()> {
     let contents = fs::read_to_string(&args.file)?;
-    for (_, tok, _) in lexer::lex(&contents, Mode::Module).flatten() {
-        println!("{tok:#?}");
+    for (start, tok, end) in lexer::lex(&contents, Mode::Module).flatten() {
+        println!("{start:#?} {tok:#?} {end:#?}");
     }
     Ok(())
 }

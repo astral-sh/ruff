@@ -194,5 +194,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
 /// during formatting) and `Parenthesize` (which are used during formatting).
 pub fn normalize_parentheses(python_cst: &mut [Stmt], locator: &Locator) {
     let mut normalizer = ParenthesesNormalizer { locator };
-    normalizer.visit_body(python_cst);
+    for stmt in python_cst {
+        normalizer.visit_stmt(stmt);
+    }
 }

@@ -62,4 +62,14 @@ expression: diagnostics
     column: 23
   fix: ~
   parent: ~
+- kind:
+    ManualDictLookup: ~
+  location:
+    row: 79
+    column: 0
+  end_location:
+    row: 86
+    column: 15
+  fix: ~
+  parent: ~
 

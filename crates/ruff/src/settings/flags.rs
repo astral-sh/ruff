@@ -1,6 +1,7 @@
 use crate::fix;
+use ruff_macros::CacheKey;
 
-#[derive(Debug, Copy, Clone, Hash, result_like::BoolLike)]
+#[derive(Debug, Copy, Clone, CacheKey, result_like::BoolLike)]
 pub enum Autofix {
     Enabled,
     Disabled,

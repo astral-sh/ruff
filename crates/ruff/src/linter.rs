@@ -22,6 +22,7 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::{add_noqa, rule_is_ignored};
 use crate::registry::{Diagnostic, Rule};
+use crate::resolver::is_interface_definition_path;
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
@@ -85,7 +86,14 @@ pub fn check_path<'a>(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
-        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
+        let is_interface_definition = is_interface_definition_path(path);
+        diagnostics.extend(check_tokens(
+            locator,
+            &tokens,
+            settings,
+            autofix,
+            is_interface_definition,
+        ));
     }
 
     // Run the filesystem-based rules.
@@ -103,7 +111,13 @@ pub fn check_path<'a>(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
-        diagnostics.extend(check_logical_lines(&tokens, locator, stylist, settings));
+        diagnostics.extend(check_logical_lines(
+            &tokens,
+            locator,
+            stylist,
+            settings,
+            flags::Autofix::Enabled,
+        ));
     }
 
     // Run the AST-based rules.
@@ -259,8 +273,8 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
         &indexer,
         &directives,
         settings,
-        flags::Autofix::Disabled,
         flags::Noqa::Disabled,
+        flags::Autofix::Disabled,
     );
 
     // Log any parse errors.
@@ -291,6 +305,7 @@ pub fn lint_only(
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
+    noqa: flags::Noqa,
     autofix: flags::Autofix,
 ) -> LinterResult<(Vec<Message>, FxHashMap<Option<PathBuf>, Vec<Import>>)> {
     // Tokenize once.
@@ -320,8 +335,8 @@ pub fn lint_only(
         &indexer,
         &directives,
         settings,
+        noqa,
         autofix,
-        flags::Noqa::Enabled,
     );
 
     // Convert from diagnostics to messages.
@@ -352,6 +367,7 @@ pub fn lint_fix<'a>(
     contents: &'a str,
     path: &Path,
     package: Option<&Path>,
+    noqa: flags::Noqa,
     settings: &Settings,
 ) -> Result<(
     LinterResult<(Vec<Message>, FxHashMap<Option<PathBuf>, Vec<Import>>)>,
@@ -398,8 +414,8 @@ pub fn lint_fix<'a>(
             &indexer,
             &directives,
             settings,
+            noqa,
             flags::Autofix::Enabled,
-            flags::Noqa::Enabled,
         );
 
         if iterations == 0 {

@@ -117,6 +117,9 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                         if summary.starred {
                             return;
                         }
+                        if !summary.keywords.is_empty() {
+                            return;
+                        }
 
                         let message_args = call_args.args.len() - 1;
 

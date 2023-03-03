@@ -1,4 +1,4 @@
-use crate::cst::{Expr, ExprKind, Unaryop};
+use crate::cst::{Expr, ExprKind, UnaryOpKind};
 
 pub fn is_self_closing(expr: &Expr) -> bool {
     match &expr.node {
@@ -56,7 +56,7 @@ pub fn is_self_closing(expr: &Expr) -> bool {
 pub fn is_simple_slice(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::UnaryOp { op, operand } => {
-            if matches!(op, Unaryop::Not) {
+            if matches!(op.node, UnaryOpKind::Not) {
                 false
             } else {
                 is_simple_slice(operand)
@@ -73,7 +73,7 @@ pub fn is_simple_slice(expr: &Expr) -> bool {
 pub fn is_simple_power(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::UnaryOp { op, operand } => {
-            if matches!(op, Unaryop::Not) {
+            if matches!(op.node, UnaryOpKind::Not) {
                 false
             } else {
                 is_simple_slice(operand)

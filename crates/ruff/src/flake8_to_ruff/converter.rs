@@ -577,6 +577,7 @@ mod tests {
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
                 ignore_decorators: None,
+                property_decorators: None,
             }),
             ..default_options([Linter::Pydocstyle.into()])
         });
