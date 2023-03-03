@@ -34,7 +34,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
             &settings::Settings {
-                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']).into(),
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
                 ..settings::Settings::for_rules(vec![
                     Rule::AmbiguousUnicodeCharacterString,
                     Rule::AmbiguousUnicodeCharacterDocstring,

@@ -2,13 +2,13 @@
 
 use std::collections::BTreeSet;
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::registry::Rule;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Convention {
     /// Use Google-style docstrings.
@@ -112,7 +112,7 @@ pub struct Options {
     pub property_decorators: Option<Vec<String>>,
 }
 
-#[derive(Debug, Default, Hash)]
+#[derive(Debug, Default, CacheKey)]
 pub struct Settings {
     pub convention: Option<Convention>,
     pub ignore_decorators: BTreeSet<String>,

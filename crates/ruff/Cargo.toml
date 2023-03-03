@@ -19,6 +19,7 @@ doctest = false
 ruff_macros = { path = "../ruff_macros" }
 ruff_python = { path = "../ruff_python" }
 ruff_rustpython = { path = "../ruff_rustpython" }
+ruff_cache = { path = "../ruff_cache" }
 
 anyhow = { workspace = true }
 bisection = { version = "0.1.0" }

@@ -1,0 +1,15 @@
+[package]
+name = "ruff_cache"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+itertools = { workspace = true }
+globset = { version = "0.4.9" }
+regex = { workspace = true }
+filetime = { version = "0.2.17" }
+
+[dev-dependencies]
+ruff_macros = { path = "../ruff_macros" }

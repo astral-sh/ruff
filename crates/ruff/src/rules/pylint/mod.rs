@@ -99,7 +99,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pylint/too_many_arguments_params.py"),
             &Settings {
-                dummy_variable_rgx: Regex::new(r"skip_.*").unwrap().into(),
+                dummy_variable_rgx: Regex::new(r"skip_.*").unwrap(),
                 ..Settings::for_rules(vec![Rule::TooManyArguments])
             },
         )?;

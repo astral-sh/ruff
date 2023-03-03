@@ -1,6 +1,6 @@
 //! Settings for the `flake8-pytest-style` plugin.
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -113,7 +113,7 @@ pub struct Options {
     pub mark_parentheses: Option<bool>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
     pub fixture_parentheses: bool,
     pub parametrize_names_type: types::ParametrizeNameType,

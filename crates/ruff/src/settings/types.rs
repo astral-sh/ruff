@@ -1,22 +1,23 @@
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, bail, Result};
 use clap::ValueEnum;
-use globset::{Glob, GlobSetBuilder};
+use globset::{Glob, GlobSet, GlobSetBuilder};
+use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_macros::CacheKey;
 use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use super::hashable::HashableHashSet;
 use crate::registry::Rule;
 use crate::rule_selector::RuleSelector;
 use crate::{fs, warn_user_once};
 
 #[derive(
-    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
+    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, JsonSchema, CacheKey,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum PythonVersion {
@@ -61,7 +62,7 @@ impl PythonVersion {
     }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, Clone, CacheKey, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),
     User(String, PathBuf),
@@ -97,11 +98,51 @@ impl FromStr for FilePattern {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct FilePatternSet {
+    set: GlobSet,
+    cache_key: u64,
+}
+
+impl FilePatternSet {
+    pub fn try_from_vec(patterns: Vec<FilePattern>) -> Result<Self, anyhow::Error> {
+        let mut builder = GlobSetBuilder::new();
+        let mut hasher = CacheKeyHasher::new();
+
+        for pattern in patterns {
+            pattern.cache_key(&mut hasher);
+            pattern.add_to(&mut builder)?;
+        }
+
+        let set = builder.build()?;
+
+        Ok(FilePatternSet {
+            set,
+            cache_key: hasher.finish(),
+        })
+    }
+}
+
+impl Deref for FilePatternSet {
+    type Target = GlobSet;
+
+    fn deref(&self) -> &Self::Target {
+        &self.set
+    }
+}
+
+impl CacheKey for FilePatternSet {
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        state.write_usize(self.set.len());
+        state.write_u64(self.cache_key);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PerFileIgnore {
     pub(crate) basename: String,
     pub(crate) absolute: PathBuf,
-    pub(crate) rules: HashableHashSet<Rule>,
+    pub(crate) rules: FxHashSet<Rule>,
 }
 
 impl PerFileIgnore {
@@ -116,7 +157,7 @@ impl PerFileIgnore {
         Self {
             basename: pattern,
             absolute,
-            rules: rules.into(),
+            rules,
         }
     }
 }
