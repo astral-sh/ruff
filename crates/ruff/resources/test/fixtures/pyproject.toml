@@ -25,22 +25,7 @@ avoid-escape = true
 max-complexity = 10
 
 [tool.ruff.pep8-naming]
-ignore-names = [
-  "setUp",
-  "tearDown",
-  "setUpClass",
-  "tearDownClass",
-  "setUpModule",
-  "tearDownModule",
-  "asyncSetUp",
-  "asyncTearDown",
-  "setUpTestData",
-  "failureException",
-  "longMessage",
-  "maxDiff",
-]
-classmethod-decorators = ["classmethod", "pydantic.validator"]
-staticmethod-decorators = ["staticmethod"]
+classmethod-decorators = ["pydantic.validator"]
 
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "parents"

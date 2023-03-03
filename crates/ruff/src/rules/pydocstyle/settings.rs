@@ -94,8 +94,7 @@ pub struct Options {
         "#
     )]
     /// Ignore docstrings for functions or methods decorated with the
-    /// specified decorators. Unlike the `pydocstyle`, Ruff accepts an array
-    /// of fully-qualified module identifiers, instead of a regular expression.
+    /// specified fully-qualified decorators.
     pub ignore_decorators: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
@@ -104,10 +103,12 @@ pub struct Options {
             property-decorators = ["gi.repository.GObject.Property"]
         "#
     )]
-    /// Consider any method decorated with one of these decorators as a property,
-    /// and consequently allow a docstring which is not in imperative mood.
-    /// Unlike pydocstyle, supplying this option doesn't disable standard
-    /// property decorators - `@property` and `@cached_property`.
+    /// A list of decorators that, when applied to a method, indicate that the
+    /// method should be treated as a property (in addition to the builtin
+    /// `@property` and standard-library `@functools.cached_property`).
+    ///
+    /// For example, Ruff will expect that any method decorated by a decorator
+    /// in this list can use a non-imperative summary line.
     pub property_decorators: Option<Vec<String>>,
 }
 
