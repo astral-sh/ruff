@@ -4,8 +4,10 @@
 use std::path::PathBuf;
 use std::{fs, str};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
+use pretty_assertions::StrComparison;
 
+use crate::generate_all::REGENERATE_ALL_COMMAND;
 use crate::ROOT_DIR;
 
 const COMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated command help. -->\n";
@@ -34,7 +36,7 @@ fn replace_docs_section(
     section: &str,
     begin_pragma: &str,
     end_pragma: &str,
-) -> Result<String> {
+) -> String {
     // Extract the prefix.
     let index = existing
         .find(begin_pragma)
@@ -47,7 +49,7 @@ fn replace_docs_section(
         .expect("Unable to find end pragma");
     let suffix = &existing[index..];
 
-    Ok(format!("{prefix}\n{section}{suffix}"))
+    format!("{prefix}\n{section}{suffix}")
 }
 
 pub fn main(args: &Args) -> Result<()> {
@@ -71,17 +73,20 @@ pub fn main(args: &Args) -> Result<()> {
             &format!("```text\n{command_help}\n```\n\n"),
             COMMAND_HELP_BEGIN_PRAGMA,
             COMMAND_HELP_END_PRAGMA,
-        )?;
+        );
         let new = replace_docs_section(
             &new,
             &format!("```text\n{subcommand_help}\n```\n\n"),
             SUBCOMMAND_HELP_BEGIN_PRAGMA,
             SUBCOMMAND_HELP_END_PRAGMA,
-        )?;
+        );
 
         if args.check {
             if existing == new {
-                println!("up-to-date: {filename}")
+                println!("up-to-date: {filename}");
+            } else {
+                let comparison = StrComparison::new(&existing, &new);
+                bail!("{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}");
             }
         } else {
             fs::write(file, &new)?;

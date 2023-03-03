@@ -17,10 +17,12 @@ pub struct Args {
 }
 
 pub fn main(args: &Args) -> Result<()> {
-    generate_docs::main(&generate_docs::Args {
-        dry_run: args.dry_run,
-        check: args.check,
-    })?;
+    // Not checked in
+    if !args.check {
+        generate_docs::main(&generate_docs::Args {
+            dry_run: args.dry_run,
+        })?;
+    }
     generate_json_schema::main(&generate_json_schema::Args {
         dry_run: args.dry_run,
         check: args.check,

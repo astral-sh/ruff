@@ -17,18 +17,6 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  cargo-build:
-    name: "cargo build"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - uses: Swatinem/rust-cache@v1
-      - run: cargo build --all
-      # Run `cargo dev generate-all` if this fails
-      - run: ./target/debug/ruff_dev generate-all --check
-
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
