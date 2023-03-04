@@ -1,12 +1,12 @@
 //! Generate CLI help.
-#![allow(clippy::print_stdout, clippy::print_stderr)]
+#![allow(clippy::print_stdout)]
 
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
 use std::{fs, str};
 
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 
 use crate::ROOT_DIR;
 
@@ -35,13 +35,13 @@ fn replace_docs_section(content: &str, begin_pragma: &str, end_pragma: &str) -> 
     // Extract the prefix.
     let index = existing
         .find(begin_pragma)
-        .expect("Unable to find begin pragma");
+        .with_context(|| "Unable to find begin pragma")?;
     let prefix = &existing[..index + begin_pragma.len()];
 
     // Extract the suffix.
     let index = existing
         .find(end_pragma)
-        .expect("Unable to find end pragma");
+        .with_context(|| "Unable to find end pragma")?;
     let suffix = &existing[index..];
 
     // Write the prefix, new contents, and suffix.
@@ -55,10 +55,10 @@ fn replace_docs_section(content: &str, begin_pragma: &str, end_pragma: &str) -> 
 
 pub fn main(args: &Args) -> Result<()> {
     // Generate `ruff help`.
-    let command_help = trim_lines(ruff_cli::command_help().trim());
+    let command_help = capture_ruff_command_output(&["help"])?;
 
     // Generate `ruff help check`.
-    let subcommand_help = trim_lines(ruff_cli::subcommand_help().trim());
+    let subcommand_help = capture_ruff_command_output(&["help", "check"])?;
 
     if args.dry_run {
         print!("{command_help}");
@@ -77,4 +77,26 @@ pub fn main(args: &Args) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn capture_ruff_command_output(args: &[&str]) -> Result<String> {
+    let output = std::process::Command::new("cargo")
+        .arg("run")
+        .arg("--bin")
+        .arg("ruff")
+        .arg("-q")
+        .arg("--")
+        .args(args)
+        .output()
+        .with_context(|| "Failed to run ruff CLI")?;
+
+    if output.status.success() {
+        let stdout =
+            str::from_utf8(&output.stdout).with_context(|| "ruff stdout to be valid UTF8")?;
+        Ok(trim_lines(stdout))
+    } else {
+        let stderr =
+            String::from_utf8(output.stderr).with_context(|| "ruff stderr to be valid UTF8")?;
+        Err(anyhow!("Running Ruff failed with\n{stderr}"))
+    }
 }

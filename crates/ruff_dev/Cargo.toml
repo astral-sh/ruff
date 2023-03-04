@@ -13,7 +13,6 @@ libcst = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }
 ruff = { path = "../ruff" }
-ruff_cli = { path = "../ruff_cli" }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
 schemars = { workspace = true }

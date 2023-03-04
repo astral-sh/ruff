@@ -2062,7 +2062,6 @@ dependencies = [
  "once_cell",
  "regex",
  "ruff",
- "ruff_cli",
  "rustpython-common",
  "rustpython-parser",
  "schemars",
