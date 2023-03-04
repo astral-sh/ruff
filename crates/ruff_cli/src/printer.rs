@@ -374,6 +374,32 @@ impl Printer {
                     writeln!(stdout, "{label}")?;
                 }
             }
+            SerializationFormat::AzureDevops => {
+                // See https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
+                for message in &diagnostics.messages {
+                    let label = format!(
+                        "{}{}{}{}{}{} {} {}",
+                        relativize_path(Path::new(&message.filename)),
+                        ":",
+                        message.location.row(),
+                        ":",
+                        message.location.column(),
+                        ":",
+                        message.kind.rule().noqa_code(),
+                        message.kind.body(),
+                    );
+                    writeln!(
+                        stdout,
+                        "##vso[task.logissue type=error\
+                        ;sourcepath={};linenumber={};columnnumber={};code={};]{}",
+                        message.filename,
+                        message.location.row(),
+                        message.location.column(),
+                        message.kind.rule().noqa_code(),
+                        label,
+                    )?;
+                }
+            }
         }
 
         stdout.flush()?;
