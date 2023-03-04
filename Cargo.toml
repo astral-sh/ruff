@@ -26,11 +26,11 @@ proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
 rustc-hash = { version = "1.1.0" }
-rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "822f6a9fa6b9142413634858c4c6908f678ce887" }
+rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "1871a1632e310985414211222f5bf8069678892f" }
 rustpython-parser = { features = [
   "lalrpop",
   "serde",
-], git = "https://github.com/RustPython/RustPython.git", rev = "822f6a9fa6b9142413634858c4c6908f678ce887" }
+], git = "https://github.com/RustPython/RustPython.git", rev = "1871a1632e310985414211222f5bf8069678892f" }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93" }
