@@ -1671,4 +1671,240 @@ expression: parse_ast
             ],
         },
     },
+    Located {
+        location: Location {
+            row: 21,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 21,
+                column: 36,
+            },
+        ),
+        custom: (),
+        node: Assign {
+            targets: [
+                Located {
+                    location: Location {
+                        row: 21,
+                        column: 0,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 21,
+                            column: 5,
+                        },
+                    ),
+                    custom: (),
+                    node: Name {
+                        id: "match",
+                        ctx: Store,
+                    },
+                },
+            ],
+            value: Located {
+                location: Location {
+                    row: 21,
+                    column: 8,
+                },
+                end_location: Some(
+                    Location {
+                        row: 21,
+                        column: 36,
+                    },
+                ),
+                custom: (),
+                node: Lambda {
+                    args: Arguments {
+                        posonlyargs: [],
+                        args: [
+                            Located {
+                                location: Location {
+                                    row: 21,
+                                    column: 15,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 21,
+                                        column: 20,
+                                    },
+                                ),
+                                custom: (),
+                                node: ArgData {
+                                    arg: "query",
+                                    annotation: None,
+                                    type_comment: None,
+                                },
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kw_defaults: [],
+                        kwarg: None,
+                        defaults: [],
+                    },
+                    body: Located {
+                        location: Location {
+                            row: 21,
+                            column: 22,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 21,
+                                column: 36,
+                            },
+                        ),
+                        custom: (),
+                        node: Compare {
+                            left: Located {
+                                location: Location {
+                                    row: 21,
+                                    column: 22,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 21,
+                                        column: 27,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name {
+                                    id: "query",
+                                    ctx: Load,
+                                },
+                            },
+                            ops: [
+                                Eq,
+                            ],
+                            comparators: [
+                                Located {
+                                    location: Location {
+                                        row: 21,
+                                        column: 31,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 21,
+                                            column: 36,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Name {
+                                        id: "event",
+                                        ctx: Load,
+                                    },
+                                },
+                            ],
+                        },
+                    },
+                },
+            },
+            type_comment: None,
+        },
+    },
+    Located {
+        location: Location {
+            row: 22,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 22,
+                column: 16,
+            },
+        ),
+        custom: (),
+        node: Expr {
+            value: Located {
+                location: Location {
+                    row: 22,
+                    column: 0,
+                },
+                end_location: Some(
+                    Location {
+                        row: 22,
+                        column: 16,
+                    },
+                ),
+                custom: (),
+                node: Call {
+                    func: Located {
+                        location: Location {
+                            row: 22,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 22,
+                                column: 5,
+                            },
+                        ),
+                        custom: (),
+                        node: Name {
+                            id: "print",
+                            ctx: Load,
+                        },
+                    },
+                    args: [
+                        Located {
+                            location: Location {
+                                row: 22,
+                                column: 6,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 22,
+                                    column: 15,
+                                },
+                            ),
+                            custom: (),
+                            node: Call {
+                                func: Located {
+                                    location: Location {
+                                        row: 22,
+                                        column: 6,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 22,
+                                            column: 11,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Name {
+                                        id: "match",
+                                        ctx: Load,
+                                    },
+                                },
+                                args: [
+                                    Located {
+                                        location: Location {
+                                            row: 22,
+                                            column: 12,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 22,
+                                                column: 14,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Constant {
+                                            value: Int(
+                                                12,
+                                            ),
+                                            kind: None,
+                                        },
+                                    },
+                                ],
+                                keywords: [],
+                            },
+                        },
+                    ],
+                    keywords: [],
+                },
+            },
+        },
+    },
 ]

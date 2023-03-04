@@ -59,11 +59,15 @@ where
                     let mut nesting = 0;
                     let mut first = true;
                     let mut seen_colon = false;
+                    let mut seen_lambda = false;
                     while let Some(Ok((_, tok, _))) = self.underlying.peek() {
                         match tok {
                             Tok::Newline => break,
+                            Tok::Lambda if nesting == 0 => seen_lambda = true,
                             Tok::Colon if nesting == 0 => {
-                                if !first {
+                                if seen_lambda {
+                                    seen_lambda = false;
+                                } else if !first {
                                     seen_colon = true;
                                 }
                             }

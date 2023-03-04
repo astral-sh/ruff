@@ -604,6 +604,8 @@ match match:
     case 1: pass
     case 2:
         pass
+match = lambda query: query == event
+print(match(12))
 "#,
             "<test>",
         )
