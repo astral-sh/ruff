@@ -1,5 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
+use ruff_macros::CacheKey;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -48,7 +49,9 @@ pub fn is_untyped_exception(type_: Option<&Expr>, checker: &Checker) -> bool {
     })
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema, Hash)]
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema, Hash, CacheKey, PartialOrd,
+)]
 pub enum Severity {
     #[default]
     Low,

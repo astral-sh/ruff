@@ -630,6 +630,17 @@
           "items": {
             "type": "string"
           }
+        },
+        "severity": {
+          "description": "The minimum severity to catch. Choose from `low`, `medium`, `high`,",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Severity"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -2230,6 +2241,14 @@
         "gitlab",
         "pylint",
         "azure"
+      ]
+    },
+    "Severity": {
+      "type": "string",
+      "enum": [
+        "Low",
+        "Medium",
+        "High"
       ]
     },
     "Strictness": {

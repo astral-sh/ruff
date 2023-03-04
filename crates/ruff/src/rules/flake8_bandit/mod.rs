@@ -12,6 +12,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::rules::flake8_bandit::helpers::Severity;
     use crate::settings::Settings;
     use crate::test::test_path;
 
@@ -58,6 +59,7 @@ mod tests {
                         "/foo".to_string(),
                     ],
                     check_typed_exception: false,
+                    severity: Severity::Low,
                 },
                 ..Settings::for_rule(Rule::HardcodedTempFile)
             },

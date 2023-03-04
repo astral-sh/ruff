@@ -1,5 +1,5 @@
 use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::Expr;
+use rustpython_parser::ast::{Expr, ExprKind};
 use smallvec::SmallVec;
 
 use crate::ast::types::Range;
@@ -185,30 +185,33 @@ fn comp_small_norm(small: &SmallVec<[&str; 8]>, norm: &&[&str]) -> bool {
 
 /// S001
 pub fn blacklist_calls(checker: &mut Checker, expr: &Expr) {
-    if let Some(message) = checker.resolve_call_path(expr).and_then(|call_path| {
-        println!("{:?}", call_path);
-        for bl_call in BLACKLISTED_CALLS {
-            for path in bl_call.calls {
-                if comp_small_norm(&call_path, path) {
-                    return Some(bl_call.message);
+    if let ExprKind::Call { func, .. } = &expr.node {
+        if let Some(message) = checker.resolve_call_path(func).and_then(|call_path| {
+            for bl_call in BLACKLISTED_CALLS {
+                if bl_call.severity >= checker.settings.flake8_bandit.severity {
+                    for path in bl_call.calls {
+                        if comp_small_norm(&call_path, path) {
+                            return Some(bl_call.message);
+                        }
+                    }
                 }
             }
-        }
-        if let Some(first_path) = call_path.first() {
-            // Both of these are high, so I am not adding conidtions for severity
-            if first_path == &"telnetlib" {
-                return Some("Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol");
-            } else if first_path == &"ftplib" {
-                return Some("FTP-related functions are being called. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol");
+            if let Some(first_path) = call_path.first() {
+                // Both of these are high, so I am not adding conidtions for severity
+                if first_path == &"telnetlib" {
+                    return Some("Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol");
+                } else if first_path == &"ftplib" {
+                    return Some("FTP-related functions are being called. FTP is considered insecure. Use SSH/SFTP/SCP or some other encrypted protocol");
+                }
             }
+            None
+        }) {
+            let issue = BlacklistCall {
+                message: message.to_string(),
+            };
+            checker
+                .diagnostics
+                .push(Diagnostic::new(issue, Range::from_located(expr)));
         }
-        None
-    }) {
-        let issue = BlacklistCall {
-            message: message.to_string(),
-        };
-        checker
-            .diagnostics
-            .push(Diagnostic::new(issue, Range::from_located(expr)));
     }
 }

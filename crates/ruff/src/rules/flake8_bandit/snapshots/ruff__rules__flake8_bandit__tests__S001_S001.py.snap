@@ -6,11 +6,22 @@ expression: diagnostics
     BlacklistCall:
       message: "Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue"
   location:
-    row: 3
+    row: 4
     column: 0
   end_location:
-    row: 3
-    column: 12
+    row: 4
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    BlacklistCall:
+      message: Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 23
   fix: ~
   parent: ~
 
