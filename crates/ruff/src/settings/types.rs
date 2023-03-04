@@ -216,7 +216,7 @@ pub enum SerializationFormat {
     Github,
     Gitlab,
     Pylint,
-    AzureDevops
+    AzureDevops,
 }
 
 impl Default for SerializationFormat {
