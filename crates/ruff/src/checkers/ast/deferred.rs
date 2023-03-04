@@ -8,6 +8,9 @@ use crate::Range;
 
 type Context<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 
+/// A collection of AST nodes that are deferred for later analysis.
+/// Used to, e.g., store functions, whose bodies shouldn't be analyzed until all
+/// module-level definitions have been analyzed.
 #[derive(Default)]
 pub struct Deferred<'a> {
     pub definitions: Vec<(Definition<'a>, Visibility, Context<'a>)>,
