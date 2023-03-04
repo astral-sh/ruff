@@ -47,6 +47,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E228") => Rule::MissingWhitespaceAroundModuloOperator,
         #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E231") => Rule::MissingWhitespace,
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E251") => Rule::UnexpectedSpacesAroundKeywordParameterEquals,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E252") => Rule::MissingWhitespaceAroundParameterEquals,

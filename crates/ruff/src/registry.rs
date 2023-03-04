@@ -53,6 +53,8 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespace,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
@@ -847,6 +849,7 @@ impl Rule {
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MissingWhitespace
             | Rule::MissingWhitespaceAfterKeyword
             | Rule::MissingWhitespaceAroundArithmeticOperator
             | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
