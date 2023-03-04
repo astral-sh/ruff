@@ -96,7 +96,7 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
 }
 
 /// See: <https://github.com/microsoft/vscode/blob/095ddabc52b82498ee7f718a34f9dd11d59099a8/src/vs/base/common/strings.ts#L1094>
-static CONFUSABLES: Lazy<FxHashMap<u32, u32>> = Lazy::new(|| {
+static CONFUSABLES: Lazy<FxHashMap<u32, u8>> = Lazy::new(|| {
     #[allow(clippy::unreadable_literal)]
     FxHashMap::from_iter([
         (8232, 32),
@@ -1701,44 +1701,42 @@ pub fn ambiguous_unicode_character(
         // Search for confusing characters.
         if let Some(representant) = CONFUSABLES.get(&(current_char as u32)) {
             if !settings.allowed_confusables.contains(&current_char) {
-                if let Some(representant) = char::from_u32(*representant) {
-                    let col = if row_offset == 0 {
-                        start.column() + col_offset
-                    } else {
-                        col_offset
-                    };
-                    let location = Location::new(start.row() + row_offset, col);
-                    let end_location = Location::new(location.row(), location.column() + 1);
-                    let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
-                        match context {
-                            Context::String => AmbiguousUnicodeCharacterString {
-                                confusable: current_char,
-                                representant,
-                            }
-                            .into(),
-                            Context::Docstring => AmbiguousUnicodeCharacterDocstring {
-                                confusable: current_char,
-                                representant,
-                            }
-                            .into(),
-                            Context::Comment => AmbiguousUnicodeCharacterComment {
-                                confusable: current_char,
-                                representant,
-                            }
-                            .into(),
-                        },
-                        Range::new(location, end_location),
-                    );
-                    if settings.rules.enabled(diagnostic.kind.rule()) {
-                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic.amend(Fix::replacement(
-                                representant.to_string(),
-                                location,
-                                end_location,
-                            ));
+                let col = if row_offset == 0 {
+                    start.column() + col_offset
+                } else {
+                    col_offset
+                };
+                let location = Location::new(start.row() + row_offset, col);
+                let end_location = Location::new(location.row(), location.column() + 1);
+                let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
+                    match context {
+                        Context::String => AmbiguousUnicodeCharacterString {
+                            confusable: current_char,
+                            representant: *representant as char,
                         }
-                        diagnostics.push(diagnostic);
+                        .into(),
+                        Context::Docstring => AmbiguousUnicodeCharacterDocstring {
+                            confusable: current_char,
+                            representant: *representant as char,
+                        }
+                        .into(),
+                        Context::Comment => AmbiguousUnicodeCharacterComment {
+                            confusable: current_char,
+                            representant: *representant as char,
+                        }
+                        .into(),
+                    },
+                    Range::new(location, end_location),
+                );
+                if settings.rules.enabled(diagnostic.kind.rule()) {
+                    if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+                        diagnostic.amend(Fix::replacement(
+                            (*representant as char).to_string(),
+                            location,
+                            end_location,
+                        ));
                     }
+                    diagnostics.push(diagnostic);
                 }
             }
         }
