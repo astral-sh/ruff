@@ -1,5 +1,8 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use anyhow::{bail, Result};
+use log::error;
 use rustpython_parser::ast::Location;
+
+use ruff_macros::{define_violation, derive_message_formats};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
@@ -30,14 +33,14 @@ const VALID_ESCAPE_SEQUENCES: &[char; 23] = &[
 ];
 
 /// Return the quotation markers used for a String token.
-fn extract_quote(text: &str) -> &str {
+fn extract_quote(text: &str) -> Result<&str> {
     for quote in ["'''", "\"\"\"", "'", "\""] {
         if text.ends_with(quote) {
-            return quote;
+            return Ok(quote);
         }
     }
 
-    panic!("Unable to find quotation mark for String token")
+    bail!("Unable to find quotation mark for String token")
 }
 
 /// W605
@@ -52,7 +55,10 @@ pub fn invalid_escape_sequence(
     let text = locator.slice(&Range::new(start, end));
 
     // Determine whether the string is single- or triple-quoted.
-    let quote = extract_quote(text);
+    let Ok(quote) = extract_quote(text) else {
+        error!("Unable to find quotation mark for string token");
+        return diagnostics;
+    };
     let quote_pos = text.find(quote).unwrap();
     let prefix = text[..quote_pos].to_lowercase();
     let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];
