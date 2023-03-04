@@ -375,6 +375,7 @@ impl Printer {
                 }
             }
             SerializationFormat::AzureDevops => {
+                // Generate error logging commands in Azure Devops format.
                 // See https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
                 for message in &diagnostics.messages {
                     let label = format!(
