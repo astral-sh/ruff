@@ -1,12 +1,11 @@
+use crate::ExitStatus;
 use ruff::settings::{
     options::Options,
     options_base::{ConfigurationOptions, OptionEntry, OptionField},
 };
 
-use crate::ExitStatus;
-
 #[allow(clippy::print_stdout)]
-pub(crate) fn config(key: Option<&str>) -> ExitStatus {
+pub fn config(key: Option<&str>) -> ExitStatus {
     let Some(entry) = Options::get(key) else {
         println!("Unknown option");
         return ExitStatus::Error;
