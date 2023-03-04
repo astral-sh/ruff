@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
+use crate::rules::flake8_bandit::helpers::Severity;
+
 fn default_tmp_dirs() -> Vec<String> {
     ["/tmp", "/var/tmp", "/dev/shm"]
         .map(std::string::ToString::to_string)
@@ -44,12 +46,16 @@ pub struct Options {
     /// exception types. By default, `try`-`except`-`pass` is only
     /// disallowed for `Exception` and `BaseException`.
     pub check_typed_exception: Option<bool>,
+    #[option(default = "", value_type = "str", example = "severity = low")]
+    /// The minimum severity to catch. Choose from `low`, `medium`, `high`,
+    pub severity: Option<Severity>,
 }
 
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     pub hardcoded_tmp_directory: Vec<String>,
     pub check_typed_exception: bool,
+    pub severity: Severity,
 }
 
 impl From<Options> for Settings {
@@ -67,6 +73,7 @@ impl From<Options> for Settings {
                 )
                 .collect(),
             check_typed_exception: options.check_typed_exception.unwrap_or(false),
+            severity: options.severity.unwrap_or_default(),
         }
     }
 }
@@ -77,6 +84,7 @@ impl From<Settings> for Options {
             hardcoded_tmp_directory: Some(settings.hardcoded_tmp_directory),
             hardcoded_tmp_directory_extend: None,
             check_typed_exception: Some(settings.check_typed_exception),
+            severity: Some(settings.severity),
         }
     }
 }
@@ -86,6 +94,7 @@ impl Default for Settings {
         Self {
             hardcoded_tmp_directory: default_tmp_dirs(),
             check_typed_exception: false,
+            severity: Severity::default(),
         }
     }
 }

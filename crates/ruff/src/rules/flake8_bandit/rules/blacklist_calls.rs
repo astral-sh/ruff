@@ -5,6 +5,7 @@ use smallvec::SmallVec;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
+use crate::rules::flake8_bandit::helpers::Severity;
 use crate::violation::Violation;
 
 define_violation!(
@@ -22,11 +23,16 @@ impl Violation for BlacklistCall {
 struct BLCall<'a> {
     calls: &'a [&'a [&'a str]],
     message: &'a str,
+    severity: Severity,
 }
 
 impl<'a> BLCall<'a> {
-    pub const fn new(calls: &'a [&'a [&'a str]], message: &'a str) -> Self {
-        Self { calls, message }
+    pub const fn new(calls: &'a [&'a [&'a str]], message: &'a str, severity: Severity) -> Self {
+        Self {
+            calls,
+            message,
+            severity,
+        }
     }
 }
 
@@ -46,14 +52,16 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
             &["jsonpickle", "unpickler", "decode"],
             &["pandas", "read_pickle"],
         ],
-        "Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue"
+        "Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue",
+        Severity::Medium
     ),
     BLCall::new(
         &[
             &["marshal", "loads"],
             &["marshal", "load"],
         ],
-        "Deserialization with the marshal module is possibly dangerous"
+        "Deserialization with the marshal module is possibly dangerous",
+        Severity::Medium
     ),
     BLCall::new(
         &[
@@ -72,7 +80,8 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
             &["cryptography", "hazmat", "primitives", "hashes", "MD5"],
             &["cryptography", "hazmat", "primitives", "hashes", "SHA1"],
         ],
-        "Use of insecure MD2, MD4, MD5, or SHA1 hash function."
+        "Use of insecure MD2, MD4, MD5, or SHA1 hash function",
+        Severity::Medium
     ),
     BLCall::new(
         &[
@@ -91,11 +100,12 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
             &["cryptography", "hazmat", "primitives", "ciphers", "algorithms", "IDEA"],
             &["cryptography", "hazmat", "primitives", "ciphers", "modes", "ECB"],
         ],
-        "Use of insecure cipher or cipher mode, replace with a known secure cipher such as AES"
+        "Use of insecure cipher or cipher mode, replace with a known secure cipher such as AES",
+        Severity::High
     ),
-    BLCall::new(&[&["tempfile", "mktemp"]], "Use of insecure and deprecated function (mktemp)"),
-    BLCall::new(&[&["eval"]], "Use of possibly insecure function - consider using safer ast.literal_eval"),
-    BLCall::new(&[&["django", "utils", "safestring", "mark_safe"]], "Use of mark_safe() may expose cross-site scripting vulnerabilities and should be reviewed."),
+    BLCall::new(&[&["tempfile", "mktemp"]], "Use of insecure and deprecated function (mktemp)", Severity::Medium),
+    BLCall::new(&[&["eval"]], "Use of possibly insecure function - consider using safer ast.literal_eval", Severity::Medium),
+    BLCall::new(&[&["django", "utils", "safestring", "mark_safe"]], "Use of mark_safe() may expose cross-site scripting vulnerabilities and should be reviewed.", Severity::Medium),
     BLCall::new(
         &[
             &["urllib", "urlopen"],
@@ -113,7 +123,8 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
             &["six", "moves", "urllib", "request", "URLopener"],
             &["six", "moves", "urllib", "request", "FancyURLopener"],
         ],
-        "Audit url open for permitted schemes. Allowing use of ‘file:’’ or custom schemes is often unexpected"
+        "Audit url open for permitted schemes. Allowing use of ‘file:’’ or custom schemes is often unexpected",
+        Severity::Medium
     ),
     BLCall::new(
         &[
@@ -125,7 +136,8 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
             &["random", "uniform"],
             &["random", "triangular"]
         ],
-        "Standard pseudo-random generators are not suitable for security/cryptographic purposes"
+        "Standard pseudo-random generators are not suitable for security/cryptographic purposes",
+        Severity::Low
         ),
     BLCall::new(&[
             &["xml", "etree", "cElementTree", "parse"],
@@ -153,9 +165,10 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
             &["lxml", "etree", "getDefaultParser"],
             &["lxml", "etree", "check_docinfo"],
         ],
-        "Using various XLM methods to parse untrusted XML data is known to be vulnerable to XML attacks. Methods should be replaced with their defusedxml equivalents"
+        "Using various XLM methods to parse untrusted XML data is known to be vulnerable to XML attacks. Methods should be replaced with their defusedxml equivalents",
+        Severity::High
     ),
-    BLCall::new(&[&["ssl", "_create_unverified_context"]], "Python allows using an insecure context via the _create_unverified_context that reverts to the previous behavior that does not validate certificates or perform hostname checks")
+    BLCall::new(&[&["ssl", "_create_unverified_context"]], "Python allows using an insecure context via the _create_unverified_context that reverts to the previous behavior that does not validate certificates or perform hostname checks", Severity::Medium)
 ];
 
 fn comp_small_norm(small: &SmallVec<[&str; 8]>, norm: &&[&str]) -> bool {
@@ -173,6 +186,7 @@ fn comp_small_norm(small: &SmallVec<[&str; 8]>, norm: &&[&str]) -> bool {
 /// S001
 pub fn blacklist_calls(checker: &mut Checker, expr: &Expr) {
     if let Some(message) = checker.resolve_call_path(expr).and_then(|call_path| {
+        println!("{:?}", call_path);
         for bl_call in BLACKLISTED_CALLS {
             for path in bl_call.calls {
                 if comp_small_norm(&call_path, path) {
@@ -181,6 +195,7 @@ pub fn blacklist_calls(checker: &mut Checker, expr: &Expr) {
             }
         }
         if let Some(first_path) = call_path.first() {
+            // Both of these are high, so I am not adding conidtions for severity
             if first_path == &"telnetlib" {
                 return Some("Telnet-related functions are being called. Telnet is considered insecure. Use SSH or some other encrypted protocol");
             } else if first_path == &"ftplib" {

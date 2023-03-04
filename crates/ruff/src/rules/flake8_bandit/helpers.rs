@@ -1,6 +1,8 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 
 use crate::checkers::ast::Checker;
 
@@ -44,4 +46,12 @@ pub fn is_untyped_exception(type_: Option<&Expr>, checker: &Checker) -> bool {
                 })
         }
     })
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema, Hash)]
+pub enum Severity {
+    #[default]
+    Low,
+    Medium,
+    High,
 }
