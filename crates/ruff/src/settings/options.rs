@@ -194,7 +194,7 @@ pub struct Options {
     pub fixable: Option<Vec<RuleSelector>>,
     #[option(
         default = r#""text""#,
-        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azuredevops""#,
+        value_type = r#""text" | "json" | "junit" | "github" | "gitlab" | "pylint" | "azure-devops""#,
         example = r#"
             # Group violations by containing file.
             format = "grouped"
@@ -205,7 +205,7 @@ pub struct Options {
     /// (machine-readable), `"junit"` (machine-readable XML), `"github"` (GitHub
     /// Actions annotations), `"gitlab"` (GitLab CI code quality report),
     /// `"pylint"` (Pylint text format) or
-    /// `"azuredevops"` (Azure Devops Pipeline logging commands).
+    /// `"azure-devops"` (Azure Devops Pipeline logging commands).
     pub format: Option<SerializationFormat>,
     #[option(
         default = r#"false"#,
