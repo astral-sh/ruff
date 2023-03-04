@@ -58,7 +58,7 @@ pub fn missing_whitespace(line: &str, row: usize, autofix: bool) -> Vec<Diagnost
             {
                 continue; // Slice syntax, no space required
             }
-            if char == ',' && ")]".contains(char) {
+            if char == ',' && ")]".contains(next_char) {
                 continue; // Allow tuple with only one element: (3,)
             }
             if char == ':' && next_char == '=' {
