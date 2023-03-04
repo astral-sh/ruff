@@ -23,7 +23,7 @@ pub fn no_eval(checker: &mut Checker, func: &Expr) {
     if id != "eval" {
         return;
     }
-    if !checker.is_builtin("eval") {
+    if !checker.ctx.is_builtin("eval") {
         return;
     }
     checker

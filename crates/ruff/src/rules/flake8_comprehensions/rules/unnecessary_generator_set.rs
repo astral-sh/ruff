@@ -53,7 +53,7 @@ pub fn unnecessary_generator_set(
     let Some(argument) = helpers::exactly_one_argument_with_matching_function("set", func, args, keywords) else {
         return;
     };
-    if !checker.is_builtin("set") {
+    if !checker.ctx.is_builtin("set") {
         return;
     }
     if let ExprKind::GeneratorExp { .. } = argument {

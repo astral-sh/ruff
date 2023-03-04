@@ -46,9 +46,13 @@ pub fn locals_in_render_function(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["django", "shortcuts", "render"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["django", "shortcuts", "render"]
+        })
+    {
         return;
     }
 
@@ -83,6 +87,7 @@ fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {
         return false
     };
     checker
+        .ctx
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["", "locals"])
 }

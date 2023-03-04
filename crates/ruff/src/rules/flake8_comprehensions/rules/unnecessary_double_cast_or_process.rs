@@ -100,7 +100,7 @@ pub fn unnecessary_double_cast_or_process(
     let Some(inner) = helpers::function_name(func) else {
         return;
     };
-    if !checker.is_builtin(inner) || !checker.is_builtin(outer) {
+    if !checker.ctx.is_builtin(inner) || !checker.ctx.is_builtin(outer) {
         return;
     }
 

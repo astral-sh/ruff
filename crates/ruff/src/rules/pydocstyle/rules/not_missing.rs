@@ -138,7 +138,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
-            if is_overload(checker, cast::decorator_list(stmt)) {
+            if is_overload(&checker.ctx, cast::decorator_list(stmt)) {
                 true
             } else {
                 if checker.settings.rules.enabled(&Rule::PublicFunction) {
@@ -151,8 +151,8 @@ pub fn not_missing(
             }
         }
         DefinitionKind::Method(stmt) => {
-            if is_overload(checker, cast::decorator_list(stmt))
-                || is_override(checker, cast::decorator_list(stmt))
+            if is_overload(&checker.ctx, cast::decorator_list(stmt))
+                || is_override(&checker.ctx, cast::decorator_list(stmt))
             {
                 true
             } else if is_init(cast::name(stmt)) {

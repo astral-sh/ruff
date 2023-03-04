@@ -31,7 +31,7 @@ impl Violation for PPrintFound {
 /// T201, T203
 pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
     let diagnostic = {
-        let call_path = checker.resolve_call_path(func);
+        let call_path = checker.ctx.resolve_call_path(func);
         if call_path
             .as_ref()
             .map_or(false, |call_path| *call_path.as_slice() == ["", "print"])
@@ -43,13 +43,13 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                 .find(|keyword| keyword.node.arg.as_ref().map_or(false, |arg| arg == "file"))
             {
                 if !is_const_none(&keyword.node.value) {
-                    if checker
-                        .resolve_call_path(&keyword.node.value)
-                        .map_or(true, |call_path| {
+                    if checker.ctx.resolve_call_path(&keyword.node.value).map_or(
+                        true,
+                        |call_path| {
                             call_path.as_slice() != ["sys", "stdout"]
                                 && call_path.as_slice() != ["sys", "stderr"]
-                        })
-                    {
+                        },
+                    ) {
                         return;
                     }
                 }

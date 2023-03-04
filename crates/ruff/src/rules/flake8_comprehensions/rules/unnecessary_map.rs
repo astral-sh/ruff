@@ -88,7 +88,7 @@ pub fn unnecessary_map(
     };
     match id {
         "map" => {
-            if !checker.is_builtin(id) {
+            if !checker.ctx.is_builtin(id) {
                 return;
             }
 
@@ -123,7 +123,7 @@ pub fn unnecessary_map(
             }
         }
         "list" | "set" => {
-            if !checker.is_builtin(id) {
+            if !checker.ctx.is_builtin(id) {
                 return;
             }
 
@@ -157,7 +157,7 @@ pub fn unnecessary_map(
             }
         }
         "dict" => {
-            if !checker.is_builtin(id) {
+            if !checker.ctx.is_builtin(id) {
                 return;
             }
 

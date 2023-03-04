@@ -38,14 +38,17 @@ const IMMUTABLE_FUNCS: &[&[&str]] = &[
 ];
 
 fn is_immutable_func(checker: &Checker, func: &Expr, extend_immutable_calls: &[CallPath]) -> bool {
-    checker.resolve_call_path(func).map_or(false, |call_path| {
-        IMMUTABLE_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-            || extend_immutable_calls
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            IMMUTABLE_FUNCS
                 .iter()
-                .any(|target| call_path == *target)
-    })
+                .any(|target| call_path.as_slice() == *target)
+                || extend_immutable_calls
+                    .iter()
+                    .any(|target| call_path == *target)
+        })
 }
 
 struct ArgumentDefaultVisitor<'a> {

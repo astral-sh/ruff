@@ -81,7 +81,7 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
     // If the target is a named variable, avoid triggering on
     // irrelevant bindings (like non-Pandas imports).
     if let ExprKind::Name { id, .. } = &value.node {
-        if checker.find_binding(id).map_or(true, |binding| {
+        if checker.ctx.find_binding(id).map_or(true, |binding| {
             if let BindingKind::Importation(.., module) = &binding.kind {
                 module != &"pandas"
             } else {

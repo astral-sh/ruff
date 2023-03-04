@@ -64,7 +64,7 @@ pub fn invalid_first_argument_name_for_class_method(
 ) -> Option<Diagnostic> {
     if !matches!(
         function_type::classify(
-            checker,
+            &checker.ctx,
             scope,
             name,
             decorator_list,

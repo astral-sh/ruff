@@ -48,7 +48,7 @@ pub fn hashlib_insecure_hash_functions(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if let Some(hashlib_call) = checker.resolve_call_path(func).and_then(|call_path| {
+    if let Some(hashlib_call) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
         if call_path.as_slice() == ["hashlib", "new"] {
             Some(HashlibCall::New)
         } else {

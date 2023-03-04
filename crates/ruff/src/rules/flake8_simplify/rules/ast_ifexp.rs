@@ -106,7 +106,7 @@ pub fn explicit_true_false_in_ifexpr(
                 expr.location,
                 expr.end_location.unwrap(),
             ));
-        } else if checker.is_builtin("bool") {
+        } else if checker.ctx.is_builtin("bool") {
             diagnostic.amend(Fix::replacement(
                 unparse_expr(
                     &create_expr(ExprKind::Call {

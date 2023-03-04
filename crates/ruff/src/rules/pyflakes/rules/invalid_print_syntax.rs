@@ -24,7 +24,7 @@ pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     if id != "print" {
         return;
     }
-    if !checker.is_builtin("print") {
+    if !checker.ctx.is_builtin("print") {
         return;
     };
     checker.diagnostics.push(Diagnostic::new(

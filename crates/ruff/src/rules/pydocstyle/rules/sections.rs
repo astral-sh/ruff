@@ -820,7 +820,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 matches!(docstring.kind, DefinitionKind::Method(_))
-                    && !is_staticmethod(checker, cast::decorator_list(parent)),
+                    && !is_staticmethod(&checker.ctx, cast::decorator_list(parent)),
             ),
         )
     {

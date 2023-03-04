@@ -35,7 +35,7 @@ pub fn blind_except(
         return;
     };
     for exception in ["BaseException", "Exception"] {
-        if id == exception && checker.is_builtin(exception) {
+        if id == exception && checker.ctx.is_builtin(exception) {
             // If the exception is re-raised, don't flag an error.
             if body.iter().any(|stmt| {
                 if let StmtKind::Raise { exc, .. } = &stmt.node {

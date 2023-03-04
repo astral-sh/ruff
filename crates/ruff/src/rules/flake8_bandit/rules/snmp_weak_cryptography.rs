@@ -27,9 +27,13 @@ pub fn snmp_weak_cryptography(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["pysnmp", "hlapi", "UsmUserData"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["pysnmp", "hlapi", "UsmUserData"]
+        })
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
         if call_args.len() < 3 {
             checker.diagnostics.push(Diagnostic::new(

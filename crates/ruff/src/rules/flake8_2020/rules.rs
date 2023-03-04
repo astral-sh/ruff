@@ -115,6 +115,7 @@ impl Violation for SysVersionSlice1Referenced {
 
 fn is_sys(checker: &Checker, expr: &Expr, target: &str) -> bool {
     checker
+        .ctx
         .resolve_call_path(expr)
         .map_or(false, |call_path| call_path.as_slice() == ["sys", target])
 }
@@ -306,6 +307,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
 /// YTT202
 pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     if checker
+        .ctx
         .resolve_call_path(expr)
         .map_or(false, |call_path| call_path.as_slice() == ["six", "PY3"])
     {

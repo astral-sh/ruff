@@ -52,7 +52,7 @@ pub fn unnecessary_generator_list(
     let Some(argument) = helpers::exactly_one_argument_with_matching_function("list", func, args, keywords) else {
         return;
     };
-    if !checker.is_builtin("list") {
+    if !checker.ctx.is_builtin("list") {
         return;
     }
     if let ExprKind::GeneratorExp { .. } = argument {

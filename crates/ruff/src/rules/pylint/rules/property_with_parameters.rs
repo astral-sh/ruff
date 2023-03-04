@@ -30,7 +30,7 @@ pub fn property_with_parameters(
     {
         return;
     }
-    if checker.is_builtin("property")
+    if checker.ctx.is_builtin("property")
         && args
             .args
             .iter()

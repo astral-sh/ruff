@@ -49,7 +49,7 @@ impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
 
 /// NPY001
 pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
-    if let Some(type_name) = checker.resolve_call_path(expr).and_then(|call_path| {
+    if let Some(type_name) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
         if call_path.as_slice() == ["numpy", "bool"]
             || call_path.as_slice() == ["numpy", "int"]
             || call_path.as_slice() == ["numpy", "float"]

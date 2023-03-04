@@ -82,10 +82,10 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         return;
     }
 
-    let Some(typing_member) = checker.resolve_call_path(value).as_ref().and_then(|call_path| {
-        if checker.match_typing_call_path(call_path, "Optional") {
+    let Some(typing_member) = checker.ctx.resolve_call_path(value).as_ref().and_then(|call_path| {
+        if checker.ctx.match_typing_call_path(call_path, "Optional") {
             Some(TypingMember::Optional)
-        } else if checker.match_typing_call_path(call_path, "Union") {
+        } else if checker.ctx.match_typing_call_path(call_path, "Union") {
             Some(TypingMember::Union)
         } else {
             None

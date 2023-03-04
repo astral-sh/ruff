@@ -103,9 +103,13 @@ pub fn unrecognized_platform(
 
     let diagnostic_unrecognized_platform_check =
         Diagnostic::new(UnrecognizedPlatformCheck, Range::from_located(expr));
-    if !checker.resolve_call_path(left).map_or(false, |call_path| {
-        call_path.as_slice() == ["sys", "platform"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(left)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["sys", "platform"]
+        })
+    {
         return;
     }
 
