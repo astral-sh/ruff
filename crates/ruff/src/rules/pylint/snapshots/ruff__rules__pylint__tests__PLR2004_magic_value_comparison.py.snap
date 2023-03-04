@@ -1,5 +1,5 @@
 ---
-source: src/rules/pylint/mod.rs
+source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
@@ -17,21 +17,43 @@ expression: diagnostics
     MagicValueComparison:
       value: "2"
   location:
-    row: 35
+    row: 38
     column: 11
   end_location:
-    row: 35
+    row: 38
     column: 12
+  fix: ~
+  parent: ~
+- kind:
+    MagicValueComparison:
+      value: "-2"
+  location:
+    row: 41
+    column: 11
+  end_location:
+    row: 41
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    MagicValueComparison:
+      value: "+2"
+  location:
+    row: 44
+    column: 11
+  end_location:
+    row: 44
+    column: 13
   fix: ~
   parent: ~
 - kind:
     MagicValueComparison:
       value: "3.141592653589793"
   location:
-    row: 56
+    row: 65
     column: 20
   end_location:
-    row: 56
+    row: 65
     column: 40
   fix: ~
   parent: ~

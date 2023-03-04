@@ -6,10 +6,10 @@ expression: diagnostics
     MagicValueComparison:
       value: "\"Hunter2\""
   location:
-    row: 50
+    row: 59
     column: 21
   end_location:
-    row: 50
+    row: 59
     column: 30
   fix: ~
   parent: ~
@@ -17,10 +17,10 @@ expression: diagnostics
     MagicValueComparison:
       value: "3.141592653589793"
   location:
-    row: 56
+    row: 65
     column: 20
   end_location:
-    row: 56
+    row: 65
     column: 40
   fix: ~
   parent: ~
@@ -28,10 +28,10 @@ expression: diagnostics
     MagicValueComparison:
       value: "b\"something\""
   location:
-    row: 65
+    row: 74
     column: 17
   end_location:
-    row: 65
+    row: 74
     column: 29
   fix: ~
   parent: ~

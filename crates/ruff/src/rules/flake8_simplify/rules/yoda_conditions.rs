@@ -53,7 +53,7 @@ fn is_constant_like(expr: &Expr) -> bool {
         ExprKind::UnaryOp {
             op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
             operand,
-        } => is_constant_like(operand),
+        } => matches!(operand.node, ExprKind::Constant { .. }),
         _ => false,
     }
 }
