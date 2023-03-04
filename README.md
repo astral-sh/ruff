@@ -137,7 +137,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.253'
+  rev: 'v0.0.254'
   hooks:
     - id: ruff
 ```
