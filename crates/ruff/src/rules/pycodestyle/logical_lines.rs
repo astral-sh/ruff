@@ -86,7 +86,7 @@ fn build_line<'a>(
         // TODO(charlie): "Mute" strings.
         let s;
         let text = if let Tok::String { value, .. } = tok {
-            s = format!("\"{}\"", "x".repeat(value.len()).to_owned());
+            s = format!("\"{}\"", "x".repeat(value.len()).clone());
             &s
         } else {
             locator.slice(&Range {

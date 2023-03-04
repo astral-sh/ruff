@@ -88,6 +88,6 @@ pub fn missing_whitespace_after_keyword(
     _line: &str,
     _row: usize,
     _autofix: bool,
-) -> Vec<(Location, DiagnosticKind)> {
+) -> Vec<Diagnostic> {
     vec![]
 }
