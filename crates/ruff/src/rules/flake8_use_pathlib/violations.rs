@@ -9,7 +9,7 @@ define_violation!(
 impl Violation for PathlibAbspath {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.abspath` should be replaced by `.resolve()`")
+        format!("`os.path.abspath()` should be replaced by `Path.resolve()`")
     }
 }
 
@@ -20,7 +20,7 @@ define_violation!(
 impl Violation for PathlibChmod {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.chmod` should be replaced by `.chmod()`")
+        format!("`os.chmod()` should be replaced by `Path.chmod()`")
     }
 }
 
@@ -31,7 +31,7 @@ define_violation!(
 impl Violation for PathlibMakedirs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.makedirs` should be replaced by `.mkdir(parents=True)`")
+        format!("`os.makedirs()` should be replaced by `Path.mkdir(parents=True)`")
     }
 }
 
@@ -42,7 +42,7 @@ define_violation!(
 impl Violation for PathlibMkdir {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.mkdir` should be replaced by `.mkdir()`")
+        format!("`os.mkdir()` should be replaced by `Path.mkdir()`")
     }
 }
 
@@ -53,7 +53,7 @@ define_violation!(
 impl Violation for PathlibRename {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.rename` should be replaced by `.rename()`")
+        format!("`os.rename()` should be replaced by `Path.rename()`")
     }
 }
 
@@ -64,7 +64,7 @@ define_violation!(
 impl Violation for PathlibReplace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.replace`should be replaced by `.replace()`")
+        format!("`os.replace()` should be replaced by `Path.replace()`")
     }
 }
 
@@ -75,7 +75,7 @@ define_violation!(
 impl Violation for PathlibRmdir {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.rmdir` should be replaced by `.rmdir()`")
+        format!("`os.rmdir()` should be replaced by `Path.rmdir()`")
     }
 }
 
@@ -86,7 +86,7 @@ define_violation!(
 impl Violation for PathlibRemove {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.remove` should be replaced by `.unlink()`")
+        format!("`os.remove()` should be replaced by `Path.unlink()`")
     }
 }
 
@@ -97,7 +97,7 @@ define_violation!(
 impl Violation for PathlibUnlink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.unlink` should be replaced by `.unlink()`")
+        format!("`os.unlink()` should be replaced by `Path.unlink()`")
     }
 }
 
@@ -108,7 +108,7 @@ define_violation!(
 impl Violation for PathlibGetcwd {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.getcwd` should be replaced by `Path.cwd()`")
+        format!("`os.getcwd()` should be replaced by `Path.cwd()`")
     }
 }
 
@@ -119,7 +119,7 @@ define_violation!(
 impl Violation for PathlibExists {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.exists` should be replaced by `.exists()`")
+        format!("`os.path.exists()` should be replaced by `Path.exists()`")
     }
 }
 
@@ -130,7 +130,7 @@ define_violation!(
 impl Violation for PathlibExpanduser {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.expanduser` should be replaced by `.expanduser()`")
+        format!("`os.path.expanduser()` should be replaced by `Path.expanduser()`")
     }
 }
 
@@ -141,7 +141,7 @@ define_violation!(
 impl Violation for PathlibIsDir {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.isdir` should be replaced by `.is_dir()`")
+        format!("`os.path.isdir()` should be replaced by `Path.is_dir()`")
     }
 }
 
@@ -152,7 +152,7 @@ define_violation!(
 impl Violation for PathlibIsFile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.isfile` should be replaced by `.is_file()`")
+        format!("`os.path.isfile()` should be replaced by `Path.is_file()`")
     }
 }
 
@@ -163,7 +163,7 @@ define_violation!(
 impl Violation for PathlibIsLink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.islink` should be replaced by `.is_symlink()`")
+        format!("`os.path.islink()` should be replaced by `Path.is_symlink()`")
     }
 }
 
@@ -174,7 +174,7 @@ define_violation!(
 impl Violation for PathlibReadlink {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.readlink` should be replaced by `.readlink()`")
+        format!("`os.readlink()` should be replaced by `Path.readlink()`")
     }
 }
 
@@ -185,7 +185,9 @@ define_violation!(
 impl Violation for PathlibStat {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.stat` should be replaced by `.stat()` or `.owner()` or `.group()`")
+        format!(
+            "`os.stat()` should be replaced by `Path.stat()`, `Path.owner()`, or `Path.group()`"
+        )
     }
 }
 
@@ -196,7 +198,7 @@ define_violation!(
 impl Violation for PathlibIsAbs {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.isabs` should be replaced by `.is_absolute()`")
+        format!("`os.path.isabs()` should be replaced by `Path.is_absolute()`")
     }
 }
 
@@ -207,7 +209,7 @@ define_violation!(
 impl Violation for PathlibJoin {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.join` should be replaced by foo_path / \"bar\"")
+        format!("`os.path.join()` should be replaced by `Path` with `/` operator")
     }
 }
 
@@ -218,7 +220,7 @@ define_violation!(
 impl Violation for PathlibBasename {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.basename` should be replaced by `.name`")
+        format!("`os.path.basename()` should be replaced by `Path.name`")
     }
 }
 
@@ -229,7 +231,7 @@ define_violation!(
 impl Violation for PathlibDirname {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.dirname` should be replaced by `.parent`")
+        format!("`os.path.dirname()` should be replaced by `Path.parent`")
     }
 }
 
@@ -240,7 +242,7 @@ define_violation!(
 impl Violation for PathlibSamefile {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.samefile` should be replaced by `.samefile()`")
+        format!("`os.path.samefile()` should be replaced by `Path.samefile()`")
     }
 }
 
@@ -251,7 +253,7 @@ define_violation!(
 impl Violation for PathlibSplitext {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`os.path.splitext` should be replaced by `.suffix`")
+        format!("`os.path.splitext()` should be replaced by `Path.suffix`")
     }
 }
 
@@ -262,7 +264,7 @@ define_violation!(
 impl Violation for PathlibOpen {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`open(\"foo\")` should be replaced by `Path(\"foo\").open()`")
+        format!("`open()` should be replaced by `Path.open()`")
     }
 }
 
