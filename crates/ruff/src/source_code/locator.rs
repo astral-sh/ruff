@@ -35,6 +35,12 @@ fn index_utf8(contents: &str) -> Vec<Vec<usize>> {
     let mut current_byte_offset = 0;
     let mut previous_char = '\0';
     for char in contents.chars() {
+        // Skip BOM.
+        if previous_char == '\0' && char == '\u{feff}' {
+            current_byte_offset += char.len_utf8();
+            continue;
+        }
+
         current_row.push(current_byte_offset);
         if char == '\n' {
             if previous_char == '\r' {
