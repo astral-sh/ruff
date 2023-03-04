@@ -32,10 +32,10 @@ impl AlwaysAutofixableViolation for MissingWhitespace {
     }
 }
 
-fn rfind(line: &str, char: char) -> i16 {
+fn rfind(line: &str, char: char) -> i64 {
     // emulate python's rfind
     match line.find(char) {
-        Some(idx) => idx as i16,
+        Some(idx) => idx as i64,
         None => -1,
     }
 }
