@@ -17,7 +17,7 @@ ruff_cli = { path = "../ruff_cli" }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
 schemars = { workspace = true }
-serde_json = { version = "1.0.91" }
+serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-textwrap = { version = "0.16.0" }
+textwrap = { workspace = true }

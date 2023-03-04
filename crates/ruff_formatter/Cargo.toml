@@ -6,16 +6,17 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-drop_bomb = { version = "0.1.5" }
 ruff_text_size = { path = "../ruff_text_size" }
+
+drop_bomb = { version = "0.1.5" }
 rustc-hash = { workspace = true }
-schemars = { version = "0.8.10", optional = true }
-serde = { version = "1.0.136", features = ["derive"], optional = true }
-tracing = { version = "0.1.31", default-features = false, features = ["std"] }
-unicode-width = { version = "0.1.9" }
+schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+tracing = { version = "0.1.37", default-features = false, features = ["std"] }
+unicode-width = { version = "0.1.10" }
 
 [dev-dependencies]
-insta = { version = "1.19.0" }
+insta = { workspace = true }
 
 [features]
 serde = ["dep:serde", "schemars"]

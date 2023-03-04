@@ -6,22 +6,42 @@ edition = "2021"
 rust-version = "1.67.0"
 
 [workspace.dependencies]
-anyhow = { version = "1.0.66" }
-clap = { version = "4.0.1", features = ["derive"] }
-itertools = { version = "0.10.5" }
+anyhow = { version = "1.0.69" }
+bitflags = { version = "1.3.2" }
+chrono = { version = "0.4.23", default-features = false, features = ["clock"] }
+clap = { version = "4.1.8", features = ["derive"] }
+colored = { version = "2.0.0" }
+filetime = { version = "0.2.20" }
+glob = { version = "0.3.1" }
+globset = { version = "0.4.10" }
+ignore = { version = "0.4.20" }
+insta = { version = "1.28.0" }
 is-macro = { version = "0.2.2" }
+itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "80e4c1399f95e5beb532fdd1e209ad2dbb470438" }
-once_cell = { version = "1.16.0" }
-regex = { version = "1.6.0" }
+log = { version = "0.4.17" }
+once_cell = { version = "1.17.1" }
+path-absolutize = { version = "3.0.14" }
+proc-macro2 = { version = "1.0.51" }
+quote = { version = "1.0.23" }
+regex = { version = "1.7.1" }
 rustc-hash = { version = "1.1.0" }
 rustpython-common = { git = "https://github.com/RustPython/RustPython.git", rev = "822f6a9fa6b9142413634858c4c6908f678ce887" }
-rustpython-parser = { features = ["lalrpop", "serde"], git = "https://github.com/RustPython/RustPython.git", rev = "822f6a9fa6b9142413634858c4c6908f678ce887" }
-schemars = { version = "0.8.11" }
-serde = { version = "1.0.147", features = ["derive"] }
-serde_json = { version = "1.0.87" }
+rustpython-parser = { features = [
+  "lalrpop",
+  "serde",
+], git = "https://github.com/RustPython/RustPython.git", rev = "822f6a9fa6b9142413634858c4c6908f678ce887" }
+schemars = { version = "0.8.12" }
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = { version = "1.0.93" }
+shellexpand = { version = "3.0.0" }
+similar = { version = "2.2.1" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
-toml = { version = "0.6.0" }
+syn = { version = "1.0.109" }
+test-case = { version = "3.0.0" }
+textwrap = { version = "0.16.0" }
+toml = { version = "0.7.2" }
 
 [profile.release]
 panic = "abort"
