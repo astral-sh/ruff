@@ -13,6 +13,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
     let mut diagnostic_kind_fixable_match_arms = quote!();
     let mut diagnostic_kind_commit_match_arms = quote!();
     let mut from_impls_for_diagnostic_kind = quote!();
+    let mut from_impls_for_diagnostic_kind2 = quote!();
 
     for (path, name, attr) in &input.entries {
         rule_variants.extend(quote! {
@@ -36,6 +37,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
         diagnostic_kind_commit_match_arms.extend(
             quote! {#(#attr)* Self::#name(x) => x.autofix_title_formatter().map(|f| f(x)), },
         );
+        from_impls_for_diagnostic_kind2.extend(quote! {#(#attr)* "#name(x)" => Rule::#name, });
         from_impls_for_diagnostic_kind.extend(quote! {
             #(#attr)*
             impl From<#path> for DiagnosticKind {
@@ -100,6 +102,15 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             /// The message used to describe the fix action for a given `DiagnosticKind`.
             pub fn commit(&self) -> Option<String> {
                 match self { #diagnostic_kind_commit_match_arms }
+            }
+        }
+
+        impl From<DiagnosticKind2> for Rule {
+            fn from(diagnostic_kind: DiagnosticKind2) -> Self {
+                match diagnostic_kind.rule.as_str() {
+                    #from_impls_for_diagnostic_kind2
+                    _ => unreachable!(),
+                }
             }
         }
 

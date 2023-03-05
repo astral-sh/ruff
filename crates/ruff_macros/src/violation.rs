@@ -57,6 +57,19 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
                     Some(#explanation)
                 }
             }
+
+            impl From<#ident> for crate::registry::DiagnosticKind2 {
+                fn from(value: #ident) -> Self {
+                    use crate::violation::Violation;
+
+                    Self {
+                        body: Violation::message(&value),
+                        fixable: value.autofix_title_formatter().is_some(),
+                        commit: value.autofix_title_formatter().map(|f| f(&value)),
+                        rule: "#ident".to_string(),
+                    }
+                }
+            }
         }
     };
     Ok(violation)

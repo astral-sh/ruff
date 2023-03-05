@@ -914,6 +914,45 @@ impl Diagnostic {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiagnosticKind2 {
+    pub body: String,
+    pub fixable: bool,
+    pub commit: Option<String>,
+    pub rule: String,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Diagnostic2 {
+    pub kind: DiagnosticKind2,
+    pub location: Location,
+    pub end_location: Location,
+    pub fix: Option<Fix>,
+    pub parent: Option<Location>,
+}
+
+impl Diagnostic2 {
+    pub fn new<K: Into<DiagnosticKind2>>(kind: K, range: Range) -> Self {
+        Self {
+            kind: kind.into(),
+            location: range.location,
+            end_location: range.end_location,
+            fix: None,
+            parent: None,
+        }
+    }
+
+    pub fn amend(&mut self, fix: Fix) -> &mut Self {
+        self.fix = Some(fix);
+        self
+    }
+
+    pub fn parent(&mut self, parent: Location) -> &mut Self {
+        self.parent = Some(parent);
+        self
+    }
+}
+
 /// Pairs of checks that shouldn't be enabled together.
 pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
     (
