@@ -1,8 +1,9 @@
-use ruff_macros::{derive_message_formats, violation, CacheKey};
-use ruff_python::identifiers::is_module_name;
 use rustpython_parser::ast::{Stmt, StmtKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{derive_message_formats, violation, CacheKey};
+use ruff_python_stdlib::identifiers::is_module_name;
 
 use crate::ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
 use crate::ast::types::Range;

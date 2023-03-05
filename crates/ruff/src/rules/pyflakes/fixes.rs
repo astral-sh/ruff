@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use libcst_native::{Call, Codegen, CodegenState, Dict, DictElement, Expression};
-use ruff_python::str::strip_quotes_and_prefixes;
+use ruff_python_stdlib::str::strip_quotes_and_prefixes;
 use rustpython_parser::ast::{Excepthandler, Expr};
 use rustpython_parser::{lexer, Mode, Tok};
 

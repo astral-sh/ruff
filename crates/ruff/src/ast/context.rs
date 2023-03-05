@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
-use ruff_python::typing::TYPING_EXTENSIONS;
+use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::ast::helpers::{collect_call_path, from_relative_import, Exceptions};
 use crate::ast::types::{Binding, BindingKind, CallPath, ExecutionContext, RefEquality, Scope};

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::identifiers::is_module_name;
+use ruff_python_stdlib::identifiers::is_module_name;
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;

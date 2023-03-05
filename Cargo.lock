@@ -2000,7 +2000,7 @@ dependencies = [
  "result-like",
  "ruff_cache",
  "ruff_macros",
- "ruff_python",
+ "ruff_python_stdlib",
  "ruff_rustpython",
  "rustc-hash",
  "rustpython-common",
@@ -2121,15 +2121,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ruff_python"
-version = "0.0.0"
-dependencies = [
- "once_cell",
- "regex",
- "rustc-hash",
-]
-
-[[package]]
 name = "ruff_python_formatter"
 version = "0.0.0"
 dependencies = [
@@ -2140,7 +2131,7 @@ dependencies = [
  "itertools",
  "once_cell",
  "ruff_formatter",
- "ruff_python",
+ "ruff_python_stdlib",
  "ruff_rustpython",
  "ruff_testing_macros",
  "ruff_text_size",
@@ -2149,6 +2140,15 @@ dependencies = [
  "rustpython-parser",
  "similar",
  "test-case",
+]
+
+[[package]]
+name = "ruff_python_stdlib"
+version = "0.0.0"
+dependencies = [
+ "once_cell",
+ "regex",
+ "rustc-hash",
 ]
 
 [[package]]

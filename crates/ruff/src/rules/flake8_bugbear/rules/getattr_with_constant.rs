@@ -1,7 +1,8 @@
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python::identifiers::{is_identifier, is_mangled_private};
-use ruff_python::keyword::KWLIST;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location};
+
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
+use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;

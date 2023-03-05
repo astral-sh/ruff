@@ -1,7 +1,8 @@
 use itertools::Itertools;
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python::future::ALL_FEATURE_NAMES;
 use rustpython_parser::ast::Alias;
+
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::future::ALL_FEATURE_NAMES;
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

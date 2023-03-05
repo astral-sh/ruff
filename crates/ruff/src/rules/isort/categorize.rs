@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use log::debug;
 use ruff_macros::CacheKey;
-use ruff_python::sys::KNOWN_STANDARD_LIBRARY;
+use ruff_python_stdlib::sys::KNOWN_STANDARD_LIBRARY;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;

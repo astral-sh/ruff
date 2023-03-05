@@ -1,13 +1,14 @@
 use std::str::FromStr;
 
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python::identifiers::is_identifier;
-use ruff_python::keyword::KWLIST;
 use rustpython_common::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
 use rustpython_parser::{lexer, Mode, Tok};
+
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;

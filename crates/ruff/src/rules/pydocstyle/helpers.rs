@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use ruff_python::str::{
+use ruff_python_stdlib::str::{
     SINGLE_QUOTE_PREFIXES, SINGLE_QUOTE_SUFFIXES, TRIPLE_QUOTE_PREFIXES, TRIPLE_QUOTE_SUFFIXES,
 };
 
