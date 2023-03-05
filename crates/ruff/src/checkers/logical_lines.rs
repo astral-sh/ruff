@@ -303,7 +303,7 @@ f()"#;
             .into_iter()
             .map(|line| line.text)
             .collect();
-        let expected = vec!["def f():", "\"xxx\"", "", "x = 1", "f()"];
+        let expected = vec!["def f():", "\"xxxxxxxxxxxxxxxxxxxx\"", "", "x = 1", "f()"];
         assert_eq!(actual, expected);
     }
 }
