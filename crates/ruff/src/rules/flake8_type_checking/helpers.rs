@@ -1,8 +1,9 @@
 use num_traits::Zero;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
+use crate::ast::context::Context;
 use crate::ast::helpers::{map_callable, to_call_path};
-use crate::ast::types::{Binding, BindingKind, ExecutionContext, Scope, ScopeKind};
+use crate::ast::types::{Binding, BindingKind, ExecutionContext, ScopeKind};
 use crate::checkers::ast::Checker;
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
@@ -56,18 +57,29 @@ pub const fn is_valid_runtime_import(binding: &Binding) -> bool {
     }
 }
 
-pub fn runtime_evaluated(checker: &Checker, scope: &Scope) -> bool {
-    runtime_evaluated_due_to_baseclass(checker, scope)
-        || runtime_evaluated_due_to_decorator(checker, scope)
+pub fn runtime_evaluated(
+    context: &Context,
+    base_classes: &[String],
+    decorators: &[String],
+) -> bool {
+    if !base_classes.is_empty() {
+        if runtime_evaluated_baseclass(context, base_classes) {
+            return true;
+        }
+    }
+    if !decorators.is_empty() {
+        if runtime_evaluated_decorators(context, decorators) {
+            return true;
+        }
+    }
+    false
 }
-pub fn runtime_evaluated_due_to_baseclass(checker: &Checker, scope: &Scope) -> bool {
-    if let ScopeKind::Class(def) = &scope.kind {
-        for base_class in def.bases.iter() {
-            if let Some(call_path) = checker.resolve_call_path(map_callable(base_class)) {
-                if checker
-                    .settings
-                    .flake8_type_checking
-                    .runtime_evaluated_baseclasses
+
+fn runtime_evaluated_baseclass(context: &Context, base_classes: &[String]) -> bool {
+    if let ScopeKind::Class(class_def) = &context.current_scope().kind {
+        for base in class_def.bases.iter() {
+            if let Some(call_path) = context.resolve_call_path(base) {
+                if base_classes
                     .iter()
                     .any(|base_class| to_call_path(base_class) == call_path)
                 {
@@ -78,14 +90,12 @@ pub fn runtime_evaluated_due_to_baseclass(checker: &Checker, scope: &Scope) -> b
     }
     false
 }
-pub fn runtime_evaluated_due_to_decorator(checker: &Checker, scope: &Scope) -> bool {
-    if let ScopeKind::Class(def) = &scope.kind {
-        for decorator in def.decorator_list.iter() {
-            if let Some(call_path) = checker.resolve_call_path(map_callable(decorator)) {
-                if checker
-                    .settings
-                    .flake8_type_checking
-                    .runtime_evaluated_decorators
+
+fn runtime_evaluated_decorators(context: &Context, decorators: &[String]) -> bool {
+    if let ScopeKind::Class(class_def) = &context.current_scope().kind {
+        for decorator in class_def.decorator_list.iter() {
+            if let Some(call_path) = context.resolve_call_path(map_callable(decorator)) {
+                if decorators
                     .iter()
                     .any(|decorator| to_call_path(decorator) == call_path)
                 {
