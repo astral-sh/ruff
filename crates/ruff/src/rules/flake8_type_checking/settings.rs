@@ -35,14 +35,14 @@ pub struct Options {
     /// blocks.
     pub exempt_modules: Option<Vec<String>>,
     #[option(
-        default = "[\"pydantic.BaseModel\"]",
+        default = "[]",
         value_type = "list[str]",
         example = r#"
             runtime-evaluated-baseclasses = ["pydantic.BaseModel"]
         "#
     )]
-    /// Exempt type annotations of certain classes with base classes from needing to be moved into type-checking
-    /// blocks.
+    /// Exempt classes that list any of the enumerated classes as a base class
+    /// from needing to be moved into type-checking blocks.
     pub runtime_evaluated_baseclasses: Option<Vec<String>>,
     #[option(
         default = "[]",
@@ -51,8 +51,8 @@ pub struct Options {
             runtime-evaluated-decorators = ["attrs.define", "attrs.frozen"]
         "#
     )]
-    /// Exempt type annotations of certain classes with decorators from needing to be moved into type-checking
-    /// blocks.
+    /// Exempt classes decorated with any of the enumerated decorators from
+    /// needing to be moved into type-checking blocks.
     pub runtime_evaluated_decorators: Option<Vec<String>>,
 }
 
@@ -69,7 +69,7 @@ impl Default for Settings {
         Self {
             strict: false,
             exempt_modules: vec!["typing".to_string()],
-            runtime_evaluated_baseclasses: vec!["pydantic.BaseModel".to_string()],
+            runtime_evaluated_baseclasses: vec![],
             runtime_evaluated_decorators: vec![],
         }
     }
@@ -84,7 +84,7 @@ impl From<Options> for Settings {
                 .unwrap_or_else(|| vec!["typing".to_string()]),
             runtime_evaluated_baseclasses: options
                 .runtime_evaluated_baseclasses
-                .unwrap_or_else(|| vec!["pydantic.BaseModel".to_string()]),
+                .unwrap_or_default(),
             runtime_evaluated_decorators: options.runtime_evaluated_decorators.unwrap_or_default(),
         }
     }

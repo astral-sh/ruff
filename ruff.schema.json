@@ -909,7 +909,7 @@
           }
         },
         "runtime-evaluated-baseclasses": {
-          "description": "Exempt type annotations of certain classes with base classes from needing to be moved into type-checking blocks.",
+          "description": "Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.",
           "type": [
             "array",
             "null"
@@ -919,7 +919,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt type annotations of certain classes with decorators from needing to be moved into type-checking blocks.",
+          "description": "Exempt classes decorated with any of the enumerated decorators from needing to be moved into type-checking blocks.",
           "type": [
             "array",
             "null"
