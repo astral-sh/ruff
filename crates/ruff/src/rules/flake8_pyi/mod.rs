@@ -31,6 +31,8 @@ mod tests {
     #[test_case(Rule::ArgumentSimpleDefaults, Path::new("PYI014.pyi"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
+    #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.py"))]
+    #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

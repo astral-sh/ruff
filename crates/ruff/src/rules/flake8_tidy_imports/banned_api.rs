@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{define_violation, derive_message_formats, CacheKey};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Alias, Expr, Located};
 use schemars::JsonSchema;
@@ -7,12 +7,11 @@ use serde::{Deserialize, Serialize};
 use crate::ast::types::{CallPath, Range};
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::settings::hashable::HashableHashMap;
 use crate::violation::Violation;
 
-pub type Settings = HashableHashMap<String, ApiBan>;
+pub type Settings = FxHashMap<String, ApiBan>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct ApiBan {
     /// The message to display when the API is used.
@@ -97,7 +96,7 @@ pub fn name_or_parent_is_banned<T>(
 
 /// TID251
 pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
-    if let Some((banned_path, ban)) = checker.resolve_call_path(expr).and_then(|call_path| {
+    if let Some((banned_path, ban)) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
         checker
             .settings
             .flake8_tidy_imports
@@ -147,8 +146,7 @@ mod tests {
                                 msg: "Use typing_extensions.TypedDict instead.".to_string(),
                             },
                         ),
-                    ])
-                    .into(),
+                    ]),
                     ..Default::default()
                 },
                 ..Settings::for_rules(vec![Rule::BannedApi])

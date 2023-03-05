@@ -75,7 +75,7 @@ pub fn unnecessary_call_around_sorted(
     if inner != "sorted" {
         return;
     }
-    if !checker.is_builtin(inner) || !checker.is_builtin(outer) {
+    if !checker.ctx.is_builtin(inner) || !checker.ctx.is_builtin(outer) {
         return;
     }
     let mut diagnostic = Diagnostic::new(

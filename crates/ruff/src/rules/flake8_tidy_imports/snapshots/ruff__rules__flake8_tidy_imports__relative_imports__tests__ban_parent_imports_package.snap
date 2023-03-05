@@ -10,50 +10,25 @@ expression: diagnostics
     column: 0
   end_location:
     row: 5
-    column: 55
-  fix:
-    content: "from my_package.sublib.protocol import commands, definitions, responses"
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 5
-      column: 55
+    column: 23
+  fix: ~
   parent: ~
 - kind:
     RelativeImports:
       strictness: parents
   location:
-    row: 5
+    row: 6
     column: 0
   end_location:
-    row: 5
+    row: 6
     column: 55
   fix:
     content: "from my_package.sublib.protocol import commands, definitions, responses"
     location:
-      row: 5
+      row: 6
       column: 0
     end_location:
-      row: 5
-      column: 55
-  parent: ~
-- kind:
-    RelativeImports:
-      strictness: parents
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 55
-  fix:
-    content: "from my_package.sublib.protocol import commands, definitions, responses"
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 5
+      row: 6
       column: 55
   parent: ~
 - kind:
@@ -64,32 +39,68 @@ expression: diagnostics
     column: 0
   end_location:
     row: 6
+    column: 55
+  fix:
+    content: "from my_package.sublib.protocol import commands, definitions, responses"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 55
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 55
+  fix:
+    content: "from my_package.sublib.protocol import commands, definitions, responses"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 55
+  parent: ~
+- kind:
+    RelativeImports:
+      strictness: parents
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
     column: 28
   fix:
     content: from my_package.sublib.server import example
     location:
-      row: 6
+      row: 7
       column: 0
     end_location:
-      row: 6
+      row: 7
       column: 28
   parent: ~
 - kind:
     RelativeImports:
       strictness: parents
   location:
-    row: 7
+    row: 8
     column: 0
   end_location:
-    row: 7
+    row: 8
     column: 21
   fix:
     content: from my_package.sublib import server
     location:
-      row: 7
+      row: 8
       column: 0
     end_location:
-      row: 7
+      row: 8
       column: 21
   parent: ~
 

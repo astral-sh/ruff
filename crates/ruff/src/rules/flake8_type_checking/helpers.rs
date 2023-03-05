@@ -30,9 +30,13 @@ pub fn is_type_checking_block(checker: &Checker, test: &Expr) -> bool {
     }
 
     // Ex) `if typing.TYPE_CHECKING:`
-    if checker.resolve_call_path(test).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TYPE_CHECKING"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(test)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["typing", "TYPE_CHECKING"]
+        })
+    {
         return true;
     }
 

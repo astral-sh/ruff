@@ -1,0 +1,35 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    MissingWhitespaceAroundModuloOperator: ~
+  location:
+    row: 131
+    column: 5
+  end_location:
+    row: 131
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    MissingWhitespaceAroundModuloOperator: ~
+  location:
+    row: 133
+    column: 9
+  end_location:
+    row: 133
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    MissingWhitespaceAroundModuloOperator: ~
+  location:
+    row: 135
+    column: 25
+  end_location:
+    row: 135
+    column: 25
+  fix: ~
+  parent: ~
+

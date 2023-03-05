@@ -66,11 +66,14 @@ fn has_control_flow(stmt: &Stmt) -> bool {
 
 /// Returns `true` if an [`Expr`] is a call to check types.
 fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
-    checker.resolve_call_path(call).map_or(false, |call_path| {
-        call_path.as_slice() == ["", "isinstance"]
-            || call_path.as_slice() == ["", "issubclass"]
-            || call_path.as_slice() == ["", "callable"]
-    })
+    checker
+        .ctx
+        .resolve_call_path(call)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["", "isinstance"]
+                || call_path.as_slice() == ["", "issubclass"]
+                || call_path.as_slice() == ["", "callable"]
+        })
 }
 
 /// Returns `true` if an [`Expr`] is a test to check types (e.g. via isinstance)
@@ -87,27 +90,30 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
 
 /// Returns `true` if `exc` is a reference to a builtin exception.
 fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
-    return checker.resolve_call_path(exc).map_or(false, |call_path| {
-        [
-            "ArithmeticError",
-            "AssertionError",
-            "AttributeError",
-            "BufferError",
-            "EOFError",
-            "Exception",
-            "ImportError",
-            "LookupError",
-            "MemoryError",
-            "NameError",
-            "ReferenceError",
-            "RuntimeError",
-            "SyntaxError",
-            "SystemError",
-            "ValueError",
-        ]
-        .iter()
-        .any(|target| call_path.as_slice() == ["", target])
-    });
+    return checker
+        .ctx
+        .resolve_call_path(exc)
+        .map_or(false, |call_path| {
+            [
+                "ArithmeticError",
+                "AssertionError",
+                "AttributeError",
+                "BufferError",
+                "EOFError",
+                "Exception",
+                "ImportError",
+                "LookupError",
+                "MemoryError",
+                "NameError",
+                "ReferenceError",
+                "RuntimeError",
+                "SyntaxError",
+                "SystemError",
+                "ValueError",
+            ]
+            .iter()
+            .any(|target| call_path.as_slice() == ["", target])
+        });
 }
 
 /// Returns `true` if an [`Expr`] is a reference to a builtin exception.

@@ -104,6 +104,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_8.pyi"); "F821_8")]
     #[test_case(Rule::UndefinedName, Path::new("F821_9.py"); "F821_9")]
     #[test_case(Rule::UndefinedName, Path::new("F821_10.py"); "F821_10")]
+    #[test_case(Rule::UndefinedName, Path::new("F821_11.py"); "F821_11")]
+    #[test_case(Rule::UndefinedName, Path::new("F821_12.py"); "F821_12")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"); "F822_0")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"); "F822_1")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"); "F822_2")]
@@ -129,7 +131,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes/F841_0.py"),
             &settings::Settings {
-                dummy_variable_rgx: Regex::new(r"^z$").unwrap().into(),
+                dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
                 ..settings::Settings::for_rule(Rule::UnusedVariable)
             },
         )?;

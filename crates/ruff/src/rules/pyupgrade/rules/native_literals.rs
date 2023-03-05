@@ -58,7 +58,7 @@ pub fn native_literals(
         return;
     }
 
-    if (id == "str" || id == "bytes") && checker.is_builtin(id) {
+    if (id == "str" || id == "bytes") && checker.ctx.is_builtin(id) {
         let Some(arg) = args.get(0) else {
             let mut diagnostic = Diagnostic::new(NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str

@@ -56,6 +56,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             Hash,
             PartialOrd,
             Ord,
+            ::ruff_macros::CacheKey,
             AsRefStr,
             ::strum_macros::IntoStaticStr,
         )]
@@ -64,7 +65,6 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
 
         #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
         pub enum DiagnosticKind { #diagnostic_kind_variants }
-
 
         impl Rule {
             /// Returns the format strings used to report violations of this rule.

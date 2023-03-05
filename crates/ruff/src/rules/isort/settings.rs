@@ -2,13 +2,13 @@
 
 use std::collections::BTreeSet;
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::categorize::ImportType;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum RelativeImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
@@ -265,7 +265,7 @@ pub struct Options {
     pub forced_separate: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub required_imports: BTreeSet<String>,

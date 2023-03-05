@@ -1,6 +1,6 @@
 //! Settings for the `pycodestyle` plugin.
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -32,7 +32,7 @@ pub struct Options {
     pub ignore_overlong_task_comments: Option<bool>,
 }
 
-#[derive(Debug, Default, Hash)]
+#[derive(Debug, Default, CacheKey)]
 pub struct Settings {
     pub max_doc_length: Option<usize>,
     pub ignore_overlong_task_comments: bool,

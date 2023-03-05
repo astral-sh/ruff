@@ -441,7 +441,7 @@ fn check_dynamically_typed<F>(
 ) where
     F: FnOnce() -> String,
 {
-    if checker.match_typing_expr(annotation, "Any") {
+    if checker.ctx.match_typing_expr(annotation, "Any") {
         diagnostics.push(Diagnostic::new(
             AnyType { name: func() },
             Range::from_located(annotation),
@@ -482,7 +482,8 @@ pub fn definition(
             .skip(
                 // If this is a non-static method, skip `cls` or `self`.
                 usize::from(
-                    is_method && !visibility::is_staticmethod(checker, cast::decorator_list(stmt)),
+                    is_method
+                        && !visibility::is_staticmethod(&checker.ctx, cast::decorator_list(stmt)),
                 ),
             )
         {
@@ -580,10 +581,10 @@ pub fn definition(
         }
 
         // ANN101, ANN102
-        if is_method && !visibility::is_staticmethod(checker, cast::decorator_list(stmt)) {
+        if is_method && !visibility::is_staticmethod(&checker.ctx, cast::decorator_list(stmt)) {
             if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
                 if arg.node.annotation.is_none() {
-                    if visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
+                    if visibility::is_classmethod(&checker.ctx, cast::decorator_list(stmt)) {
                         if checker.settings.rules.enabled(&Rule::MissingTypeCls) {
                             diagnostics.push(Diagnostic::new(
                                 MissingTypeCls {
@@ -619,7 +620,7 @@ pub fn definition(
             // (explicitly or implicitly).
             checker.settings.flake8_annotations.suppress_none_returning && is_none_returning(body)
         ) {
-            if is_method && visibility::is_classmethod(checker, cast::decorator_list(stmt)) {
+            if is_method && visibility::is_classmethod(&checker.ctx, cast::decorator_list(stmt)) {
                 if checker
                     .settings
                     .rules
@@ -632,7 +633,8 @@ pub fn definition(
                         helpers::identifier_range(stmt, checker.locator),
                     ));
                 }
-            } else if is_method && visibility::is_staticmethod(checker, cast::decorator_list(stmt))
+            } else if is_method
+                && visibility::is_staticmethod(&checker.ctx, cast::decorator_list(stmt))
             {
                 if checker
                     .settings

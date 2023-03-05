@@ -60,7 +60,7 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
             op: Operator::Add | Operator::Mod,
             ..
         } => {
-            let Some(parent) = checker.current_expr_parent() else {
+            let Some(parent) = checker.ctx.current_expr_parent() else {
                 if any_over_expr(expr, &has_string_literal) {
                     return Some(unparse_expr(expr, checker.stylist));
                 }

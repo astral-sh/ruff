@@ -63,7 +63,7 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(mut diagnostic) = rule(name, bases, checker.current_scope(), &checker.bindings) else {
+    let Some(mut diagnostic) = rule(name, bases, checker.ctx.current_scope(), &checker.ctx.bindings) else {
         return;
     };
     if checker.patch(diagnostic.kind.rule()) {

@@ -221,7 +221,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     },
                     Range::from_located(stmt),
                 );
-                if checker.patch(diagnostic.kind.rule()) && checker.is_builtin("any") {
+                if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("any") {
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,
@@ -298,7 +298,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     },
                     Range::from_located(stmt),
                 );
-                if checker.patch(diagnostic.kind.rule()) && checker.is_builtin("all") {
+                if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("all") {
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,

@@ -59,7 +59,7 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
     };
 
     // Avoid flagging on function calls (e.g., `df.values()`).
-    if let Some(parent) = checker.current_expr_parent() {
+    if let Some(parent) = checker.ctx.current_expr_parent() {
         if matches!(parent.node, ExprKind::Call { .. }) {
             return;
         }
@@ -72,7 +72,7 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
     // If the target is a named variable, avoid triggering on
     // irrelevant bindings (like imports).
     if let ExprKind::Name { id, .. } = &value.node {
-        if checker.find_binding(id).map_or(true, |binding| {
+        if checker.ctx.find_binding(id).map_or(true, |binding| {
             matches!(
                 binding.kind,
                 BindingKind::Builtin

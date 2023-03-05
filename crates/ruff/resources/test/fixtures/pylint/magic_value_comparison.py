@@ -11,6 +11,9 @@ if 10 == 100:  # [comparison-of-constants] R0133
 if 1 == 3:  # [comparison-of-constants] R0133
     pass
 
+if 1 == -3:  # [comparison-of-constants] R0133
+    pass
+
 x = 0
 if 4 == 3 == x:  # [comparison-of-constants] R0133
     pass
@@ -33,6 +36,12 @@ if argc != 1:  # correct
     pass
 
 if argc != 2:  # [magic-value-comparison]
+    pass
+
+if argc != -2:  # [magic-value-comparison]
+    pass
+
+if argc != +2:  # [magic-value-comparison]
     pass
 
 if __name__ == "__main__":  # correct

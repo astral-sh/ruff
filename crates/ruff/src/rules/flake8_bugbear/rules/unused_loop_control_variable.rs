@@ -140,7 +140,7 @@ pub fn unused_loop_control_variable(
         }
 
         // Avoid fixing any variables that _may_ be used, but undetectably so.
-        let certainty = Certainty::from(!helpers::uses_magic_variable_access(checker, body));
+        let certainty = Certainty::from(!helpers::uses_magic_variable_access(&checker.ctx, body));
 
         // Attempt to rename the variable by prepending an underscore, but avoid
         // applying the fix if doing so wouldn't actually cause us to ignore the
@@ -163,14 +163,14 @@ pub fn unused_loop_control_variable(
         if let Some(rename) = rename {
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {
                 // Find the `BindingKind::LoopVar` corresponding to the name.
-                let scope = checker.current_scope();
+                let scope = checker.ctx.current_scope();
                 let binding = scope
                     .bindings
                     .get(name)
                     .into_iter()
                     .chain(scope.rebounds.get(name).into_iter().flatten())
                     .find_map(|index| {
-                        let binding = &checker.bindings[*index];
+                        let binding = &checker.ctx.bindings[*index];
                         binding
                             .source
                             .as_ref()

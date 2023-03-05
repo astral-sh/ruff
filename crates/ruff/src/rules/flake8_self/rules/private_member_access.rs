@@ -89,6 +89,7 @@ pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
 
                 // Ignore accesses on class members from _within_ the class.
                 if checker
+                    .ctx
                     .scopes
                     .iter()
                     .rev()
@@ -99,6 +100,7 @@ pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
                     .map_or(false, |class_def| {
                         if call_path.as_slice() == [class_def.name] {
                             checker
+                                .ctx
                                 .find_binding(class_def.name)
                                 .map_or(false, |binding| {
                                     // TODO(charlie): Could the name ever be bound to a _different_

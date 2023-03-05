@@ -8,10 +8,61 @@ expression: diagnostics
         - y
         - z
   location:
+    row: 1
+    column: 4
+  end_location:
+    row: 1
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UndocumentedParam:
+      names:
+        - y
+        - z
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UndocumentedParam:
+      names:
+        - y
+        - z
+  location:
     row: 27
     column: 4
   end_location:
     row: 27
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UndocumentedParam:
+      names:
+        - y
+        - z
+  location:
+    row: 39
+    column: 4
+  end_location:
+    row: 39
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    UndocumentedParam:
+      names:
+        - y
+  location:
+    row: 52
+    column: 4
+  end_location:
+    row: 52
     column: 5
   fix: ~
   parent: ~

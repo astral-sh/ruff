@@ -17,13 +17,17 @@ pub fn get_mark_name(decorator: &Expr) -> &str {
 }
 
 pub fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
-    checker.resolve_call_path(call).map_or(false, |call_path| {
-        call_path.as_slice() == ["pytest", "fail"]
-    })
+    checker
+        .ctx
+        .resolve_call_path(call)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["pytest", "fail"]
+        })
 }
 
 pub fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
     checker
+        .ctx
         .resolve_call_path(if let ExprKind::Call { func, .. } = &decorator.node {
             func
         } else {
@@ -45,6 +49,7 @@ pub fn is_pytest_mark(decorator: &Expr) -> bool {
 
 pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
     checker
+        .ctx
         .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "yield_fixture"]
@@ -53,6 +58,7 @@ pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
 
 pub fn is_abstractmethod_decorator(decorator: &Expr, checker: &Checker) -> bool {
     checker
+        .ctx
         .resolve_call_path(decorator)
         .map_or(false, |call_path| {
             call_path.as_slice() == ["abc", "abstractmethod"]
@@ -103,6 +109,7 @@ pub fn is_falsy_constant(expr: &Expr) -> bool {
 
 pub fn is_pytest_parametrize(decorator: &Expr, checker: &Checker) -> bool {
     checker
+        .ctx
         .resolve_call_path(map_callable(decorator))
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "mark", "parametrize"]

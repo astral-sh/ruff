@@ -122,6 +122,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
         // `sys.stdin`, etc.
         ExprKind::Attribute { .. } => {
             if checker
+                .ctx
                 .resolve_call_path(default)
                 .map_or(false, |call_path| {
                     ALLOWED_ATTRIBUTES_IN_DEFAULTS

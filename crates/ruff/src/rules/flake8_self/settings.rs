@@ -1,6 +1,6 @@
 //! Settings for the `flake8-self` plugin.
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ pub struct Options {
     pub ignore_names: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
     pub ignore_names: Vec<String>,
 }

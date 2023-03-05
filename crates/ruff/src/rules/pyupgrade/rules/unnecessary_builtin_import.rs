@@ -104,13 +104,9 @@ pub fn unnecessary_builtin_import(
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        let deleted: Vec<&Stmt> = checker
-            .deletions
-            .iter()
-            .map(std::convert::Into::into)
-            .collect();
-        let defined_by = checker.current_stmt();
-        let defined_in = checker.current_stmt_parent();
+        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
+        let defined_by = checker.ctx.current_stmt();
+        let defined_in = checker.ctx.current_stmt_parent();
         let unused_imports: Vec<String> = unused_imports
             .iter()
             .map(|alias| format!("{module}.{}", alias.node.name))
@@ -118,7 +114,7 @@ pub fn unnecessary_builtin_import(
         match autofix::helpers::remove_unused_imports(
             unused_imports.iter().map(String::as_str),
             defined_by.into(),
-            defined_in.map(std::convert::Into::into),
+            defined_in.map(Into::into),
             &deleted,
             checker.locator,
             checker.indexer,

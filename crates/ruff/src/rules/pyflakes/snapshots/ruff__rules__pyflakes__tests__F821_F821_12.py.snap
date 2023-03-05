@@ -1,0 +1,27 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    UndefinedName:
+      name: os
+  location:
+    row: 20
+    column: 26
+  end_location:
+    row: 20
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    UndefinedName:
+      name: Baz
+  location:
+    row: 25
+    column: 12
+  end_location:
+    row: 25
+    column: 17
+  fix: ~
+  parent: ~
+

@@ -34,11 +34,15 @@ pub fn request_without_timeout(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        HTTP_VERBS
-            .iter()
-            .any(|func_name| call_path.as_slice() == ["requests", func_name])
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            HTTP_VERBS
+                .iter()
+                .any(|func_name| call_path.as_slice() == ["requests", func_name])
+        })
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
         if let Some(timeout_arg) = call_args.get_argument("timeout", None) {
             if let Some(timeout) = match &timeout_arg.node {

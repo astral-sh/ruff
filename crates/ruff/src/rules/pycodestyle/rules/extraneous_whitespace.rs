@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports, unused_variables)]
 
 use once_cell::sync::Lazy;
 use regex::Regex;

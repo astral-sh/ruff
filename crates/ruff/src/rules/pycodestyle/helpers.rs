@@ -156,3 +156,71 @@ pub fn is_op_token(token: &Tok) -> bool {
             | Tok::Colon
     )
 }
+
+pub fn is_skip_comment_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::Newline | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline | Tok::Comment { .. }
+    )
+}
+
+pub fn is_soft_keyword_token(token: &Tok) -> bool {
+    matches!(token, Tok::Match | Tok::Case)
+}
+
+pub fn is_arithmetic_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::DoubleStar | Tok::Star | Tok::Plus | Tok::Minus | Tok::Slash | Tok::At
+    )
+}
+
+pub fn is_ws_optional_token(token: &Tok) -> bool {
+    is_arithmetic_token(token)
+        || matches!(
+            token,
+            Tok::CircumFlex
+                | Tok::Amper
+                | Tok::Vbar
+                | Tok::LeftShift
+                | Tok::RightShift
+                | Tok::Percent
+        )
+}
+
+pub fn is_ws_needed_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::DoubleStarEqual
+            | Tok::StarEqual
+            | Tok::SlashEqual
+            | Tok::DoubleSlashEqual
+            | Tok::PlusEqual
+            | Tok::MinusEqual
+            | Tok::NotEqual
+            | Tok::Less
+            | Tok::Greater
+            | Tok::PercentEqual
+            | Tok::CircumflexEqual
+            | Tok::AmperEqual
+            | Tok::VbarEqual
+            | Tok::EqEqual
+            | Tok::LessEqual
+            | Tok::GreaterEqual
+            | Tok::LeftShiftEqual
+            | Tok::RightShiftEqual
+            | Tok::Equal
+            | Tok::And
+            | Tok::Or
+            | Tok::In
+            | Tok::Is
+            | Tok::Rarrow
+    )
+}
+
+pub fn is_unary_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::Plus | Tok::Minus | Tok::Star | Tok::DoubleStar | Tok::RightShift
+    )
+}

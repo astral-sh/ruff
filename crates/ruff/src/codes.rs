@@ -29,6 +29,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E203") => Rule::WhitespaceBeforePunctuation,
         #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E211") => Rule::WhitespaceBeforeParameters,
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E221") => Rule::MultipleSpacesBeforeOperator,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E222") => Rule::MultipleSpacesAfterOperator,
@@ -36,6 +38,16 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E223") => Rule::TabBeforeOperator,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E224") => Rule::TabAfterOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E225") => Rule::MissingWhitespaceAroundOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E226") => Rule::MissingWhitespaceAroundArithmeticOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E227") => Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E228") => Rule::MissingWhitespaceAroundModuloOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E231") => Rule::MissingWhitespace,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E251") => Rule::UnexpectedSpacesAroundKeywordParameterEquals,
         #[cfg(feature = "logical_lines")]
@@ -501,6 +513,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "011") => Rule::TypedArgumentSimpleDefaults,
         (Flake8Pyi, "014") => Rule::ArgumentSimpleDefaults,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
+        (Flake8Pyi, "033") => Rule::TypeCommentInStub,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::IncorrectFixtureParenthesesStyle,

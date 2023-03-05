@@ -109,21 +109,6 @@ jobs:
           ./scripts/add_rule.py --name FirstRule --code TST001 --linter test
       - run: cargo check
 
-  maturin-build:
-    name: "maturin build"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - run: pip install maturin
-      - run: maturin build -b bin
-      - run: python scripts/transform_readme.py --target pypi
-
   typos:
     name: "spell check"
     runs-on: ubuntu-latest

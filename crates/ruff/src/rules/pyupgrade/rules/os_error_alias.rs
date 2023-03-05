@@ -35,8 +35,8 @@ const ERROR_MODULES: &[&str] = &["mmap", "select", "socket"];
 
 fn corrected_name(checker: &Checker, original: &str) -> String {
     if ERROR_NAMES.contains(&original)
-        && checker.is_builtin(original)
-        && checker.is_builtin("OSError")
+        && checker.ctx.is_builtin(original)
+        && checker.ctx.is_builtin("OSError")
     {
         "OSError".to_string()
     } else {
@@ -59,7 +59,7 @@ fn get_before_replace(elts: &[Expr]) -> Vec<String> {
 fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
     let mut replacements: Vec<String> = vec![];
     let mut before_replace: Vec<String> = vec![];
-    if let Some(call_path) = checker.resolve_call_path(expr) {
+    if let Some(call_path) = checker.ctx.resolve_call_path(expr) {
         for module in ERROR_MODULES.iter() {
             if call_path.as_slice() == [module, "error"] {
                 replacements.push("OSError".to_string());

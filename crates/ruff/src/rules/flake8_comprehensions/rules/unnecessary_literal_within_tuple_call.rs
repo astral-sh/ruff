@@ -53,7 +53,7 @@ pub fn unnecessary_literal_within_tuple_call(
     let Some(argument) = helpers::first_argument_with_matching_function("tuple", func, args) else {
         return;
     };
-    if !checker.is_builtin("tuple") {
+    if !checker.ctx.is_builtin("tuple") {
         return;
     }
     let argument_kind = match argument {

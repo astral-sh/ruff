@@ -37,9 +37,13 @@ pub fn jinja2_autoescape_false(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["jinja2", "Environment"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["jinja2", "Environment"]
+        })
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
 
         if let Some(autoescape_arg) = call_args.get_argument("autoescape", None) {

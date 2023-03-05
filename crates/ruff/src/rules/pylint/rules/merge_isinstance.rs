@@ -27,7 +27,7 @@ impl Violation for ConsiderMergingIsinstance {
 
 /// PLR1701
 pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values: &[Expr]) {
-    if !matches!(op, Boolop::Or) || !checker.is_builtin("isinstance") {
+    if !matches!(op, Boolop::Or) || !checker.ctx.is_builtin("isinstance") {
         return;
     }
 
