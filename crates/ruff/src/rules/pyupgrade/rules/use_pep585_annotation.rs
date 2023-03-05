@@ -44,7 +44,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
             },
             Range::from_located(expr),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             let binding = binding.to_lowercase();
             if checker.ctx.is_builtin(&binding) {
                 diagnostic.amend(Fix::replacement(

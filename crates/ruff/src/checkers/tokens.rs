@@ -121,7 +121,7 @@ pub fn check_tokens(
         diagnostics.extend(
             pycodestyle::rules::compound_statements(tokens, settings, autofix)
                 .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+                .filter(|diagnostic| settings.rules.enabled((&diagnostic.kind).into())),
         );
     }
 
@@ -130,7 +130,7 @@ pub fn check_tokens(
         diagnostics.extend(
             flake8_quotes::rules::from_tokens(tokens, locator, settings, autofix)
                 .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+                .filter(|diagnostic| settings.rules.enabled((&diagnostic.kind).into())),
         );
     }
 
@@ -142,7 +142,7 @@ pub fn check_tokens(
                 &settings.flake8_implicit_str_concat,
             )
             .into_iter()
-            .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+            .filter(|diagnostic| settings.rules.enabled((&diagnostic.kind).into())),
         );
     }
 
@@ -151,7 +151,7 @@ pub fn check_tokens(
         diagnostics.extend(
             flake8_commas::rules::trailing_commas(tokens, locator, settings, autofix)
                 .into_iter()
-                .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+                .filter(|diagnostic| settings.rules.enabled((&diagnostic.kind).into())),
         );
     }
 

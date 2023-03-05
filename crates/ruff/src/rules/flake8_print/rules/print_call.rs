@@ -64,7 +64,7 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
         }
     };
 
-    if !checker.settings.rules.enabled(diagnostic.kind.rule()) {
+    if !checker.settings.rules.enabled((&diagnostic.kind).into()) {
         return;
     }
 

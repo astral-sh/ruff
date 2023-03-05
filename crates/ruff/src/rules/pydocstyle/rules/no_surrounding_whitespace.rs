@@ -42,7 +42,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     }
     let mut diagnostic =
         Diagnostic::new(NoSurroundingWhitespace, Range::from_located(docstring.expr));
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         if let Some(pattern) = leading_quote(contents) {
             // If removing whitespace would lead to an invalid string of quote
             // characters, avoid applying the fix.

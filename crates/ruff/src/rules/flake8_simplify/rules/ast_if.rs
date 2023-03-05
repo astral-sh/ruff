@@ -279,7 +279,7 @@ pub fn nested_if_statements(
             |colon| Range::new(stmt.location, colon.end_location),
         ),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
+    if fixable && checker.patch((&diagnostic.kind).into()) {
         match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
             Ok(fix) => {
                 if fix
@@ -353,7 +353,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         NeedlessBool { condition, fixable },
         Range::from_located(stmt),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
+    if fixable && checker.patch((&diagnostic.kind).into()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
             diagnostic.amend(Fix::replacement(
@@ -503,7 +503,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         },
         Range::from_located(stmt),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
+    if fixable && checker.patch((&diagnostic.kind).into()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,
@@ -851,7 +851,7 @@ pub fn use_dict_get_with_default(
         },
         Range::from_located(stmt),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
+    if fixable && checker.patch((&diagnostic.kind).into()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,

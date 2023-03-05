@@ -50,17 +50,17 @@ export interface Diagnostic {
 "#;
 
 #[derive(Serialize)]
-struct ExpandedMessage {
-    code: SerializeRuleAsCode,
+struct ExpandedMessage<'a> {
+    code: SerializeRuleAsCode<'a>,
     message: String,
     location: Location,
     end_location: Location,
     fix: Option<ExpandedFix>,
 }
 
-struct SerializeRuleAsCode(Rule);
+struct SerializeRuleAsCode<'a>(&'a Rule);
 
-impl Serialize for SerializeRuleAsCode {
+impl Serialize for SerializeRuleAsCode<'_> {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -69,8 +69,8 @@ impl Serialize for SerializeRuleAsCode {
     }
 }
 
-impl From<Rule> for SerializeRuleAsCode {
-    fn from(rule: Rule) -> Self {
+impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
+    fn from(rule: &'a Rule) -> Self {
         Self(rule)
     }
 }
@@ -207,14 +207,14 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
 
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
-        .map(|diagnostic| ExpandedMessage {
-            code: diagnostic.kind.rule().clone().into(),
-            message: diagnostic.kind.body(),
-            location: diagnostic.location,
-            end_location: diagnostic.end_location,
-            fix: diagnostic.fix.map(|fix| ExpandedFix {
+        .map(|message| ExpandedMessage {
+            code: Into::<&Rule>::into(&message.kind).into(),
+            message: message.kind.body.clone(),
+            location: message.location,
+            end_location: message.end_location,
+            fix: message.fix.map(|fix| ExpandedFix {
                 content: fix.content,
-                message: diagnostic.kind.commit(),
+                message: message.kind.commit.clone(),
                 location: fix.location,
                 end_location: fix.end_location,
             }),

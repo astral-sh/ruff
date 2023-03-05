@@ -76,7 +76,7 @@ pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut
     {
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 diagnostic.amend(fix_f_string_missing_placeholders(
                     &prefix_range,
                     &tok_range,

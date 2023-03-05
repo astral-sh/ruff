@@ -162,7 +162,7 @@ pub fn yoda_conditions(
             },
             Range::from_located(expr),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             diagnostic.amend(Fix::replacement(
                 suggestion,
                 expr.location,

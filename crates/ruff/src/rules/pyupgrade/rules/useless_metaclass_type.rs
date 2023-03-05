@@ -48,7 +48,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         rule(targets, value, Range::from_located(stmt)) else {
             return;
         };
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
         let defined_by = checker.ctx.current_stmt();
         let defined_in = checker.ctx.current_stmt_parent();

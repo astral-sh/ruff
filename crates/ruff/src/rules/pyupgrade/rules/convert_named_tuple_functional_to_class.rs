@@ -205,7 +205,7 @@ pub fn convert_named_tuple_functional_to_class(
         },
         Range::from_located(stmt),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
+    if fixable && checker.patch((&diagnostic.kind).into()) {
         diagnostic.amend(convert_to_class(
             stmt,
             typename,

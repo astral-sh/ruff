@@ -117,7 +117,7 @@ pub fn consider_using_sys_exit(checker: &mut Checker, func: &Expr) {
             },
             Range::from_located(func),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {
                 diagnostic.amend(Fix::replacement(
                     content,

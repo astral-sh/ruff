@@ -69,7 +69,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
         },
         Range::from_located(arg),
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         let new_env_var = create_expr(ExprKind::Constant {
             value: capital_env_var.into(),
             kind: kind.clone(),
@@ -111,7 +111,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
         },
         Range::from_located(slice),
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         let new_env_var = create_expr(ExprKind::Constant {
             value: capital_env_var.into(),
             kind: kind.clone(),

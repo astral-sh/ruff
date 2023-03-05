@@ -337,7 +337,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
                 },
                 binding.range,
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 if let Some(stmt) = binding.source.as_ref().map(Into::into) {
                     if let Some((kind, fix)) = remove_unused_variable(stmt, &binding.range, checker)
                     {

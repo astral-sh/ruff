@@ -97,7 +97,7 @@ fn duplicate_handler_exceptions<'a>(
                 },
                 Range::from_located(expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 diagnostic.amend(Fix::replacement(
                     if unique_elts.len() == 1 {
                         unparse_expr(unique_elts[0], checker.stylist)

@@ -361,7 +361,7 @@ fn blanks_and_section_underline(
                 },
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}{}",
@@ -408,7 +408,7 @@ fn blanks_and_section_underline(
                     },
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     // Delete any blank lines between the header and the underline.
                     diagnostic.amend(Fix::deletion(
                         Location::new(
@@ -446,7 +446,7 @@ fn blanks_and_section_underline(
                     },
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     // Replace the existing underline with a line of the appropriate length.
                     let content = format!(
                         "{}{}{}",
@@ -490,7 +490,7 @@ fn blanks_and_section_underline(
                     },
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     // Replace the existing indentation with whitespace of the appropriate length.
                     diagnostic.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
@@ -545,7 +545,7 @@ fn blanks_and_section_underline(
                             },
                             Range::from_located(docstring.expr),
                         );
-                        if checker.patch(diagnostic.kind.rule()) {
+                        if checker.patch((&diagnostic.kind).into()) {
                             // Delete any blank lines between the header and content.
                             diagnostic.amend(Fix::deletion(
                                 Location::new(
@@ -591,7 +591,7 @@ fn blanks_and_section_underline(
                 },
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}{}",
@@ -621,7 +621,7 @@ fn blanks_and_section_underline(
                     },
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     // Delete any blank lines between the header and content.
                     diagnostic.amend(Fix::deletion(
                         Location::new(
@@ -653,7 +653,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                 },
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 // Replace the section title with the capitalized variant. This requires
                 // locating the start and end of the section name.
                 if let Some(index) = context.line.find(context.section_name) {
@@ -690,7 +690,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                 },
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
                 diagnostic.amend(Fix::replacement(
                     whitespace::clean(docstring.indentation),
@@ -723,7 +723,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                     },
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     // Add a newline after the section.
                     diagnostic.amend(Fix::insertion(
                         line_end.to_string(),
@@ -746,7 +746,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                     },
                     Range::from_located(docstring.expr),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     // Add a newline after the section.
                     diagnostic.amend(Fix::insertion(
                         line_end.to_string(),
@@ -776,7 +776,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                 },
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 // Add a blank line before the section.
                 diagnostic.amend(Fix::insertion(
                     line_end.to_string(),
@@ -971,7 +971,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
                 },
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 // Delete the suffix. This requires locating the end of the section name.
                 if let Some(index) = context.line.find(context.section_name) {
                     // Map from bytes to characters.
@@ -1022,7 +1022,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                 },
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 // Replace the suffix. This requires locating the end of the section name.
                 if let Some(index) = context.line.find(context.section_name) {
                     // Map from bytes to characters.

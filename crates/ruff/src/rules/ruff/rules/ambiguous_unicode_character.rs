@@ -1729,8 +1729,8 @@ pub fn ambiguous_unicode_character(
                     },
                     Range::new(location, end_location),
                 );
-                if settings.rules.enabled(diagnostic.kind.rule()) {
-                    if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+                if settings.rules.enabled((&diagnostic.kind).into()) {
+                    if autofix.into() && settings.rules.should_fix((&diagnostic.kind).into()) {
                         diagnostic.amend(Fix::replacement(
                             (*representant as char).to_string(),
                             location,

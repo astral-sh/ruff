@@ -46,6 +46,19 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
         quote! {
             #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
             #violation
+
+            impl From<#ident> for crate::registry::DiagnosticKind {
+                fn from(value: #ident) -> Self {
+                    use crate::violation::Violation;
+
+                    Self {
+                        body: Violation::message(&value),
+                        fixable: value.autofix_title_formatter().is_some(),
+                        commit: value.autofix_title_formatter().map(|f| f(&value)),
+                        rule: stringify!(#ident).to_string(),
+                    }
+                }
+            }
         }
     } else {
         quote! {
@@ -58,7 +71,7 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
                 }
             }
 
-            impl From<#ident> for crate::registry::DiagnosticKind2 {
+            impl From<#ident> for crate::registry::DiagnosticKind {
                 fn from(value: #ident) -> Self {
                     use crate::violation::Violation;
 
@@ -66,7 +79,7 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
                         body: Violation::message(&value),
                         fixable: value.autofix_title_formatter().is_some(),
                         commit: value.autofix_title_formatter().map(|f| f(&value)),
-                        rule: "#ident".to_string(),
+                        rule: stringify!(#ident).to_string(),
                     }
                 }
             }

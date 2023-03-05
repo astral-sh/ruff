@@ -113,7 +113,7 @@ pub fn unnecessary_double_cast_or_process(
         || ((outer == "list" || outer == "tuple") && (inner == "list" || inner == "tuple"))
     {
         let mut diagnostic = create_diagnostic(inner, outer, Range::from_located(expr));
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             if let Ok(fix) = fixes::fix_unnecessary_double_cast_or_process(
                 checker.locator,
                 checker.stylist,

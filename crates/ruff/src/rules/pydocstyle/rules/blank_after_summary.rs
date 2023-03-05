@@ -61,7 +61,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
             },
             Range::from_located(docstring.expr),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             if blanks_count > 1 {
                 // Find the "summary" line (defined as the first non-blank line).
                 let mut summary_line = 0;

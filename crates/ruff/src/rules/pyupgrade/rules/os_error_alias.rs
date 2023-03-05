@@ -172,7 +172,7 @@ fn handle_making_changes(
             },
             Range::from_located(target),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             diagnostic.amend(Fix::replacement(
                 final_str,
                 target.location,

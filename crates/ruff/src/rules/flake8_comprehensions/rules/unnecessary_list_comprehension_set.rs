@@ -42,7 +42,7 @@ pub fn unnecessary_list_comprehension_set(
     if let ExprKind::ListComp { .. } = &argument {
         let mut diagnostic =
             Diagnostic::new(UnnecessaryListComprehensionSet, Range::from_located(expr));
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             match fixes::fix_unnecessary_list_comprehension_set(
                 checker.locator,
                 checker.stylist,

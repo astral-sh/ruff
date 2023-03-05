@@ -64,7 +64,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 MultiLineSummaryFirstLine,
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 let location = docstring.expr.location;
                 let mut end_row = location.row() + 1;
                 // Delete until first non-whitespace char.
@@ -91,7 +91,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 MultiLineSummarySecondLine,
                 Range::from_located(docstring.expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 let mut indentation = String::from(docstring.indentation);
                 let mut fixable = true;
                 if !indentation.chars().all(char::is_whitespace) {

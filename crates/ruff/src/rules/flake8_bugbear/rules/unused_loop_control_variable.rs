@@ -162,7 +162,7 @@ pub fn unused_loop_control_variable(
             Range::from_located(expr),
         );
         if let Some(rename) = rename {
-            if certainty.into() && checker.patch(diagnostic.kind.rule()) {
+            if certainty.into() && checker.patch((&diagnostic.kind).into()) {
                 // Find the `BindingKind::LoopVar` corresponding to the name.
                 let scope = checker.ctx.current_scope();
                 let binding = scope

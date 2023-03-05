@@ -51,7 +51,7 @@ pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stm
                 Range::from_located(stmt),
             );
 
-            if checker.patch(diagnostic.kind.rule())
+            if checker.patch((&diagnostic.kind).into())
                 && fixable
                 && !match_leading_content(stmt, checker.locator)
                 && !match_trailing_content(stmt, checker.locator)

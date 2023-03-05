@@ -41,7 +41,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                         NewLineAfterLastParagraph,
                         Range::from_located(docstring.expr),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
+                    if checker.patch((&diagnostic.kind).into()) {
                         // Insert a newline just before the end-quote(s).
                         let num_trailing_quotes = "'''".len();
                         let num_trailing_spaces = last_line

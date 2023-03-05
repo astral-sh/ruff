@@ -666,7 +666,7 @@ pub fn definition(
                             },
                             helpers::identifier_range(stmt, checker.locator),
                         );
-                        if checker.patch(diagnostic.kind.rule()) {
+                        if checker.patch((&diagnostic.kind).into()) {
                             match fixes::add_return_none_annotation(checker.locator, stmt) {
                                 Ok(fix) => {
                                     diagnostic.amend(fix);

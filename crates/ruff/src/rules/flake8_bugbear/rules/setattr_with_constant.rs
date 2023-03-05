@@ -80,7 +80,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         if expr == child.as_ref() {
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, Range::from_located(expr));
 
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 diagnostic.amend(Fix::replacement(
                     assignment(obj, name, value, checker.stylist),
                     expr.location,

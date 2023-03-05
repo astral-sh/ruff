@@ -62,7 +62,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
             let mut diagnostic =
                 Diagnostic::new(EndsInPunctuation, Range::from_located(docstring.expr));
             // Best-effort autofix: avoid adding a period after other punctuation marks.
-            if checker.patch(diagnostic.kind.rule())
+            if checker.patch((&diagnostic.kind).into())
                 && !trimmed.ends_with(':')
                 && !trimmed.ends_with(';')
             {

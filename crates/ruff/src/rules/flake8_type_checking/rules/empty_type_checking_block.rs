@@ -35,7 +35,7 @@ pub fn empty_type_checking_block<'a, 'b>(
         let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, Range::from_located(&body[0]));
 
         // Delete the entire type-checking block.
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             let parent = checker
                 .ctx
                 .child_to_parent

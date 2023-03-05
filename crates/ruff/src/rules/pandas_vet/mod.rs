@@ -45,10 +45,10 @@ mod tests {
             flags::Noqa::Enabled,
             flags::Autofix::Enabled,
         );
-        let actual = diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.kind.rule().clone())
-            .collect::<Vec<_>>();
+        let actual: Vec<Rule> = diagnostics
+            .into_iter()
+            .map(|diagnostic| (Into::<&Rule>::into(&diagnostic.kind)).clone())
+            .collect();
         assert_eq!(actual, expected);
     }
 

@@ -105,7 +105,7 @@ pub fn multiple_with_statements(
                 |colon| Range::new(with_stmt.location, colon.end_location),
             ),
         );
-        if fixable && checker.patch(diagnostic.kind.rule()) {
+        if fixable && checker.patch((&diagnostic.kind).into()) {
             match fix_with::fix_multiple_with_statements(
                 checker.locator,
                 checker.stylist,

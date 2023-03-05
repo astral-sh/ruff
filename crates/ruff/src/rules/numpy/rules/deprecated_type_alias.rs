@@ -71,7 +71,7 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             },
             Range::from_located(expr),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             diagnostic.amend(Fix::replacement(
                 match type_name {
                     "unicode" => "str",

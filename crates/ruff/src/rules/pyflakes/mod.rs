@@ -270,10 +270,10 @@ mod tests {
             flags::Autofix::Enabled,
         );
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        let actual = diagnostics
-            .iter()
-            .map(|diagnostic| diagnostic.kind.rule().clone())
-            .collect::<Vec<_>>();
+        let actual: Vec<Rule> = diagnostics
+            .into_iter()
+            .map(|diagnostic| (Into::<&Rule>::into(&diagnostic.kind)).clone())
+            .collect();
         assert_eq!(actual, expected);
     }
 

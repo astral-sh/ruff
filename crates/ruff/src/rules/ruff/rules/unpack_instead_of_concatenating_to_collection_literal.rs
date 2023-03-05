@@ -112,7 +112,7 @@ pub fn unpack_instead_of_concatenating_to_collection_literal(checker: &mut Check
         },
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         if fixable {
             diagnostic.amend(Fix::replacement(
                 contents,

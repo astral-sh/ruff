@@ -24,7 +24,7 @@ impl AlwaysAutofixableViolation for RewriteCElementTree {
 
 fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
     let mut diagnostic = Diagnostic::new(RewriteCElementTree, Range::from_located(node));
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         let contents = checker.locator.slice(Range::from_located(node));
         diagnostic.amend(Fix::replacement(
             contents.replacen("cElementTree", "ElementTree", 1),

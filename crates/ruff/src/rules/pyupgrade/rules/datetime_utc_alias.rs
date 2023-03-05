@@ -45,7 +45,7 @@ pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
             DatetimeTimezoneUTC { straight_import },
             Range::from_located(expr),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             if straight_import {
                 diagnostic.amend(Fix::replacement(
                     "datetime.UTC".to_string(),

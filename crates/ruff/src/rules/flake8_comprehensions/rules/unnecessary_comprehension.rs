@@ -67,7 +67,7 @@ pub fn unnecessary_comprehension(
         },
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         match fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);

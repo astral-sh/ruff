@@ -48,7 +48,7 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
                 LRUCacheWithoutParameters,
                 Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 diagnostic.amend(Fix::replacement(
                     unparse_expr(func, checker.stylist),
                     expr.location,

@@ -402,7 +402,7 @@ pub(crate) fn printf_string_formatting(
     contents.push_str(&format!(".format{params_string}"));
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, Range::from_located(expr));
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         diagnostic.amend(Fix::replacement(
             contents,
             expr.location,

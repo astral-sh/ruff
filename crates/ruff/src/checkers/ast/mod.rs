@@ -4976,7 +4976,7 @@ impl<'a> Checker<'a> {
                             self.settings,
                         )
                     {
-                        if self.settings.rules.enabled(diagnostic.kind.rule()) {
+                        if self.settings.rules.enabled((&diagnostic.kind).into()) {
                             diagnostics.push(diagnostic);
                         }
                     }

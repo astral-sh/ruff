@@ -32,7 +32,7 @@ pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
         })
     {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, Range::from_located(expr));
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             diagnostic.amend(Fix::replacement(
                 "str".to_string(),
                 expr.location,

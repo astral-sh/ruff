@@ -37,7 +37,7 @@ pub fn unnecessary_list_call(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         return;
     }
     let mut diagnostic = Diagnostic::new(UnnecessaryListCall, Range::from_located(expr));
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         match fixes::fix_unnecessary_list_call(checker.locator, checker.stylist, expr) {
             Ok(fix) => {
                 diagnostic.amend(fix);

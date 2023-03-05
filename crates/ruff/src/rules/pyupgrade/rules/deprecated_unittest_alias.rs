@@ -70,7 +70,7 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         },
         Range::from_located(expr),
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         diagnostic.amend(Fix::replacement(
             format!("self.{target}"),
             expr.location,

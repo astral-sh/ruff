@@ -202,7 +202,10 @@ pub fn check_path(
     if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
         let ignores = fs::ignores_from_path(path, &settings.per_file_ignores);
         if !ignores.is_empty() {
-            diagnostics.retain(|diagnostic| !ignores.contains(&diagnostic.kind.rule()));
+            diagnostics.retain(|diagnostic| {
+                let rule: &Rule = (&diagnostic.kind).into();
+                !ignores.contains(rule)
+            });
         }
     };
 

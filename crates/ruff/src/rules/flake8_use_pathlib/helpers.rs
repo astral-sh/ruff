@@ -54,7 +54,7 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
         let diagnostic =
             Diagnostic::new::<DiagnosticKind>(diagnostic_kind, Range::from_located(expr));
 
-        if checker.settings.rules.enabled(diagnostic.kind.rule()) {
+        if checker.settings.rules.enabled((&diagnostic.kind).into()) {
             checker.diagnostics.push(diagnostic);
         }
     }

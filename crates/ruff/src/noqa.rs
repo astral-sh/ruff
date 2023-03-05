@@ -201,7 +201,8 @@ fn add_noqa_inner(
 
         // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
         if !file_exemptions.is_empty() {
-            if file_exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
+            let rule: &Rule = (&diagnostic.kind).into();
+            if file_exemptions.contains(&rule.noqa_code()) {
                 continue;
             }
         }
@@ -215,7 +216,7 @@ fn add_noqa_inner(
                         continue;
                     }
                     Directive::Codes(.., codes) => {
-                        if includes(diagnostic.kind.rule(), &codes) {
+                        if includes((&diagnostic.kind).into(), &codes) {
                             continue;
                         }
                     }
@@ -235,7 +236,7 @@ fn add_noqa_inner(
                     continue;
                 }
                 Directive::Codes(.., codes) => {
-                    if includes(diagnostic.kind.rule(), &codes) {
+                    if includes((&diagnostic.kind).into(), &codes) {
                         continue;
                     }
                 }
@@ -249,7 +250,7 @@ fn add_noqa_inner(
         matches_by_line
             .entry(noqa_lineno)
             .or_default()
-            .insert(diagnostic.kind.rule());
+            .insert((&diagnostic.kind).into());
     }
 
     let mut count: usize = 0;

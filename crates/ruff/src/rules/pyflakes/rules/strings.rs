@@ -304,7 +304,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         },
         location,
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         match remove_unused_format_arguments_from_dict(
             &missing,
             right,
@@ -470,7 +470,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         },
         location,
     );
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         match remove_unused_keyword_arguments_from_format_call(
             &missing,
             location,

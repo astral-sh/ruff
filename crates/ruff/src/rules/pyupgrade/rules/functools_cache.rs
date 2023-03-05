@@ -58,7 +58,7 @@ pub fn functools_cache(checker: &mut Checker, decorator_list: &[Expr]) {
                     FunctoolsCache,
                     Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     if let ExprKind::Attribute { value, ctx, .. } = &func.node {
                         diagnostic.amend(Fix::replacement(
                             unparse_expr(

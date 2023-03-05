@@ -63,7 +63,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
     };
 
     let mut diagnostic = Diagnostic::new(AssertFalse, Range::from_located(test));
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&assertion_error(msg), checker.stylist),
             stmt.location,

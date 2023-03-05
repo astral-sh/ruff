@@ -50,7 +50,7 @@ pub fn unnecessary_list_comprehension_dict(
     }
     let mut diagnostic =
         Diagnostic::new(UnnecessaryListComprehensionDict, Range::from_located(expr));
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         match fixes::fix_unnecessary_list_comprehension_dict(checker.locator, checker.stylist, expr)
         {
             Ok(fix) => {

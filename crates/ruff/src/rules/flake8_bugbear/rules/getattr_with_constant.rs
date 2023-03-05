@@ -65,7 +65,7 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
 
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, Range::from_located(expr));
 
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(&attribute(obj, value), checker.stylist),
             expr.location,

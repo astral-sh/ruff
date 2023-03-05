@@ -93,7 +93,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row() + i, 0),
                     ),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     diagnostic.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),
@@ -143,7 +143,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                             Location::new(docstring.expr.location.row() + i, 0),
                         ),
                     );
-                    if checker.patch(diagnostic.kind.rule()) {
+                    if checker.patch((&diagnostic.kind).into()) {
                         diagnostic.amend(Fix::replacement(
                             whitespace::clean(docstring.indentation),
                             Location::new(docstring.expr.location.row() + i, 0),
@@ -167,7 +167,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row() + i, 0),
                     ),
                 );
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     diagnostic.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),

@@ -171,7 +171,7 @@ pub fn banned_relative_import(
             },
             Range::from_located(stmt),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch((&diagnostic.kind).into()) {
             if let Some(fix) =
                 fix_banned_relative_import(stmt, level, module, module_path, checker.stylist)
             {

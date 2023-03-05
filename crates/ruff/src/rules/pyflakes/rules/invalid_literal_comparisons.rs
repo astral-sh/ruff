@@ -70,7 +70,7 @@ pub fn invalid_literal_comparison(
                 || helpers::is_constant_non_singleton(right))
         {
             let mut diagnostic = Diagnostic::new(IsLiteral { cmpop: op.into() }, location);
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 if let Some(located_op) = &located.get(index) {
                     assert_eq!(&located_op.node, op);
                     if let Some(content) = match &located_op.node {

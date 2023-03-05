@@ -158,7 +158,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                 && matches!(logging_level, LoggingLevel::Warn)
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     diagnostic.amend(Fix::replacement(
                         "warning".to_string(),
                         level_call_range.location,

@@ -54,7 +54,7 @@ pub fn use_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, names:
         },
         Range::from_located(alias),
     );
-    if fixable && checker.patch(diagnostic.kind.rule()) {
+    if fixable && checker.patch((&diagnostic.kind).into()) {
         diagnostic.amend(Fix::replacement(
             unparse_stmt(
                 &create_stmt(StmtKind::ImportFrom {

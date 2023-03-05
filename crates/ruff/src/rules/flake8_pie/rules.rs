@@ -172,7 +172,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
                 let mut diagnostic =
                     Diagnostic::new(UnnecessaryPass, Range::from_located(pass_stmt));
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     if let Some(index) = match_trailing_comment(pass_stmt, checker.locator) {
                         diagnostic.amend(Fix::deletion(
                             pass_stmt.location,
@@ -242,7 +242,7 @@ pub fn dupe_class_field_definitions<'a, 'b>(
                 DupeClassFieldDefinitions(target.to_string()),
                 Range::from_located(stmt),
             );
-            if checker.patch(diagnostic.kind.rule()) {
+            if checker.patch((&diagnostic.kind).into()) {
                 let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                 let locator = checker.locator;
                 match delete_stmt(
@@ -342,7 +342,7 @@ pub fn unnecessary_comprehension_any_all(
             if let ExprKind::ListComp { .. } = args[0].node {
                 let mut diagnostic =
                     Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from_located(expr));
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     match fixes::fix_unnecessary_comprehension_any_all(
                         checker.locator,
                         checker.stylist,
@@ -445,7 +445,7 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(PreferListBuiltin, Range::from_located(expr));
-                if checker.patch(diagnostic.kind.rule()) {
+                if checker.patch((&diagnostic.kind).into()) {
                     diagnostic.amend(Fix::replacement(
                         "list".to_string(),
                         expr.location,

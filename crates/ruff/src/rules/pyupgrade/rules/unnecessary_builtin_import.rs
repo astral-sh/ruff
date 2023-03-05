@@ -104,7 +104,7 @@ pub fn unnecessary_builtin_import(
         Range::from_located(stmt),
     );
 
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
         let defined_by = checker.ctx.current_stmt();
         let defined_in = checker.ctx.current_stmt_parent();

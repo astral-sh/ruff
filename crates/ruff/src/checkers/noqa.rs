@@ -8,7 +8,7 @@ use crate::codes::NoqaCode;
 use crate::fix::Fix;
 use crate::noqa;
 use crate::noqa::{extract_file_exemption, Directive, Exemption};
-use crate::registry::{Diagnostic, DiagnosticKind, Rule};
+use crate::registry::{Diagnostic, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::{flags, Settings};
@@ -65,7 +65,8 @@ pub fn check_noqa(
 
     // Remove any ignored diagnostics.
     for (index, diagnostic) in diagnostics.iter().enumerate() {
-        if matches!(diagnostic.kind, DiagnosticKind::BlanketNOQA(..)) {
+        let rule: &Rule = (&diagnostic.kind).into();
+        if matches!(rule, Rule::BlanketNOQA) {
             continue;
         }
 
@@ -77,7 +78,8 @@ pub fn check_noqa(
 
         // If the diagnostic is ignored by a global exemption, ignore it.
         if !file_exemptions.is_empty() {
-            if file_exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
+            let rule: &Rule = (&diagnostic.kind).into();
+            if file_exemptions.contains(&rule.noqa_code()) {
                 ignored_diagnostics.push(index);
                 continue;
             }
@@ -92,13 +94,13 @@ pub fn check_noqa(
                 });
                 match noqa {
                     (Directive::All(..), matches) => {
-                        matches.push(diagnostic.kind.rule().noqa_code());
+                        matches.push(rule.noqa_code());
                         ignored_diagnostics.push(index);
                         continue;
                     }
                     (Directive::Codes(.., codes), matches) => {
-                        if noqa::includes(diagnostic.kind.rule(), codes) {
-                            matches.push(diagnostic.kind.rule().noqa_code());
+                        if noqa::includes(rule, codes) {
+                            matches.push(rule.noqa_code());
                             ignored_diagnostics.push(index);
                             continue;
                         }
@@ -119,13 +121,15 @@ pub fn check_noqa(
                 .or_insert_with(|| (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![]));
             match noqa {
                 (Directive::All(..), matches) => {
-                    matches.push(diagnostic.kind.rule().noqa_code());
+                    let rule: &Rule = (&diagnostic.kind).into();
+                    matches.push(rule.noqa_code());
                     ignored_diagnostics.push(index);
                     continue;
                 }
                 (Directive::Codes(.., codes), matches) => {
-                    if noqa::includes(diagnostic.kind.rule(), codes) {
-                        matches.push(diagnostic.kind.rule().noqa_code());
+                    let rule: &Rule = (&diagnostic.kind).into();
+                    if noqa::includes(rule, codes) {
+                        matches.push(rule.noqa_code());
                         ignored_diagnostics.push(index);
                         continue;
                     }
@@ -148,7 +152,7 @@ pub fn check_noqa(
                             UnusedNOQA { codes: None },
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
-                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+                        if autofix.into() && settings.rules.should_fix((&diagnostic.kind).into()) {
                             diagnostic.amend(Fix::deletion(
                                 Location::new(row + 1, start - spaces),
                                 Location::new(row + 1, lines[row].chars().count()),
@@ -215,7 +219,7 @@ pub fn check_noqa(
                             },
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
-                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+                        if autofix.into() && settings.rules.should_fix((&diagnostic.kind).into()) {
                             if valid_codes.is_empty() {
                                 diagnostic.amend(Fix::deletion(
                                     Location::new(row + 1, start - spaces),

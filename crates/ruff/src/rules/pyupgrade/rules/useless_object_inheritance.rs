@@ -68,7 +68,7 @@ pub fn useless_object_inheritance(
     let Some(mut diagnostic) = rule(name, bases, checker.ctx.current_scope(), &checker.ctx.bindings) else {
         return;
     };
-    if checker.patch(diagnostic.kind.rule()) {
+    if checker.patch((&diagnostic.kind).into()) {
         if let Some(fix) = fixes::remove_class_def_base(
             checker.locator,
             stmt.location,

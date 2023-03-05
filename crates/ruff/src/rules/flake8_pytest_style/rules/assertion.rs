@@ -205,7 +205,7 @@ pub fn unittest_assertion(
                     },
                     Range::from_located(func),
                 );
-                if fixable && checker.patch(diagnostic.kind.rule()) {
+                if fixable && checker.patch((&diagnostic.kind).into()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         diagnostic.amend(Fix::replacement(
                             unparse_stmt(&stmt, checker.stylist),
@@ -438,7 +438,7 @@ pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
             && !has_comments_in(Range::from_located(stmt), checker.locator);
         let mut diagnostic =
             Diagnostic::new(CompositeAssertion { fixable }, Range::from_located(stmt));
-        if fixable && checker.patch(diagnostic.kind.rule()) {
+        if fixable && checker.patch((&diagnostic.kind).into()) {
             if let Ok(fix) = fix_composite_condition(stmt, checker.locator, checker.stylist) {
                 diagnostic.amend(fix);
             }
