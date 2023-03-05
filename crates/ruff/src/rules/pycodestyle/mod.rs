@@ -103,6 +103,7 @@ mod tests {
         Path::new("E22.py")
     )]
     #[test_case(Rule::MissingWhitespaceAroundModuloOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MissingWhitespace, Path::new("E23.py"))]
     #[test_case(Rule::TooFewSpacesBeforeInlineComment, Path::new("E26.py"))]
     #[test_case(Rule::UnexpectedIndentation, Path::new("E11.py"))]
     #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]

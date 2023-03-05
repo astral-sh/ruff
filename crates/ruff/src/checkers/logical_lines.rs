@@ -9,7 +9,7 @@ use crate::ast::types::Range;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
 use crate::rules::pycodestyle::rules::{
-    extraneous_whitespace, indentation, missing_whitespace_after_keyword,
+    extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, space_around_operator, whitespace_around_keywords,
     whitespace_around_named_parameter_equals, whitespace_before_comment,
     whitespace_before_parameters,
@@ -162,6 +162,18 @@ pub fn check_logical_lines(
                     });
                 }
             }
+
+            #[cfg(feature = "logical_lines")]
+            let should_fix = autofix.into() && settings.rules.should_fix(&Rule::MissingWhitespace);
+
+            #[cfg(not(feature = "logical_lines"))]
+            let should_fix = false;
+
+            for diagnostic in missing_whitespace(&line.text, start_loc.row(), should_fix) {
+                if settings.rules.enabled(diagnostic.kind.rule()) {
+                    diagnostics.push(diagnostic);
+                }
+            }
         }
 
         if line.flags.contains(TokenFlags::BRACKET) {
@@ -291,7 +303,7 @@ f()"#;
             .into_iter()
             .map(|line| line.text)
             .collect();
-        let expected = vec!["def f():", "\"xxx\"", "", "x = 1", "f()"];
+        let expected = vec!["def f():", "\"xxxxxxxxxxxxxxxxxxxx\"", "", "x = 1", "f()"];
         assert_eq!(actual, expected);
     }
 }
