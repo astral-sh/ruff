@@ -5,14 +5,13 @@ use rustpython_parser::Tok;
 
 use ruff_macros::{define_violation, derive_message_formats};
 
+use crate::ast::types::Range;
+use crate::fix::Fix;
+use crate::registry::Diagnostic;
 use crate::registry::DiagnosticKind;
 use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
 use crate::violation::AlwaysAutofixableViolation;
 use crate::violation::Violation;
-
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
 
 define_violation!(
     pub struct MissingWhitespace {
@@ -32,14 +31,6 @@ impl AlwaysAutofixableViolation for MissingWhitespace {
     }
 }
 
-fn rfind(line: &str, char: char) -> i64 {
-    // emulate python's rfind
-    match line.find(char) {
-        Some(idx) => idx as i64,
-        None => -1,
-    }
-}
-
 /// E231
 #[cfg(feature = "logical_lines")]
 pub fn missing_whitespace(line: &str, row: usize, autofix: bool) -> Vec<Diagnostic> {
@@ -54,7 +45,7 @@ pub fn missing_whitespace(line: &str, row: usize, autofix: bool) -> Vec<Diagnost
             let before = &line[..idx];
             if char == ':'
                 && before.matches('[').count() > before.matches(']').count()
-                && rfind(before, '{') < rfind(before, '[')
+                && before.rfind('{') < before.rfind('[')
             {
                 continue; // Slice syntax, no space required
             }

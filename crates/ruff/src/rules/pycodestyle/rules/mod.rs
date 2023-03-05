@@ -26,9 +26,7 @@ pub use invalid_escape_sequence::{invalid_escape_sequence, InvalidEscapeSequence
 pub use lambda_assignment::{lambda_assignment, LambdaAssignment};
 pub use line_too_long::{line_too_long, LineTooLong};
 pub use literal_comparisons::{literal_comparisons, NoneComparison, TrueFalseComparison};
-
 pub use missing_whitespace::{missing_whitespace, MissingWhitespace};
-
 pub use missing_whitespace_after_keyword::{
     missing_whitespace_after_keyword, MissingWhitespaceAfterKeyword,
 };
