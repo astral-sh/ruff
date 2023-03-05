@@ -84,10 +84,6 @@ pub fn missing_whitespace(line: &str, row: usize, autofix: bool) -> Vec<Diagnost
 }
 
 #[cfg(not(feature = "logical_lines"))]
-pub fn missing_whitespace_after_keyword(
-    _line: &str,
-    _row: usize,
-    _autofix: bool,
-) -> Vec<Diagnostic> {
+pub fn missing_whitespace(_line: &str, _row: usize, _autofix: bool) -> Vec<Diagnostic> {
     vec![]
 }
