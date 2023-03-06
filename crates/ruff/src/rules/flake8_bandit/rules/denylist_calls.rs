@@ -186,7 +186,7 @@ fn comp_small_norm(small: &SmallVec<[&str; 8]>, norm: &&[&str]) -> bool {
 /// S001
 pub fn denylist_calls(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Call { func, .. } = &expr.node {
-        if let Some(message) = checker.resolve_call_path(func).and_then(|call_path| {
+        if let Some(message) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
             for bl_call in DENYLIST_CALLS {
                 if bl_call.severity >= checker.settings.flake8_bandit.severity {
                     for path in bl_call.calls {
