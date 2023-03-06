@@ -1,7 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::parse::{Parse, ParseStream};
-use syn::{Attribute, Error, Ident, ItemStruct, Lit, LitStr, Meta, Result, Token};
+use syn::{Attribute, Error, ItemStruct, Lit, LitStr, Meta, Result};
 
 fn parse_attr<const LEN: usize>(path: [&'static str; LEN], attr: &Attribute) -> Option<LitStr> {
     if let Meta::NameValue(name_value) = attr.parse_meta().ok()? {
@@ -19,59 +18,6 @@ fn parse_attr<const LEN: usize>(path: [&'static str; LEN], attr: &Attribute) -> 
     }
 
     None
-}
-
-pub struct LintMeta {
-    explanation: String,
-    name: Ident,
-}
-
-impl Parse for LintMeta {
-    fn parse(input: ParseStream) -> Result<Self> {
-        let attrs = input.call(Attribute::parse_outer)?;
-
-        let mut explanation = String::new();
-        for attr in &attrs {
-            if let Some(lit) = parse_attr(["doc"], attr) {
-                let value = lit.value();
-                let line = value.strip_prefix(' ').unwrap_or(&value);
-                explanation.push_str(line);
-                explanation.push('\n');
-            } else {
-                return Err(Error::new_spanned(attr, "unexpected attribute"));
-            }
-        }
-
-        input.parse::<Token![pub]>()?;
-        input.parse::<Token![struct]>()?;
-        let name = input.parse()?;
-
-        // Ignore the rest of the input.
-        input.parse::<TokenStream>()?;
-
-        Ok(Self { explanation, name })
-    }
-}
-
-pub fn define_violation(input: &TokenStream, meta: LintMeta) -> TokenStream {
-    let LintMeta { explanation, name } = meta;
-    if explanation.is_empty() {
-        quote! {
-            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-            #input
-        }
-    } else {
-        quote! {
-            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-            #input
-
-            impl #name {
-                pub fn explanation() -> Option<&'static str> {
-                    Some(#explanation)
-                }
-            }
-        }
-    }
 }
 
 /// Collect all doc comment attributes into a string

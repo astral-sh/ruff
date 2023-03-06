@@ -3,7 +3,7 @@
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
@@ -13,11 +13,11 @@ use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
 use crate::violation::AlwaysAutofixableViolation;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct MissingWhitespace {
-        pub token: String,
-    }
-);
+#[violation]
+pub struct MissingWhitespace {
+    pub token: String,
+}
+
 impl AlwaysAutofixableViolation for MissingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
