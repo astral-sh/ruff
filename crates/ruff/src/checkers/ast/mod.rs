@@ -4709,30 +4709,33 @@ impl<'a> Checker<'a> {
     }
 
     fn check_dead_scopes(&mut self) {
+        let enforce_typing_imports = !self.is_interface_definition
+            && (self
+                .settings
+                .rules
+                .enabled(&Rule::GlobalVariableNotAssigned)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyFirstPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyThirdPartyImport)
+                || self
+                    .settings
+                    .rules
+                    .enabled(&Rule::TypingOnlyStandardLibraryImport));
+
         if !(self.settings.rules.enabled(&Rule::UnusedImport)
             || self.settings.rules.enabled(&Rule::ImportStarUsage)
             || self.settings.rules.enabled(&Rule::RedefinedWhileUnused)
             || self.settings.rules.enabled(&Rule::UndefinedExport)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::GlobalVariableNotAssigned)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::TypingOnlyFirstPartyImport)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::TypingOnlyThirdPartyImport)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::TypingOnlyStandardLibraryImport))
+            || enforce_typing_imports)
         {
             return;
         }
@@ -4781,26 +4784,10 @@ impl<'a> Checker<'a> {
         // Identify any valid runtime imports. If a module is imported at runtime, and
         // used at runtime, then by default, we avoid flagging any other
         // imports from that model as typing-only.
-        let runtime_imports: Vec<Vec<&Binding>> = if self.settings.flake8_type_checking.strict {
-            vec![]
-        } else {
-            if self
-                .settings
-                .rules
-                .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
-                || self
-                    .settings
-                    .rules
-                    .enabled(&Rule::TypingOnlyFirstPartyImport)
-                || self
-                    .settings
-                    .rules
-                    .enabled(&Rule::TypingOnlyThirdPartyImport)
-                || self
-                    .settings
-                    .rules
-                    .enabled(&Rule::TypingOnlyStandardLibraryImport)
-            {
+        let runtime_imports: Vec<Vec<&Binding>> = if enforce_typing_imports {
+            if self.settings.flake8_type_checking.strict {
+                vec![]
+            } else {
                 self.ctx
                     .scopes
                     .iter()
@@ -4815,9 +4802,9 @@ impl<'a> Checker<'a> {
                             .collect::<Vec<_>>()
                     })
                     .collect::<Vec<_>>()
-            } else {
-                vec![]
             }
+        } else {
+            vec![]
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
@@ -4939,23 +4926,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self
-                .settings
-                .rules
-                .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
-                || self
-                    .settings
-                    .rules
-                    .enabled(&Rule::TypingOnlyFirstPartyImport)
-                || self
-                    .settings
-                    .rules
-                    .enabled(&Rule::TypingOnlyThirdPartyImport)
-                || self
-                    .settings
-                    .rules
-                    .enabled(&Rule::TypingOnlyStandardLibraryImport)
-            {
+            if enforce_typing_imports {
                 let runtime_imports: Vec<&Binding> = if self.settings.flake8_type_checking.strict {
                     vec![]
                 } else {
