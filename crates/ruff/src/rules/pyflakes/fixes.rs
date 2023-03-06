@@ -1,9 +1,9 @@
 use anyhow::{bail, Result};
 use libcst_native::{Call, Codegen, CodegenState, Dict, DictElement, Expression};
-use ruff_python_stdlib::str::strip_quotes_and_prefixes;
 use rustpython_parser::ast::{Excepthandler, Expr};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use crate::ast::strings::raw_contents;
 use crate::ast::types::Range;
 use crate::cst::matchers::{match_expr, match_module};
 use crate::fix::Fix;
@@ -37,7 +37,7 @@ pub fn remove_unused_format_arguments_from_dict(
                     DictElement::Simple {
                         key: Expression::SimpleString(name),
                         ..
-                    } if unused_arguments.contains(&strip_quotes_and_prefixes(name.value)) => None,
+                    } if unused_arguments.contains(&raw_contents(name.value)) => None,
                     e => Some(e.clone()),
                 })
                 .collect(),
