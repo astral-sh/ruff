@@ -38,22 +38,9 @@ pub fn is_upper(s: &str) -> bool {
     cased
 }
 
-/// Remove prefixes (u, r, b) and quotes around a string. This expects the given
-/// string to be a valid Python string representation, it doesn't do any
-/// validation.
-pub fn strip_quotes_and_prefixes(s: &str) -> &str {
-    match STRING_QUOTE_PREFIX_REGEX.captures(s) {
-        Some(caps) => match caps.name("raw") {
-            Some(m) => m.as_str(),
-            None => s,
-        },
-        None => s,
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::str::{is_lower, is_upper, strip_quotes_and_prefixes};
+    use crate::str::{is_lower, is_upper};
 
     #[test]
     fn test_is_lower() {
@@ -75,13 +62,5 @@ mod tests {
         assert!(!is_upper("abc"));
         assert!(!is_upper(""));
         assert!(!is_upper("_"));
-    }
-
-    #[test]
-    fn test_strip_quotes_and_prefixes() {
-        assert_eq!(strip_quotes_and_prefixes(r#"'a'"#), "a");
-        assert_eq!(strip_quotes_and_prefixes(r#"bur'a'"#), "a");
-        assert_eq!(strip_quotes_and_prefixes(r#"UrB'a'"#), "a");
-        assert_eq!(strip_quotes_and_prefixes(r#""a""#), "a");
     }
 }
