@@ -9,8 +9,8 @@ use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::ast::helpers::{collect_call_path, from_relative_import, Exceptions};
 use crate::ast::types::{Binding, BindingKind, CallPath, ExecutionContext, RefEquality, Scope};
+use crate::ast::visibility::{module_visibility, Modifier, VisibleScope};
 use crate::resolver::is_interface_definition_path;
-use crate::visibility::{module_visibility, Modifier, VisibleScope};
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Context<'a> {

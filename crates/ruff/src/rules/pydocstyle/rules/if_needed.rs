@@ -2,11 +2,11 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::cast;
 use crate::ast::helpers::identifier_range;
+use crate::ast::visibility::is_overload;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use crate::visibility::is_overload;
 
 #[violation]
 pub struct OverloadWithDocstring;

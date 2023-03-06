@@ -1,9 +1,9 @@
 use rustpython_parser::ast::{Arguments, Expr, Stmt, StmtKind};
 
 use crate::ast::cast;
+use crate::ast::visibility;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::visibility;
 
 pub(super) fn match_function_def(
     stmt: &Stmt,

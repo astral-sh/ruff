@@ -25,9 +25,11 @@ use crate::ast::types::{
 };
 use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use crate::ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
-use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
+use crate::ast::{branch_detection, cast, helpers, operations, typing, visibility, visitor};
 use crate::checkers::ast::deferred::Deferred;
-use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
+use crate::docstrings::definition::{
+    transition_scope, Definition, DefinitionKind, Docstring, Documentable,
+};
 use crate::registry::{Diagnostic, Rule};
 use crate::resolver::is_interface_definition_path;
 use crate::rules::{
@@ -42,8 +44,7 @@ use crate::rules::{
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-use crate::visibility::transition_scope;
-use crate::{ast, autofix, docstrings, noqa, visibility};
+use crate::{ast, autofix, docstrings, noqa};
 
 mod deferred;
 

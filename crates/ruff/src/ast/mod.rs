@@ -11,5 +11,6 @@ pub mod relocate;
 pub mod strings;
 pub mod types;
 pub mod typing;
+pub mod visibility;
 pub mod visitor;
 pub mod whitespace;

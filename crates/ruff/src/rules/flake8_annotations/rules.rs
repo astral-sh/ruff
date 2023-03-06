@@ -6,14 +6,14 @@ use super::fixes;
 use super::helpers::match_function_def;
 use crate::ast::helpers::ReturnStatementVisitor;
 use crate::ast::types::Range;
+use crate::ast::visibility;
+use crate::ast::visibility::Visibility;
 use crate::ast::visitor::Visitor;
 use crate::ast::{cast, helpers};
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use crate::visibility;
-use crate::visibility::Visibility;
 
 /// ## What it does
 /// Checks that function arguments have type annotations.

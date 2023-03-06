@@ -8,6 +8,7 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::identifier_range;
 use crate::ast::types::Range;
+use crate::ast::visibility::is_staticmethod;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::ast::{cast, whitespace};
 use crate::checkers::ast::Checker;
@@ -19,7 +20,6 @@ use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pydocstyle::settings::Convention;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
-use crate::visibility::is_staticmethod;
 
 #[violation]
 pub struct SectionNotOverIndented {
