@@ -8,6 +8,7 @@ pub mod helpers;
 pub mod logging;
 pub mod operations;
 pub mod relocate;
+pub mod strings;
 pub mod types;
 pub mod typing;
 pub mod visitor;

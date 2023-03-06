@@ -8,8 +8,8 @@ use ruff_rustpython::vendor;
 use rustpython_parser::ast::Location;
 use rustpython_parser::{lexer, Mode, Tok};
 
+use crate::ast::strings::leading_quote;
 use crate::ast::types::Range;
-use crate::rules::pydocstyle::helpers::leading_quote;
 use crate::source_code::Locator;
 
 pub struct Stylist<'a> {
