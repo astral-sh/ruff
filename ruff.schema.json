@@ -272,7 +272,7 @@
       ]
     },
     "format": {
-      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure-devops\"` (Azure Devops Pipeline logging commands).",
+      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -2179,7 +2179,7 @@
         "github",
         "gitlab",
         "pylint",
-        "azure-devops"
+        "azure"
       ]
     },
     "Strictness": {
