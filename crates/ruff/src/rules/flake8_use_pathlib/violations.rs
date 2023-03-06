@@ -1,11 +1,11 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::violation::Violation;
 
 // PTH100
-define_violation!(
-    pub struct PathlibAbspath;
-);
+#[violation]
+pub struct PathlibAbspath;
+
 impl Violation for PathlibAbspath {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -14,9 +14,9 @@ impl Violation for PathlibAbspath {
 }
 
 // PTH101
-define_violation!(
-    pub struct PathlibChmod;
-);
+#[violation]
+pub struct PathlibChmod;
+
 impl Violation for PathlibChmod {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -25,9 +25,9 @@ impl Violation for PathlibChmod {
 }
 
 // PTH102
-define_violation!(
-    pub struct PathlibMakedirs;
-);
+#[violation]
+pub struct PathlibMakedirs;
+
 impl Violation for PathlibMakedirs {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -36,9 +36,9 @@ impl Violation for PathlibMakedirs {
 }
 
 // PTH103
-define_violation!(
-    pub struct PathlibMkdir;
-);
+#[violation]
+pub struct PathlibMkdir;
+
 impl Violation for PathlibMkdir {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,9 +47,9 @@ impl Violation for PathlibMkdir {
 }
 
 // PTH104
-define_violation!(
-    pub struct PathlibRename;
-);
+#[violation]
+pub struct PathlibRename;
+
 impl Violation for PathlibRename {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -58,9 +58,9 @@ impl Violation for PathlibRename {
 }
 
 // PTH105
-define_violation!(
-    pub struct PathlibReplace;
-);
+#[violation]
+pub struct PathlibReplace;
+
 impl Violation for PathlibReplace {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -69,9 +69,9 @@ impl Violation for PathlibReplace {
 }
 
 // PTH106
-define_violation!(
-    pub struct PathlibRmdir;
-);
+#[violation]
+pub struct PathlibRmdir;
+
 impl Violation for PathlibRmdir {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -80,9 +80,9 @@ impl Violation for PathlibRmdir {
 }
 
 // PTH107
-define_violation!(
-    pub struct PathlibRemove;
-);
+#[violation]
+pub struct PathlibRemove;
+
 impl Violation for PathlibRemove {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -91,9 +91,9 @@ impl Violation for PathlibRemove {
 }
 
 // PTH108
-define_violation!(
-    pub struct PathlibUnlink;
-);
+#[violation]
+pub struct PathlibUnlink;
+
 impl Violation for PathlibUnlink {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -102,9 +102,9 @@ impl Violation for PathlibUnlink {
 }
 
 // PTH109
-define_violation!(
-    pub struct PathlibGetcwd;
-);
+#[violation]
+pub struct PathlibGetcwd;
+
 impl Violation for PathlibGetcwd {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -113,9 +113,9 @@ impl Violation for PathlibGetcwd {
 }
 
 // PTH110
-define_violation!(
-    pub struct PathlibExists;
-);
+#[violation]
+pub struct PathlibExists;
+
 impl Violation for PathlibExists {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -124,9 +124,9 @@ impl Violation for PathlibExists {
 }
 
 // PTH111
-define_violation!(
-    pub struct PathlibExpanduser;
-);
+#[violation]
+pub struct PathlibExpanduser;
+
 impl Violation for PathlibExpanduser {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -135,9 +135,9 @@ impl Violation for PathlibExpanduser {
 }
 
 // PTH112
-define_violation!(
-    pub struct PathlibIsDir;
-);
+#[violation]
+pub struct PathlibIsDir;
+
 impl Violation for PathlibIsDir {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -146,9 +146,9 @@ impl Violation for PathlibIsDir {
 }
 
 // PTH113
-define_violation!(
-    pub struct PathlibIsFile;
-);
+#[violation]
+pub struct PathlibIsFile;
+
 impl Violation for PathlibIsFile {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -157,9 +157,9 @@ impl Violation for PathlibIsFile {
 }
 
 // PTH114
-define_violation!(
-    pub struct PathlibIsLink;
-);
+#[violation]
+pub struct PathlibIsLink;
+
 impl Violation for PathlibIsLink {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -168,9 +168,9 @@ impl Violation for PathlibIsLink {
 }
 
 // PTH115
-define_violation!(
-    pub struct PathlibReadlink;
-);
+#[violation]
+pub struct PathlibReadlink;
+
 impl Violation for PathlibReadlink {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -179,9 +179,9 @@ impl Violation for PathlibReadlink {
 }
 
 // PTH116
-define_violation!(
-    pub struct PathlibStat;
-);
+#[violation]
+pub struct PathlibStat;
+
 impl Violation for PathlibStat {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -192,9 +192,9 @@ impl Violation for PathlibStat {
 }
 
 // PTH117
-define_violation!(
-    pub struct PathlibIsAbs;
-);
+#[violation]
+pub struct PathlibIsAbs;
+
 impl Violation for PathlibIsAbs {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -203,9 +203,9 @@ impl Violation for PathlibIsAbs {
 }
 
 // PTH118
-define_violation!(
-    pub struct PathlibJoin;
-);
+#[violation]
+pub struct PathlibJoin;
+
 impl Violation for PathlibJoin {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -214,9 +214,9 @@ impl Violation for PathlibJoin {
 }
 
 // PTH119
-define_violation!(
-    pub struct PathlibBasename;
-);
+#[violation]
+pub struct PathlibBasename;
+
 impl Violation for PathlibBasename {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -225,9 +225,9 @@ impl Violation for PathlibBasename {
 }
 
 // PTH120
-define_violation!(
-    pub struct PathlibDirname;
-);
+#[violation]
+pub struct PathlibDirname;
+
 impl Violation for PathlibDirname {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -236,9 +236,9 @@ impl Violation for PathlibDirname {
 }
 
 // PTH121
-define_violation!(
-    pub struct PathlibSamefile;
-);
+#[violation]
+pub struct PathlibSamefile;
+
 impl Violation for PathlibSamefile {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -247,9 +247,9 @@ impl Violation for PathlibSamefile {
 }
 
 // PTH122
-define_violation!(
-    pub struct PathlibSplitext;
-);
+#[violation]
+pub struct PathlibSplitext;
+
 impl Violation for PathlibSplitext {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -258,9 +258,9 @@ impl Violation for PathlibSplitext {
 }
 
 // PTH123
-define_violation!(
-    pub struct PathlibOpen;
-);
+#[violation]
+pub struct PathlibOpen;
+
 impl Violation for PathlibOpen {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -269,9 +269,9 @@ impl Violation for PathlibOpen {
 }
 
 // PTH124
-define_violation!(
-    pub struct PathlibPyPath;
-);
+#[violation]
+pub struct PathlibPyPath;
+
 impl Violation for PathlibPyPath {
     #[derive_message_formats]
     fn message(&self) -> String {

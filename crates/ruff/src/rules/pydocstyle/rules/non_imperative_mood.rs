@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use imperative::Mood;
 use once_cell::sync::Lazy;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::cast;
 use crate::ast::helpers::to_call_path;
@@ -69,9 +69,9 @@ pub fn non_imperative_mood(
     }
 }
 
-define_violation!(
-    pub struct NonImperativeMood(pub String);
-);
+#[violation]
+pub struct NonImperativeMood(pub String);
+
 impl Violation for NonImperativeMood {
     #[derive_message_formats]
     fn message(&self) -> String {

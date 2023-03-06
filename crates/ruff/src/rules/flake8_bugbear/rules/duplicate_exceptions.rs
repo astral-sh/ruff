@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
     Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location,
@@ -13,11 +13,11 @@ use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
-define_violation!(
-    pub struct DuplicateTryBlockException {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct DuplicateTryBlockException {
+    pub name: String,
+}
+
 impl Violation for DuplicateTryBlockException {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -25,11 +25,11 @@ impl Violation for DuplicateTryBlockException {
         format!("try-except block with duplicate exception `{name}`")
     }
 }
-define_violation!(
-    pub struct DuplicateHandlerException {
-        pub names: Vec<String>,
-    }
-);
+#[violation]
+pub struct DuplicateHandlerException {
+    pub names: Vec<String>,
+}
+
 impl AlwaysAutofixableViolation for DuplicateHandlerException {
     #[derive_message_formats]
     fn message(&self) -> String {

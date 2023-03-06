@@ -81,13 +81,12 @@ def main(*, name: str, code: str, linter: str) -> None:
         fp.write(
             """use ruff_macros::derive_message_formats;
 
-use ruff_macros::define_violation;
+use ruff_macros::violation;
 use crate::violation::Violation;
 use crate::checkers::ast::Checker;
 
-define_violation!(
-    pub struct %s;
-);
+#[violation]
+pub struct %s;
 impl Violation for %s {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 
 use crate::ast::types::Range;
@@ -11,12 +11,12 @@ use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct AmbiguousUnicodeCharacterString {
-        pub confusable: char,
-        pub representant: char,
-    }
-);
+#[violation]
+pub struct AmbiguousUnicodeCharacterString {
+    pub confusable: char,
+    pub representant: char,
+}
+
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -39,12 +39,12 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterString {
     }
 }
 
-define_violation!(
-    pub struct AmbiguousUnicodeCharacterDocstring {
-        pub confusable: char,
-        pub representant: char,
-    }
-);
+#[violation]
+pub struct AmbiguousUnicodeCharacterDocstring {
+    pub confusable: char,
+    pub representant: char,
+}
+
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -67,12 +67,12 @@ impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterDocstring {
     }
 }
 
-define_violation!(
-    pub struct AmbiguousUnicodeCharacterComment {
-        pub confusable: char,
-        pub representant: char,
-    }
-);
+#[violation]
+pub struct AmbiguousUnicodeCharacterComment {
+    pub confusable: char,
+    pub representant: char,
+}
+
 impl AlwaysAutofixableViolation for AmbiguousUnicodeCharacterComment {
     #[derive_message_formats]
     fn message(&self) -> String {

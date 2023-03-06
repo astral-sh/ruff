@@ -1,5 +1,5 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python::identifiers::is_identifier;
 use ruff_python::keyword::KWLIST;
 use rustc_hash::FxHashSet;
@@ -17,9 +17,9 @@ use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 use super::fixes;
 
-define_violation!(
-    pub struct UnnecessaryPass;
-);
+#[violation]
+pub struct UnnecessaryPass;
+
 impl AlwaysAutofixableViolation for UnnecessaryPass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -31,9 +31,9 @@ impl AlwaysAutofixableViolation for UnnecessaryPass {
     }
 }
 
-define_violation!(
-    pub struct DupeClassFieldDefinitions(pub String);
-);
+#[violation]
+pub struct DupeClassFieldDefinitions(pub String);
+
 impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,11 +47,11 @@ impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
     }
 }
 
-define_violation!(
-    pub struct PreferUniqueEnums {
-        pub value: String,
-    }
-);
+#[violation]
+pub struct PreferUniqueEnums {
+    pub value: String,
+}
+
 impl Violation for PreferUniqueEnums {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -60,39 +60,39 @@ impl Violation for PreferUniqueEnums {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for unnecessary list comprehensions passed to `any` and `all`.
-    ///
-    /// ## Why is this bad?
-    /// `any` and `all` take any iterators, including generators. Converting a generator to a list
-    /// by way of a list comprehension is unnecessary and reduces performance due to the
-    /// overhead of creating the list.
-    ///
-    /// For example, compare the performance of `all` with a list comprehension against that
-    /// of a generator (~40x faster here):
-    ///
-    /// ```console
-    /// In [1]: %timeit all([i for i in range(1000)])
-    /// 8.14 µs ± 25.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-    ///
-    /// In [2]: %timeit all(i for i in range(1000))
-    /// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
-    /// ```
-    ///
-    /// ## Examples
-    /// ```python
-    /// any([x.id for x in bar])
-    /// all([x.id for x in bar])
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// any(x.id for x in bar)
-    /// all(x.id for x in bar)
-    /// ```
-    pub struct UnnecessaryComprehensionAnyAll;
-);
+/// ## What it does
+/// Checks for unnecessary list comprehensions passed to `any` and `all`.
+///
+/// ## Why is this bad?
+/// `any` and `all` take any iterators, including generators. Converting a generator to a list
+/// by way of a list comprehension is unnecessary and reduces performance due to the
+/// overhead of creating the list.
+///
+/// For example, compare the performance of `all` with a list comprehension against that
+/// of a generator (~40x faster here):
+///
+/// ```console
+/// In [1]: %timeit all([i for i in range(1000)])
+/// 8.14 µs ± 25.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
+///
+/// In [2]: %timeit all(i for i in range(1000))
+/// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
+/// ```
+///
+/// ## Examples
+/// ```python
+/// any([x.id for x in bar])
+/// all([x.id for x in bar])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// any(x.id for x in bar)
+/// all(x.id for x in bar)
+/// ```
+#[violation]
+pub struct UnnecessaryComprehensionAnyAll;
+
 impl AlwaysAutofixableViolation for UnnecessaryComprehensionAnyAll {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -104,9 +104,9 @@ impl AlwaysAutofixableViolation for UnnecessaryComprehensionAnyAll {
     }
 }
 
-define_violation!(
-    pub struct UnnecessarySpread;
-);
+#[violation]
+pub struct UnnecessarySpread;
+
 impl Violation for UnnecessarySpread {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -114,11 +114,11 @@ impl Violation for UnnecessarySpread {
     }
 }
 
-define_violation!(
-    pub struct SingleStartsEndsWith {
-        pub attr: String,
-    }
-);
+#[violation]
+pub struct SingleStartsEndsWith {
+    pub attr: String,
+}
+
 impl Violation for SingleStartsEndsWith {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -127,9 +127,9 @@ impl Violation for SingleStartsEndsWith {
     }
 }
 
-define_violation!(
-    pub struct UnnecessaryDictKwargs;
-);
+#[violation]
+pub struct UnnecessaryDictKwargs;
+
 impl Violation for UnnecessaryDictKwargs {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -137,9 +137,9 @@ impl Violation for UnnecessaryDictKwargs {
     }
 }
 
-define_violation!(
-    pub struct PreferListBuiltin;
-);
+#[violation]
+pub struct PreferListBuiltin;
+
 impl AlwaysAutofixableViolation for PreferListBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {

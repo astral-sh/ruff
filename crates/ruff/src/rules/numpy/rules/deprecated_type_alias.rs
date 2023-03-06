@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Expr;
 
 use crate::ast::types::Range;
@@ -7,33 +7,33 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for deprecated NumPy type aliases.
-    ///
-    /// ## Why is this bad?
-    /// NumPy's `np.int` has long been an alias of the builtin `int`. The same
-    /// goes for `np.float`, `np.bool`, and others. These aliases exist
-    /// primarily primarily for historic reasons, and have been a cause of
-    /// frequent confusion for newcomers.
-    ///
-    /// These aliases were been deprecated in 1.20, and removed in 1.24.
-    ///
-    /// ## Examples
-    /// ```python
-    /// import numpy as np
-    ///
-    /// np.bool
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// bool
-    /// ```
-    pub struct NumpyDeprecatedTypeAlias {
-        pub type_name: String,
-    }
-);
+/// ## What it does
+/// Checks for deprecated NumPy type aliases.
+///
+/// ## Why is this bad?
+/// NumPy's `np.int` has long been an alias of the builtin `int`. The same
+/// goes for `np.float`, `np.bool`, and others. These aliases exist
+/// primarily primarily for historic reasons, and have been a cause of
+/// frequent confusion for newcomers.
+///
+/// These aliases were been deprecated in 1.20, and removed in 1.24.
+///
+/// ## Examples
+/// ```python
+/// import numpy as np
+///
+/// np.bool
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bool
+/// ```
+#[violation]
+pub struct NumpyDeprecatedTypeAlias {
+    pub type_name: String,
+}
+
 impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {

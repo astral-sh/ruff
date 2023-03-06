@@ -1,15 +1,14 @@
 use rustpython_parser::ast::{Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct CollapsibleElseIf;
-);
+#[violation]
+pub struct CollapsibleElseIf;
 
 impl Violation for CollapsibleElseIf {
     #[derive_message_formats]

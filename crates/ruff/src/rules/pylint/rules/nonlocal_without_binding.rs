@@ -1,12 +1,12 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct NonlocalWithoutBinding {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct NonlocalWithoutBinding {
+    pub name: String,
+}
+
 impl Violation for NonlocalWithoutBinding {
     #[derive_message_formats]
     fn message(&self) -> String {

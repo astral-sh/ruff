@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{ExprKind, Stmt, Withitem};
 
 use crate::ast::types::Range;
@@ -6,28 +6,28 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for `self.assertRaises(Exception)`.
-    ///
-    /// ## Why is this bad?
-    /// `assertRaises(Exception)` can lead to your test passing even if the
-    /// code being tested is never executed due to a typo.
-    ///
-    /// Either assert for a more specific exception (builtin or custom), use
-    /// `assertRaisesRegex` or the context manager form of `assertRaises`.
-    ///
-    /// ## Example
-    /// ```python
-    /// self.assertRaises(Exception, foo)
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// self.assertRaises(SomeSpecificException, foo)
-    /// ```
-    pub struct AssertRaisesException;
-);
+/// ## What it does
+/// Checks for `self.assertRaises(Exception)`.
+///
+/// ## Why is this bad?
+/// `assertRaises(Exception)` can lead to your test passing even if the
+/// code being tested is never executed due to a typo.
+///
+/// Either assert for a more specific exception (builtin or custom), use
+/// `assertRaisesRegex` or the context manager form of `assertRaises`.
+///
+/// ## Example
+/// ```python
+/// self.assertRaises(Exception, foo)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// self.assertRaises(SomeSpecificException, foo)
+/// ```
+#[violation]
+pub struct AssertRaisesException;
+
 impl Violation for AssertRaisesException {
     #[derive_message_formats]
     fn message(&self) -> String {

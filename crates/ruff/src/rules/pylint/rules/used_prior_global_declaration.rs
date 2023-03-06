@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Expr;
 
 use crate::ast::types::{Range, ScopeKind};
@@ -6,12 +6,12 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UsedPriorGlobalDeclaration {
-        pub name: String,
-        pub line: usize,
-    }
-);
+#[violation]
+pub struct UsedPriorGlobalDeclaration {
+    pub name: String,
+    pub line: usize,
+}
+
 impl Violation for UsedPriorGlobalDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {

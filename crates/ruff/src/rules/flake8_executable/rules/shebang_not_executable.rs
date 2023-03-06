@@ -4,7 +4,7 @@ use std::path::Path;
 
 use rustpython_parser::ast::Location;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
@@ -13,9 +13,9 @@ use crate::rules::flake8_executable::helpers::is_executable;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct ShebangNotExecutable;
-);
+#[violation]
+pub struct ShebangNotExecutable;
+
 impl Violation for ShebangNotExecutable {
     #[derive_message_formats]
     fn message(&self) -> String {

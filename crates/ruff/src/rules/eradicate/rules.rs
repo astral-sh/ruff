@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 
 use super::detection::comment_contains_code;
@@ -9,20 +9,20 @@ use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for commented-out Python code.
-    ///
-    /// ## Why is this bad?
-    /// Commented-out code is dead code, and is often included inadvertently.
-    /// It should be removed.
-    ///
-    /// ## Example
-    /// ```python
-    /// # print('foo')
-    /// ```
-    pub struct CommentedOutCode;
-);
+/// ## What it does
+/// Checks for commented-out Python code.
+///
+/// ## Why is this bad?
+/// Commented-out code is dead code, and is often included inadvertently.
+/// It should be removed.
+///
+/// ## Example
+/// ```python
+/// # print('foo')
+/// ```
+#[violation]
+pub struct CommentedOutCode;
+
 impl AlwaysAutofixableViolation for CommentedOutCode {
     #[derive_message_formats]
     fn message(&self) -> String {

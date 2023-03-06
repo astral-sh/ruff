@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Stmt;
 
@@ -6,30 +6,30 @@ use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for imports that are typically imported using a common convention,
-    /// like `import pandas as pd`, and enforces that convention.
-    ///
-    /// ## Why is this bad?
-    /// Consistency is good. Use a common convention for imports to make your code
-    /// more readable and idiomatic.
-    ///
-    /// For example, `import pandas as pd` is a common
-    /// convention for importing the `pandas` library, and users typically expect
-    /// Pandas to be aliased as `pd`.
-    ///
-    /// ## Example
-    /// ```python
-    /// import pandas
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// import pandas as pd
-    /// ```
-    pub struct UnconventionalImportAlias(pub String, pub String);
-);
+/// ## What it does
+/// Checks for imports that are typically imported using a common convention,
+/// like `import pandas as pd`, and enforces that convention.
+///
+/// ## Why is this bad?
+/// Consistency is good. Use a common convention for imports to make your code
+/// more readable and idiomatic.
+///
+/// For example, `import pandas as pd` is a common
+/// convention for importing the `pandas` library, and users typically expect
+/// Pandas to be aliased as `pd`.
+///
+/// ## Example
+/// ```python
+/// import pandas
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import pandas as pd
+/// ```
+#[violation]
+pub struct UnconventionalImportAlias(pub String, pub String);
+
 impl Violation for UnconventionalImportAlias {
     #[derive_message_formats]
     fn message(&self) -> String {

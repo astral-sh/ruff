@@ -2,14 +2,14 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::registry::DiagnosticKind;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct TabBeforeOperator;
-);
+#[violation]
+pub struct TabBeforeOperator;
+
 impl Violation for TabBeforeOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -17,9 +17,9 @@ impl Violation for TabBeforeOperator {
     }
 }
 
-define_violation!(
-    pub struct MultipleSpacesBeforeOperator;
-);
+#[violation]
+pub struct MultipleSpacesBeforeOperator;
+
 impl Violation for MultipleSpacesBeforeOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -27,9 +27,9 @@ impl Violation for MultipleSpacesBeforeOperator {
     }
 }
 
-define_violation!(
-    pub struct TabAfterOperator;
-);
+#[violation]
+pub struct TabAfterOperator;
+
 impl Violation for TabAfterOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -37,9 +37,9 @@ impl Violation for TabAfterOperator {
     }
 }
 
-define_violation!(
-    pub struct MultipleSpacesAfterOperator;
-);
+#[violation]
+pub struct MultipleSpacesAfterOperator;
+
 impl Violation for MultipleSpacesAfterOperator {
     #[derive_message_formats]
     fn message(&self) -> String {

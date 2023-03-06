@@ -1,12 +1,12 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct HardcodedBindAllInterfaces;
-);
+#[violation]
+pub struct HardcodedBindAllInterfaces;
+
 impl Violation for HardcodedBindAllInterfaces {
     #[derive_message_formats]
     fn message(&self) -> String {

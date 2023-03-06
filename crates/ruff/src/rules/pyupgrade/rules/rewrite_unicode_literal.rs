@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Location};
 
 use crate::ast::types::Range;
@@ -7,9 +7,9 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct RewriteUnicodeLiteral;
-);
+#[violation]
+pub struct RewriteUnicodeLiteral;
+
 impl AlwaysAutofixableViolation for RewriteUnicodeLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {

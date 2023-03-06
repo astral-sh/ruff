@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Keyword, Location};
 
 use crate::ast::helpers::find_keyword;
@@ -8,9 +8,9 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct ReplaceUniversalNewlines;
-);
+#[violation]
+pub struct ReplaceUniversalNewlines;
+
 impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
     #[derive_message_formats]
     fn message(&self) -> String {

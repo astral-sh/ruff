@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::unparse_expr;
 use crate::ast::types::Range;
@@ -10,11 +10,11 @@ use crate::registry::Diagnostic;
 use crate::rules::pylint::settings::ConstantType;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct MagicValueComparison {
-        pub value: String,
-    }
-);
+#[violation]
+pub struct MagicValueComparison {
+    pub value: String,
+}
+
 impl Violation for MagicValueComparison {
     #[derive_message_formats]
     fn message(&self) -> String {

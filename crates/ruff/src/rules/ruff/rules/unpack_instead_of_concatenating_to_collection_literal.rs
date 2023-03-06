@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Operator};
 
 use crate::ast::helpers::{create_expr, has_comments, unparse_expr};
@@ -8,12 +8,12 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::{AutofixKind, Availability, Violation};
 
-define_violation!(
-    pub struct UnpackInsteadOfConcatenatingToCollectionLiteral {
-        pub expr: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct UnpackInsteadOfConcatenatingToCollectionLiteral {
+    pub expr: String,
+    pub fixable: bool,
+}
+
 impl Violation for UnpackInsteadOfConcatenatingToCollectionLiteral {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

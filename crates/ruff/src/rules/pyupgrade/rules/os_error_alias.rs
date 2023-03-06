@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::compose_call_path;
 use crate::ast::types::Range;
@@ -10,11 +10,11 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct OSErrorAlias {
-        pub name: Option<String>,
-    }
-);
+#[violation]
+pub struct OSErrorAlias {
+    pub name: Option<String>,
+}
+
 impl AlwaysAutofixableViolation for OSErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {

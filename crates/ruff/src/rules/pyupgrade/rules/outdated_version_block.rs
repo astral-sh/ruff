@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use log::error;
 use num_bigint::{BigInt, Sign};
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
@@ -17,9 +17,9 @@ use crate::settings::types::PythonVersion;
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct OutdatedVersionBlock;
-);
+#[violation]
+pub struct OutdatedVersionBlock;
+
 impl AlwaysAutofixableViolation for OutdatedVersionBlock {
     #[derive_message_formats]
     fn message(&self) -> String {

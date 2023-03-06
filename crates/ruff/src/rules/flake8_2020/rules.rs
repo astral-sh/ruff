@@ -1,5 +1,5 @@
 use num_bigint::BigInt;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located};
 
 use crate::ast::types::Range;
@@ -7,9 +7,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct SysVersionSlice3Referenced;
-);
+#[violation]
+pub struct SysVersionSlice3Referenced;
+
 impl Violation for SysVersionSlice3Referenced {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -17,9 +17,9 @@ impl Violation for SysVersionSlice3Referenced {
     }
 }
 
-define_violation!(
-    pub struct SysVersion2Referenced;
-);
+#[violation]
+pub struct SysVersion2Referenced;
+
 impl Violation for SysVersion2Referenced {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -27,9 +27,9 @@ impl Violation for SysVersion2Referenced {
     }
 }
 
-define_violation!(
-    pub struct SysVersionCmpStr3;
-);
+#[violation]
+pub struct SysVersionCmpStr3;
+
 impl Violation for SysVersionCmpStr3 {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -37,9 +37,9 @@ impl Violation for SysVersionCmpStr3 {
     }
 }
 
-define_violation!(
-    pub struct SysVersionInfo0Eq3Referenced;
-);
+#[violation]
+pub struct SysVersionInfo0Eq3Referenced;
+
 impl Violation for SysVersionInfo0Eq3Referenced {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,9 +47,9 @@ impl Violation for SysVersionInfo0Eq3Referenced {
     }
 }
 
-define_violation!(
-    pub struct SixPY3Referenced;
-);
+#[violation]
+pub struct SixPY3Referenced;
+
 impl Violation for SixPY3Referenced {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -57,9 +57,9 @@ impl Violation for SixPY3Referenced {
     }
 }
 
-define_violation!(
-    pub struct SysVersionInfo1CmpInt;
-);
+#[violation]
+pub struct SysVersionInfo1CmpInt;
+
 impl Violation for SysVersionInfo1CmpInt {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -70,9 +70,9 @@ impl Violation for SysVersionInfo1CmpInt {
     }
 }
 
-define_violation!(
-    pub struct SysVersionInfoMinorCmpInt;
-);
+#[violation]
+pub struct SysVersionInfoMinorCmpInt;
+
 impl Violation for SysVersionInfoMinorCmpInt {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -83,9 +83,9 @@ impl Violation for SysVersionInfoMinorCmpInt {
     }
 }
 
-define_violation!(
-    pub struct SysVersion0Referenced;
-);
+#[violation]
+pub struct SysVersion0Referenced;
+
 impl Violation for SysVersion0Referenced {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -93,9 +93,9 @@ impl Violation for SysVersion0Referenced {
     }
 }
 
-define_violation!(
-    pub struct SysVersionCmpStr10;
-);
+#[violation]
+pub struct SysVersionCmpStr10;
+
 impl Violation for SysVersionCmpStr10 {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -103,9 +103,9 @@ impl Violation for SysVersionCmpStr10 {
     }
 }
 
-define_violation!(
-    pub struct SysVersionSlice1Referenced;
-);
+#[violation]
+pub struct SysVersionSlice1Referenced;
+
 impl Violation for SysVersionSlice1Referenced {
     #[derive_message_formats]
     fn message(&self) -> String {

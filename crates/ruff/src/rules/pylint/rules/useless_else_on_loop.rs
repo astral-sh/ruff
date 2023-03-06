@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{ExcepthandlerKind, MatchCase, Stmt, StmtKind};
 
 use crate::ast::helpers;
@@ -6,9 +6,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UselessElseOnLoop;
-);
+#[violation]
+pub struct UselessElseOnLoop;
+
 impl Violation for UselessElseOnLoop {
     #[derive_message_formats]
     fn message(&self) -> String {

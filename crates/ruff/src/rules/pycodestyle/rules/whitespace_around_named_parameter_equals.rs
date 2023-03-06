@@ -5,7 +5,7 @@ use rustpython_parser::Tok;
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 #[cfg(feature = "logical_lines")]
 use crate::rules::pycodestyle::helpers::is_op_token;
@@ -13,9 +13,9 @@ use crate::rules::pycodestyle::helpers::is_op_token;
 use crate::registry::DiagnosticKind;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UnexpectedSpacesAroundKeywordParameterEquals;
-);
+#[violation]
+pub struct UnexpectedSpacesAroundKeywordParameterEquals;
+
 impl Violation for UnexpectedSpacesAroundKeywordParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -23,9 +23,9 @@ impl Violation for UnexpectedSpacesAroundKeywordParameterEquals {
     }
 }
 
-define_violation!(
-    pub struct MissingWhitespaceAroundParameterEquals;
-);
+#[violation]
+pub struct MissingWhitespaceAroundParameterEquals;
+
 impl Violation for MissingWhitespaceAroundParameterEquals {
     #[derive_message_formats]
     fn message(&self) -> String {

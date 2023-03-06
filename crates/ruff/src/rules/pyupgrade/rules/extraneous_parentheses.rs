@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -9,9 +9,9 @@ use crate::settings::{flags, Settings};
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct ExtraneousParentheses;
-);
+#[violation]
+pub struct ExtraneousParentheses;
+
 impl AlwaysAutofixableViolation for ExtraneousParentheses {
     #[derive_message_formats]
     fn message(&self) -> String {

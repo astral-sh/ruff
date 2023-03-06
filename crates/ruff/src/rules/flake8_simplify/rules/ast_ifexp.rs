@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
@@ -8,11 +8,11 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct IfExprWithTrueFalse {
-        pub expr: String,
-    }
-);
+#[violation]
+pub struct IfExprWithTrueFalse {
+    pub expr: String,
+}
+
 impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -26,11 +26,11 @@ impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
     }
 }
 
-define_violation!(
-    pub struct IfExprWithFalseTrue {
-        pub expr: String,
-    }
-);
+#[violation]
+pub struct IfExprWithFalseTrue {
+    pub expr: String,
+}
+
 impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -44,12 +44,12 @@ impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
     }
 }
 
-define_violation!(
-    pub struct IfExprWithTwistedArms {
-        pub expr_body: String,
-        pub expr_else: String,
-    }
-);
+#[violation]
+pub struct IfExprWithTwistedArms {
+    pub expr_body: String,
+    pub expr_else: String,
+}
+
 impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
     #[derive_message_formats]
     fn message(&self) -> String {

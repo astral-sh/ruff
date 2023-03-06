@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ParseError;
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct IOError {
-        pub message: String,
-    }
-);
+#[violation]
+pub struct IOError {
+    pub message: String,
+}
+
 impl Violation for IOError {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,11 +18,11 @@ impl Violation for IOError {
     }
 }
 
-define_violation!(
-    pub struct SyntaxError {
-        pub message: String,
-    }
-);
+#[violation]
+pub struct SyntaxError {
+    pub message: String,
+}
+
 impl Violation for SyntaxError {
     #[derive_message_formats]
     fn message(&self) -> String {

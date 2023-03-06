@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::helpers::unparse_stmt;
@@ -8,9 +8,9 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct AssertFalse;
-);
+#[violation]
+pub struct AssertFalse;
+
 impl AlwaysAutofixableViolation for AssertFalse {
     #[derive_message_formats]
     fn message(&self) -> String {

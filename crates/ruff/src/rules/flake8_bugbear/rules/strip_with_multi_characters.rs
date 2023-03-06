@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use crate::ast::types::Range;
@@ -7,9 +7,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct StripWithMultiCharacters;
-);
+#[violation]
+pub struct StripWithMultiCharacters;
+
 impl Violation for StripWithMultiCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {

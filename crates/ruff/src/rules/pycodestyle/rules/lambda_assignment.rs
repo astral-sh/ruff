@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use crate::ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
@@ -10,12 +10,12 @@ use crate::registry::Diagnostic;
 use crate::source_code::Stylist;
 use crate::violation::{AutofixKind, Availability, Violation};
 
-define_violation!(
-    pub struct LambdaAssignment {
-        pub name: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct LambdaAssignment {
+    pub name: String,
+    pub fixable: bool,
+}
+
 impl Violation for LambdaAssignment {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

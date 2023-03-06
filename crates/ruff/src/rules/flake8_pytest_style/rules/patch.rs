@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
@@ -9,9 +9,9 @@ use crate::ast::visitor::Visitor;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct PatchWithLambda;
-);
+#[violation]
+pub struct PatchWithLambda;
+
 impl Violation for PatchWithLambda {
     #[derive_message_formats]
     fn message(&self) -> String {

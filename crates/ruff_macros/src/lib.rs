@@ -2,7 +2,7 @@
 
 use crate::cache_key::derive_cache_key;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, ItemFn};
+use syn::{parse_macro_input, DeriveInput, ItemFn, ItemStruct};
 
 mod cache_key;
 mod config;
@@ -43,6 +43,16 @@ pub fn define_violation(item: proc_macro::TokenStream) -> proc_macro::TokenStrea
     let cloned = item.clone();
     let meta = parse_macro_input!(cloned as define_violation::LintMeta);
     define_violation::define_violation(&item.into(), meta).into()
+}
+
+/// Adds an `explanation()` method from the doc comment and
+/// `#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]`
+#[proc_macro_attribute]
+pub fn violation(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let violation = parse_macro_input!(item as ItemStruct);
+    define_violation::violation(&violation)
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
 }
 
 #[proc_macro_derive(RuleNamespace, attributes(prefix))]

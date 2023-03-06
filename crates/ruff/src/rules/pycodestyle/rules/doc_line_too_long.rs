@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 
 use crate::ast::types::Range;
@@ -7,9 +7,9 @@ use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct DocLineTooLong(pub usize, pub usize);
-);
+#[violation]
+pub struct DocLineTooLong(pub usize, pub usize);
+
 impl Violation for DocLineTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {

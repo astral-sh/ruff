@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -8,9 +8,9 @@ use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
-define_violation!(
-    pub struct MultipleStatementsOnOneLineColon;
-);
+#[violation]
+pub struct MultipleStatementsOnOneLineColon;
+
 impl Violation for MultipleStatementsOnOneLineColon {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +18,9 @@ impl Violation for MultipleStatementsOnOneLineColon {
     }
 }
 
-define_violation!(
-    pub struct MultipleStatementsOnOneLineSemicolon;
-);
+#[violation]
+pub struct MultipleStatementsOnOneLineSemicolon;
+
 impl Violation for MultipleStatementsOnOneLineSemicolon {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +28,9 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
     }
 }
 
-define_violation!(
-    pub struct UselessSemicolon;
-);
+#[violation]
+pub struct UselessSemicolon;
+
 impl AlwaysAutofixableViolation for UselessSemicolon {
     #[derive_message_formats]
     fn message(&self) -> String {

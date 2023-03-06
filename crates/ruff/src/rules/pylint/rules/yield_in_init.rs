@@ -1,36 +1,35 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::pylint::helpers::in_dunder_init;
 use crate::{
     ast::types::Range, checkers::ast::Checker, registry::Diagnostic, violation::Violation,
 };
 
-define_violation!(
-    /// ## What it does
-    /// Checks for `__init__` methods that are turned into generators by the
-    /// inclusion of `yield` or `yield from` expressions.
-    ///
-    /// ## Why is this bad?
-    /// The `__init__` method is the constructor for a given Python class,
-    /// responsible for initializing, rather than creating, new objects.
-    ///
-    /// The `__init__` method has to return `None`. By including a `yield` or
-    /// `yield from` expression in an `__init__`, the method will return a
-    /// generator object when called at runtime, resulting in a runtime error.
-    ///
-    /// ## Example
-    /// ```python
-    /// class InitIsGenerator:
-    ///     def __init__(self, i):
-    ///         yield i
-    /// ```
-    ///
-    /// ## References
-    /// - [CodeQL: `py-init-method-is-generator`](https://codeql.github.com/codeql-query-help/python/py-init-method-is-generator/)
-    pub struct YieldInInit;
-);
+/// ## What it does
+/// Checks for `__init__` methods that are turned into generators by the
+/// inclusion of `yield` or `yield from` expressions.
+///
+/// ## Why is this bad?
+/// The `__init__` method is the constructor for a given Python class,
+/// responsible for initializing, rather than creating, new objects.
+///
+/// The `__init__` method has to return `None`. By including a `yield` or
+/// `yield from` expression in an `__init__`, the method will return a
+/// generator object when called at runtime, resulting in a runtime error.
+///
+/// ## Example
+/// ```python
+/// class InitIsGenerator:
+///     def __init__(self, i):
+///         yield i
+/// ```
+///
+/// ## References
+/// - [CodeQL: `py-init-method-is-generator`](https://codeql.github.com/codeql-query-help/python/py-init-method-is-generator/)
+#[violation]
+pub struct YieldInInit;
 
 impl Violation for YieldInInit {
     #[derive_message_formats]

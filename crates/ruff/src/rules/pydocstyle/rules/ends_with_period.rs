@@ -1,6 +1,6 @@
 use strum::IntoEnumIterator;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -12,9 +12,9 @@ use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::{leading_quote, logical_line};
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct EndsInPeriod;
-);
+#[violation]
+pub struct EndsInPeriod;
+
 impl AlwaysAutofixableViolation for EndsInPeriod {
     #[derive_message_formats]
     fn message(&self) -> String {

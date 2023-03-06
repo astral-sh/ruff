@@ -1,6 +1,6 @@
 use anyhow::Result;
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt, StmtKind};
 
 use super::helpers::{
@@ -18,12 +18,12 @@ use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
-define_violation!(
-    pub struct IncorrectFixtureParenthesesStyle {
-        pub expected_parens: String,
-        pub actual_parens: String,
-    }
-);
+#[violation]
+pub struct IncorrectFixtureParenthesesStyle {
+    pub expected_parens: String,
+    pub actual_parens: String,
+}
+
 impl AlwaysAutofixableViolation for IncorrectFixtureParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -39,11 +39,11 @@ impl AlwaysAutofixableViolation for IncorrectFixtureParenthesesStyle {
     }
 }
 
-define_violation!(
-    pub struct FixturePositionalArgs {
-        pub function: String,
-    }
-);
+#[violation]
+pub struct FixturePositionalArgs {
+    pub function: String,
+}
+
 impl Violation for FixturePositionalArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -52,9 +52,9 @@ impl Violation for FixturePositionalArgs {
     }
 }
 
-define_violation!(
-    pub struct ExtraneousScopeFunction;
-);
+#[violation]
+pub struct ExtraneousScopeFunction;
+
 impl AlwaysAutofixableViolation for ExtraneousScopeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -66,11 +66,11 @@ impl AlwaysAutofixableViolation for ExtraneousScopeFunction {
     }
 }
 
-define_violation!(
-    pub struct MissingFixtureNameUnderscore {
-        pub function: String,
-    }
-);
+#[violation]
+pub struct MissingFixtureNameUnderscore {
+    pub function: String,
+}
+
 impl Violation for MissingFixtureNameUnderscore {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -79,11 +79,11 @@ impl Violation for MissingFixtureNameUnderscore {
     }
 }
 
-define_violation!(
-    pub struct IncorrectFixtureNameUnderscore {
-        pub function: String,
-    }
-);
+#[violation]
+pub struct IncorrectFixtureNameUnderscore {
+    pub function: String,
+}
+
 impl Violation for IncorrectFixtureNameUnderscore {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -92,11 +92,11 @@ impl Violation for IncorrectFixtureNameUnderscore {
     }
 }
 
-define_violation!(
-    pub struct FixtureParamWithoutValue {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct FixtureParamWithoutValue {
+    pub name: String,
+}
+
 impl Violation for FixtureParamWithoutValue {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -108,9 +108,9 @@ impl Violation for FixtureParamWithoutValue {
     }
 }
 
-define_violation!(
-    pub struct DeprecatedYieldFixture;
-);
+#[violation]
+pub struct DeprecatedYieldFixture;
+
 impl Violation for DeprecatedYieldFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -118,9 +118,9 @@ impl Violation for DeprecatedYieldFixture {
     }
 }
 
-define_violation!(
-    pub struct FixtureFinalizerCallback;
-);
+#[violation]
+pub struct FixtureFinalizerCallback;
+
 impl Violation for FixtureFinalizerCallback {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -128,11 +128,11 @@ impl Violation for FixtureFinalizerCallback {
     }
 }
 
-define_violation!(
-    pub struct UselessYieldFixture {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UselessYieldFixture {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for UselessYieldFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -145,9 +145,9 @@ impl AlwaysAutofixableViolation for UselessYieldFixture {
     }
 }
 
-define_violation!(
-    pub struct ErroneousUseFixturesOnFixture;
-);
+#[violation]
+pub struct ErroneousUseFixturesOnFixture;
+
 impl AlwaysAutofixableViolation for ErroneousUseFixturesOnFixture {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -159,9 +159,9 @@ impl AlwaysAutofixableViolation for ErroneousUseFixturesOnFixture {
     }
 }
 
-define_violation!(
-    pub struct UnnecessaryAsyncioMarkOnFixture;
-);
+#[violation]
+pub struct UnnecessaryAsyncioMarkOnFixture;
+
 impl AlwaysAutofixableViolation for UnnecessaryAsyncioMarkOnFixture {
     #[derive_message_formats]
     fn message(&self) -> String {

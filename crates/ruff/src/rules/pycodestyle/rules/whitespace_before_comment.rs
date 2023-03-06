@@ -1,6 +1,6 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
@@ -9,9 +9,9 @@ use crate::registry::DiagnosticKind;
 use crate::source_code::Locator;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct TooFewSpacesBeforeInlineComment;
-);
+#[violation]
+pub struct TooFewSpacesBeforeInlineComment;
+
 impl Violation for TooFewSpacesBeforeInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -19,9 +19,9 @@ impl Violation for TooFewSpacesBeforeInlineComment {
     }
 }
 
-define_violation!(
-    pub struct NoSpaceAfterInlineComment;
-);
+#[violation]
+pub struct NoSpaceAfterInlineComment;
+
 impl Violation for NoSpaceAfterInlineComment {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -29,9 +29,9 @@ impl Violation for NoSpaceAfterInlineComment {
     }
 }
 
-define_violation!(
-    pub struct NoSpaceAfterBlockComment;
-);
+#[violation]
+pub struct NoSpaceAfterBlockComment;
+
 impl Violation for NoSpaceAfterBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -39,9 +39,9 @@ impl Violation for NoSpaceAfterBlockComment {
     }
 }
 
-define_violation!(
-    pub struct MultipleLeadingHashesForBlockComment;
-);
+#[violation]
+pub struct MultipleLeadingHashesForBlockComment;
+
 impl Violation for MultipleLeadingHashesForBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
@@ -8,9 +8,9 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct FunctoolsCache;
-);
+#[violation]
+pub struct FunctoolsCache;
+
 impl AlwaysAutofixableViolation for FunctoolsCache {
     #[derive_message_formats]
     fn message(&self) -> String {

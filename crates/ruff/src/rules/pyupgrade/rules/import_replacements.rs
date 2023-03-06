@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Alias, AliasData, Stmt};
 
 use crate::ast::types::Range;
@@ -12,13 +12,13 @@ use crate::settings::types::PythonVersion;
 use crate::source_code::{Locator, Stylist};
 use crate::violation::{AutofixKind, Availability, Violation};
 
-define_violation!(
-    pub struct ImportReplacements {
-        pub module: String,
-        pub members: Vec<String>,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct ImportReplacements {
+    pub module: String,
+    pub members: Vec<String>,
+    pub fixable: bool,
+}
+
 impl Violation for ImportReplacements {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 

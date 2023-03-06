@@ -1,16 +1,16 @@
 use std::string::ToString;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::{Binding, Scope, ScopeKind};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct UndefinedLocal {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UndefinedLocal {
+    pub name: String,
+}
+
 impl Violation for UndefinedLocal {
     #[derive_message_formats]
     fn message(&self) -> String {

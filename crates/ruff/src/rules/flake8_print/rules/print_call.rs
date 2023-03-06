@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, Keyword};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::is_const_none;
 use crate::ast::types::Range;
@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct PrintFound;
-);
+#[violation]
+pub struct PrintFound;
+
 impl Violation for PrintFound {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +18,9 @@ impl Violation for PrintFound {
     }
 }
 
-define_violation!(
-    pub struct PPrintFound;
-);
+#[violation]
+pub struct PPrintFound;
+
 impl Violation for PPrintFound {
     #[derive_message_formats]
     fn message(&self) -> String {

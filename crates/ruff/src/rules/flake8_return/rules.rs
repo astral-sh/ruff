@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::{elif_else_range, end_of_statement};
 use crate::ast::types::Range;
@@ -16,9 +16,9 @@ use super::branch::Branch;
 use super::helpers::result_exists;
 use super::visitor::{ReturnVisitor, Stack};
 
-define_violation!(
-    pub struct UnnecessaryReturnNone;
-);
+#[violation]
+pub struct UnnecessaryReturnNone;
+
 impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -32,9 +32,9 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
     }
 }
 
-define_violation!(
-    pub struct ImplicitReturnValue;
-);
+#[violation]
+pub struct ImplicitReturnValue;
+
 impl AlwaysAutofixableViolation for ImplicitReturnValue {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -46,9 +46,9 @@ impl AlwaysAutofixableViolation for ImplicitReturnValue {
     }
 }
 
-define_violation!(
-    pub struct ImplicitReturn;
-);
+#[violation]
+pub struct ImplicitReturn;
+
 impl AlwaysAutofixableViolation for ImplicitReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -60,9 +60,9 @@ impl AlwaysAutofixableViolation for ImplicitReturn {
     }
 }
 
-define_violation!(
-    pub struct UnnecessaryAssign;
-);
+#[violation]
+pub struct UnnecessaryAssign;
+
 impl Violation for UnnecessaryAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -70,11 +70,11 @@ impl Violation for UnnecessaryAssign {
     }
 }
 
-define_violation!(
-    pub struct SuperfluousElseReturn {
-        pub branch: Branch,
-    }
-);
+#[violation]
+pub struct SuperfluousElseReturn {
+    pub branch: Branch,
+}
+
 impl Violation for SuperfluousElseReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -83,11 +83,11 @@ impl Violation for SuperfluousElseReturn {
     }
 }
 
-define_violation!(
-    pub struct SuperfluousElseRaise {
-        pub branch: Branch,
-    }
-);
+#[violation]
+pub struct SuperfluousElseRaise {
+    pub branch: Branch,
+}
+
 impl Violation for SuperfluousElseRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -96,11 +96,11 @@ impl Violation for SuperfluousElseRaise {
     }
 }
 
-define_violation!(
-    pub struct SuperfluousElseContinue {
-        pub branch: Branch,
-    }
-);
+#[violation]
+pub struct SuperfluousElseContinue {
+    pub branch: Branch,
+}
+
 impl Violation for SuperfluousElseContinue {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -109,11 +109,11 @@ impl Violation for SuperfluousElseContinue {
     }
 }
 
-define_violation!(
-    pub struct SuperfluousElseBreak {
-        pub branch: Branch,
-    }
-);
+#[violation]
+pub struct SuperfluousElseBreak {
+    pub branch: Branch,
+}
+
 impl Violation for SuperfluousElseBreak {
     #[derive_message_formats]
     fn message(&self) -> String {

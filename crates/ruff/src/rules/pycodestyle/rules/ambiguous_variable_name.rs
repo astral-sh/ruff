@@ -1,13 +1,13 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct AmbiguousVariableName(pub String);
-);
+#[violation]
+pub struct AmbiguousVariableName(pub String);
+
 impl Violation for AmbiguousVariableName {
     #[derive_message_formats]
     fn message(&self) -> String {

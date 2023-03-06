@@ -1,44 +1,44 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::flake8_django::rules::helpers::is_model_form;
 use crate::violation::Violation;
 use crate::{checkers::ast::Checker, registry::Diagnostic, Range};
 
-define_violation!(
-    /// ## What it does
-    /// Checks for the use of `fields = "__all__"` in Django `ModelForm`
-    /// classes.
-    ///
-    /// ## Why is this bad?
-    /// If a `ModelForm` includes the `fields = "__all__"` attribute, any new
-    /// field that is added to the model will automatically be exposed for
-    /// modification.
-    ///
-    /// ## Example
-    /// ```python
-    /// from django.forms import ModelForm
-    ///
-    ///
-    /// class PostForm(ModelForm):
-    ///     class Meta:
-    ///         model = Post
-    ///         fields = "__all__"
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// from django.forms import ModelForm
-    ///
-    ///
-    /// class PostForm(ModelForm):
-    ///     class Meta:
-    ///         model = Post
-    ///         fields = ["title", "content"]
-    /// ```
-    pub struct AllWithModelForm;
-);
+/// ## What it does
+/// Checks for the use of `fields = "__all__"` in Django `ModelForm`
+/// classes.
+///
+/// ## Why is this bad?
+/// If a `ModelForm` includes the `fields = "__all__"` attribute, any new
+/// field that is added to the model will automatically be exposed for
+/// modification.
+///
+/// ## Example
+/// ```python
+/// from django.forms import ModelForm
+///
+///
+/// class PostForm(ModelForm):
+///     class Meta:
+///         model = Post
+///         fields = "__all__"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from django.forms import ModelForm
+///
+///
+/// class PostForm(ModelForm):
+///     class Meta:
+///         model = Post
+///         fields = ["title", "content"]
+/// ```
+#[violation]
+pub struct AllWithModelForm;
+
 impl Violation for AllWithModelForm {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
@@ -14,11 +14,11 @@ use crate::registry::{Diagnostic, Rule};
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct RedundantOpenModes {
-        pub replacement: Option<String>,
-    }
-);
+#[violation]
+pub struct RedundantOpenModes {
+    pub replacement: Option<String>,
+}
+
 impl AlwaysAutofixableViolation for RedundantOpenModes {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::types::Range;
@@ -7,33 +7,33 @@ use crate::registry::Diagnostic;
 use crate::rules::pandas_vet::fixes::fix_inplace_argument;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for `inplace=True` usages in `pandas` function and method
-    /// calls.
-    ///
-    /// ## Why is this bad?
-    /// Using `inplace=True` encourages mutation rather than immutable data,
-    /// which is harder to reason about and may cause bugs. It also removes the
-    /// ability to use the method chaining style for `pandas` operations.
-    ///
-    /// Further, in many cases, `inplace=True` does not provide a performance
-    /// benefit, as `pandas` will often copy `DataFrames` in the background.
-    ///
-    /// ## Example
-    /// ```python
-    /// df.sort_values("col1", inplace=True)
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// sorted_df = df.sort_values("col1")
-    /// ```
-    ///
-    /// ## References
-    /// - [_Why You Should Probably Never Use pandas inplace=True_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
-    pub struct UseOfInplaceArgument;
-);
+/// ## What it does
+/// Checks for `inplace=True` usages in `pandas` function and method
+/// calls.
+///
+/// ## Why is this bad?
+/// Using `inplace=True` encourages mutation rather than immutable data,
+/// which is harder to reason about and may cause bugs. It also removes the
+/// ability to use the method chaining style for `pandas` operations.
+///
+/// Further, in many cases, `inplace=True` does not provide a performance
+/// benefit, as `pandas` will often copy `DataFrames` in the background.
+///
+/// ## Example
+/// ```python
+/// df.sort_values("col1", inplace=True)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// sorted_df = df.sort_values("col1")
+/// ```
+///
+/// ## References
+/// - [_Why You Should Probably Never Use pandas inplace=True_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
+#[violation]
+pub struct UseOfInplaceArgument;
+
 impl AlwaysAutofixableViolation for UseOfInplaceArgument {
     #[derive_message_formats]
     fn message(&self) -> String {

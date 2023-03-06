@@ -1,7 +1,7 @@
 use std::string::ToString;
 
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, KeywordData};
 
@@ -15,11 +15,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
-define_violation!(
-    pub struct PercentFormatInvalidFormat {
-        pub message: String,
-    }
-);
+#[violation]
+pub struct PercentFormatInvalidFormat {
+    pub message: String,
+}
+
 impl Violation for PercentFormatInvalidFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +28,9 @@ impl Violation for PercentFormatInvalidFormat {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatExpectedMapping;
-);
+#[violation]
+pub struct PercentFormatExpectedMapping;
+
 impl Violation for PercentFormatExpectedMapping {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -38,9 +38,9 @@ impl Violation for PercentFormatExpectedMapping {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatExpectedSequence;
-);
+#[violation]
+pub struct PercentFormatExpectedSequence;
+
 impl Violation for PercentFormatExpectedSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -48,11 +48,11 @@ impl Violation for PercentFormatExpectedSequence {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatExtraNamedArguments {
-        pub missing: Vec<String>,
-    }
-);
+#[violation]
+pub struct PercentFormatExtraNamedArguments {
+    pub missing: Vec<String>,
+}
+
 impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -68,11 +68,11 @@ impl AlwaysAutofixableViolation for PercentFormatExtraNamedArguments {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatMissingArgument {
-        pub missing: Vec<String>,
-    }
-);
+#[violation]
+pub struct PercentFormatMissingArgument {
+    pub missing: Vec<String>,
+}
+
 impl Violation for PercentFormatMissingArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -82,9 +82,9 @@ impl Violation for PercentFormatMissingArgument {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatMixedPositionalAndNamed;
-);
+#[violation]
+pub struct PercentFormatMixedPositionalAndNamed;
+
 impl Violation for PercentFormatMixedPositionalAndNamed {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -92,12 +92,12 @@ impl Violation for PercentFormatMixedPositionalAndNamed {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatPositionalCountMismatch {
-        pub wanted: usize,
-        pub got: usize,
-    }
-);
+#[violation]
+pub struct PercentFormatPositionalCountMismatch {
+    pub wanted: usize,
+    pub got: usize,
+}
+
 impl Violation for PercentFormatPositionalCountMismatch {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -106,9 +106,9 @@ impl Violation for PercentFormatPositionalCountMismatch {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatStarRequiresSequence;
-);
+#[violation]
+pub struct PercentFormatStarRequiresSequence;
+
 impl Violation for PercentFormatStarRequiresSequence {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -116,11 +116,11 @@ impl Violation for PercentFormatStarRequiresSequence {
     }
 }
 
-define_violation!(
-    pub struct PercentFormatUnsupportedFormatCharacter {
-        pub char: char,
-    }
-);
+#[violation]
+pub struct PercentFormatUnsupportedFormatCharacter {
+    pub char: char,
+}
+
 impl Violation for PercentFormatUnsupportedFormatCharacter {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -129,11 +129,11 @@ impl Violation for PercentFormatUnsupportedFormatCharacter {
     }
 }
 
-define_violation!(
-    pub struct StringDotFormatInvalidFormat {
-        pub message: String,
-    }
-);
+#[violation]
+pub struct StringDotFormatInvalidFormat {
+    pub message: String,
+}
+
 impl Violation for StringDotFormatInvalidFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -142,11 +142,11 @@ impl Violation for StringDotFormatInvalidFormat {
     }
 }
 
-define_violation!(
-    pub struct StringDotFormatExtraNamedArguments {
-        pub missing: Vec<String>,
-    }
-);
+#[violation]
+pub struct StringDotFormatExtraNamedArguments {
+    pub missing: Vec<String>,
+}
+
 impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -162,11 +162,11 @@ impl AlwaysAutofixableViolation for StringDotFormatExtraNamedArguments {
     }
 }
 
-define_violation!(
-    pub struct StringDotFormatExtraPositionalArguments {
-        pub missing: Vec<String>,
-    }
-);
+#[violation]
+pub struct StringDotFormatExtraPositionalArguments {
+    pub missing: Vec<String>,
+}
+
 impl Violation for StringDotFormatExtraPositionalArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -176,11 +176,11 @@ impl Violation for StringDotFormatExtraPositionalArguments {
     }
 }
 
-define_violation!(
-    pub struct StringDotFormatMissingArguments {
-        pub missing: Vec<String>,
-    }
-);
+#[violation]
+pub struct StringDotFormatMissingArguments {
+    pub missing: Vec<String>,
+}
+
 impl Violation for StringDotFormatMissingArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -190,9 +190,9 @@ impl Violation for StringDotFormatMissingArguments {
     }
 }
 
-define_violation!(
-    pub struct StringDotFormatMixingAutomatic;
-);
+#[violation]
+pub struct StringDotFormatMixingAutomatic;
+
 impl Violation for StringDotFormatMixingAutomatic {
     #[derive_message_formats]
     fn message(&self) -> String {

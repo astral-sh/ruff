@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -10,11 +10,11 @@ use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct NoBlankLineBeforeFunction {
-        pub num_lines: usize,
-    }
-);
+#[violation]
+pub struct NoBlankLineBeforeFunction {
+    pub num_lines: usize,
+}
+
 impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -27,11 +27,11 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
     }
 }
 
-define_violation!(
-    pub struct NoBlankLineAfterFunction {
-        pub num_lines: usize,
-    }
-);
+#[violation]
+pub struct NoBlankLineAfterFunction {
+    pub num_lines: usize,
+}
+
 impl AlwaysAutofixableViolation for NoBlankLineAfterFunction {
     #[derive_message_formats]
     fn message(&self) -> String {

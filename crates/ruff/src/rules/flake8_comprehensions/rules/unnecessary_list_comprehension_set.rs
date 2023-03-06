@@ -1,5 +1,5 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use super::helpers;
@@ -9,9 +9,9 @@ use crate::registry::Diagnostic;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct UnnecessaryListComprehensionSet;
-);
+#[violation]
+pub struct UnnecessaryListComprehensionSet;
+
 impl AlwaysAutofixableViolation for UnnecessaryListComprehensionSet {
     #[derive_message_formats]
     fn message(&self) -> String {

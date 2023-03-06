@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
 use crate::ast::types::Range;
@@ -8,9 +8,9 @@ use crate::registry::Diagnostic;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct ErrorInsteadOfException;
-);
+#[violation]
+pub struct ErrorInsteadOfException;
+
 impl Violation for ErrorInsteadOfException {
     #[derive_message_formats]
     fn message(&self) -> String {

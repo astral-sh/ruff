@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
@@ -15,9 +15,9 @@ use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct FString;
-);
+#[violation]
+pub struct FString;
+
 impl AlwaysAutofixableViolation for FString {
     #[derive_message_formats]
     fn message(&self) -> String {

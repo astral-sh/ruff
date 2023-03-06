@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python::identifiers::{is_identifier, is_mangled_private};
 use ruff_python::keyword::KWLIST;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location};
@@ -10,9 +10,9 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct GetAttrWithConstant;
-);
+#[violation]
+pub struct GetAttrWithConstant;
+
 impl AlwaysAutofixableViolation for GetAttrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {

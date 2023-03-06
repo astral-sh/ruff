@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
@@ -10,9 +10,9 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct RewriteYieldFrom;
-);
+#[violation]
+pub struct RewriteYieldFrom;
+
 impl AlwaysAutofixableViolation for RewriteYieldFrom {
     #[derive_message_formats]
     fn message(&self) -> String {

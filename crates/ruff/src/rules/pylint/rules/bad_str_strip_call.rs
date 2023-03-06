@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 use serde::{Deserialize, Serialize};
@@ -11,12 +11,12 @@ use crate::registry::Diagnostic;
 use crate::settings::types::PythonVersion;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct BadStrStripCall {
-        strip: StripKind,
-        removal: Option<RemovalKind>,
-    }
-);
+#[violation]
+pub struct BadStrStripCall {
+    strip: StripKind,
+    removal: Option<RemovalKind>,
+}
+
 impl Violation for BadStrStripCall {
     #[derive_message_formats]
     fn message(&self) -> String {

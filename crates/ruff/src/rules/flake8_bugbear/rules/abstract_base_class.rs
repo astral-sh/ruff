@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use crate::ast::types::Range;
@@ -7,11 +7,11 @@ use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 use crate::visibility::{is_abstract, is_overload};
 
-define_violation!(
-    pub struct AbstractBaseClassWithoutAbstractMethod {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct AbstractBaseClassWithoutAbstractMethod {
+    pub name: String,
+}
+
 impl Violation for AbstractBaseClassWithoutAbstractMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -19,11 +19,11 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
-define_violation!(
-    pub struct EmptyMethodWithoutAbstractDecorator {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct EmptyMethodWithoutAbstractDecorator {
+    pub name: String,
+}
+
 impl Violation for EmptyMethodWithoutAbstractDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {

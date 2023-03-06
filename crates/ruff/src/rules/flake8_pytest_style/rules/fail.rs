@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Keyword};
 
 use super::helpers::{is_empty_or_null_string, is_pytest_fail};
@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct FailWithoutMessage;
-);
+#[violation]
+pub struct FailWithoutMessage;
+
 impl Violation for FailWithoutMessage {
     #[derive_message_formats]
     fn message(&self) -> String {

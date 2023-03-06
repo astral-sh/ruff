@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::StmtKind;
 
 use crate::ast::types::Range;
@@ -7,9 +7,9 @@ use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct NoSignature;
-);
+#[violation]
+pub struct NoSignature;
+
 impl Violation for NoSignature {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem};
 
 use super::helpers::is_empty_or_null_string;
@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct RaisesWithMultipleStatements;
-);
+#[violation]
+pub struct RaisesWithMultipleStatements;
+
 impl Violation for RaisesWithMultipleStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,11 +18,11 @@ impl Violation for RaisesWithMultipleStatements {
     }
 }
 
-define_violation!(
-    pub struct RaisesTooBroad {
-        pub exception: String,
-    }
-);
+#[violation]
+pub struct RaisesTooBroad {
+    pub exception: String,
+}
+
 impl Violation for RaisesTooBroad {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -34,9 +34,9 @@ impl Violation for RaisesTooBroad {
     }
 }
 
-define_violation!(
-    pub struct RaisesWithoutException;
-);
+#[violation]
+pub struct RaisesWithoutException;
+
 impl Violation for RaisesWithoutException {
     #[derive_message_formats]
     fn message(&self) -> String {

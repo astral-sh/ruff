@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::{create_expr, unparse_expr};
 use crate::ast::types::Range;
@@ -12,11 +12,11 @@ use crate::violation::{AlwaysAutofixableViolation, Violation};
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
 
-define_violation!(
-    pub struct ParametrizeNamesWrongType {
-        pub expected: types::ParametrizeNameType,
-    }
-);
+#[violation]
+pub struct ParametrizeNamesWrongType {
+    pub expected: types::ParametrizeNameType,
+}
+
 impl AlwaysAutofixableViolation for ParametrizeNamesWrongType {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -30,12 +30,12 @@ impl AlwaysAutofixableViolation for ParametrizeNamesWrongType {
     }
 }
 
-define_violation!(
-    pub struct ParametrizeValuesWrongType {
-        pub values: types::ParametrizeValuesType,
-        pub row: types::ParametrizeValuesRowType,
-    }
-);
+#[violation]
+pub struct ParametrizeValuesWrongType {
+    pub values: types::ParametrizeValuesType,
+    pub row: types::ParametrizeValuesRowType,
+}
+
 impl Violation for ParametrizeValuesWrongType {
     #[derive_message_formats]
     fn message(&self) -> String {

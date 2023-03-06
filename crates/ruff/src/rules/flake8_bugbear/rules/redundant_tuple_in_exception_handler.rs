@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
 use crate::ast::helpers::unparse_expr;
@@ -8,11 +8,11 @@ use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct RedundantTupleInExceptionHandler {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct RedundantTupleInExceptionHandler {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
     #[derive_message_formats]
     fn message(&self) -> String {

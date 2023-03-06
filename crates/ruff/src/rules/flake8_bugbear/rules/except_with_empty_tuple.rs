@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Excepthandler;
 
 use crate::ast::types::Range;
@@ -8,9 +8,9 @@ use crate::violation::Violation;
 
 use rustpython_parser::ast::{ExcepthandlerKind, ExprKind};
 
-define_violation!(
-    pub struct ExceptWithEmptyTuple;
-);
+#[violation]
+pub struct ExceptWithEmptyTuple;
+
 impl Violation for ExceptWithEmptyTuple {
     #[derive_message_formats]
     fn message(&self) -> String {

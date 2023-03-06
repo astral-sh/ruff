@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::error;
 use rustpython_parser::ast::Location;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::types::Range;
 use crate::fix::Fix;
@@ -10,9 +10,9 @@ use crate::registry::Diagnostic;
 use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct InvalidEscapeSequence(pub char);
-);
+#[violation]
+pub struct InvalidEscapeSequence(pub char);
+
 impl AlwaysAutofixableViolation for InvalidEscapeSequence {
     #[derive_message_formats]
     fn message(&self) -> String {

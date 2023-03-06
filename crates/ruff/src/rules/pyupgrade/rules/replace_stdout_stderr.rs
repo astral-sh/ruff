@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Keyword};
 
 use crate::ast::helpers::find_keyword;
@@ -10,9 +10,9 @@ use crate::registry::Diagnostic;
 use crate::source_code::{Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct ReplaceStdoutStderr;
-);
+#[violation]
+pub struct ReplaceStdoutStderr;
+
 impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
     #[derive_message_formats]
     fn message(&self) -> String {

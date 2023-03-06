@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{ExprKind, Stmt};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::ast::helpers::RaiseStatementVisitor;
 use crate::ast::visitor::Visitor;
@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct ReraiseNoCause;
-);
+#[violation]
+pub struct ReraiseNoCause;
+
 impl Violation for ReraiseNoCause {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,4 +1,4 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::ast::helpers::{has_non_none_keyword, is_const_none};
@@ -7,9 +7,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
-define_violation!(
-    pub struct CallDatetimeWithoutTzinfo;
-);
+#[violation]
+pub struct CallDatetimeWithoutTzinfo;
+
 impl Violation for CallDatetimeWithoutTzinfo {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -17,9 +17,9 @@ impl Violation for CallDatetimeWithoutTzinfo {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeToday;
-);
+#[violation]
+pub struct CallDatetimeToday;
+
 impl Violation for CallDatetimeToday {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -30,9 +30,9 @@ impl Violation for CallDatetimeToday {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeUtcnow;
-);
+#[violation]
+pub struct CallDatetimeUtcnow;
+
 impl Violation for CallDatetimeUtcnow {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -43,9 +43,9 @@ impl Violation for CallDatetimeUtcnow {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeUtcfromtimestamp;
-);
+#[violation]
+pub struct CallDatetimeUtcfromtimestamp;
+
 impl Violation for CallDatetimeUtcfromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -56,9 +56,9 @@ impl Violation for CallDatetimeUtcfromtimestamp {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeNowWithoutTzinfo;
-);
+#[violation]
+pub struct CallDatetimeNowWithoutTzinfo;
+
 impl Violation for CallDatetimeNowWithoutTzinfo {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -66,9 +66,9 @@ impl Violation for CallDatetimeNowWithoutTzinfo {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeFromtimestamp;
-);
+#[violation]
+pub struct CallDatetimeFromtimestamp;
+
 impl Violation for CallDatetimeFromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -78,9 +78,9 @@ impl Violation for CallDatetimeFromtimestamp {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeStrptimeWithoutZone;
-);
+#[violation]
+pub struct CallDatetimeStrptimeWithoutZone;
+
 impl Violation for CallDatetimeStrptimeWithoutZone {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -91,9 +91,9 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
     }
 }
 
-define_violation!(
-    pub struct CallDateToday;
-);
+#[violation]
+pub struct CallDateToday;
+
 impl Violation for CallDateToday {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -104,9 +104,9 @@ impl Violation for CallDateToday {
     }
 }
 
-define_violation!(
-    pub struct CallDateFromtimestamp;
-);
+#[violation]
+pub struct CallDateFromtimestamp;
+
 impl Violation for CallDateFromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
