@@ -1,13 +1,13 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.253"
+version = "0.0.254"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
-colored = { version = "2.0.0" }
+colored = { workspace = true }
 configparser = { version = "3.0.2" }
 once_cell = { workspace = true }
 regex = { workspace = true }

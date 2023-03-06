@@ -53,15 +53,27 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespace,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundArithmeticOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundBitwiseOrShiftOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundModuloOperator,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::WhitespaceBeforeParameters,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
@@ -475,6 +487,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::DocstringInStub,
     rules::flake8_pyi::rules::TypedArgumentSimpleDefaults,
     rules::flake8_pyi::rules::ArgumentSimpleDefaults,
+    rules::flake8_pyi::rules::TypeCommentInStub,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     rules::flake8_pytest_style::rules::FixturePositionalArgs,
@@ -828,19 +841,26 @@ impl Rule {
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::TrailingCommaProhibited => &LintSource::Tokens,
+            | Rule::TrailingCommaProhibited
+            | Rule::TypeCommentInStub => &LintSource::Tokens,
             Rule::IOError => &LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => &LintSource::Filesystem,
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MissingWhitespace
+            | Rule::MissingWhitespaceAfterKeyword
+            | Rule::MissingWhitespaceAroundArithmeticOperator
+            | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
+            | Rule::MissingWhitespaceAroundModuloOperator
+            | Rule::MissingWhitespaceAroundOperator
+            | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::MultipleLeadingHashesForBlockComment
             | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
             | Rule::MultipleSpacesBeforeKeyword
             | Rule::MultipleSpacesBeforeOperator
-            | Rule::MissingWhitespaceAfterKeyword
             | Rule::NoIndentedBlock
             | Rule::NoIndentedBlockComment
             | Rule::NoSpaceAfterBlockComment
@@ -853,10 +873,10 @@ impl Rule {
             | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
+            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
-            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
-            | Rule::MissingWhitespaceAroundParameterEquals
+            | Rule::WhitespaceBeforeParameters
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }

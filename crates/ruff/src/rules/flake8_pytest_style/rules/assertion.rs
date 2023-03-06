@@ -195,8 +195,8 @@ pub fn unittest_assertion(
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
-                let fixable = checker.current_expr_parent().is_none()
-                    && matches!(checker.current_stmt().node, StmtKind::Expr { .. })
+                let fixable = checker.ctx.current_expr_parent().is_none()
+                    && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
                     && !has_comments_in(Range::from_located(expr), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     UnittestAssertion {

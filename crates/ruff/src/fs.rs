@@ -1,13 +1,12 @@
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use globset::GlobMatcher;
 use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
 use rustc_hash::FxHashSet;
 
 use crate::registry::Rule;
-use crate::settings::hashable::{HashableGlobMatcher, HashableHashSet};
 
 /// Extract the absolute path and basename (as strings) from a Path.
 pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -25,11 +24,7 @@ pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
 /// Create a set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path<'a>(
     path: &Path,
-    pattern_code_pairs: &'a [(
-        HashableGlobMatcher,
-        HashableGlobMatcher,
-        HashableHashSet<Rule>,
-    )],
+    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, FxHashSet<Rule>)],
 ) -> FxHashSet<&'a Rule> {
     let (file_path, file_basename) = extract_path_names(path).expect("Unable to parse filename");
     pattern_code_pairs
@@ -39,8 +34,8 @@ pub(crate) fn ignores_from_path<'a>(
                 debug!(
                     "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
                     path,
-                    basename.deref().glob().regex(),
-                    &**codes
+                    basename.glob().regex(),
+                    codes
                 );
                 return Some(codes.iter());
             }
@@ -48,8 +43,8 @@ pub(crate) fn ignores_from_path<'a>(
                 debug!(
                     "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
                     path,
-                    absolute.deref().glob().regex(),
-                    &**codes
+                    absolute.glob().regex(),
+                    codes
                 );
                 return Some(codes.iter());
             }

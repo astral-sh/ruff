@@ -37,7 +37,7 @@ pub fn unnecessary_literal_dict(
     let Some(argument) = helpers::exactly_one_argument_with_matching_function("dict", func, args, keywords) else {
         return;
     };
-    if !checker.is_builtin("dict") {
+    if !checker.ctx.is_builtin("dict") {
         return;
     }
     let (kind, elts) = match argument {

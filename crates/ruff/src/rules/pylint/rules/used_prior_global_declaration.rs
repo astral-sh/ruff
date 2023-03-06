@@ -21,7 +21,7 @@ impl Violation for UsedPriorGlobalDeclaration {
 }
 /// PLE0118
 pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
-    let globals = match &checker.current_scope().kind {
+    let globals = match &checker.ctx.current_scope().kind {
         ScopeKind::Class(class_def) => &class_def.globals,
         ScopeKind::Function(function_def) => &function_def.globals,
         _ => return,

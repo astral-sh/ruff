@@ -347,7 +347,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let fixable = matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
-        && (matches!(test.node, ExprKind::Compare { .. }) || checker.is_builtin("bool"));
+        && (matches!(test.node, ExprKind::Compare { .. }) || checker.ctx.is_builtin("bool"));
 
     let mut diagnostic = Diagnostic::new(
         NeedlessBool { condition, fixable },
@@ -431,13 +431,13 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(checker, test, &["sys", "version_info"]) {
+    if contains_call_path(&checker.ctx, test, &["sys", "version_info"]) {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
     // checks.
-    if contains_call_path(checker, test, &["sys", "platform"]) {
+    if contains_call_path(&checker.ctx, test, &["sys", "platform"]) {
         return;
     }
 
@@ -629,7 +629,7 @@ pub fn manual_dict_lookup(
     };
     if value
         .as_ref()
-        .map_or(false, |value| contains_effect(checker, value))
+        .map_or(false, |value| contains_effect(&checker.ctx, value))
     {
         return;
     }
@@ -702,7 +702,7 @@ pub fn manual_dict_lookup(
         };
         if value
             .as_ref()
-            .map_or(false, |value| contains_effect(checker, value))
+            .map_or(false, |value| contains_effect(&checker.ctx, value))
         {
             return;
         };
@@ -784,7 +784,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(checker, default_val) {
+    if contains_effect(&checker.ctx, default_val) {
         return;
     }
 

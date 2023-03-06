@@ -909,7 +909,7 @@
           }
         },
         "runtime-evaluated-baseclasses": {
-          "description": "Exempt type annotations of certain classes with base classes from needing to be moved into type-checking blocks.",
+          "description": "Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.",
           "type": [
             "array",
             "null"
@@ -919,7 +919,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt type annotations of certain classes with decorators from needing to be moved into type-checking blocks.",
+          "description": "Exempt classes decorated with any of the enumerated decorators from needing to be moved into type-checking blocks.",
           "type": [
             "array",
             "null"
@@ -1198,7 +1198,7 @@
       "type": "object",
       "properties": {
         "classmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method. For example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method (in addition to the builtin `@classmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
           "type": [
             "array",
             "null"
@@ -1218,7 +1218,7 @@
           }
         },
         "staticmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method. For example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method (in addition to the builtin `@staticmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
           "type": [
             "array",
             "null"
@@ -1280,7 +1280,17 @@
           ]
         },
         "ignore-decorators": {
-          "description": "Ignore docstrings for functions or methods decorated with the specified decorators. Unlike the `pydocstyle`, Ruff accepts an array of fully-qualified module identifiers, instead of a regular expression.",
+          "description": "Ignore docstrings for functions or methods decorated with the specified fully-qualified decorators.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "property-decorators": {
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a property (in addition to the builtin `@property` and standard-library `@functools.cached_property`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list can use a non-imperative summary line.",
           "type": [
             "array",
             "null"
@@ -1958,6 +1968,8 @@
         "PYI014",
         "PYI02",
         "PYI021",
+        "PYI03",
+        "PYI033",
         "Q",
         "Q0",
         "Q00",

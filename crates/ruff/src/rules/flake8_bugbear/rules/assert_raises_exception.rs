@@ -54,6 +54,7 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
         return;
     }
     if !checker
+        .ctx
         .resolve_call_path(args.first().unwrap())
         .map_or(false, |call_path| call_path.as_slice() == ["", "Exception"])
     {

@@ -13,7 +13,6 @@ pub use violation::{AutofixKind, Availability as AutofixAvailability};
 
 mod ast;
 mod autofix;
-pub mod cache;
 mod checkers;
 mod codes;
 mod cst;

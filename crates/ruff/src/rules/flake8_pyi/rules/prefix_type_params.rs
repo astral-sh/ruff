@@ -71,12 +71,12 @@ pub fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr])
     };
 
     if let ExprKind::Call { func, .. } = &value.node {
-        let Some(kind) = checker.resolve_call_path(func).and_then(|call_path| {
-            if checker.match_typing_call_path(&call_path, "ParamSpec") {
+        let Some(kind) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
+            if checker.ctx.match_typing_call_path(&call_path, "ParamSpec") {
                 Some(VarKind::ParamSpec)
-            } else if checker.match_typing_call_path(&call_path, "TypeVar") {
+            } else if checker.ctx.match_typing_call_path(&call_path, "TypeVar") {
                 Some(VarKind::TypeVar)
-            } else if checker.match_typing_call_path(&call_path, "TypeVarTuple") {
+            } else if checker.ctx.match_typing_call_path(&call_path, "TypeVarTuple") {
                 Some(VarKind::TypeVarTuple)
             } else {
                 None

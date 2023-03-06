@@ -45,9 +45,14 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Constant { value: Constant::Str(env_var), kind } = &arg.node else {
         return;
     };
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["os", "environ", "get"] || call_path.as_slice() == ["os", "getenv"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["os", "environ", "get"]
+                || call_path.as_slice() == ["os", "getenv"]
+        })
+    {
         return;
     }
 

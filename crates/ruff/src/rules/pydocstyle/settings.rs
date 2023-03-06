@@ -2,13 +2,13 @@
 
 use std::collections::BTreeSet;
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::registry::Rule;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Convention {
     /// Use Google-style docstrings.
@@ -94,15 +94,29 @@ pub struct Options {
         "#
     )]
     /// Ignore docstrings for functions or methods decorated with the
-    /// specified decorators. Unlike the `pydocstyle`, Ruff accepts an array
-    /// of fully-qualified module identifiers, instead of a regular expression.
+    /// specified fully-qualified decorators.
     pub ignore_decorators: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            property-decorators = ["gi.repository.GObject.Property"]
+        "#
+    )]
+    /// A list of decorators that, when applied to a method, indicate that the
+    /// method should be treated as a property (in addition to the builtin
+    /// `@property` and standard-library `@functools.cached_property`).
+    ///
+    /// For example, Ruff will expect that any method decorated by a decorator
+    /// in this list can use a non-imperative summary line.
+    pub property_decorators: Option<Vec<String>>,
 }
 
-#[derive(Debug, Default, Hash)]
+#[derive(Debug, Default, CacheKey)]
 pub struct Settings {
     pub convention: Option<Convention>,
     pub ignore_decorators: BTreeSet<String>,
+    pub property_decorators: BTreeSet<String>,
 }
 
 impl From<Options> for Settings {
@@ -110,6 +124,9 @@ impl From<Options> for Settings {
         Self {
             convention: options.convention,
             ignore_decorators: BTreeSet::from_iter(options.ignore_decorators.unwrap_or_default()),
+            property_decorators: BTreeSet::from_iter(
+                options.property_decorators.unwrap_or_default(),
+            ),
         }
     }
 }
@@ -119,6 +136,7 @@ impl From<Settings> for Options {
         Self {
             convention: settings.convention,
             ignore_decorators: Some(settings.ignore_decorators.into_iter().collect()),
+            property_decorators: Some(settings.property_decorators.into_iter().collect()),
         }
     }
 }

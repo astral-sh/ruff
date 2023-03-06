@@ -162,17 +162,13 @@ fn fix_py2_block(
         // Delete the entire statement. If this is an `elif`, know it's the only child
         // of its parent, so avoid passing in the parent at all. Otherwise,
         // `delete_stmt` will erroneously include a `pass`.
-        let deleted: Vec<&Stmt> = checker
-            .deletions
-            .iter()
-            .map(std::convert::Into::into)
-            .collect();
-        let defined_by = checker.current_stmt();
-        let defined_in = checker.current_stmt_parent();
+        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
+        let defined_by = checker.ctx.current_stmt();
+        let defined_in = checker.ctx.current_stmt_parent();
         return match delete_stmt(
             defined_by.into(),
             if block.starter == Tok::If {
-                defined_in.map(std::convert::Into::into)
+                defined_in.map(Into::into)
             } else {
                 None
             },
@@ -331,9 +327,13 @@ pub fn outdated_version_block(
         return;
     };
 
-    if !checker.resolve_call_path(left).map_or(false, |call_path| {
-        call_path.as_slice() == ["sys", "version_info"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(left)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["sys", "version_info"]
+        })
+    {
         return;
     }
 

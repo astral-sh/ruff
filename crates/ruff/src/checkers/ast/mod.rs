@@ -1,13 +1,9 @@
-//! Lint rules based on AST traversal.
-
 use std::iter;
 use std::path::Path;
 
 use itertools::Itertools;
 use log::error;
 use nohash_hasher::IntMap;
-use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python::typing::TYPING_EXTENSIONS;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
 use rustpython_parser as parser;
@@ -16,21 +12,21 @@ use rustpython_parser::ast::{
     ExprKind, KeywordData, Located, Location, Operator, Pattern, PatternKind, Stmt, StmtKind,
     Suite,
 };
-use smallvec::smallvec;
 
-use crate::ast::helpers::{
-    binding_range, collect_call_path, extract_handled_exceptions, from_relative_import,
-    to_module_path, Exceptions,
-};
+use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
+
+use crate::ast::context::Context;
+use crate::ast::helpers::{binding_range, extract_handled_exceptions, to_module_path, Exceptions};
 use crate::ast::operations::{extract_all_names, AllNamesFlags};
 use crate::ast::relocate::relocate_expr;
 use crate::ast::types::{
-    Binding, BindingKind, CallPath, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
+    Binding, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
     RefEquality, Scope, ScopeKind,
 };
 use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use crate::ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use crate::ast::{branch_detection, cast, helpers, operations, typing, visitor};
+use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::definition::{Definition, DefinitionKind, Docstring, Documentable};
 use crate::registry::{Diagnostic, Rule};
 use crate::resolver::is_interface_definition_path;
@@ -46,73 +42,36 @@ use crate::rules::{
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
-use crate::visibility::{module_visibility, transition_scope, Modifier, Visibility, VisibleScope};
+use crate::visibility::transition_scope;
 use crate::{autofix, docstrings, noqa, visibility};
+
+mod deferred;
 
 const GLOBAL_SCOPE_INDEX: usize = 0;
 
-type DeferralContext<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 type AnnotationContext = (bool, bool);
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
-    // Input data.
-    pub(crate) path: &'a Path,
+    // Settings, static metadata, etc.
+    pub path: &'a Path,
     module_path: Option<Vec<String>>,
     package: Option<&'a Path>,
     is_interface_definition: bool,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
-    pub(crate) settings: &'a Settings,
-    pub(crate) noqa_line_for: &'a IntMap<usize, usize>,
-    pub(crate) locator: &'a Locator<'a>,
-    pub(crate) stylist: &'a Stylist<'a>,
-    pub(crate) indexer: &'a Indexer,
-    // Computed diagnostics.
-    pub(crate) diagnostics: Vec<Diagnostic>,
-    // Function and class definition tracking (e.g., for docstring enforcement).
-    definitions: Vec<(Definition<'a>, Visibility, DeferralContext<'a>)>,
-    // Edit tracking.
-    // TODO(charlie): Instead of exposing deletions, wrap in a public API.
-    pub(crate) deletions: FxHashSet<RefEquality<'a, Stmt>>,
-    // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
-    // at various points in time.
-    pub(crate) parents: Vec<RefEquality<'a, Stmt>>,
-    pub(crate) depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
-    pub(crate) child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
-    // A stack of all bindings created in any scope, at any point in execution.
-    pub(crate) bindings: Vec<Binding<'a>>,
-    // Map from binding index to indexes of bindings that redefine it in other scopes.
-    pub(crate) redefinitions: IntMap<usize, Vec<usize>>,
-    pub(crate) exprs: Vec<RefEquality<'a, Expr>>,
-    pub(crate) scopes: Vec<Scope<'a>>,
-    pub(crate) scope_stack: Vec<usize>,
-    pub(crate) dead_scopes: Vec<(usize, Vec<usize>)>,
-    deferred_string_type_definitions: Vec<(Range, &'a str, AnnotationContext, DeferralContext<'a>)>,
-    deferred_type_definitions: Vec<(&'a Expr, AnnotationContext, DeferralContext<'a>)>,
-    deferred_functions: Vec<(&'a Stmt, DeferralContext<'a>, VisibleScope)>,
-    deferred_lambdas: Vec<(&'a Expr, DeferralContext<'a>)>,
-    deferred_for_loops: Vec<(&'a Stmt, DeferralContext<'a>)>,
-    deferred_assignments: Vec<DeferralContext<'a>>,
-    // Body iteration; used to peek at siblings.
-    body: &'a [Stmt],
-    body_index: usize,
-    // Internal, derivative state.
-    visible_scope: VisibleScope,
-    in_annotation: bool,
-    in_type_definition: bool,
-    in_deferred_string_type_definition: bool,
-    in_deferred_type_definition: bool,
-    in_exception_handler: bool,
-    in_literal: bool,
-    in_subscript: bool,
-    in_type_checking_block: bool,
-    pub(crate) seen_import_boundary: bool,
-    futures_allowed: bool,
-    annotations_future_enabled: bool,
-    handled_exceptions: Vec<Exceptions>,
+    pub settings: &'a Settings,
+    pub noqa_line_for: &'a IntMap<usize, usize>,
+    pub locator: &'a Locator<'a>,
+    pub stylist: &'a Stylist<'a>,
+    pub indexer: &'a Indexer,
+    // Stateful fields.
+    pub ctx: Context<'a>,
+    pub deferred: Deferred<'a>,
+    pub diagnostics: Vec<Diagnostic>,
+    pub deletions: FxHashSet<RefEquality<'a, Stmt>>,
     // Check-specific state.
-    pub(crate) flake8_bugbear_seen: Vec<&'a Expr>,
+    pub flake8_bugbear_seen: Vec<&'a Expr>,
 }
 
 impl<'a> Checker<'a> {
@@ -129,7 +88,6 @@ impl<'a> Checker<'a> {
         style: &'a Stylist,
         indexer: &'a Indexer,
     ) -> Checker<'a> {
-        let is_interface_definition = is_interface_definition_path(path);
         Checker {
             settings,
             noqa_line_for,
@@ -137,161 +95,25 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             package,
-            module_path,
-            is_interface_definition,
+            module_path: module_path.clone(),
+            is_interface_definition: is_interface_definition_path(path),
             locator,
             stylist: style,
             indexer,
+            ctx: Context::new(&settings.typing_modules, path, module_path),
+            deferred: Deferred::default(),
             diagnostics: vec![],
-            definitions: vec![],
             deletions: FxHashSet::default(),
-            parents: vec![],
-            depths: FxHashMap::default(),
-            child_to_parent: FxHashMap::default(),
-            bindings: vec![],
-            redefinitions: IntMap::default(),
-            exprs: vec![],
-            scopes: vec![],
-            scope_stack: vec![],
-            dead_scopes: vec![],
-            deferred_string_type_definitions: vec![],
-            deferred_type_definitions: vec![],
-            deferred_functions: vec![],
-            deferred_lambdas: vec![],
-            deferred_for_loops: vec![],
-            deferred_assignments: vec![],
-            // Body iteration.
-            body: &[],
-            body_index: 0,
-            // Internal, derivative state.
-            visible_scope: VisibleScope {
-                modifier: Modifier::Module,
-                visibility: module_visibility(path),
-            },
-            in_annotation: false,
-            in_type_definition: false,
-            in_deferred_string_type_definition: false,
-            in_deferred_type_definition: false,
-            in_exception_handler: false,
-            in_literal: false,
-            in_subscript: false,
-            in_type_checking_block: false,
-            seen_import_boundary: false,
-            futures_allowed: true,
-            annotations_future_enabled: is_interface_definition,
-            handled_exceptions: vec![],
-            // Check-specific state.
             flake8_bugbear_seen: vec![],
         }
     }
+}
 
+impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
     pub fn patch(&self, code: &Rule) -> bool {
         self.autofix.into() && self.settings.rules.should_fix(code)
-    }
-
-    /// Return `true` if the `Expr` is a reference to `typing.${target}`.
-    pub fn match_typing_expr(&self, expr: &Expr, target: &str) -> bool {
-        self.resolve_call_path(expr).map_or(false, |call_path| {
-            self.match_typing_call_path(&call_path, target)
-        })
-    }
-
-    /// Return `true` if the call path is a reference to `typing.${target}`.
-    pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
-        if call_path.as_slice() == ["typing", target] {
-            return true;
-        }
-
-        if TYPING_EXTENSIONS.contains(target) {
-            if call_path.as_slice() == ["typing_extensions", target] {
-                return true;
-            }
-        }
-
-        if self.settings.typing_modules.iter().any(|module| {
-            let mut module: CallPath = module.split('.').collect();
-            module.push(target);
-            *call_path == module
-        }) {
-            return true;
-        }
-
-        false
-    }
-
-    /// Return the current `Binding` for a given `name`.
-    pub fn find_binding(&self, member: &str) -> Option<&Binding> {
-        self.current_scopes()
-            .find_map(|scope| scope.bindings.get(member))
-            .map(|index| &self.bindings[*index])
-    }
-
-    /// Return `true` if `member` is bound as a builtin.
-    pub fn is_builtin(&self, member: &str) -> bool {
-        self.find_binding(member)
-            .map_or(false, |binding| binding.kind.is_builtin())
-    }
-
-    /// Resolves the call path, e.g. if you have a file
-    ///
-    /// ```python
-    /// from sys import version_info as python_version
-    /// print(python_version)
-    /// ```
-    ///
-    /// then `python_version` from the print statement will resolve to `sys.version_info`.
-    pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
-    where
-        'b: 'a,
-    {
-        let call_path = collect_call_path(value);
-        let Some(head) = call_path.first() else {
-            return None;
-        };
-        let Some(binding) = self.find_binding(head) else {
-            return None;
-        };
-        match &binding.kind {
-            BindingKind::Importation(.., name) | BindingKind::SubmoduleImportation(name, ..) => {
-                if name.starts_with('.') {
-                    if let Some(module) = &self.module_path {
-                        let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
-                    } else {
-                        None
-                    }
-                } else {
-                    let mut source_path: CallPath = name.split('.').collect();
-                    source_path.extend(call_path.into_iter().skip(1));
-                    Some(source_path)
-                }
-            }
-            BindingKind::FromImportation(.., name) => {
-                if name.starts_with('.') {
-                    if let Some(module) = &self.module_path {
-                        let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
-                    } else {
-                        None
-                    }
-                } else {
-                    let mut source_path: CallPath = name.split('.').collect();
-                    source_path.extend(call_path.into_iter().skip(1));
-                    Some(source_path)
-                }
-            }
-            BindingKind::Builtin => {
-                let mut source_path: CallPath = smallvec![];
-                source_path.push("");
-                source_path.extend(call_path);
-                Some(source_path)
-            }
-            _ => None,
-        }
     }
 
     /// Return `true` if a `Rule` is disabled by a `noqa` directive.
@@ -313,20 +135,20 @@ impl<'a> Checker<'a> {
 /// Visit an [`Expr`], and treat it as a type definition.
 macro_rules! visit_type_definition {
     ($self:ident, $expr:expr) => {{
-        let prev_in_type_definition = $self.in_type_definition;
-        $self.in_type_definition = true;
+        let prev_in_type_definition = $self.ctx.in_type_definition;
+        $self.ctx.in_type_definition = true;
         $self.visit_expr($expr);
-        $self.in_type_definition = prev_in_type_definition;
+        $self.ctx.in_type_definition = prev_in_type_definition;
     }};
 }
 
 /// Visit an [`Expr`], and treat it as _not_ a type definition.
 macro_rules! visit_non_type_definition {
     ($self:ident, $expr:expr) => {{
-        let prev_in_type_definition = $self.in_type_definition;
-        $self.in_type_definition = false;
+        let prev_in_type_definition = $self.ctx.in_type_definition;
+        $self.ctx.in_type_definition = false;
         $self.visit_expr($expr);
-        $self.in_type_definition = prev_in_type_definition;
+        $self.ctx.in_type_definition = prev_in_type_definition;
     }};
 }
 
@@ -335,48 +157,46 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
-        self.push_parent(stmt);
+        self.ctx.push_parent(stmt);
 
         // Track whether we've seen docstrings, non-imports, etc.
         match &stmt.node {
             StmtKind::ImportFrom { module, .. } => {
                 // Allow __future__ imports until we see a non-__future__ import.
-                if self.futures_allowed {
+                if self.ctx.futures_allowed {
                     if let Some(module) = module {
                         if module != "__future__" {
-                            self.futures_allowed = false;
+                            self.ctx.futures_allowed = false;
                         }
                     }
                 }
             }
             StmtKind::Import { .. } => {
-                self.futures_allowed = false;
+                self.ctx.futures_allowed = false;
             }
             _ => {
-                self.futures_allowed = false;
-                if !self.seen_import_boundary
+                self.ctx.futures_allowed = false;
+                if !self.ctx.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(stmt)
-                    && !operations::in_nested_block(
-                        self.parents.iter().rev().map(std::convert::Into::into),
-                    )
+                    && !operations::in_nested_block(self.ctx.parents.iter().rev().map(Into::into))
                 {
-                    self.seen_import_boundary = true;
+                    self.ctx.seen_import_boundary = true;
                 }
             }
         }
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
-                let scope_index = *self.scope_stack.last().expect("No current scope found");
+                let scope_index = *self.ctx.scope_stack.last().expect("No current scope found");
                 let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
                     // Add the binding to the current scope.
-                    let context = self.execution_context();
-                    let scope = &mut self.scopes[scope_index];
+                    let context = self.ctx.execution_context();
+                    let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        let index = self.bindings.len();
-                        self.bindings.push(Binding {
+                        let index = self.ctx.bindings.len();
+                        self.ctx.bindings.push(Binding {
                             kind: BindingKind::Global,
                             runtime_usage: None,
                             synthetic_usage: usage,
@@ -397,16 +217,16 @@ where
                 }
             }
             StmtKind::Nonlocal { names } => {
-                let scope_index = *self.scope_stack.last().expect("No current scope found");
+                let scope_index = *self.ctx.scope_stack.last().expect("No current scope found");
                 let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if scope_index != GLOBAL_SCOPE_INDEX {
-                    let context = self.execution_context();
-                    let scope = &mut self.scopes[scope_index];
+                    let context = self.ctx.execution_context();
+                    let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from_located(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let index = self.bindings.len();
-                        self.bindings.push(Binding {
+                        let index = self.ctx.bindings.len();
+                        self.ctx.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
                             runtime_usage: None,
                             synthetic_usage: usage,
@@ -422,10 +242,12 @@ where
                     // and the current scope.)
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let mut exists = false;
-                        for index in self.scope_stack.iter().skip(1).rev().skip(1) {
-                            if let Some(index) = self.scopes[*index].bindings.get(&name.as_str()) {
+                        for index in self.ctx.scope_stack.iter().skip(1).rev().skip(1) {
+                            if let Some(index) =
+                                self.ctx.scopes[*index].bindings.get(&name.as_str())
+                            {
                                 exists = true;
-                                self.bindings[*index].runtime_usage = usage;
+                                self.ctx.bindings[*index].runtime_usage = usage;
                             }
                         }
 
@@ -454,12 +276,7 @@ where
                 if self.settings.rules.enabled(&Rule::BreakOutsideLoop) {
                     if let Some(diagnostic) = pyflakes::rules::break_outside_loop(
                         stmt,
-                        &mut self
-                            .parents
-                            .iter()
-                            .rev()
-                            .map(std::convert::Into::into)
-                            .skip(1),
+                        &mut self.ctx.parents.iter().rev().map(Into::into).skip(1),
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -469,12 +286,7 @@ where
                 if self.settings.rules.enabled(&Rule::ContinueOutsideLoop) {
                     if let Some(diagnostic) = pyflakes::rules::continue_outside_loop(
                         stmt,
-                        &mut self
-                            .parents
-                            .iter()
-                            .rev()
-                            .map(std::convert::Into::into)
-                            .skip(1),
+                        &mut self.ctx.parents.iter().rev().map(Into::into).skip(1),
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -504,7 +316,7 @@ where
                     self.diagnostics
                         .extend(flake8_django::rules::non_leading_receiver_decorator(
                             decorator_list,
-                            |expr| self.resolve_call_path(expr),
+                            |expr| self.ctx.resolve_call_path(expr),
                         ));
                 }
                 if self.settings.rules.enabled(&Rule::AmbiguousFunctionName) {
@@ -536,7 +348,7 @@ where
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_class_method(
                             self,
-                            self.current_scope(),
+                            self.ctx.current_scope(),
                             name,
                             decorator_list,
                             args,
@@ -554,7 +366,7 @@ where
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_method(
                             self,
-                            self.current_scope(),
+                            self.ctx.current_scope(),
                             name,
                             decorator_list,
                             args,
@@ -575,7 +387,7 @@ where
 
                 if self.settings.rules.enabled(&Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
-                        self.current_scope(),
+                        self.ctx.current_scope(),
                         stmt,
                         name,
                         self.locator,
@@ -778,9 +590,9 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = !self.annotations_future_enabled
+                let runtime_annotation = !self.ctx.annotations_future_enabled
                     && matches!(
-                        self.current_scope().kind,
+                        self.ctx.current_scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
                     );
 
@@ -843,7 +655,7 @@ where
                     self.visit_expr(expr);
                 }
 
-                let context = self.execution_context();
+                let context = self.ctx.execution_context();
                 self.add_binding(
                     name,
                     Binding {
@@ -852,7 +664,7 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: Range::from_located(stmt),
-                        source: Some(self.current_stmt().clone()),
+                        source: Some(self.ctx.current_stmt().clone()),
                         context,
                     },
                 );
@@ -1027,6 +839,7 @@ where
                 // If a module is imported within a `ModuleNotFoundError` body, treat that as a
                 // synthetic usage.
                 let is_handled = self
+                    .ctx
                     .handled_exceptions
                     .iter()
                     .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
@@ -1041,7 +854,8 @@ where
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
                                 synthetic_usage: Some((
-                                    self.scopes[*(self
+                                    self.ctx.scopes[*(self
+                                        .ctx
                                         .scope_stack
                                         .last()
                                         .expect("No current scope found"))]
@@ -1050,13 +864,13 @@ where
                                 )),
                                 typing_usage: None,
                                 range: Range::from_located(alias),
-                                source: Some(self.current_stmt().clone()),
-                                context: self.execution_context(),
+                                source: Some(self.ctx.current_stmt().clone()),
+                                context: self.ctx.execution_context(),
                             },
                         );
 
                         if self.settings.rules.enabled(&Rule::LateFutureImport)
-                            && !self.futures_allowed
+                            && !self.ctx.futures_allowed
                         {
                             self.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::LateFutureImport,
@@ -1075,7 +889,8 @@ where
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled {
                                     Some((
-                                        self.scopes[*(self
+                                        self.ctx.scopes[*(self
+                                            .ctx
                                             .scope_stack
                                             .last()
                                             .expect("No current scope found"))]
@@ -1087,8 +902,8 @@ where
                                 },
                                 typing_usage: None,
                                 range: Range::from_located(alias),
-                                source: Some(self.current_stmt().clone()),
-                                context: self.execution_context(),
+                                source: Some(self.ctx.current_stmt().clone()),
+                                context: self.ctx.execution_context(),
                             },
                         );
                     } else {
@@ -1112,7 +927,8 @@ where
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled || is_explicit_reexport {
                                     Some((
-                                        self.scopes[*(self
+                                        self.ctx.scopes[*(self
+                                            .ctx
                                             .scope_stack
                                             .last()
                                             .expect("No current scope found"))]
@@ -1124,8 +940,8 @@ where
                                 },
                                 typing_usage: None,
                                 range: Range::from_located(alias),
-                                source: Some(self.current_stmt().clone()),
-                                context: self.execution_context(),
+                                source: Some(self.ctx.current_stmt().clone()),
+                                context: self.ctx.execution_context(),
                             },
                         );
 
@@ -1369,6 +1185,7 @@ where
                 // If a module is imported within a `ModuleNotFoundError` body, treat that as a
                 // synthetic usage.
                 let is_handled = self
+                    .ctx
                     .handled_exceptions
                     .iter()
                     .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
@@ -1383,7 +1200,8 @@ where
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
                                 synthetic_usage: Some((
-                                    self.scopes[*(self
+                                    self.ctx.scopes[*(self
+                                        .ctx
                                         .scope_stack
                                         .last()
                                         .expect("No current scope found"))]
@@ -1392,13 +1210,13 @@ where
                                 )),
                                 typing_usage: None,
                                 range: Range::from_located(alias),
-                                source: Some(self.current_stmt().clone()),
-                                context: self.execution_context(),
+                                source: Some(self.ctx.current_stmt().clone()),
+                                context: self.ctx.execution_context(),
                             },
                         );
 
                         if alias.node.name == "annotations" {
-                            self.annotations_future_enabled = true;
+                            self.ctx.annotations_future_enabled = true;
                         }
 
                         if self.settings.rules.enabled(&Rule::FutureFeatureNotDefined) {
@@ -1406,7 +1224,7 @@ where
                         }
 
                         if self.settings.rules.enabled(&Rule::LateFutureImport)
-                            && !self.futures_allowed
+                            && !self.ctx.futures_allowed
                         {
                             self.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::LateFutureImport,
@@ -1421,7 +1239,8 @@ where
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled {
                                     Some((
-                                        self.scopes[*(self
+                                        self.ctx.scopes[*(self
+                                            .ctx
                                             .scope_stack
                                             .last()
                                             .expect("No current scope found"))]
@@ -1433,14 +1252,14 @@ where
                                 },
                                 typing_usage: None,
                                 range: Range::from_located(stmt),
-                                source: Some(self.current_stmt().clone()),
-                                context: self.execution_context(),
+                                source: Some(self.ctx.current_stmt().clone()),
+                                context: self.ctx.execution_context(),
                             },
                         );
 
                         if self.settings.rules.enabled(&Rule::ImportStarNotPermitted) {
-                            let scope = &self.scopes
-                                [*(self.scope_stack.last().expect("No current scope found"))];
+                            let scope = &self.ctx.scopes
+                                [*(self.ctx.scope_stack.last().expect("No current scope found"))];
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::ImportStarNotPermitted {
@@ -1466,8 +1285,8 @@ where
                             ));
                         }
 
-                        let scope = &mut self.scopes
-                            [*(self.scope_stack.last().expect("No current scope found"))];
+                        let scope = &mut self.ctx.scopes
+                            [*(self.ctx.scope_stack.last().expect("No current scope found"))];
                         scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
@@ -1498,7 +1317,8 @@ where
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled || is_explicit_reexport {
                                     Some((
-                                        self.scopes[*(self
+                                        self.ctx.scopes[*(self
+                                            .ctx
                                             .scope_stack
                                             .last()
                                             .expect("No current scope found"))]
@@ -1510,8 +1330,9 @@ where
                                 },
                                 typing_usage: None,
                                 range: Range::from_located(alias),
-                                source: Some(self.current_stmt().clone()),
-                                context: self.execution_context(),
+
+                                source: Some(self.ctx.current_stmt().clone()),
+                                context: self.ctx.execution_context(),
                             },
                         );
                     }
@@ -1721,14 +1542,14 @@ where
                         test,
                         body,
                         orelse,
-                        self.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::IfWithSameArms) {
                     flake8_simplify::rules::if_with_same_arms(
                         self,
                         stmt,
-                        self.current_stmt_parent().map(std::convert::Into::into),
+                        self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::NeedlessBool) {
@@ -1741,14 +1562,14 @@ where
                         test,
                         body,
                         orelse,
-                        self.current_stmt_parent().map(std::convert::Into::into),
+                        self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::UseTernaryOperator) {
                     flake8_simplify::rules::use_ternary_operator(
                         self,
                         stmt,
-                        self.current_stmt_parent().map(std::convert::Into::into),
+                        self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::DictGetWithDefault) {
@@ -1758,7 +1579,7 @@ where
                         test,
                         body,
                         orelse,
-                        self.current_stmt_parent().map(std::convert::Into::into),
+                        self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::PreferTypeError) {
@@ -1767,7 +1588,7 @@ where
                         body,
                         test,
                         orelse,
-                        self.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::OutdatedVersionBlock) {
@@ -1822,7 +1643,7 @@ where
                         self,
                         stmt,
                         body,
-                        self.current_stmt_parent().map(Into::into),
+                        self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
                 if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
@@ -1856,8 +1677,10 @@ where
                     .rules
                     .enabled(&Rule::UnusedLoopControlVariable)
                 {
-                    self.deferred_for_loops
-                        .push((stmt, (self.scope_stack.clone(), self.parents.clone())));
+                    self.deferred.for_loops.push((
+                        stmt,
+                        (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+                    ));
                 }
                 if self
                     .settings
@@ -1880,7 +1703,7 @@ where
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
-                            self.current_sibling_stmt(),
+                            self.ctx.current_sibling_stmt(),
                         );
                     }
                     if self.settings.rules.enabled(&Rule::KeyInDict) {
@@ -2066,7 +1889,7 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::AsyncioDanglingTask) {
                     if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
-                        self.resolve_call_path(expr)
+                        self.ctx.resolve_call_path(expr)
                     }) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -2076,8 +1899,8 @@ where
         }
 
         // Recurse.
-        let prev_in_exception_handler = self.in_exception_handler;
-        let prev_visible_scope = self.visible_scope.clone();
+        let prev_in_exception_handler = self.ctx.in_exception_handler;
+        let prev_visible_scope = self.ctx.visible_scope.clone();
         match &stmt.node {
             StmtKind::FunctionDef {
                 body,
@@ -2097,7 +1920,7 @@ where
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
-                    &self.visible_scope,
+                    &self.ctx.visible_scope,
                     stmt,
                     body,
                     &Documentable::Function,
@@ -2105,49 +1928,53 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteYieldFrom) {
                     pyupgrade::rules::rewrite_yield_from(self, stmt);
                 }
-                let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Function);
-                self.definitions.push((
+                let scope =
+                    transition_scope(&self.ctx.visible_scope, stmt, &Documentable::Function);
+                self.deferred.definitions.push((
                     definition,
                     scope.visibility.clone(),
-                    (self.scope_stack.clone(), self.parents.clone()),
+                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
-                self.visible_scope = scope;
+                self.ctx.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in operations::extract_globals(body) {
-                    if self.scopes[GLOBAL_SCOPE_INDEX]
+                    if self.ctx.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
+                        .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
                     {
-                        let index = self.bindings.len();
-                        self.bindings.push(Binding {
+                        let index = self.ctx.bindings.len();
+                        self.ctx.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             runtime_usage: None,
                             synthetic_usage: None,
                             typing_usage: None,
                             range: Range::from_located(stmt),
                             source: Some(RefEquality(stmt)),
-                            context: self.execution_context(),
+                            context: self.ctx.execution_context(),
                         });
-                        self.scopes[GLOBAL_SCOPE_INDEX].bindings.insert(name, index);
+                        self.ctx.scopes[GLOBAL_SCOPE_INDEX]
+                            .bindings
+                            .insert(name, index);
                     }
                 }
 
-                self.push_scope(Scope::new(ScopeKind::Function(FunctionDef {
-                    name,
-                    body,
-                    args,
-                    decorator_list,
-                    async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
-                    globals,
-                })));
+                self.ctx
+                    .push_scope(Scope::new(ScopeKind::Function(FunctionDef {
+                        name,
+                        body,
+                        args,
+                        decorator_list,
+                        async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
+                        globals,
+                    })));
 
-                self.deferred_functions.push((
+                self.deferred.functions.push((
                     stmt,
-                    (self.scope_stack.clone(), self.parents.clone()),
-                    self.visible_scope.clone(),
+                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+                    self.ctx.visible_scope.clone(),
                 ));
             }
             StmtKind::ClassDef {
@@ -2162,42 +1989,44 @@ where
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
-                    &self.visible_scope,
+                    &self.ctx.visible_scope,
                     stmt,
                     body,
                     &Documentable::Class,
                 );
-                let scope = transition_scope(&self.visible_scope, stmt, &Documentable::Class);
-                self.definitions.push((
+                let scope = transition_scope(&self.ctx.visible_scope, stmt, &Documentable::Class);
+                self.deferred.definitions.push((
                     definition,
                     scope.visibility.clone(),
-                    (self.scope_stack.clone(), self.parents.clone()),
+                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
-                self.visible_scope = scope;
+                self.ctx.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in &globals {
-                    if self.scopes[GLOBAL_SCOPE_INDEX]
+                    if self.ctx.scopes[GLOBAL_SCOPE_INDEX]
                         .bindings
                         .get(name)
-                        .map_or(true, |index| self.bindings[*index].kind.is_annotation())
+                        .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
                     {
-                        let index = self.bindings.len();
-                        self.bindings.push(Binding {
+                        let index = self.ctx.bindings.len();
+                        self.ctx.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             runtime_usage: None,
                             synthetic_usage: None,
                             typing_usage: None,
                             range: Range::from_located(stmt),
                             source: Some(RefEquality(stmt)),
-                            context: self.execution_context(),
+                            context: self.ctx.execution_context(),
                         });
-                        self.scopes[GLOBAL_SCOPE_INDEX].bindings.insert(name, index);
+                        self.ctx.scopes[GLOBAL_SCOPE_INDEX]
+                            .bindings
+                            .insert(name, index);
                     }
                 }
 
-                self.push_scope(Scope::new(ScopeKind::Class(ClassDef {
+                self.ctx.push_scope(Scope::new(ScopeKind::Class(ClassDef {
                     name,
                     bases,
                     keywords,
@@ -2221,7 +2050,7 @@ where
             } => {
                 let mut handled_exceptions = Exceptions::empty();
                 for type_ in extract_handled_exceptions(handlers) {
-                    if let Some(call_path) = self.resolve_call_path(type_) {
+                    if let Some(call_path) = self.ctx.resolve_call_path(type_) {
                         if call_path.as_slice() == ["", "NameError"] {
                             handled_exceptions |= Exceptions::NAME_ERROR;
                         } else if call_path.as_slice() == ["", "ModuleNotFoundError"] {
@@ -2230,18 +2059,18 @@ where
                     }
                 }
 
-                self.handled_exceptions.push(handled_exceptions);
+                self.ctx.handled_exceptions.push(handled_exceptions);
                 if self.settings.rules.enabled(&Rule::JumpStatementInFinally) {
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
                 }
                 self.visit_body(body);
-                self.handled_exceptions.pop();
+                self.ctx.handled_exceptions.pop();
 
-                self.in_exception_handler = true;
+                self.ctx.in_exception_handler = true;
                 for excepthandler in handlers {
                     self.visit_excepthandler(excepthandler);
                 }
-                self.in_exception_handler = prev_in_exception_handler;
+                self.ctx.in_exception_handler = prev_in_exception_handler;
 
                 self.visit_body(orelse);
                 self.visit_body(finalbody);
@@ -2255,17 +2084,30 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = (!self.annotations_future_enabled
-                    && matches!(
-                        self.current_scope().kind,
+                let runtime_annotation = if self.ctx.annotations_future_enabled {
+                    if matches!(self.ctx.current_scope().kind, ScopeKind::Class(..)) {
+                        let baseclasses = &self
+                            .settings
+                            .flake8_type_checking
+                            .runtime_evaluated_baseclasses;
+                        let decorators = &self
+                            .settings
+                            .flake8_type_checking
+                            .runtime_evaluated_decorators;
+                        flake8_type_checking::helpers::runtime_evaluated(
+                            &self.ctx,
+                            baseclasses,
+                            decorators,
+                        )
+                    } else {
+                        false
+                    }
+                } else {
+                    matches!(
+                        self.ctx.current_scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
-                    ))
-                    || (self.annotations_future_enabled
-                        && matches!(self.current_scope().kind, ScopeKind::Class(..))
-                        && flake8_type_checking::helpers::runtime_evaluated(
-                            self,
-                            self.current_scope(),
-                        ));
+                    )
+                };
 
                 if runtime_annotation {
                     visit_type_definition!(self, annotation);
@@ -2273,7 +2115,7 @@ where
                     self.visit_annotation(annotation);
                 }
                 if let Some(expr) = value {
-                    if self.match_typing_expr(annotation, "TypeAlias") {
+                    if self.ctx.match_typing_expr(annotation, "TypeAlias") {
                         visit_type_definition!(self, expr);
                     } else {
                         self.visit_expr(expr);
@@ -2289,10 +2131,10 @@ where
                         flake8_type_checking::rules::empty_type_checking_block(self, stmt, body);
                     }
 
-                    let prev_in_type_checking_block = self.in_type_checking_block;
-                    self.in_type_checking_block = true;
+                    let prev_in_type_checking_block = self.ctx.in_type_checking_block;
+                    self.ctx.in_type_checking_block = true;
                     self.visit_body(body);
-                    self.in_type_checking_block = prev_in_type_checking_block;
+                    self.ctx.in_type_checking_block = prev_in_type_checking_block;
                 } else {
                     self.visit_body(body);
                 }
@@ -2301,15 +2143,15 @@ where
             }
             _ => visitor::walk_stmt(self, stmt),
         };
-        self.visible_scope = prev_visible_scope;
+        self.ctx.visible_scope = prev_visible_scope;
 
         // Post-visit.
         match &stmt.node {
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                self.pop_scope();
+                self.ctx.pop_scope();
             }
             StmtKind::ClassDef { name, .. } => {
-                self.pop_scope();
+                self.ctx.pop_scope();
                 self.add_binding(
                     name,
                     Binding {
@@ -2318,72 +2160,73 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: Range::from_located(stmt),
-                        source: Some(self.current_stmt().clone()),
-                        context: self.execution_context(),
+                        source: Some(self.ctx.current_stmt().clone()),
+                        context: self.ctx.execution_context(),
                     },
                 );
             }
             _ => {}
         }
 
-        self.pop_parent();
+        self.ctx.pop_parent();
     }
 
     fn visit_annotation(&mut self, expr: &'b Expr) {
-        let prev_in_annotation = self.in_annotation;
-        self.in_annotation = true;
+        let prev_in_annotation = self.ctx.in_annotation;
+        self.ctx.in_annotation = true;
         visit_type_definition!(self, expr);
-        self.in_annotation = prev_in_annotation;
+        self.ctx.in_annotation = prev_in_annotation;
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        if !(self.in_deferred_type_definition || self.in_deferred_string_type_definition)
-            && self.in_type_definition
-            && self.annotations_future_enabled
+        if !(self.ctx.in_deferred_type_definition || self.ctx.in_deferred_string_type_definition)
+            && self.ctx.in_type_definition
+            && self.ctx.annotations_future_enabled
         {
             if let ExprKind::Constant {
                 value: Constant::Str(value),
                 ..
             } = &expr.node
             {
-                self.deferred_string_type_definitions.push((
+                self.deferred.string_type_definitions.push((
                     Range::from_located(expr),
                     value,
-                    (self.in_annotation, self.in_type_checking_block),
-                    (self.scope_stack.clone(), self.parents.clone()),
+                    (self.ctx.in_annotation, self.ctx.in_type_checking_block),
+                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
             } else {
-                self.deferred_type_definitions.push((
+                self.deferred.type_definitions.push((
                     expr,
-                    (self.in_annotation, self.in_type_checking_block),
-                    (self.scope_stack.clone(), self.parents.clone()),
+                    (self.ctx.in_annotation, self.ctx.in_type_checking_block),
+                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
             }
             return;
         }
 
-        self.push_expr(expr);
+        self.ctx.push_expr(expr);
 
-        let prev_in_literal = self.in_literal;
+        let prev_in_literal = self.ctx.in_literal;
+        let prev_in_type_definition = self.ctx.in_type_definition;
 
         // Pre-visit.
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...], Union[...]
-                if self.in_type_definition
-                    && !self.in_deferred_string_type_definition
+                if self.ctx.in_type_definition
+                    && !self.ctx.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(&Rule::TypingUnion)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
-                            && self.annotations_future_enabled
-                            && self.in_annotation))
+                            && self.ctx.annotations_future_enabled
+                            && self.ctx.in_annotation))
                 {
                     pyupgrade::rules::use_pep604_annotation(self, expr, value, slice);
                 }
 
-                if self.match_typing_expr(value, "Literal") {
-                    self.in_literal = true;
+                if self.ctx.match_typing_expr(value, "Literal") {
+                    self.ctx.in_literal = true;
                 }
 
                 if self
@@ -2429,14 +2272,16 @@ where
                         }
 
                         // Ex) List[...]
-                        if !self.in_deferred_string_type_definition
+                        if !self.ctx.in_deferred_string_type_definition
                             && !self.settings.pyupgrade.keep_runtime_typing
                             && self.settings.rules.enabled(&Rule::DeprecatedCollectionType)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
-                                    && self.annotations_future_enabled
-                                    && self.in_annotation))
-                            && typing::is_pep585_builtin(expr, |expr| self.resolve_call_path(expr))
+                                    && self.ctx.annotations_future_enabled
+                                    && self.ctx.in_annotation))
+                            && typing::is_pep585_builtin(expr, |expr| {
+                                self.ctx.resolve_call_path(expr)
+                            })
                         {
                             pyupgrade::rules::use_pep585_annotation(self, expr);
                         }
@@ -2474,14 +2319,14 @@ where
             }
             ExprKind::Attribute { attr, value, .. } => {
                 // Ex) typing.List[...]
-                if !self.in_deferred_string_type_definition
+                if !self.ctx.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(&Rule::DeprecatedCollectionType)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
-                            && self.annotations_future_enabled
-                            && self.in_annotation))
-                    && typing::is_pep585_builtin(expr, |expr| self.resolve_call_path(expr))
+                            && self.ctx.annotations_future_enabled
+                            && self.ctx.in_annotation))
+                    && typing::is_pep585_builtin(expr, |expr| self.ctx.resolve_call_path(expr))
                 {
                     pyupgrade::rules::use_pep585_annotation(self, expr);
                 }
@@ -2636,7 +2481,9 @@ where
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias(self, &expr);
                 }
-                if self.settings.rules.enabled(&Rule::IsinstanceWithTuple) {
+                if self.settings.rules.enabled(&Rule::IsinstanceWithTuple)
+                    && self.settings.target_version >= PythonVersion::Py310
+                {
                     pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
                 }
 
@@ -2763,7 +2610,7 @@ where
                     flake8_comprehensions::rules::unnecessary_generator_set(
                         self,
                         expr,
-                        self.current_expr_parent().map(Into::into),
+                        self.ctx.current_expr_parent().map(Into::into),
                         func,
                         args,
                         keywords,
@@ -2773,7 +2620,7 @@ where
                     flake8_comprehensions::rules::unnecessary_generator_dict(
                         self,
                         expr,
-                        self.current_expr_parent().map(Into::into),
+                        self.ctx.current_expr_parent().map(Into::into),
                         func,
                         args,
                         keywords,
@@ -2873,7 +2720,7 @@ where
                     flake8_comprehensions::rules::unnecessary_map(
                         self,
                         expr,
-                        self.current_expr_parent().map(Into::into),
+                        self.ctx.current_expr_parent().map(Into::into),
                         func,
                         args,
                     );
@@ -2891,8 +2738,8 @@ where
                 }
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
-                        let scope = &mut self.scopes
-                            [*(self.scope_stack.last().expect("No current scope found"))];
+                        let scope = &mut self.ctx.scopes
+                            [*(self.ctx.scope_stack.last().expect("No current scope found"))];
                         scope.uses_locals = true;
                     }
                 }
@@ -3502,12 +3349,12 @@ where
                 value: Constant::Str(value),
                 kind,
             } => {
-                if self.in_type_definition && !self.in_literal {
-                    self.deferred_string_type_definitions.push((
+                if self.ctx.in_type_definition && !self.ctx.in_literal {
+                    self.deferred.string_type_definitions.push((
                         Range::from_located(expr),
                         value,
-                        (self.in_annotation, self.in_type_checking_block),
-                        (self.scope_stack.clone(), self.parents.clone()),
+                        (self.ctx.in_annotation, self.ctx.in_type_checking_block),
+                        (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                     ));
                 }
                 if self
@@ -3547,7 +3394,8 @@ where
                 for expr in &args.defaults {
                     self.visit_expr(expr);
                 }
-                self.push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
+                self.ctx
+                    .push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
             }
             ExprKind::IfExp { test, body, orelse } => {
                 if self.settings.rules.enabled(&Rule::IfExprWithTrueFalse) {
@@ -3573,13 +3421,13 @@ where
                 if self.settings.rules.enabled(&Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.push_scope(Scope::new(ScopeKind::Generator));
+                self.ctx.push_scope(Scope::new(ScopeKind::Generator));
             }
             ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
                 if self.settings.rules.enabled(&Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.push_scope(Scope::new(ScopeKind::Generator));
+                self.ctx.push_scope(Scope::new(ScopeKind::Generator));
             }
             ExprKind::BoolOp { op, values } => {
                 if self
@@ -3617,30 +3465,39 @@ where
         // Recurse.
         match &expr.node {
             ExprKind::Lambda { .. } => {
-                self.deferred_lambdas
-                    .push((expr, (self.scope_stack.clone(), self.parents.clone())));
+                self.deferred.lambdas.push((
+                    expr,
+                    (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
+                ));
             }
             ExprKind::Call {
                 func,
                 args,
                 keywords,
             } => {
-                let callable = self.resolve_call_path(func).and_then(|call_path| {
-                    if self.match_typing_call_path(&call_path, "ForwardRef") {
+                let callable = self.ctx.resolve_call_path(func).and_then(|call_path| {
+                    if self.ctx.match_typing_call_path(&call_path, "ForwardRef") {
                         Some(Callable::ForwardRef)
-                    } else if self.match_typing_call_path(&call_path, "cast") {
+                    } else if self.ctx.match_typing_call_path(&call_path, "cast") {
                         Some(Callable::Cast)
-                    } else if self.match_typing_call_path(&call_path, "NewType") {
+                    } else if self.ctx.match_typing_call_path(&call_path, "NewType") {
                         Some(Callable::NewType)
-                    } else if self.match_typing_call_path(&call_path, "TypeVar") {
+                    } else if self.ctx.match_typing_call_path(&call_path, "TypeVar") {
                         Some(Callable::TypeVar)
-                    } else if self.match_typing_call_path(&call_path, "NamedTuple") {
+                    } else if self.ctx.match_typing_call_path(&call_path, "NamedTuple") {
                         Some(Callable::NamedTuple)
-                    } else if self.match_typing_call_path(&call_path, "TypedDict") {
+                    } else if self.ctx.match_typing_call_path(&call_path, "TypedDict") {
                         Some(Callable::TypedDict)
-                    } else if ["Arg", "DefaultArg", "NamedArg", "DefaultNamedArg"]
-                        .iter()
-                        .any(|target| call_path.as_slice() == ["mypy_extensions", target])
+                    } else if [
+                        "Arg",
+                        "DefaultArg",
+                        "NamedArg",
+                        "DefaultNamedArg",
+                        "VarArg",
+                        "KwArg",
+                    ]
+                    .iter()
+                    .any(|target| call_path.as_slice() == ["mypy_extensions", target])
                     {
                         Some(Callable::MypyExtension)
                     } else {
@@ -3763,7 +3620,17 @@ where
                         }
                     }
                     None => {
-                        visitor::walk_expr(self, expr);
+                        // If we're in a type definition, we need to treat the arguments to any
+                        // other callables as non-type definitions (i.e., we don't want to treat
+                        // any strings as deferred type definitions).
+                        self.visit_expr(func);
+                        for arg in args {
+                            visit_non_type_definition!(self, arg);
+                        }
+                        for keyword in keywords {
+                            let KeywordData { value, .. } = &keyword.node;
+                            visit_non_type_definition!(self, value);
+                        }
                     }
                 }
             }
@@ -3772,16 +3639,16 @@ where
                 // `obj["foo"]["bar"]`, we need to avoid treating the `obj["foo"]`
                 // portion as an annotation, despite having `ExprContext::Load`. Thus, we track
                 // the `ExprContext` at the top-level.
-                let prev_in_subscript = self.in_subscript;
-                if self.in_subscript {
+                let prev_in_subscript = self.ctx.in_subscript;
+                if self.ctx.in_subscript {
                     visitor::walk_expr(self, expr);
                 } else if matches!(ctx, ExprContext::Store | ExprContext::Del) {
-                    self.in_subscript = true;
+                    self.ctx.in_subscript = true;
                     visitor::walk_expr(self, expr);
                 } else {
                     match match_annotated_subscript(
                         value,
-                        |expr| self.resolve_call_path(expr),
+                        |expr| self.ctx.resolve_call_path(expr),
                         self.settings.typing_modules.iter().map(String::as_str),
                     ) {
                         Some(subscript) => {
@@ -3817,7 +3684,7 @@ where
                         None => visitor::walk_expr(self, expr),
                     }
                 }
-                self.in_subscript = prev_in_subscript;
+                self.ctx.in_subscript = prev_in_subscript;
             }
             ExprKind::JoinedStr { .. } => {
                 visitor::walk_expr(self, expr);
@@ -3832,14 +3699,26 @@ where
             | ExprKind::ListComp { .. }
             | ExprKind::DictComp { .. }
             | ExprKind::SetComp { .. } => {
-                self.pop_scope();
+                self.ctx.pop_scope();
             }
             _ => {}
         };
 
-        self.in_literal = prev_in_literal;
+        self.ctx.in_type_definition = prev_in_type_definition;
+        self.ctx.in_literal = prev_in_literal;
 
-        self.pop_expr();
+        self.ctx.pop_expr();
+    }
+
+    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
+        if self.settings.rules.enabled(&Rule::KeyInDict) {
+            flake8_simplify::rules::key_in_dict_for(
+                self,
+                &comprehension.target,
+                &comprehension.iter,
+            );
+        }
+        visitor::walk_comprehension(self, comprehension);
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
@@ -3915,7 +3794,12 @@ where
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
 
-                        if self.current_scope().bindings.contains_key(&name.as_str()) {
+                        if self
+                            .ctx
+                            .current_scope()
+                            .bindings
+                            .contains_key(&name.as_str())
+                        {
                             self.handle_node_store(
                                 name,
                                 &Expr::new(
@@ -3929,7 +3813,12 @@ where
                             );
                         }
 
-                        let definition = self.current_scope().bindings.get(&name.as_str()).copied();
+                        let definition = self
+                            .ctx
+                            .current_scope()
+                            .bindings
+                            .get(&name.as_str())
+                            .copied();
                         self.handle_node_store(
                             name,
                             &Expr::new(
@@ -3945,11 +3834,11 @@ where
                         walk_excepthandler(self, excepthandler);
 
                         if let Some(index) = {
-                            let scope = &mut self.scopes
-                                [*(self.scope_stack.last().expect("No current scope found"))];
+                            let scope = &mut self.ctx.scopes
+                                [*(self.ctx.scope_stack.last().expect("No current scope found"))];
                             &scope.bindings.remove(&name.as_str())
                         } {
-                            if !self.bindings[*index].used() {
+                            if !self.ctx.bindings[*index].used() {
                                 if self.settings.rules.enabled(&Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
                                         pyflakes::rules::UnusedVariable {
@@ -3980,8 +3869,8 @@ where
                         }
 
                         if let Some(index) = definition {
-                            let scope = &mut self.scopes
-                                [*(self.scope_stack.last().expect("No current scope found"))];
+                            let scope = &mut self.ctx.scopes
+                                [*(self.ctx.scope_stack.last().expect("No current scope found"))];
                             scope.bindings.insert(name, index);
                         }
                     }
@@ -3989,32 +3878,6 @@ where
                 }
             }
         }
-    }
-
-    fn visit_pattern(&mut self, pattern: &'b Pattern) {
-        if let PatternKind::MatchAs {
-            name: Some(name), ..
-        }
-        | PatternKind::MatchStar { name: Some(name) }
-        | PatternKind::MatchMapping {
-            rest: Some(name), ..
-        } = &pattern.node
-        {
-            self.add_binding(
-                name,
-                Binding {
-                    kind: BindingKind::Assignment,
-                    runtime_usage: None,
-                    synthetic_usage: None,
-                    typing_usage: None,
-                    range: Range::from_located(pattern),
-                    source: Some(self.current_stmt().clone()),
-                    context: self.execution_context(),
-                },
-            );
-        }
-
-        walk_pattern(self, pattern);
     }
 
     fn visit_format_spec(&mut self, format_spec: &'b Expr) {
@@ -4026,17 +3889,6 @@ where
             }
             _ => unreachable!("Unexpected expression for format_spec"),
         }
-    }
-
-    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
-        if self.settings.rules.enabled(&Rule::KeyInDict) {
-            flake8_simplify::rules::key_in_dict_for(
-                self,
-                &comprehension.target,
-                &comprehension.iter,
-            );
-        }
-        visitor::walk_comprehension(self, comprehension);
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
@@ -4096,8 +3948,8 @@ where
                 synthetic_usage: None,
                 typing_usage: None,
                 range: Range::from_located(arg),
-                source: Some(self.current_stmt().clone()),
-                context: self.execution_context(),
+                source: Some(self.ctx.current_stmt().clone()),
+                context: self.ctx.execution_context(),
             },
         );
 
@@ -4122,165 +3974,69 @@ where
         self.check_builtin_arg_shadowing(&arg.node.arg, arg);
     }
 
+    fn visit_pattern(&mut self, pattern: &'b Pattern) {
+        if let PatternKind::MatchAs {
+            name: Some(name), ..
+        }
+        | PatternKind::MatchStar { name: Some(name) }
+        | PatternKind::MatchMapping {
+            rest: Some(name), ..
+        } = &pattern.node
+        {
+            self.add_binding(
+                name,
+                Binding {
+                    kind: BindingKind::Assignment,
+                    runtime_usage: None,
+                    synthetic_usage: None,
+                    typing_usage: None,
+                    range: Range::from_located(pattern),
+                    source: Some(self.ctx.current_stmt().clone()),
+                    context: self.ctx.execution_context(),
+                },
+            );
+        }
+
+        walk_pattern(self, pattern);
+    }
+
     fn visit_body(&mut self, body: &'b [Stmt]) {
         if self.settings.rules.enabled(&Rule::UnnecessaryPass) {
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
-        let prev_body = self.body;
-        let prev_body_index = self.body_index;
-        self.body = body;
-        self.body_index = 0;
+        let prev_body = self.ctx.body;
+        let prev_body_index = self.ctx.body_index;
+        self.ctx.body = body;
+        self.ctx.body_index = 0;
 
         for stmt in body {
             self.visit_stmt(stmt);
-            self.body_index += 1;
+            self.ctx.body_index += 1;
         }
 
-        self.body = prev_body;
-        self.body_index = prev_body_index;
+        self.ctx.body = prev_body;
+        self.ctx.body_index = prev_body_index;
     }
 }
 
 impl<'a> Checker<'a> {
-    fn push_parent(&mut self, parent: &'a Stmt) {
-        let num_existing = self.parents.len();
-        self.parents.push(RefEquality(parent));
-        self.depths
-            .insert(self.parents[num_existing].clone(), num_existing);
-        if num_existing > 0 {
-            self.child_to_parent.insert(
-                self.parents[num_existing].clone(),
-                self.parents[num_existing - 1].clone(),
-            );
-        }
-    }
-
-    fn pop_parent(&mut self) {
-        self.parents.pop().expect("Attempted to pop without parent");
-    }
-
-    fn push_expr(&mut self, expr: &'a Expr) {
-        self.exprs.push(RefEquality(expr));
-    }
-
-    fn pop_expr(&mut self) {
-        self.exprs
-            .pop()
-            .expect("Attempted to pop without expression");
-    }
-
-    fn push_scope(&mut self, scope: Scope<'a>) {
-        self.scope_stack.push(self.scopes.len());
-        self.scopes.push(scope);
-    }
-
-    fn pop_scope(&mut self) {
-        self.dead_scopes.push((
-            self.scope_stack
-                .pop()
-                .expect("Attempted to pop without scope"),
-            self.scope_stack.clone(),
-        ));
-    }
-
-    fn bind_builtins(&mut self) {
-        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
-
-        for builtin in BUILTINS
-            .iter()
-            .chain(MAGIC_GLOBALS.iter())
-            .copied()
-            .chain(self.settings.builtins.iter().map(String::as_str))
-        {
-            let index = self.bindings.len();
-            self.bindings.push(Binding {
-                kind: BindingKind::Builtin,
-                range: Range::default(),
-                runtime_usage: None,
-                synthetic_usage: Some((0, Range::default())),
-                typing_usage: None,
-                source: None,
-                context: ExecutionContext::Runtime,
-            });
-            scope.bindings.insert(builtin, index);
-        }
-    }
-
-    /// Return the current `Stmt`.
-    pub fn current_stmt(&self) -> &RefEquality<'a, Stmt> {
-        self.parents.iter().rev().next().expect("No parent found")
-    }
-
-    /// Return the parent `Stmt` of the current `Stmt`, if any.
-    pub fn current_stmt_parent(&self) -> Option<&RefEquality<'a, Stmt>> {
-        self.parents.iter().rev().nth(1)
-    }
-
-    /// Return the parent `Expr` of the current `Expr`.
-    pub fn current_expr_parent(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().nth(1)
-    }
-
-    /// Return the grandparent `Expr` of the current `Expr`.
-    pub fn current_expr_grandparent(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().nth(2)
-    }
-
-    /// Return the `Stmt` that immediately follows the current `Stmt`, if any.
-    pub fn current_sibling_stmt(&self) -> Option<&'a Stmt> {
-        self.body.get(self.body_index + 1)
-    }
-
-    pub fn current_scope(&self) -> &Scope {
-        &self.scopes[*(self.scope_stack.last().expect("No current scope found"))]
-    }
-
-    pub fn current_scope_parent(&self) -> Option<&Scope> {
-        self.scope_stack
-            .iter()
-            .rev()
-            .nth(1)
-            .map(|index| &self.scopes[*index])
-    }
-
-    pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
-        self.scope_stack
-            .iter()
-            .rev()
-            .map(|index| &self.scopes[*index])
-    }
-
-    pub const fn in_exception_handler(&self) -> bool {
-        self.in_exception_handler
-    }
-
-    pub const fn execution_context(&self) -> ExecutionContext {
-        if self.in_type_checking_block
-            || self.in_annotation
-            || self.in_deferred_string_type_definition
-        {
-            ExecutionContext::Typing
-        } else {
-            ExecutionContext::Runtime
-        }
-    }
-
     fn add_binding<'b>(&mut self, name: &'b str, binding: Binding<'a>)
     where
         'b: 'a,
     {
-        let binding_index = self.bindings.len();
+        let binding_index = self.ctx.bindings.len();
 
         if let Some((stack_index, scope_index)) = self
+            .ctx
             .scope_stack
             .iter()
             .rev()
             .enumerate()
-            .find(|(_, scope_index)| self.scopes[**scope_index].bindings.contains_key(&name))
+            .find(|(_, scope_index)| self.ctx.scopes[**scope_index].bindings.contains_key(&name))
         {
-            let existing_binding_index = self.scopes[*scope_index].bindings.get(&name).unwrap();
-            let existing = &self.bindings[*existing_binding_index];
+            let existing_binding_index = self.ctx.scopes[*scope_index].bindings.get(&name).unwrap();
+            let existing = &self.ctx.bindings[*existing_binding_index];
             let in_current_scope = stack_index == 0;
             if !existing.kind.is_builtin()
                 && existing.source.as_ref().map_or(true, |left| {
@@ -4288,8 +4044,8 @@ impl<'a> Checker<'a> {
                         !branch_detection::different_forks(
                             left,
                             right,
-                            &self.depths,
-                            &self.child_to_parent,
+                            &self.ctx.depths,
+                            &self.ctx.child_to_parent,
                         )
                     })
                 })
@@ -4318,7 +4074,7 @@ impl<'a> Checker<'a> {
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
                         && !(existing.kind.is_function_definition()
                             && visibility::is_overload(
-                                self,
+                                &self.ctx,
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))
                     {
@@ -4341,7 +4097,8 @@ impl<'a> Checker<'a> {
                         }
                     }
                 } else if existing_is_import && binding.redefines(existing) {
-                    self.redefinitions
+                    self.ctx
+                        .redefinitions
                         .entry(*existing_binding_index)
                         .or_insert_with(Vec::new)
                         .push(binding_index);
@@ -4349,9 +4106,9 @@ impl<'a> Checker<'a> {
             }
         }
 
-        let scope = self.current_scope();
+        let scope = self.ctx.current_scope();
         let binding = if let Some(index) = scope.bindings.get(&name) {
-            let existing = &self.bindings[*index];
+            let existing = &self.ctx.bindings[*index];
             match &existing.kind {
                 BindingKind::Builtin => {
                     // Avoid overriding builtins.
@@ -4381,7 +4138,8 @@ impl<'a> Checker<'a> {
 
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
-        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
+        let scope =
+            &mut self.ctx.scopes[*(self.ctx.scope_stack.last().expect("No current scope found"))];
         if !(binding.kind.is_annotation() && scope.bindings.contains_key(name)) {
             if let Some(rebound_index) = scope.bindings.insert(name, binding_index) {
                 scope
@@ -4392,21 +4150,45 @@ impl<'a> Checker<'a> {
             }
         }
 
-        self.bindings.push(binding);
+        self.ctx.bindings.push(binding);
+    }
+
+    fn bind_builtins(&mut self) {
+        let scope =
+            &mut self.ctx.scopes[*(self.ctx.scope_stack.last().expect("No current scope found"))];
+
+        for builtin in BUILTINS
+            .iter()
+            .chain(MAGIC_GLOBALS.iter())
+            .copied()
+            .chain(self.settings.builtins.iter().map(String::as_str))
+        {
+            let index = self.ctx.bindings.len();
+            self.ctx.bindings.push(Binding {
+                kind: BindingKind::Builtin,
+                range: Range::default(),
+                runtime_usage: None,
+                synthetic_usage: Some((0, Range::default())),
+                typing_usage: None,
+                source: None,
+                context: ExecutionContext::Runtime,
+            });
+            scope.bindings.insert(builtin, index);
+        }
     }
 
     fn handle_node_load(&mut self, expr: &Expr) {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
-        let scope_id = self.current_scope().id;
+        let scope_id = self.ctx.current_scope().id;
 
         let mut first_iter = true;
         let mut in_generator = false;
         let mut import_starred = false;
 
-        for scope_index in self.scope_stack.iter().rev() {
-            let scope = &self.scopes[*scope_index];
+        for scope_index in self.ctx.scope_stack.iter().rev() {
+            let scope = &self.ctx.scopes[*scope_index];
 
             if matches!(scope.kind, ScopeKind::Class(_)) {
                 if id == "__class__" {
@@ -4418,12 +4200,12 @@ impl<'a> Checker<'a> {
 
             if let Some(index) = scope.bindings.get(&id.as_str()) {
                 // Mark the binding as used.
-                let context = self.execution_context();
-                self.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
+                let context = self.ctx.execution_context();
+                self.ctx.bindings[*index].mark_used(scope_id, Range::from_located(expr), context);
 
-                if self.bindings[*index].kind.is_annotation()
-                    && !self.in_deferred_string_type_definition
-                    && !self.in_deferred_type_definition
+                if self.ctx.bindings[*index].kind.is_annotation()
+                    && !self.ctx.in_deferred_string_type_definition
+                    && !self.ctx.in_deferred_type_definition
                 {
                     continue;
                 }
@@ -4436,7 +4218,7 @@ impl<'a> Checker<'a> {
                 //   import pyarrow as pa
                 //   import pyarrow.csv
                 //   print(pa.csv.read_csv("test.csv"))
-                match &self.bindings[*index].kind {
+                match &self.ctx.bindings[*index].kind {
                     BindingKind::Importation(name, full_name)
                     | BindingKind::SubmoduleImportation(name, full_name) => {
                         let has_alias = full_name
@@ -4447,7 +4229,7 @@ impl<'a> Checker<'a> {
                         if has_alias {
                             // Mark the sub-importation as used.
                             if let Some(index) = scope.bindings.get(full_name) {
-                                self.bindings[*index].mark_used(
+                                self.ctx.bindings[*index].mark_used(
                                     scope_id,
                                     Range::from_located(expr),
                                     context,
@@ -4464,7 +4246,7 @@ impl<'a> Checker<'a> {
                         if has_alias {
                             // Mark the sub-importation as used.
                             if let Some(index) = scope.bindings.get(full_name.as_str()) {
-                                self.bindings[*index].mark_used(
+                                self.ctx.bindings[*index].mark_used(
                                     scope_id,
                                     Range::from_located(expr),
                                     context,
@@ -4486,9 +4268,13 @@ impl<'a> Checker<'a> {
         if import_starred {
             if self.settings.rules.enabled(&Rule::ImportStarUsage) {
                 let mut from_list = vec![];
-                for scope_index in self.scope_stack.iter().rev() {
-                    let scope = &self.scopes[*scope_index];
-                    for binding in scope.bindings.values().map(|index| &self.bindings[*index]) {
+                for scope_index in self.ctx.scope_stack.iter().rev() {
+                    let scope = &self.ctx.scopes[*scope_index];
+                    for binding in scope
+                        .bindings
+                        .values()
+                        .map(|index| &self.ctx.bindings[*index])
+                    {
                         if let BindingKind::StarImportation(level, module) = &binding.kind {
                             from_list.push(helpers::format_import_from(
                                 level.as_ref(),
@@ -4518,13 +4304,14 @@ impl<'a> Checker<'a> {
 
             // Allow "__module__" and "__qualname__" in class scopes.
             if (id == "__module__" || id == "__qualname__")
-                && matches!(self.current_scope().kind, ScopeKind::Class(..))
+                && matches!(self.ctx.current_scope().kind, ScopeKind::Class(..))
             {
                 return;
             }
 
             // Avoid flagging if NameError is handled.
             if self
+                .ctx
                 .handled_exceptions
                 .iter()
                 .any(|handler_names| handler_names.contains(Exceptions::NAME_ERROR))
@@ -4543,15 +4330,17 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let parent = self.current_stmt().0;
+        let parent = self.ctx.current_stmt().0;
 
         if self.settings.rules.enabled(&Rule::UndefinedLocal) {
             let scopes: Vec<&Scope> = self
+                .ctx
                 .scope_stack
                 .iter()
-                .map(|index| &self.scopes[*index])
+                .map(|index| &self.ctx.scopes[*index])
                 .collect();
-            if let Some(diagnostic) = pyflakes::rules::undefined_local(id, &scopes, &self.bindings)
+            if let Some(diagnostic) =
+                pyflakes::rules::undefined_local(id, &scopes, &self.ctx.bindings)
             {
                 self.diagnostics.push(diagnostic);
             }
@@ -4562,13 +4351,14 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(&Rule::NonLowercaseVariableInFunction)
         {
-            if matches!(self.current_scope().kind, ScopeKind::Function(..)) {
+            if matches!(self.ctx.current_scope().kind, ScopeKind::Function(..)) {
                 // Ignore globals.
                 if !self
+                    .ctx
                     .current_scope()
                     .bindings
                     .get(id)
-                    .map_or(false, |index| self.bindings[*index].kind.is_global())
+                    .map_or(false, |index| self.ctx.bindings[*index].kind.is_global())
                 {
                     pep8_naming::rules::non_lowercase_variable_in_function(self, expr, parent, id);
                 }
@@ -4580,7 +4370,7 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(&Rule::MixedCaseVariableInClassScope)
         {
-            if matches!(self.current_scope().kind, ScopeKind::Class(..)) {
+            if matches!(self.ctx.current_scope().kind, ScopeKind::Class(..)) {
                 pep8_naming::rules::mixed_case_variable_in_class_scope(self, expr, parent, id);
             }
         }
@@ -4590,7 +4380,7 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(&Rule::MixedCaseVariableInGlobalScope)
         {
-            if matches!(self.current_scope().kind, ScopeKind::Module) {
+            if matches!(self.ctx.current_scope().kind, ScopeKind::Module) {
                 pep8_naming::rules::mixed_case_variable_in_global_scope(self, expr, parent, id);
             }
         }
@@ -4604,8 +4394,8 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: Range::from_located(expr),
-                    source: Some(self.current_stmt().clone()),
-                    context: self.execution_context(),
+                    source: Some(self.ctx.current_stmt().clone()),
+                    context: self.ctx.execution_context(),
                 },
             );
             return;
@@ -4624,8 +4414,8 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: Range::from_located(expr),
-                    source: Some(self.current_stmt().clone()),
-                    context: self.execution_context(),
+                    source: Some(self.ctx.current_stmt().clone()),
+                    context: self.ctx.execution_context(),
                 },
             );
             return;
@@ -4640,14 +4430,14 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: Range::from_located(expr),
-                    source: Some(self.current_stmt().clone()),
-                    context: self.execution_context(),
+                    source: Some(self.ctx.current_stmt().clone()),
+                    context: self.ctx.execution_context(),
                 },
             );
             return;
         }
 
-        let current = self.current_scope();
+        let current = self.ctx.current_scope();
         if id == "__all__"
             && matches!(current.kind, ScopeKind::Module)
             && matches!(
@@ -4681,7 +4471,7 @@ impl<'a> Checker<'a> {
                 }
                 _ => false,
             } {
-                let (all_names, all_names_flags) = extract_all_names(self, parent, current);
+                let (all_names, all_names_flags) = extract_all_names(&self.ctx, parent, current);
 
                 if self.settings.rules.enabled(&Rule::InvalidAllFormat) {
                     if matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT) {
@@ -4705,8 +4495,8 @@ impl<'a> Checker<'a> {
                         synthetic_usage: None,
                         typing_usage: None,
                         range: Range::from_located(expr),
-                        source: Some(self.current_stmt().clone()),
-                        context: self.execution_context(),
+                        source: Some(self.ctx.current_stmt().clone()),
+                        context: self.ctx.execution_context(),
                     },
                 );
                 return;
@@ -4721,8 +4511,8 @@ impl<'a> Checker<'a> {
                 synthetic_usage: None,
                 typing_usage: None,
                 range: Range::from_located(expr),
-                source: Some(self.current_stmt().clone()),
-                context: self.execution_context(),
+                source: Some(self.ctx.current_stmt().clone()),
+                context: self.ctx.execution_context(),
             },
         );
     }
@@ -4734,13 +4524,12 @@ impl<'a> Checker<'a> {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
-        if operations::on_conditional_branch(
-            &mut self.parents.iter().rev().map(std::convert::Into::into),
-        ) {
+        if operations::on_conditional_branch(&mut self.ctx.parents.iter().rev().map(Into::into)) {
             return;
         }
 
-        let scope = &mut self.scopes[*(self.scope_stack.last().expect("No current scope found"))];
+        let scope =
+            &mut self.ctx.scopes[*(self.ctx.scope_stack.last().expect("No current scope found"))];
         if scope.bindings.remove(&id.as_str()).is_some() {
             return;
         }
@@ -4764,7 +4553,7 @@ impl<'a> Checker<'a> {
             flake8_bugbear::rules::f_string_docstring(self, python_ast);
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);
-        self.definitions.push((
+        self.deferred.definitions.push((
             Definition {
                 kind: if self.path.ends_with("__init__.py") {
                     DefinitionKind::Package
@@ -4773,26 +4562,26 @@ impl<'a> Checker<'a> {
                 },
                 docstring,
             },
-            self.visible_scope.visibility.clone(),
-            (self.scope_stack.clone(), self.parents.clone()),
+            self.ctx.visible_scope.visibility.clone(),
+            (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
         ));
         docstring.is_some()
     }
 
     fn check_deferred_type_definitions(&mut self) {
-        self.deferred_type_definitions.reverse();
+        self.deferred.type_definitions.reverse();
         while let Some((expr, (in_annotation, in_type_checking_block), (scopes, parents))) =
-            self.deferred_type_definitions.pop()
+            self.deferred.type_definitions.pop()
         {
-            self.scope_stack = scopes;
-            self.parents = parents;
-            self.in_annotation = in_annotation;
-            self.in_type_checking_block = in_type_checking_block;
-            self.in_type_definition = true;
-            self.in_deferred_type_definition = true;
+            self.ctx.scope_stack = scopes;
+            self.ctx.parents = parents;
+            self.ctx.in_annotation = in_annotation;
+            self.ctx.in_type_checking_block = in_type_checking_block;
+            self.ctx.in_type_definition = true;
+            self.ctx.in_deferred_type_definition = true;
             self.visit_expr(expr);
-            self.in_deferred_type_definition = false;
-            self.in_type_definition = false;
+            self.ctx.in_deferred_type_definition = false;
+            self.ctx.in_type_definition = false;
         }
     }
 
@@ -4801,12 +4590,12 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         let mut stacks = vec![];
-        self.deferred_string_type_definitions.reverse();
+        self.deferred.string_type_definitions.reverse();
         while let Some((range, expression, (in_annotation, in_type_checking_block), deferral)) =
-            self.deferred_string_type_definitions.pop()
+            self.deferred.string_type_definitions.pop()
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
-                if in_annotation && self.annotations_future_enabled {
+                if in_annotation && self.ctx.annotations_future_enabled {
                     if self.settings.rules.enabled(&Rule::QuotedAnnotation) {
                         pyupgrade::rules::quoted_annotation(self, expression, range);
                     }
@@ -4832,24 +4621,24 @@ impl<'a> Checker<'a> {
         for (expr, ((in_annotation, in_type_checking_block), (scopes, parents))) in
             allocator.iter().zip(stacks)
         {
-            self.scope_stack = scopes;
-            self.parents = parents;
-            self.in_annotation = in_annotation;
-            self.in_type_checking_block = in_type_checking_block;
-            self.in_type_definition = true;
-            self.in_deferred_string_type_definition = true;
+            self.ctx.scope_stack = scopes;
+            self.ctx.parents = parents;
+            self.ctx.in_annotation = in_annotation;
+            self.ctx.in_type_checking_block = in_type_checking_block;
+            self.ctx.in_type_definition = true;
+            self.ctx.in_deferred_string_type_definition = true;
             self.visit_expr(expr);
-            self.in_deferred_string_type_definition = false;
-            self.in_type_definition = false;
+            self.ctx.in_deferred_string_type_definition = false;
+            self.ctx.in_type_definition = false;
         }
     }
 
     fn check_deferred_functions(&mut self) {
-        self.deferred_functions.reverse();
-        while let Some((stmt, (scopes, parents), visibility)) = self.deferred_functions.pop() {
-            self.scope_stack = scopes.clone();
-            self.parents = parents.clone();
-            self.visible_scope = visibility;
+        self.deferred.functions.reverse();
+        while let Some((stmt, (scopes, parents), visibility)) = self.deferred.functions.pop() {
+            self.ctx.scope_stack = scopes.clone();
+            self.ctx.parents = parents.clone();
+            self.ctx.visible_scope = visibility;
 
             match &stmt.node {
                 StmtKind::FunctionDef { body, args, .. }
@@ -4860,15 +4649,15 @@ impl<'a> Checker<'a> {
                 _ => unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef"),
             }
 
-            self.deferred_assignments.push((scopes, parents));
+            self.deferred.assignments.push((scopes, parents));
         }
     }
 
     fn check_deferred_lambdas(&mut self) {
-        self.deferred_lambdas.reverse();
-        while let Some((expr, (scopes, parents))) = self.deferred_lambdas.pop() {
-            self.scope_stack = scopes.clone();
-            self.parents = parents.clone();
+        self.deferred.lambdas.reverse();
+        while let Some((expr, (scopes, parents))) = self.deferred.lambdas.pop() {
+            self.ctx.scope_stack = scopes.clone();
+            self.ctx.parents = parents.clone();
 
             if let ExprKind::Lambda { args, body } = &expr.node {
                 self.visit_arguments(args);
@@ -4877,13 +4666,13 @@ impl<'a> Checker<'a> {
                 unreachable!("Expected ExprKind::Lambda");
             }
 
-            self.deferred_assignments.push((scopes, parents));
+            self.deferred.assignments.push((scopes, parents));
         }
     }
 
     fn check_deferred_assignments(&mut self) {
-        self.deferred_assignments.reverse();
-        while let Some((scopes, ..)) = self.deferred_assignments.pop() {
+        self.deferred.assignments.reverse();
+        while let Some((scopes, ..)) = self.deferred.assignments.pop() {
             let scope_index = scopes[scopes.len() - 1];
             let parent_scope_index = scopes[scopes.len() - 2];
             if self.settings.rules.enabled(&Rule::UnusedVariable) {
@@ -4907,19 +4696,19 @@ impl<'a> Checker<'a> {
                 self.diagnostics
                     .extend(flake8_unused_arguments::rules::unused_arguments(
                         self,
-                        &self.scopes[parent_scope_index],
-                        &self.scopes[scope_index],
-                        &self.bindings,
+                        &self.ctx.scopes[parent_scope_index],
+                        &self.ctx.scopes[scope_index],
+                        &self.ctx.bindings,
                     ));
             }
         }
     }
 
     fn check_deferred_for_loops(&mut self) {
-        self.deferred_for_loops.reverse();
-        while let Some((stmt, (scopes, parents))) = self.deferred_for_loops.pop() {
-            self.scope_stack = scopes.clone();
-            self.parents = parents.clone();
+        self.deferred.for_loops.reverse();
+        while let Some((stmt, (scopes, parents))) = self.deferred.for_loops.pop() {
+            self.ctx.scope_stack = scopes.clone();
+            self.ctx.parents = parents.clone();
 
             if let StmtKind::For { target, body, .. } | StmtKind::AsyncFor { target, body, .. } =
                 &stmt.node
@@ -4967,11 +4756,11 @@ impl<'a> Checker<'a> {
         }
 
         // Mark anything referenced in `__all__` as used.
-        let global_scope = &self.scopes[GLOBAL_SCOPE_INDEX];
+        let global_scope = &self.ctx.scopes[GLOBAL_SCOPE_INDEX];
         let all_names: Option<(&Vec<String>, Range)> = global_scope
             .bindings
             .get("__all__")
-            .map(|index| &self.bindings[*index])
+            .map(|index| &self.ctx.bindings[*index])
             .and_then(|binding| match &binding.kind {
                 BindingKind::Export(names) => Some((names, binding.range)),
                 _ => None,
@@ -4987,7 +4776,7 @@ impl<'a> Checker<'a> {
         });
         if let Some((bindings, range)) = all_bindings {
             for index in bindings {
-                self.bindings[index].mark_used(
+                self.ctx.bindings[index].mark_used(
                     GLOBAL_SCOPE_INDEX,
                     range,
                     ExecutionContext::Runtime,
@@ -4999,7 +4788,7 @@ impl<'a> Checker<'a> {
         let all_names: Option<(Vec<&str>, Range)> = global_scope
             .bindings
             .get("__all__")
-            .map(|index| &self.bindings[*index])
+            .map(|index| &self.ctx.bindings[*index])
             .and_then(|binding| match &binding.kind {
                 BindingKind::Export(names) => {
                     Some((names.iter().map(String::as_str).collect(), binding.range))
@@ -5030,13 +4819,14 @@ impl<'a> Checker<'a> {
                     .rules
                     .enabled(&Rule::TypingOnlyStandardLibraryImport)
             {
-                self.scopes
+                self.ctx
+                    .scopes
                     .iter()
                     .map(|scope| {
                         scope
                             .bindings
                             .values()
-                            .map(|index| &self.bindings[*index])
+                            .map(|index| &self.ctx.bindings[*index])
                             .filter(|binding| {
                                 flake8_type_checking::helpers::is_valid_runtime_import(binding)
                             })
@@ -5049,8 +4839,8 @@ impl<'a> Checker<'a> {
         };
 
         let mut diagnostics: Vec<Diagnostic> = vec![];
-        for (index, stack) in self.dead_scopes.iter().rev() {
-            let scope = &self.scopes[*index];
+        for (index, stack) in self.ctx.dead_scopes.iter().rev() {
+            let scope = &self.ctx.scopes[*index];
 
             // F822
             if *index == GLOBAL_SCOPE_INDEX {
@@ -5070,7 +4860,7 @@ impl<'a> Checker<'a> {
                 .enabled(&Rule::GlobalVariableNotAssigned)
             {
                 for (name, index) in &scope.bindings {
-                    let binding = &self.bindings[*index];
+                    let binding = &self.ctx.bindings[*index];
                     if binding.kind.is_global() {
                         if let Some(stmt) = &binding.source {
                             if matches!(stmt.node, StmtKind::Global { .. }) {
@@ -5096,7 +4886,7 @@ impl<'a> Checker<'a> {
             // the bindings are in different scopes.
             if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
                 for (name, index) in &scope.bindings {
-                    let binding = &self.bindings[*index];
+                    let binding = &self.ctx.bindings[*index];
 
                     if matches!(
                         binding.kind,
@@ -5110,9 +4900,9 @@ impl<'a> Checker<'a> {
                             continue;
                         }
 
-                        if let Some(indices) = self.redefinitions.get(index) {
+                        if let Some(indices) = self.ctx.redefinitions.get(index) {
                             for index in indices {
-                                let rebound = &self.bindings[*index];
+                                let rebound = &self.ctx.bindings[*index];
                                 let mut diagnostic = Diagnostic::new(
                                     pyflakes::rules::RedefinedWhileUnused {
                                         name: (*name).to_string(),
@@ -5138,7 +4928,11 @@ impl<'a> Checker<'a> {
                 if scope.import_starred {
                     if let Some((names, range)) = &all_names {
                         let mut from_list = vec![];
-                        for binding in scope.bindings.values().map(|index| &self.bindings[*index]) {
+                        for binding in scope
+                            .bindings
+                            .values()
+                            .map(|index| &self.ctx.bindings[*index])
+                        {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
@@ -5191,7 +4985,7 @@ impl<'a> Checker<'a> {
                         .collect()
                 };
                 for (.., index) in &scope.bindings {
-                    let binding = &self.bindings[*index];
+                    let binding = &self.ctx.bindings[*index];
 
                     if let Some(diagnostic) =
                         flake8_type_checking::rules::runtime_import_in_type_checking_block(binding)
@@ -5225,7 +5019,7 @@ impl<'a> Checker<'a> {
                     FxHashMap::default();
 
                 for index in scope.bindings.values() {
-                    let binding = &self.bindings[*index];
+                    let binding = &self.ctx.bindings[*index];
 
                     let full_name = match &binding.kind {
                         BindingKind::Importation(.., full_name) => full_name,
@@ -5239,7 +5033,7 @@ impl<'a> Checker<'a> {
                     }
 
                     let defined_by = binding.source.as_ref().unwrap();
-                    let defined_in = self.child_to_parent.get(defined_by);
+                    let defined_in = self.ctx.child_to_parent.get(defined_by);
                     let child: &Stmt = defined_by.into();
 
                     let diagnostic_lineno = binding.range.location.row();
@@ -5275,14 +5069,10 @@ impl<'a> Checker<'a> {
                     .sorted_by_key(|((defined_by, _), _)| defined_by.location)
                 {
                     let child: &Stmt = defined_by.into();
-                    let parent: Option<&Stmt> = defined_in.map(std::convert::Into::into);
+                    let parent: Option<&Stmt> = defined_in.map(Into::into);
 
                     let fix = if !ignore_init && self.patch(&Rule::UnusedImport) {
-                        let deleted: Vec<&Stmt> = self
-                            .deletions
-                            .iter()
-                            .map(std::convert::Into::into)
-                            .collect();
+                        let deleted: Vec<&Stmt> = self.deletions.iter().map(Into::into).collect();
                         match autofix::helpers::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
                             child,
@@ -5467,10 +5257,12 @@ impl<'a> Checker<'a> {
             || self.settings.rules.enabled(&Rule::EmptyDocstring);
 
         let mut overloaded_name: Option<String> = None;
-        self.definitions.reverse();
-        while let Some((definition, visibility, (scopes, parents))) = self.definitions.pop() {
-            self.scope_stack = scopes.clone();
-            self.parents = parents.clone();
+        self.deferred.definitions.reverse();
+        while let Some((definition, visibility, (scopes, parents))) =
+            self.deferred.definitions.pop()
+        {
+            self.ctx.scope_stack = scopes.clone();
+            self.ctx.parents = parents.clone();
 
             // flake8-annotations
             if enforce_annotations {
@@ -5598,7 +5390,11 @@ impl<'a> Checker<'a> {
                     pydocstyle::rules::ends_with_period(self, &docstring);
                 }
                 if self.settings.rules.enabled(&Rule::NonImperativeMood) {
-                    pydocstyle::rules::non_imperative_mood(self, &docstring);
+                    pydocstyle::rules::non_imperative_mood(
+                        self,
+                        &docstring,
+                        &self.settings.pydocstyle.property_decorators,
+                    );
                 }
                 if self.settings.rules.enabled(&Rule::NoSignature) {
                     pydocstyle::rules::no_signature(self, &docstring);
@@ -5663,7 +5459,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_shadowing<T>(&mut self, name: &str, located: &Located<T>, is_attribute: bool) {
-        if is_attribute && matches!(self.current_scope().kind, ScopeKind::Class(_)) {
+        if is_attribute && matches!(self.ctx.current_scope().kind, ScopeKind::Class(_)) {
             if self
                 .settings
                 .rules
@@ -5731,7 +5527,7 @@ pub fn check_ast(
         stylist,
         indexer,
     );
-    checker.push_scope(Scope::new(ScopeKind::Module));
+    checker.ctx.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 
     // Check for module docstring.
@@ -5756,8 +5552,8 @@ pub fn check_ast(
     checker.check_definitions();
 
     // Reset the scope to module-level, and check all consumed scopes.
-    checker.scope_stack = vec![GLOBAL_SCOPE_INDEX];
-    checker.pop_scope();
+    checker.ctx.scope_stack = vec![GLOBAL_SCOPE_INDEX];
+    checker.ctx.pop_scope();
     checker.check_dead_scopes();
 
     checker.diagnostics

@@ -33,6 +33,7 @@ impl AlwaysAutofixableViolation for DeprecatedCollectionType {
 /// UP006
 pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
     if let Some(binding) = checker
+        .ctx
         .resolve_call_path(expr)
         .and_then(|call_path| call_path.last().copied())
     {
@@ -44,7 +45,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
         );
         if checker.patch(diagnostic.kind.rule()) {
             let binding = binding.to_lowercase();
-            if checker.is_builtin(&binding) {
+            if checker.ctx.is_builtin(&binding) {
                 diagnostic.amend(Fix::replacement(
                     binding,
                     expr.location,

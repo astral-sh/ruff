@@ -25,7 +25,7 @@ pub fn zip_without_explicit_strict(
 ) {
     if let ExprKind::Name { id, .. } = &func.node {
         if id == "zip"
-            && checker.is_builtin("zip")
+            && checker.ctx.is_builtin("zip")
             && !kwargs.iter().any(|keyword| {
                 keyword
                     .node

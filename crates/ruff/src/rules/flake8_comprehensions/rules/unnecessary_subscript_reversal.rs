@@ -37,7 +37,7 @@ pub fn unnecessary_subscript_reversal(
     if !(id == "set" || id == "sorted" || id == "reversed") {
         return;
     }
-    if !checker.is_builtin(id) {
+    if !checker.ctx.is_builtin(id) {
         return;
     }
     let ExprKind::Subscript { slice, .. } = &first_arg.node else {

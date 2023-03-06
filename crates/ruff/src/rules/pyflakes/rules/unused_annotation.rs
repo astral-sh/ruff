@@ -19,11 +19,11 @@ impl Violation for UnusedAnnotation {
 
 /// F842
 pub fn unused_annotation(checker: &mut Checker, scope: usize) {
-    let scope = &checker.scopes[scope];
+    let scope = &checker.ctx.scopes[scope];
     for (name, binding) in scope
         .bindings
         .iter()
-        .map(|(name, index)| (name, &checker.bindings[*index]))
+        .map(|(name, index)| (name, &checker.ctx.bindings[*index]))
     {
         if !binding.used()
             && binding.kind.is_annotation()

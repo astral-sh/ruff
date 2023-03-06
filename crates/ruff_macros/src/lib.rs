@@ -1,8 +1,10 @@
 //! This crate implements internal macros for the `ruff` library.
 
+use crate::cache_key::derive_cache_key;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput, ItemFn};
 
+mod cache_key;
 mod config;
 mod define_violation;
 mod derive_message_formats;
@@ -18,6 +20,16 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
     config::derive_impl(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
+}
+
+#[proc_macro_derive(CacheKey)]
+pub fn cache_key(input: TokenStream) -> TokenStream {
+    let item = parse_macro_input!(input as DeriveInput);
+
+    let result = derive_cache_key(&item);
+    let stream = result.unwrap_or_else(|err| err.to_compile_error());
+
+    TokenStream::from(stream)
 }
 
 #[proc_macro]

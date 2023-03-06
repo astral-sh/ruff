@@ -19,15 +19,18 @@ impl Violation for CachedInstanceMethod {
 }
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
-    checker.resolve_call_path(expr).map_or(false, |call_path| {
-        call_path.as_slice() == ["functools", "lru_cache"]
-            || call_path.as_slice() == ["functools", "cache"]
-    })
+    checker
+        .ctx
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["functools", "lru_cache"]
+                || call_path.as_slice() == ["functools", "cache"]
+        })
 }
 
 /// B019
 pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
-    if !matches!(checker.current_scope().kind, ScopeKind::Class(_)) {
+    if !matches!(checker.ctx.current_scope().kind, ScopeKind::Class(_)) {
         return;
     }
     for decorator in decorator_list {

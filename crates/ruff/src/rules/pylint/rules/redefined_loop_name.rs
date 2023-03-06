@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::{fmt, iter};
 
 use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind, Withitem};
@@ -12,7 +13,6 @@ use crate::ast::visitor;
 use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
-use crate::settings::hashable::HashableRegex;
 use crate::violation::Violation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
@@ -142,7 +142,7 @@ struct ExprWithInnerBindingKind<'a> {
 }
 
 struct InnerForWithAssignTargetsVisitor<'a> {
-    dummy_variable_rgx: &'a HashableRegex,
+    dummy_variable_rgx: &'a Regex,
     assignment_targets: Vec<ExprWithInnerBindingKind<'a>>,
 }
 
@@ -213,7 +213,7 @@ where
 
 fn assignment_targets_from_expr<'a, U>(
     expr: &'a Expr<U>,
-    dummy_variable_rgx: &'a HashableRegex,
+    dummy_variable_rgx: &'a Regex,
 ) -> Box<dyn Iterator<Item = &'a Expr<U>> + 'a> {
     // The Box is necessary to ensure the match arms have the same return type - we can't use
     // a cast to "impl Iterator", since at the time of writing that is only allowed for
@@ -266,7 +266,7 @@ fn assignment_targets_from_expr<'a, U>(
 
 fn assignment_targets_from_with_items<'a, U>(
     items: &'a [Withitem<U>],
-    dummy_variable_rgx: &'a HashableRegex,
+    dummy_variable_rgx: &'a Regex,
 ) -> impl Iterator<Item = &'a Expr<U>> + 'a {
     items
         .iter()
@@ -280,7 +280,7 @@ fn assignment_targets_from_with_items<'a, U>(
 
 fn assignment_targets_from_assign_targets<'a, U>(
     targets: &'a [Expr<U>],
-    dummy_variable_rgx: &'a HashableRegex,
+    dummy_variable_rgx: &'a Regex,
 ) -> impl Iterator<Item = &'a Expr<U>> + 'a {
     targets
         .iter()

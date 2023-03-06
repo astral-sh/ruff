@@ -73,7 +73,7 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };
-        if !checker.is_builtin(id) {
+        if !checker.ctx.is_builtin(id) {
             return;
         };
         if let Some(types) = args.get(1) {

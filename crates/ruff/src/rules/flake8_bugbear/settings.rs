@@ -1,6 +1,6 @@
 //! Settings for the `flake8-bugbear` plugin.
 
-use ruff_macros::ConfigurationOptions;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +26,7 @@ pub struct Options {
     pub extend_immutable_calls: Option<Vec<String>>,
 }
 
-#[derive(Debug, Default, Hash)]
+#[derive(Debug, Default, CacheKey)]
 pub struct Settings {
     pub extend_immutable_calls: Vec<String>,
 }

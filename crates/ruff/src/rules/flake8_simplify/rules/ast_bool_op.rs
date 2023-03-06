@@ -172,7 +172,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if func_name != "isinstance" {
             continue;
         }
-        if !checker.is_builtin("isinstance") {
+        if !checker.ctx.is_builtin("isinstance") {
             continue;
         }
 
@@ -313,7 +313,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
         if comparators
             .iter()
-            .any(|expr| contains_effect(checker, expr))
+            .any(|expr| contains_effect(&checker.ctx, expr))
         {
             continue;
         }
@@ -395,7 +395,7 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(checker, expr) {
+    if contains_effect(&checker.ctx, expr) {
         return;
     }
 
@@ -449,7 +449,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(checker, expr) {
+    if contains_effect(&checker.ctx, expr) {
         return;
     }
 
@@ -480,7 +480,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
         return;
     };
-    if contains_effect(checker, expr) {
+    if contains_effect(&checker.ctx, expr) {
         return;
     }
     for value in values {
@@ -507,7 +507,7 @@ pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
         return;
     };
-    if contains_effect(checker, expr) {
+    if contains_effect(&checker.ctx, expr) {
         return;
     }
     for value in values {

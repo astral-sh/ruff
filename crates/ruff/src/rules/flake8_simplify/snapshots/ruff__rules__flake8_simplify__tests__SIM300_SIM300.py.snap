@@ -130,110 +130,146 @@ expression: diagnostics
   parent: ~
 - kind:
     YodaConditions:
-      suggestion: age == YODA
+      suggestion: age < -42
   location:
     row: 9
     column: 0
   end_location:
     row: 9
-    column: 11
+    column: 9
   fix:
-    content: age == YODA
+    content: age < -42
     location:
       row: 9
       column: 0
     end_location:
       row: 9
+      column: 9
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age < +42
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 9
+  fix:
+    content: age < +42
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 9
+  parent: ~
+- kind:
+    YodaConditions:
+      suggestion: age == YODA
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 11
+  fix:
+    content: age == YODA
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
       column: 11
   parent: ~
 - kind:
     YodaConditions:
       suggestion: age < YODA
   location:
-    row: 10
+    row: 12
     column: 0
   end_location:
-    row: 10
+    row: 12
     column: 10
   fix:
     content: age < YODA
     location:
-      row: 10
+      row: 12
       column: 0
     end_location:
-      row: 10
+      row: 12
       column: 10
   parent: ~
 - kind:
     YodaConditions:
       suggestion: age <= YODA
   location:
-    row: 11
+    row: 13
     column: 0
   end_location:
-    row: 11
+    row: 13
     column: 11
   fix:
     content: age <= YODA
     location:
-      row: 11
+      row: 13
       column: 0
     end_location:
-      row: 11
+      row: 13
       column: 11
   parent: ~
 - kind:
     YodaConditions:
       suggestion: age == JediOrder.YODA
   location:
-    row: 12
+    row: 14
     column: 0
   end_location:
-    row: 12
+    row: 14
     column: 21
   fix:
     content: age == JediOrder.YODA
     location:
-      row: 12
+      row: 14
       column: 0
     end_location:
-      row: 12
+      row: 14
       column: 21
   parent: ~
 - kind:
     YodaConditions:
       suggestion: (number - 100) > 0
   location:
-    row: 13
+    row: 15
     column: 0
   end_location:
-    row: 13
+    row: 15
     column: 18
   fix:
     content: (number - 100) > 0
     location:
-      row: 13
+      row: 15
       column: 0
     end_location:
-      row: 13
+      row: 15
       column: 18
   parent: ~
 - kind:
     YodaConditions:
       suggestion: (60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE
   location:
-    row: 14
+    row: 16
     column: 0
   end_location:
-    row: 14
+    row: 16
     column: 52
   fix:
     content: (60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE
     location:
-      row: 14
+      row: 16
       column: 0
     end_location:
-      row: 14
+      row: 16
       column: 52
   parent: ~
 

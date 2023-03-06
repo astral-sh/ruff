@@ -85,6 +85,7 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::Settings {
                 flake8_type_checking: super::settings::Settings {
+                    runtime_evaluated_baseclasses: vec!["pydantic.BaseModel".to_string()],
                     ..Default::default()
                 },
                 ..settings::Settings::for_rule(rule_code)

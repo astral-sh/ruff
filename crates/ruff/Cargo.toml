@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.253"
+version = "0.0.254"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -19,61 +19,64 @@ doctest = false
 ruff_macros = { path = "../ruff_macros" }
 ruff_python = { path = "../ruff_python" }
 ruff_rustpython = { path = "../ruff_rustpython" }
+ruff_cache = { path = "../ruff_cache" }
 
 anyhow = { workspace = true }
 bisection = { version = "0.1.0" }
-bitflags = { version = "1.3.2" }
+bitflags = { workspace = true }
 cfg-if = { version = "1.0.0" }
-chrono = { version = "0.4.21", default-features = false, features = ["clock"] }
+chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "env", "string"] }
-colored = { version = "2.0.0" }
+colored = { workspace = true }
 derivative = { version = "2.2.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
-glob = { version = "0.3.0" }
-globset = { version = "0.4.9" }
-ignore = { version = "0.4.18" }
-imperative = { version = "1.0.3" }
+glob = { workspace = true }
+globset = { workspace = true }
+ignore = { workspace = true }
+imperative = { version = "1.0.4" }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
-log = { version = "0.4.17" }
+log = { workspace = true }
 natord = { version = "1.0.9" }
 nohash-hasher = { version = "0.2.0" }
 num-bigint = { version = "0.4.3" }
-num-traits = "0.2.15"
+num-traits = { version = "0.2.15" }
 once_cell = { workspace = true }
-path-absolutize = { version = "3.0.14", features = ["once_cell_cache", "use_unix_paths_on_wasm"] }
+path-absolutize = { workspace = true, features = [
+  "once_cell_cache",
+  "use_unix_paths_on_wasm",
+] }
 regex = { workspace = true }
-result-like = "0.4.6"
+result-like = { version = "0.4.6" }
 rustc-hash = { workspace = true }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
 schemars = { workspace = true }
 semver = { version = "1.0.16" }
 serde = { workspace = true }
-shellexpand = { version = "3.0.0" }
+shellexpand = { workspace = true }
 smallvec = { version = "1.10.0" }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-textwrap = { version = "0.16.0" }
-thiserror = { version = "1.0" }
-titlecase = { version = "2.2.1" }
+textwrap = { workspace = true }
+thiserror = { version = "1.0.38" }
 toml = { workspace = true }
 
 # https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
-getrandom = { version = "0.2.7", features = ["js"] }
+getrandom = { version = "0.2.8", features = ["js"] }
 console_error_panic_hook = { version = "0.1.7" }
-console_log = { version = "0.2.0" }
-serde-wasm-bindgen = { version = "0.4" }
-js-sys = { version = "0.3.60" }
-wasm-bindgen = { version = "0.2.83" }
+console_log = { version = "0.2.1" }
+serde-wasm-bindgen = { version = "0.4.5" }
+js-sys = { version = "0.3.61" }
+wasm-bindgen = { version = "0.2.84" }
 
 [dev-dependencies]
-insta = { version = "1.19.0", features = ["yaml", "redactions"] }
-test-case = { version = "2.2.2" }
-wasm-bindgen-test = { version = "0.3.33" }
+insta = { workspace = true, features = ["yaml", "redactions"] }
+test-case = { workspace = true }
+wasm-bindgen-test = { version = "0.3.34" }
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 criterion = { version = "0.4.0" }

@@ -21,6 +21,7 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::{add_noqa, rule_is_ignored};
 use crate::registry::{Diagnostic, Rule};
+use crate::resolver::is_interface_definition_path;
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
@@ -83,7 +84,14 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
-        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
+        let is_interface_definition = is_interface_definition_path(path);
+        diagnostics.extend(check_tokens(
+            locator,
+            &tokens,
+            settings,
+            autofix,
+            is_interface_definition,
+        ));
     }
 
     // Run the filesystem-based rules.
@@ -101,7 +109,13 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
-        diagnostics.extend(check_logical_lines(&tokens, locator, stylist, settings));
+        diagnostics.extend(check_logical_lines(
+            &tokens,
+            locator,
+            stylist,
+            settings,
+            flags::Autofix::Enabled,
+        ));
     }
 
     // Run the AST-based rules.

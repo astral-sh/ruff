@@ -88,12 +88,12 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     if !matches!(&ops[..], [Cmpop::Eq]) {
         return;
     }
-    if is_exception_check(checker.current_stmt()) {
+    if is_exception_check(checker.ctx.current_stmt()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.current_scope().kind {
+    if let ScopeKind::Function(def) = &checker.ctx.current_scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }
@@ -139,12 +139,12 @@ pub fn negation_with_not_equal_op(
     if !matches!(&ops[..], [Cmpop::NotEq]) {
         return;
     }
-    if is_exception_check(checker.current_stmt()) {
+    if is_exception_check(checker.ctx.current_stmt()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.current_scope().kind {
+    if let ScopeKind::Function(def) = &checker.ctx.current_scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }

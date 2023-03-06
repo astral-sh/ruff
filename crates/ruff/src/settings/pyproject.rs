@@ -369,25 +369,9 @@ other-attribute = 1
                     max_complexity: Some(10),
                 }),
                 pep8_naming: Some(pep8_naming::settings::Options {
-                    ignore_names: Some(vec![
-                        "setUp".to_string(),
-                        "tearDown".to_string(),
-                        "setUpClass".to_string(),
-                        "tearDownClass".to_string(),
-                        "setUpModule".to_string(),
-                        "tearDownModule".to_string(),
-                        "asyncSetUp".to_string(),
-                        "asyncTearDown".to_string(),
-                        "setUpTestData".to_string(),
-                        "failureException".to_string(),
-                        "longMessage".to_string(),
-                        "maxDiff".to_string(),
-                    ]),
-                    classmethod_decorators: Some(vec![
-                        "classmethod".to_string(),
-                        "pydantic.validator".to_string()
-                    ]),
-                    staticmethod_decorators: Some(vec!["staticmethod".to_string()]),
+                    ignore_names: None,
+                    classmethod_decorators: Some(vec!["pydantic.validator".to_string()]),
+                    staticmethod_decorators: None,
                 }),
                 ..Options::default()
             }

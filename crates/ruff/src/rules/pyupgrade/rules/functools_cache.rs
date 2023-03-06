@@ -36,9 +36,12 @@ pub fn functools_cache(checker: &mut Checker, decorator_list: &[Expr]) {
         // Look for, e.g., `import functools; @functools.lru_cache(maxsize=None)`.
         if args.is_empty()
             && keywords.len() == 1
-            && checker.resolve_call_path(func).map_or(false, |call_path| {
-                call_path.as_slice() == ["functools", "lru_cache"]
-            })
+            && checker
+                .ctx
+                .resolve_call_path(func)
+                .map_or(false, |call_path| {
+                    call_path.as_slice() == ["functools", "lru_cache"]
+                })
         {
             let KeywordData { arg, value } = &keywords[0].node;
             if arg.as_ref().map_or(false, |arg| arg == "maxsize")

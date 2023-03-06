@@ -478,21 +478,4 @@ expression: diagnostics
       row: 67
       column: 49
   parent: ~
-- kind:
-    QuotedAnnotation: ~
-  location:
-    row: 69
-    column: 14
-  end_location:
-    row: 69
-    column: 17
-  fix:
-    content: X
-    location:
-      row: 69
-      column: 14
-    end_location:
-      row: 69
-      column: 17
-  parent: ~
 

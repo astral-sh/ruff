@@ -107,6 +107,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
         }
         ExprKind::Call { func, keywords, .. } => {
             if checker
+                .ctx
                 .resolve_call_path(func)
                 .map_or(false, |call_path| call_path.as_slice() == ["", "dict"])
             {
@@ -180,7 +181,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                     .rules
                     .enabled(&Rule::LoggingRedundantExcInfo)
             {
-                if !checker.in_exception_handler() {
+                if !checker.ctx.in_exception_handler() {
                     return;
                 }
                 if let Some(exc_info) = find_keyword(keywords, "exc_info") {
@@ -193,9 +194,12 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                             ..
                         }
                     ) || if let ExprKind::Call { func, .. } = &exc_info.node.value.node {
-                        checker.resolve_call_path(func).map_or(false, |call_path| {
-                            call_path.as_slice() == ["sys", "exc_info"]
-                        })
+                        checker
+                            .ctx
+                            .resolve_call_path(func)
+                            .map_or(false, |call_path| {
+                                call_path.as_slice() == ["sys", "exc_info"]
+                            })
                     } else {
                         false
                     }) {

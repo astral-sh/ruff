@@ -36,14 +36,11 @@ pub fn empty_type_checking_block<'a, 'b>(
         // Delete the entire type-checking block.
         if checker.patch(diagnostic.kind.rule()) {
             let parent = checker
+                .ctx
                 .child_to_parent
                 .get(&RefEquality(stmt))
-                .map(std::convert::Into::into);
-            let deleted: Vec<&Stmt> = checker
-                .deletions
-                .iter()
-                .map(std::convert::Into::into)
-                .collect();
+                .map(Into::into);
+            let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
             match delete_stmt(
                 stmt,
                 parent,

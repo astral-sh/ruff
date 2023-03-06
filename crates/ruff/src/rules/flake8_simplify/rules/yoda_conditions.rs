@@ -2,7 +2,7 @@ use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
 use ruff_macros::{define_violation, derive_message_formats};
 use ruff_python::str::{self};
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
@@ -50,6 +50,10 @@ fn is_constant_like(expr: &Expr) -> bool {
         ExprKind::Constant { .. } => true,
         ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant_like),
         ExprKind::Name { id, .. } => str::is_upper(id),
+        ExprKind::UnaryOp {
+            op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
+            operand,
+        } => matches!(operand.node, ExprKind::Constant { .. }),
         _ => false,
     }
 }
