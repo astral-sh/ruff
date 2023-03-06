@@ -209,7 +209,7 @@ Options:
       --ignore-noqa
           Ignore any `# noqa` comments
       --format <FORMAT>
-          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
+          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint, azure]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported
       --config <CONFIG>
