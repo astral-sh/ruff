@@ -1,7 +1,7 @@
 use rustpython_parser::ast::Location;
 
-use crate::core::locator::Locator;
-use crate::core::types::Range;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
 /// Return `true` if the given string is a radix literal (e.g., `0b101`).
 pub fn is_radix_literal(content: &str) -> bool {
@@ -20,9 +20,8 @@ pub fn find_tok(
     locator: &Locator,
     f: impl Fn(rustpython_parser::Tok) -> bool,
 ) -> (Location, Location) {
-    let (source, start_index, end_index) = locator.slice(Range::new(location, end_location));
     for (start, tok, end) in rustpython_parser::lexer::lex_located(
-        &source[start_index..end_index],
+        locator.slice(Range::new(location, end_location)),
         rustpython_parser::Mode::Module,
         location,
     )
@@ -48,8 +47,8 @@ pub fn expand_indented_block(
     locator: &Locator,
 ) -> (Location, Location) {
     let contents = locator.contents();
-    let start_index = locator.index(location);
-    let end_index = locator.index(end_location);
+    let start_index = locator.offset(location);
+    let end_index = locator.offset(end_location);
 
     // Find the colon, which indicates the end of the header.
     let mut nesting = 0;
@@ -76,7 +75,7 @@ pub fn expand_indented_block(
         }
     }
     let colon_location = colon.unwrap();
-    let colon_index = locator.index(colon_location);
+    let colon_index = locator.offset(colon_location);
 
     // From here, we have two options: simple statement or compound statement.
     let indent = rustpython_parser::lexer::lex_located(
@@ -120,11 +119,8 @@ pub fn expand_indented_block(
 /// Return true if the `orelse` block of an `if` statement is an `elif` statement.
 pub fn is_elif(orelse: &[rustpython_parser::ast::Stmt], locator: &Locator) -> bool {
     if orelse.len() == 1 && matches!(orelse[0].node, rustpython_parser::ast::StmtKind::If { .. }) {
-        let (source, start, end) = locator.slice(Range::new(
-            orelse[0].location,
-            orelse[0].end_location.unwrap(),
-        ));
-        if source[start..end].starts_with("elif") {
+        let contents = locator.skip(orelse[0].location);
+        if contents.starts_with("elif") {
             return true;
         }
     }

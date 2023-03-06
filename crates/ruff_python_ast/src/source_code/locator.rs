@@ -2,11 +2,13 @@
 
 use once_cell::unsync::OnceCell;
 use rustpython_parser::ast::Location;
+use std::rc::Rc;
 
 use crate::types::Range;
 
 pub struct Locator<'a> {
     contents: &'a str,
+    contents_rc: Rc<str>,
     index: OnceCell<Index>,
 }
 
@@ -99,9 +101,10 @@ fn truncate(location: Location, index: &Index, contents: &str) -> usize {
 }
 
 impl<'a> Locator<'a> {
-    pub const fn new(contents: &'a str) -> Self {
+    pub fn new(contents: &'a str) -> Self {
         Self {
             contents,
+            contents_rc: Rc::from(contents),
             index: OnceCell::new(),
         }
     }
@@ -131,6 +134,17 @@ impl<'a> Locator<'a> {
         let start = truncate(range.location, index, self.contents);
         let end = truncate(range.end_location, index, self.contents);
         &self.contents[start..end]
+    }
+
+    /// Return the byte offset of the given [`Location`].
+    pub fn offset(&self, location: Location) -> usize {
+        let index = self.get_or_init_index();
+        truncate(location, index, self.contents)
+    }
+
+    /// Return an [`Rc`] to the source code.
+    pub fn contents(&self) -> Rc<str> {
+        self.contents_rc.clone()
     }
 
     pub const fn len(&self) -> usize {

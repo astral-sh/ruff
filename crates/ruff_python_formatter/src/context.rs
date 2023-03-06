@@ -1,6 +1,5 @@
 use ruff_formatter::{FormatContext, SimpleFormatOptions};
-
-use crate::core::locator::Locator;
+use ruff_python_ast::source_code::Locator;
 
 pub struct ASTFormatContext<'a> {
     options: SimpleFormatOptions,

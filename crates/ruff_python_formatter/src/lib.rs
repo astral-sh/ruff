@@ -2,10 +2,10 @@ use anyhow::Result;
 use rustpython_parser::lexer::LexResult;
 
 use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
+use ruff_python_ast::source_code::Locator;
 
 use crate::attachment::attach;
 use crate::context::ASTFormatContext;
-use crate::core::locator::Locator;
 use crate::cst::Stmt;
 use crate::newlines::normalize_newlines;
 use crate::parentheses::normalize_parentheses;
