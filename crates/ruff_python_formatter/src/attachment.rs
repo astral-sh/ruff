@@ -1,5 +1,5 @@
-use crate::core::visitor;
-use crate::core::visitor::Visitor;
+use crate::cst::visitor;
+use crate::cst::visitor::Visitor;
 use crate::cst::{
     Alias, Arg, Body, BoolOp, CmpOp, Excepthandler, Expr, Keyword, Operator, Pattern, SliceIndex,
     Stmt, UnaryOp,

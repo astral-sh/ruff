@@ -13,7 +13,6 @@ use crate::parentheses::normalize_parentheses;
 mod attachment;
 pub mod cli;
 pub mod context;
-mod core;
 mod cst;
 mod format;
 mod newlines;

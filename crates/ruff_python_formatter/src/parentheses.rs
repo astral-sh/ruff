@@ -2,9 +2,9 @@ use rustpython_parser::ast::Constant;
 
 use ruff_python_ast::source_code::Locator;
 
-use crate::core::helpers::is_radix_literal;
-use crate::core::visitor;
-use crate::core::visitor::Visitor;
+use crate::cst::helpers::is_radix_literal;
+use crate::cst::visitor;
+use crate::cst::visitor::Visitor;
 use crate::cst::{Expr, ExprKind, Stmt, StmtKind};
 use crate::trivia::Parenthesize;
 
