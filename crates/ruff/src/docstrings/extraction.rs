@@ -2,8 +2,8 @@
 
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
+use crate::ast::visibility::{Modifier, VisibleScope};
 use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
-use crate::visibility::{Modifier, VisibleScope};
 
 /// Extract a docstring from a function or class body.
 pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {

@@ -10,10 +10,10 @@ use super::types::Argumentable;
 use crate::ast::function_type;
 use crate::ast::function_type::FunctionType;
 use crate::ast::types::{Binding, FunctionDef, Lambda, Scope, ScopeKind};
+use crate::ast::visibility;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use crate::visibility;
 
 #[violation]
 pub struct UnusedFunctionArgument {

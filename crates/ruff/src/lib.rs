@@ -35,7 +35,6 @@ mod rules;
 pub mod settings;
 pub mod source_code;
 mod violation;
-mod visibility;
 
 cfg_if! {
     if #[cfg(target_family = "wasm")] {

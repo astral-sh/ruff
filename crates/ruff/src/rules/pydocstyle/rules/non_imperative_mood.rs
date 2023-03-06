@@ -7,12 +7,12 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::ast::cast;
 use crate::ast::helpers::to_call_path;
 use crate::ast::types::{CallPath, Range};
+use crate::ast::visibility::{is_property, is_test};
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;
 use crate::violation::Violation;
-use crate::visibility::{is_property, is_test};
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 

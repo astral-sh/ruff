@@ -1,6 +1,3 @@
-//! Abstractions for tracking public and private visibility across modules,
-//! classes, and functions.
-
 use std::path::Path;
 
 use rustpython_parser::ast::{Expr, Stmt, StmtKind};
@@ -8,7 +5,6 @@ use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 use crate::ast::context::Context;
 use crate::ast::helpers::{collect_call_path, map_callable};
 use crate::ast::types::CallPath;
-use crate::docstrings::definition::Documentable;
 
 #[derive(Debug, Clone)]
 pub enum Modifier {
@@ -159,7 +155,7 @@ pub fn module_visibility(path: &Path) -> Visibility {
     Visibility::Public
 }
 
-fn function_visibility(stmt: &Stmt) -> Visibility {
+pub fn function_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
         StmtKind::FunctionDef { name, .. } | StmtKind::AsyncFunctionDef { name, .. } => {
             if name.starts_with('_') {
@@ -172,7 +168,7 @@ fn function_visibility(stmt: &Stmt) -> Visibility {
     }
 }
 
-fn method_visibility(stmt: &Stmt) -> Visibility {
+pub fn method_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
         StmtKind::FunctionDef {
             name,
@@ -209,7 +205,7 @@ fn method_visibility(stmt: &Stmt) -> Visibility {
     }
 }
 
-fn class_visibility(stmt: &Stmt) -> Visibility {
+pub fn class_visibility(stmt: &Stmt) -> Visibility {
     match &stmt.node {
         StmtKind::ClassDef { name, .. } => {
             if name.starts_with('_') {
@@ -219,42 +215,5 @@ fn class_visibility(stmt: &Stmt) -> Visibility {
             }
         }
         _ => panic!("Found non-ClassDef in function_visibility"),
-    }
-}
-
-/// Transition a `VisibleScope` based on a new `Documentable` definition.
-///
-/// `scope` is the current `VisibleScope`, while `Documentable` and `Stmt`
-/// describe the current node used to modify visibility.
-pub fn transition_scope(scope: &VisibleScope, stmt: &Stmt, kind: &Documentable) -> VisibleScope {
-    match kind {
-        Documentable::Function => VisibleScope {
-            modifier: Modifier::Function,
-            visibility: match scope {
-                VisibleScope {
-                    modifier: Modifier::Module,
-                    visibility: Visibility::Public,
-                } => function_visibility(stmt),
-                VisibleScope {
-                    modifier: Modifier::Class,
-                    visibility: Visibility::Public,
-                } => method_visibility(stmt),
-                _ => Visibility::Private,
-            },
-        },
-        Documentable::Class => VisibleScope {
-            modifier: Modifier::Class,
-            visibility: match scope {
-                VisibleScope {
-                    modifier: Modifier::Module,
-                    visibility: Visibility::Public,
-                } => class_visibility(stmt),
-                VisibleScope {
-                    modifier: Modifier::Class,
-                    visibility: Visibility::Public,
-                } => class_visibility(stmt),
-                _ => Visibility::Private,
-            },
-        },
     }
 }

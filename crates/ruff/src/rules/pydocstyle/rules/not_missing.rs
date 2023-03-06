@@ -3,12 +3,14 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::ast::cast;
 use crate::ast::helpers::identifier_range;
 use crate::ast::types::Range;
+use crate::ast::visibility::{
+    is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
+};
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::message::Location;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;
-use crate::visibility::{is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility};
 
 #[violation]
 pub struct PublicModule;
