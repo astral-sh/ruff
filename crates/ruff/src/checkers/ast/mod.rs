@@ -13,7 +13,7 @@ use rustpython_parser::ast::{
     Suite,
 };
 
-use ruff_python::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 
 use crate::ast::context::Context;
 use crate::ast::helpers::{binding_range, extract_handled_exceptions, to_module_path, Exceptions};

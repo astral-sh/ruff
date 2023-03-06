@@ -1,6 +1,7 @@
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python::str::{self};
 use rustpython_parser::ast::Stmt;
+
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::str::{self};
 
 use crate::ast::helpers::identifier_range;
 use crate::registry::Diagnostic;

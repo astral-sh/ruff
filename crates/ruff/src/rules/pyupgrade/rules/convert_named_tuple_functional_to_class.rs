@@ -3,8 +3,8 @@ use log::debug;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::identifiers::is_identifier;
-use ruff_python::keyword::KWLIST;
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use crate::ast::types::Range;

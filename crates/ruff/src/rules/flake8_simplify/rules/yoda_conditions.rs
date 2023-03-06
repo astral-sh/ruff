@@ -1,8 +1,9 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python::str::{self};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
+
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::str::{self};
 
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;

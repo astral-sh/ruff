@@ -1,5 +1,5 @@
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python::str::TRIPLE_QUOTE_PREFIXES;
+use ruff_python_stdlib::str::TRIPLE_QUOTE_PREFIXES;
 
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;

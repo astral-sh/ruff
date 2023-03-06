@@ -1,5 +1,5 @@
 [package]
-name = "ruff_python"
+name = "ruff_python_stdlib"
 version = "0.0.0"
 publish = false
 edition = { workspace = true }

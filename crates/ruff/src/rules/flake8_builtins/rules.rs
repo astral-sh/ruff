@@ -1,11 +1,13 @@
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python::builtins::BUILTINS;
 use rustpython_parser::ast::Located;
 
-use super::types::ShadowingType;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::builtins::BUILTINS;
+
 use crate::ast::types::Range;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violation::Violation;
+
+use super::types::ShadowingType;
 
 /// ## What it does
 /// Checks for variable (and function) assignments that use the same name

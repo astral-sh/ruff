@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
 use crate::rules::isort::types::Importable;
-use ruff_python::str;
+use ruff_python_stdlib::str;
 
 use super::settings::RelativeImportsOrder;
 use super::types::EitherImport::{Import, ImportFrom};
