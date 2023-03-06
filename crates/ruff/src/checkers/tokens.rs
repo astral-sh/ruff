@@ -18,7 +18,7 @@ pub fn check_tokens(
     tokens: &[LexResult],
     settings: &Settings,
     autofix: flags::Autofix,
-    is_interface_definition: bool,
+    is_stub: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -164,7 +164,7 @@ pub fn check_tokens(
     }
 
     // PYI033
-    if enforce_type_comment_in_stub && is_interface_definition {
+    if enforce_type_comment_in_stub && is_stub {
         diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(tokens));
     }
 

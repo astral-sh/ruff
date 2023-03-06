@@ -4,6 +4,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::error;
+use ruff_python_stdlib::path::is_python_stub_file;
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::ParseError;
@@ -21,7 +22,6 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::{add_noqa, rule_is_ignored};
 use crate::registry::{Diagnostic, Rule};
-use crate::resolver::is_interface_definition_path;
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
@@ -84,14 +84,8 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
-        let is_interface_definition = is_interface_definition_path(path);
-        diagnostics.extend(check_tokens(
-            locator,
-            &tokens,
-            settings,
-            autofix,
-            is_interface_definition,
-        ));
+        let is_stub = is_python_stub_file(path);
+        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix, is_stub));
     }
 
     // Run the filesystem-based rules.

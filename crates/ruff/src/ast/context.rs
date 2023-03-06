@@ -5,12 +5,12 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
+use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::ast::helpers::{collect_call_path, from_relative_import, Exceptions};
 use crate::ast::types::{Binding, BindingKind, CallPath, ExecutionContext, RefEquality, Scope};
 use crate::ast::visibility::{module_visibility, Modifier, VisibleScope};
-use crate::resolver::is_interface_definition_path;
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Context<'a> {
@@ -82,7 +82,7 @@ impl<'a> Context<'a> {
             in_type_checking_block: false,
             seen_import_boundary: false,
             futures_allowed: true,
-            annotations_future_enabled: is_interface_definition_path(path),
+            annotations_future_enabled: is_python_stub_file(path),
             handled_exceptions: Vec::default(),
         }
     }
