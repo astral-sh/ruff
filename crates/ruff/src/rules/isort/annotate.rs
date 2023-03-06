@@ -1,10 +1,11 @@
 use rustpython_parser::ast::{Stmt, StmtKind};
 
+use ruff_python_ast::source_code::Locator;
+
 use super::comments::Comment;
 use super::helpers::trailing_comma;
 use super::types::{AliasData, TrailingComma};
 use super::{AnnotatedAliasData, AnnotatedImport};
-use crate::source_code::Locator;
 
 pub fn annotate_imports<'a>(
     imports: &'a [&'a Stmt],

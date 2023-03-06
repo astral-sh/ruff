@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Binding, BindingKind, ExecutionContext};
 
-use crate::ast::types::{Binding, BindingKind, ExecutionContext};
 use crate::registry::Diagnostic;
 use crate::rules::isort::{categorize, ImportType};
 use crate::settings::Settings;

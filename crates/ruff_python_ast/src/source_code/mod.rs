@@ -3,12 +3,12 @@ mod indexer;
 mod locator;
 mod stylist;
 
-pub(crate) use generator::Generator;
-pub(crate) use indexer::Indexer;
-pub(crate) use locator::Locator;
+pub use generator::Generator;
+pub use indexer::Indexer;
+pub use locator::Locator;
 use rustpython_parser as parser;
 use rustpython_parser::ParseError;
-pub(crate) use stylist::{LineEnding, Stylist};
+pub use stylist::{LineEnding, Stylist};
 
 /// Run round-trip source code generation on a given Python code.
 pub fn round_trip(code: &str, source_path: &str) -> Result<String, ParseError> {

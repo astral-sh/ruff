@@ -3,10 +3,10 @@ use std::cmp::Ordering;
 pub use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::source_code::Locator;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {

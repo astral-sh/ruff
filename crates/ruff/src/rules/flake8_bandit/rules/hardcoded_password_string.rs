@@ -1,10 +1,12 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use super::super::helpers::{matches_password_name, string_literal};
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
+
+use super::super::helpers::{matches_password_name, string_literal};
 
 #[violation]
 pub struct HardcodedPasswordString {

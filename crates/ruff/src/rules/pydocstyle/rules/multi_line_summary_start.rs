@@ -1,9 +1,9 @@
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::strings::leading_quote;
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 use ruff_python_stdlib::str::TRIPLE_QUOTE_PREFIXES;
 
-use crate::ast::strings::leading_quote;
-use crate::ast::types::Range;
-use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;

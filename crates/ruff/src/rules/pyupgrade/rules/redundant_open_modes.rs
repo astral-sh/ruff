@@ -2,16 +2,17 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use log::error;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::helpers::find_keyword;
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]

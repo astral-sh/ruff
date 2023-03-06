@@ -1,7 +1,7 @@
 use ruff_python_stdlib::typing::{PEP_585_BUILTINS_ELIGIBLE, PEP_593_SUBSCRIPTS, SUBSCRIPTS};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::CallPath;
+use crate::types::CallPath;
 
 pub enum Callable {
     ForwardRef,

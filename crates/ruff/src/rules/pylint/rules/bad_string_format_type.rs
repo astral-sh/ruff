@@ -1,13 +1,14 @@
 use std::str::FromStr;
 
-use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_common::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Operator};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::strings::{leading_quote, trailing_quote};
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::strings::{leading_quote, trailing_quote};
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;

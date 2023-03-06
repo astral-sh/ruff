@@ -17,7 +17,7 @@ use crate::rules::{
 use crate::settings::configuration::Configuration;
 use crate::settings::options::Options;
 use crate::settings::{defaults, flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 

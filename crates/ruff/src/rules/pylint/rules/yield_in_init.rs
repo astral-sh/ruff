@@ -1,11 +1,10 @@
 use rustpython_parser::ast::Expr;
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
 use crate::rules::pylint::helpers::in_dunder_init;
-use crate::{
-    ast::types::Range, checkers::ast::Checker, registry::Diagnostic, violation::Violation,
-};
+use crate::{checkers::ast::Checker, registry::Diagnostic, violation::Violation};
 
 /// ## What it does
 /// Checks for `__init__` methods that are turned into generators by the

@@ -3,15 +3,15 @@ use log::debug;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_stdlib::keyword::KWLIST;
 
-use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
 use crate::violation::{Availability, Violation};
 use crate::AutofixKind;
 

@@ -1,16 +1,18 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use super::settings::Quote;
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
 use crate::fix::Fix;
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
-use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
+
+use super::settings::Quote;
 
 /// ## What it does
 /// Checks for inline strings that use single quotes or double quotes,

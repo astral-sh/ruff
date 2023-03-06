@@ -1,9 +1,10 @@
 //! Settings for import conventions.
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
 use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),

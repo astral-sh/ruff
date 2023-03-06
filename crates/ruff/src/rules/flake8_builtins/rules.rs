@@ -1,9 +1,9 @@
 use rustpython_parser::ast::Located;
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 use ruff_python_stdlib::builtins::BUILTINS;
 
-use crate::ast::types::Range;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violation::Violation;
 

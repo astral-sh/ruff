@@ -11,11 +11,12 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use super::settings::Settings;
-    use super::types;
     use crate::registry::Rule;
     use crate::settings;
     use crate::test::test_path;
+
+    use super::settings::Settings;
+    use super::types;
 
     #[test_case(Rule::IncorrectFixtureParenthesesStyle, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]
     #[test_case(

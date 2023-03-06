@@ -1,8 +1,9 @@
 //! Settings for the `flake8-bandit` plugin.
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 fn default_tmp_dirs() -> Vec<String> {
     ["/tmp", "/var/tmp", "/dev/shm"]

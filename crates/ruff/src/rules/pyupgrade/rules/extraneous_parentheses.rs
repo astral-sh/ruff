@@ -1,12 +1,13 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
-use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]

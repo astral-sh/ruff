@@ -1,10 +1,11 @@
-use ruff_macros::{derive_message_formats, violation, CacheKey};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Alias, Expr, Located};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::ast::types::{CallPath, Range};
+use ruff_macros::{derive_message_formats, violation, CacheKey};
+use ruff_python_ast::types::{CallPath, Range};
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
@@ -122,10 +123,11 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use rustc_hash::FxHashMap;
 
-    use super::ApiBan;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
+
+    use super::ApiBan;
 
     #[test]
     fn banned_api_true_positives() -> Result<()> {

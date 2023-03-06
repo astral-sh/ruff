@@ -1,13 +1,14 @@
 use itertools::Itertools;
-use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
     Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location,
 };
 
-use crate::ast::helpers;
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::{CallPath, Range};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::{CallPath, Range};
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};

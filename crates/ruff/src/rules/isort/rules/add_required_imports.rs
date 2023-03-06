@@ -1,19 +1,21 @@
 use std::fmt;
 
 use log::error;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser as parser;
 use rustpython_parser::ast::{Location, StmtKind, Suite};
 
-use super::super::helpers;
-use super::super::track::Block;
-use crate::ast::helpers::is_docstring_stmt;
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
+
+use super::super::helpers;
+use super::super::track::Block;
 
 /// ## What it does
 /// Adds any required imports, as specified by the user, to the top of the

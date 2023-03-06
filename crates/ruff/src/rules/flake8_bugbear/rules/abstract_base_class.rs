@@ -1,8 +1,9 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
-use crate::ast::types::Range;
-use crate::ast::visibility::{is_abstract, is_overload};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visibility::{is_abstract, is_overload};
+
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::Violation;

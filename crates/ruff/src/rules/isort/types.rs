@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use rustc_hash::FxHashMap;
 
-use crate::ast;
+use ruff_python_ast::helpers::format_import_from;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum TrailingComma {
@@ -46,7 +46,7 @@ impl Importable for AliasData<'_> {
 
 impl Importable for ImportFromData<'_> {
     fn module_name(&self) -> String {
-        ast::helpers::format_import_from(self.level, self.module)
+        format_import_from(self.level, self.module)
     }
 
     fn module_base(&self) -> String {

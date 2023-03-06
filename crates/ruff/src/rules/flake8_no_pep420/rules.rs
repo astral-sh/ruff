@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::fs;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;

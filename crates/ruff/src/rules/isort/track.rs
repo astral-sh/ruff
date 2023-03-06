@@ -1,16 +1,18 @@
 use std::path::Path;
 
-use ruff_python_stdlib::path::is_python_stub_file;
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
     Unaryop, Withitem,
 };
 
-use super::helpers;
-use crate::ast::visitor::Visitor;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_stdlib::path::is_python_stub_file;
+
 use crate::directives::IsortDirectives;
-use crate::source_code::Locator;
+
+use super::helpers;
 
 #[derive(Debug)]
 pub enum Trailer {

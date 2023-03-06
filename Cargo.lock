@@ -2000,6 +2000,7 @@ dependencies = [
  "result-like",
  "ruff_cache",
  "ruff_macros",
+ "ruff_python_ast",
  "ruff_python_stdlib",
  "ruff_rustpython",
  "rustc-hash",
@@ -2118,6 +2119,28 @@ dependencies = [
  "quote",
  "syn",
  "textwrap",
+]
+
+[[package]]
+name = "ruff_python_ast"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bitflags",
+ "is-macro",
+ "itertools",
+ "log",
+ "nohash-hasher",
+ "num-bigint",
+ "num-traits",
+ "once_cell",
+ "regex",
+ "ruff_python_stdlib",
+ "ruff_rustpython",
+ "rustc-hash",
+ "rustpython-common",
+ "rustpython-parser",
+ "smallvec",
 ]
 
 [[package]]

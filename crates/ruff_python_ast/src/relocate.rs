@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use crate::ast::types::Range;
+use crate::types::Range;
 
 fn relocate_keyword(keyword: &mut Keyword, location: Range) {
     keyword.location = location.location;

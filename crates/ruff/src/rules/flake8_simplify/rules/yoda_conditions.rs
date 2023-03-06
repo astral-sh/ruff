@@ -3,14 +3,14 @@ use libcst_native::{Codegen, CodegenState, CompOp};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
 use ruff_python_stdlib::str::{self};
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::{Locator, Stylist};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]

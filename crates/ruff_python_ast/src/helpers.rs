@@ -13,11 +13,11 @@ use rustpython_parser::ast::{
 use rustpython_parser::{lexer, Mode, StringKind, Tok};
 use smallvec::{smallvec, SmallVec};
 
-use crate::ast::context::Context;
-use crate::ast::types::{Binding, BindingKind, CallPath, Range};
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
+use crate::context::Context;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
+use crate::types::{Binding, BindingKind, CallPath, Range};
+use crate::visitor;
+use crate::visitor::Visitor;
 
 /// Create an `Expr` with default location from an `ExprKind`.
 pub fn create_expr(node: ExprKind) -> Expr {
@@ -741,7 +741,7 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
         .ok()?
         .iter()
         .map(Path::new)
-        .map(std::path::Path::file_stem)
+        .map(Path::file_stem)
         .map(|path| path.and_then(|path| path.to_os_string().into_string().ok()))
         .collect::<Option<Vec<String>>>()
 }
@@ -1250,9 +1250,14 @@ impl<'a> SimpleCallArgs<'a> {
         None
     }
 
-    /// Get the number of positional and keyword arguments used.
+    /// Return the number of positional and keyword arguments.
     pub fn len(&self) -> usize {
         self.args.len() + self.kwargs.len()
+    }
+
+    /// Return `true` if there are no positional or keyword arguments.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -1277,11 +1282,11 @@ mod tests {
     use rustpython_parser as parser;
     use rustpython_parser::ast::Location;
 
-    use crate::ast::helpers::{
+    use crate::helpers::{
         elif_else_range, else_range, first_colon_range, identifier_range, match_trailing_content,
     };
-    use crate::ast::types::Range;
     use crate::source_code::Locator;
+    use crate::types::Range;
 
     #[test]
     fn trailing_content() -> Result<()> {

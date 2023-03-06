@@ -6,14 +6,14 @@ use libcst_native::{
 use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::helpers;
-use crate::ast::helpers::to_absolute;
-use crate::ast::types::Range;
-use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_module;
 use crate::fix::Fix;
-use crate::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::helpers;
+use ruff_python_ast::helpers::to_absolute;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 
 /// Determine if a body contains only a single statement, taking into account
 /// deleted.
@@ -451,7 +451,7 @@ mod tests {
     use rustpython_parser::ast::Location;
 
     use crate::autofix::helpers::{next_stmt_break, trailing_semicolon};
-    use crate::source_code::Locator;
+    use ruff_python_ast::source_code::Locator;
 
     #[test]
     fn find_semicolon() -> Result<()> {

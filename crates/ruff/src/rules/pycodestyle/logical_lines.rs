@@ -3,10 +3,10 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::rules::pycodestyle::helpers::{is_keyword_token, is_op_token};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
-use crate::source_code::Locator;
+use crate::rules::pycodestyle::helpers::{is_keyword_token, is_op_token};
 
 bitflags! {
     #[derive(Default)]

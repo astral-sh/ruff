@@ -3,11 +3,11 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::context::Context;
-use crate::ast::helpers::any_over_expr;
-use crate::ast::types::{BindingKind, Scope};
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
+use crate::context::Context;
+use crate::helpers::any_over_expr;
+use crate::types::{BindingKind, Scope};
+use crate::visitor;
+use crate::visitor::Visitor;
 
 bitflags! {
     #[derive(Default)]
@@ -348,7 +348,7 @@ pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
 mod tests {
     use rustpython_parser::ast::{Cmpop, Location};
 
-    use crate::ast::operations::{locate_cmpops, LocatedCmpop};
+    use crate::operations::{locate_cmpops, LocatedCmpop};
 
     #[test]
     fn locates_cmpops() {

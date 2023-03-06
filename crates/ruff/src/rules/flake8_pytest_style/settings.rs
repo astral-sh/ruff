@@ -1,8 +1,9 @@
 //! Settings for the `flake8-pytest-style` plugin.
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 use super::types;
 

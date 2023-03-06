@@ -2,9 +2,10 @@ use anyhow::{bail, Result};
 use rustpython_parser::ast::Stmt;
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::types::Range;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
 use crate::fix::Fix;
-use crate::source_code::Locator;
 
 /// ANN204
 pub fn add_return_none_annotation(locator: &Locator, stmt: &Stmt) -> Result<Fix> {

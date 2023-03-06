@@ -1,9 +1,10 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind};
 
-use crate::ast::helpers::except_range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::except_range;
+use ruff_python_ast::source_code::Locator;
+
 use crate::registry::Diagnostic;
-use crate::source_code::Locator;
 use crate::violation::Violation;
 
 #[violation]

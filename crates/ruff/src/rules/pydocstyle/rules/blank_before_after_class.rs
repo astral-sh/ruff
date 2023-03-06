@@ -1,6 +1,6 @@
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;

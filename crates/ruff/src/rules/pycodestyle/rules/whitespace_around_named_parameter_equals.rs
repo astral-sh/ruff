@@ -1,16 +1,15 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
+use once_cell::sync::Lazy;
+use regex::Regex;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use once_cell::sync::Lazy;
-use regex::Regex;
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::registry::DiagnosticKind;
 #[cfg(feature = "logical_lines")]
 use crate::rules::pycodestyle::helpers::is_op_token;
-
-use crate::registry::DiagnosticKind;
 use crate::violation::Violation;
 
 #[violation]

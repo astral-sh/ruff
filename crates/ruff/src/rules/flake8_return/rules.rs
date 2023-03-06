@@ -2,11 +2,11 @@ use itertools::Itertools;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{elif_else_range, end_of_statement};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::whitespace::indentation;
 
-use crate::ast::helpers::{elif_else_range, end_of_statement};
-use crate::ast::types::Range;
-use crate::ast::visitor::Visitor;
-use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};

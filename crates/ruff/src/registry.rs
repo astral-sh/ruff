@@ -5,11 +5,11 @@ use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter};
 
-use crate::ast::types::Range;
 use crate::codes::{self, RuleCodePrefix};
 use crate::fix::Fix;
 use crate::rules;
 use crate::violation::Violation;
+use ruff_python_ast::types::Range;
 
 ruff_macros::register_rules!(
     // pycodestyle errors

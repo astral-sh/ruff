@@ -3,23 +3,24 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use itertools::Either::{Left, Right};
+use strum::IntoEnumIterator;
+
 use annotate::annotate_imports;
 use categorize::categorize_imports;
 pub use categorize::{categorize, ImportType};
 use comments::Comment;
-use itertools::Either::{Left, Right};
 use normalize::normalize_imports;
 use order::order_imports;
+use ruff_python_ast::source_code::{Locator, Stylist};
 use settings::RelativeImportsOrder;
 use sorting::cmp_either_import;
-use strum::IntoEnumIterator;
 use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingComma};
 
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
-use crate::source_code::{Locator, Stylist};
 
 mod annotate;
 mod categorize;
@@ -350,12 +351,12 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use super::categorize::ImportType;
-    use super::settings::RelativeImportsOrder;
-
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
+
+    use super::categorize::ImportType;
+    use super::settings::RelativeImportsOrder;
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("as_imports_comments.py"))]

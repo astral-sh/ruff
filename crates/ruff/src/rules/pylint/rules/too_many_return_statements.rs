@@ -1,10 +1,11 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Stmt;
 
-use crate::ast::helpers::{identifier_range, ReturnStatementVisitor};
-use crate::ast::visitor::Visitor;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{identifier_range, ReturnStatementVisitor};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::visitor::Visitor;
+
 use crate::registry::Diagnostic;
-use crate::source_code::Locator;
 use crate::violation::Violation;
 
 #[violation]

@@ -2,9 +2,9 @@ use std::path::Path;
 
 use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 
-use crate::ast::context::Context;
-use crate::ast::helpers::{collect_call_path, map_callable};
-use crate::ast::types::CallPath;
+use crate::context::Context;
+use crate::helpers::{collect_call_path, map_callable};
+use crate::types::CallPath;
 
 #[derive(Debug, Clone)]
 pub enum Modifier {

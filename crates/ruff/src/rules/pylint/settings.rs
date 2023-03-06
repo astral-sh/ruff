@@ -1,10 +1,12 @@
 //! Settings for the `pylint` plugin.
 
 use anyhow::anyhow;
-use ruff_macros::{CacheKey, ConfigurationOptions};
 use rustpython_parser::ast::Constant;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ConstantType {

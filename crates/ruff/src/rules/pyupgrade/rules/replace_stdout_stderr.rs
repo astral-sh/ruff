@@ -1,13 +1,14 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Keyword};
 
-use crate::ast::helpers::find_keyword;
-use crate::ast::types::Range;
-use crate::ast::whitespace::indentation;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::indentation;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::{Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]

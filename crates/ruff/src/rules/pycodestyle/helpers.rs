@@ -3,8 +3,8 @@ use regex::Regex;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 use rustpython_parser::Tok;
 
-use crate::ast::helpers::{create_expr, unparse_expr};
-use crate::source_code::Stylist;
+use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::source_code::Stylist;
 
 pub fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"

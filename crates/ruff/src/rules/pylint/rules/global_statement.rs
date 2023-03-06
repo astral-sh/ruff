@@ -1,9 +1,9 @@
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use crate::Range;
 
 /// ## What it does
 /// Checks for the use of `global` statements to update identifiers.

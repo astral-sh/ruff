@@ -1,19 +1,21 @@
 use log::error;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
 
-use super::fixes;
-use super::helpers::match_function_def;
-use crate::ast::helpers::ReturnStatementVisitor;
-use crate::ast::types::Range;
-use crate::ast::visibility;
-use crate::ast::visibility::Visibility;
-use crate::ast::visitor::Visitor;
-use crate::ast::{cast, helpers};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::ReturnStatementVisitor;
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visibility;
+use ruff_python_ast::visibility::Visibility;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{cast, helpers};
+
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::registry::{Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
+
+use super::fixes;
+use super::helpers::match_function_def;
 
 /// ## What it does
 /// Checks that function arguments have type annotations.

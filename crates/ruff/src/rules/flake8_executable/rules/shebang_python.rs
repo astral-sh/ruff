@@ -1,7 +1,8 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::registry::Diagnostic;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 use crate::violation::Violation;

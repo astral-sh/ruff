@@ -1,11 +1,13 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
 
-use super::super::fixes;
-use crate::ast::types::{Binding, BindingKind, Range, Scope};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Binding, BindingKind, Range, Scope};
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;
+
+use super::super::fixes;
 
 #[violation]
 pub struct UselessObjectInheritance {

@@ -12,7 +12,7 @@ use crate::linter::{check_path, LinterResult};
 use crate::packaging::detect_package_root;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)

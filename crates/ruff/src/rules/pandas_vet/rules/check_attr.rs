@@ -1,8 +1,8 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{BindingKind, Range};
 
-use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;

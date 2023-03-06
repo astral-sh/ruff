@@ -1,9 +1,10 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::violation::AlwaysAutofixableViolation;

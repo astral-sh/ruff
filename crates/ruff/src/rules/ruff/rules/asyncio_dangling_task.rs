@@ -1,11 +1,13 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use std::fmt;
 
-use crate::ast::types::{CallPath, Range};
+use rustpython_parser::ast::{Expr, ExprKind};
+use serde::{Deserialize, Serialize};
+
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{CallPath, Range};
+
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use ruff_macros::{derive_message_formats, violation};
-use serde::{Deserialize, Serialize};
-use std::fmt;
 
 /// ## What it does
 /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls

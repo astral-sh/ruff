@@ -1,12 +1,13 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
 use crate::registry::DiagnosticKind;
-use crate::source_code::Locator;
 use crate::violation::Violation;
 
 #[violation]

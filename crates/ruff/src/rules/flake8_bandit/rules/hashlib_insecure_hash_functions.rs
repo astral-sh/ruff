@@ -1,12 +1,14 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use super::super::helpers::string_literal;
-use crate::ast::helpers::SimpleCallArgs;
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
+
+use super::super::helpers::string_literal;
 
 #[violation]
 pub struct HashlibInsecureHashFunction {

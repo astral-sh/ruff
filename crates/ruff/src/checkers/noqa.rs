@@ -4,7 +4,6 @@ use log::warn;
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
 use crate::codes::NoqaCode;
 use crate::fix::Fix;
 use crate::noqa;
@@ -13,6 +12,7 @@ use crate::registry::{Diagnostic, DiagnosticKind, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::{flags, Settings};
+use ruff_python_ast::types::Range;
 
 pub fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,

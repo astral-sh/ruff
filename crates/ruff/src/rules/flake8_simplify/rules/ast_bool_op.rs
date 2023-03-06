@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use itertools::Either::{Left, Right};
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use crate::ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;

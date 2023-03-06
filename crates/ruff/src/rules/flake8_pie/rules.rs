@@ -3,12 +3,12 @@ use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Boolop, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::{match_trailing_comment, unparse_expr};
+use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_stdlib::keyword::KWLIST;
 
-use crate::ast::comparable::ComparableExpr;
-use crate::ast::helpers::{match_trailing_comment, unparse_expr};
-use crate::ast::types::{Range, RefEquality};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;

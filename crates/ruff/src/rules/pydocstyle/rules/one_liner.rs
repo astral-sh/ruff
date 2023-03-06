@@ -1,8 +1,8 @@
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::strings::{leading_quote, trailing_quote};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 
-use crate::ast::strings::{leading_quote, trailing_quote};
-use crate::ast::types::Range;
-use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;

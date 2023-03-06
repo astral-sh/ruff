@@ -1,9 +1,10 @@
 //! Settings for the `flake8-tidy-imports` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::ConfigurationOptions;
 
 use super::banned_api::ApiBan;
 use super::relative_imports::Strictness;

@@ -1,13 +1,12 @@
 use num_traits::Zero;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use crate::ast::context::Context;
-use crate::ast::helpers::{map_callable, to_call_path};
-use crate::ast::types::{Binding, BindingKind, ExecutionContext, ScopeKind};
-use crate::checkers::ast::Checker;
+use ruff_python_ast::context::Context;
+use ruff_python_ast::helpers::{map_callable, to_call_path};
+use ruff_python_ast::types::{Binding, BindingKind, ExecutionContext, ScopeKind};
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
-pub fn is_type_checking_block(checker: &Checker, test: &Expr) -> bool {
+pub fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
     // Ex) `if False:`
     if matches!(
         test.node,
@@ -31,13 +30,9 @@ pub fn is_type_checking_block(checker: &Checker, test: &Expr) -> bool {
     }
 
     // Ex) `if typing.TYPE_CHECKING:`
-    if checker
-        .ctx
-        .resolve_call_path(test)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["typing", "TYPE_CHECKING"]
-        })
-    {
+    if context.resolve_call_path(test).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TYPE_CHECKING"]
+    }) {
         return true;
     }
 

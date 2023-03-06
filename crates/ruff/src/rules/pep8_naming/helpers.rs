@@ -1,6 +1,7 @@
 use itertools::Itertools;
-use ruff_python_stdlib::str::{is_lower, is_upper};
 use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
+
+use ruff_python_stdlib::str::{is_lower, is_upper};
 
 use crate::checkers::ast::Checker;
 

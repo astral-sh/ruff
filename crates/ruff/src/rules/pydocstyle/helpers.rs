@@ -1,7 +1,8 @@
 use std::collections::BTreeSet;
 
-use crate::ast::cast;
-use crate::ast::helpers::{map_callable, to_call_path};
+use ruff_python_ast::cast;
+use ruff_python_ast::helpers::{map_callable, to_call_path};
+
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 

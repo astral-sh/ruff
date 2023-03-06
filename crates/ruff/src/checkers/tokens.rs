@@ -11,7 +11,7 @@ use crate::rules::{
     pyupgrade, ruff,
 };
 use crate::settings::{flags, Settings};
-use crate::source_code::Locator;
+use ruff_python_ast::source_code::Locator;
 
 pub fn check_tokens(
     locator: &Locator,

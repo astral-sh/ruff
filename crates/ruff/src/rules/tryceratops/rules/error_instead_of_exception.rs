@@ -1,8 +1,9 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
-use crate::ast::types::Range;
-use crate::ast::visitor::Visitor;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor::Visitor;
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;

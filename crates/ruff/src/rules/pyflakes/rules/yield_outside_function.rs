@@ -1,10 +1,11 @@
 use std::fmt;
 
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind};
 use serde::{Deserialize, Serialize};
 
-use crate::ast::types::{Range, ScopeKind};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Range, ScopeKind};
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;

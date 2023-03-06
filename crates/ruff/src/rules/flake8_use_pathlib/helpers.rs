@@ -1,6 +1,7 @@
 use rustpython_parser::ast::Expr;
 
-use crate::ast::types::Range;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::rules::flake8_use_pathlib::violations::{

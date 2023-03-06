@@ -1,22 +1,24 @@
 use anyhow::Result;
 use log::error;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt, StmtKind};
+
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{collect_arg_names, collect_call_path};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
+
+use crate::autofix::helpers::remove_argument;
+use crate::checkers::ast::Checker;
+use crate::fix::Fix;
+use crate::registry::{Diagnostic, Rule};
+use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 use super::helpers::{
     get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,
     is_pytest_yield_fixture, keyword_is_literal,
 };
-use crate::ast::helpers::{collect_arg_names, collect_call_path};
-use crate::ast::types::Range;
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
-use crate::autofix::helpers::remove_argument;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::source_code::Locator;
-use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 #[violation]
 pub struct IncorrectFixtureParenthesesStyle {

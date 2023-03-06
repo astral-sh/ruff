@@ -1,12 +1,13 @@
 //! An equivalent object hierarchy to the [`Expr`] hierarchy, but with the
 //! ability to compare expressions for equality (via [`Eq`] and [`Hash`]).
 
-use num_bigint::BigInt;
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, ExprKind, Keyword, MatchCase, Operator, Pattern,
     PatternKind, Stmt, StmtKind, Unaryop, Withitem,
 };
+
+use num_bigint::BigInt;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ComparableExprContext {

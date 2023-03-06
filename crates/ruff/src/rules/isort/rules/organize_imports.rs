@@ -1,22 +1,24 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Location, Stmt};
 use textwrap::indent;
 
-use super::super::track::Block;
-use super::super::{comments, format_imports};
-use crate::ast::helpers::{
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{
     count_trailing_lines, followed_by_multi_statement_line, preceded_by_multi_statement_line,
 };
-use crate::ast::types::Range;
-use crate::ast::whitespace::leading_space;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::leading_space;
+
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
+
+use super::super::track::Block;
+use super::super::{comments, format_imports};
 
 /// ## What it does
 /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.

@@ -1,8 +1,9 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Alias, AliasData, Located, Stmt, StmtKind};
 
-use crate::ast::helpers::{create_stmt, unparse_stmt};
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_stmt, unparse_stmt};
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
