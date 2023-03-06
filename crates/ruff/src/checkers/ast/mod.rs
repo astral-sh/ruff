@@ -2445,8 +2445,8 @@ where
                 }
 
                 // flake8-bandit
-                if self.settings.rules.enabled(Rule::DenylistCall) {
-                    flake8_bandit::rules::denylist_calls(self, expr);
+                if self.settings.rules.enabled(Rule::DeniedFunctionCall) {
+                    flake8_bandit::rules::denied_function_call(self, expr);
                 }
 
                 // flake8-bugbear

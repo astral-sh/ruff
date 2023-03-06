@@ -1,6 +1,6 @@
 pub use assert_used::{assert_used, Assert};
 pub use bad_file_permissions::{bad_file_permissions, BadFilePermissions};
-pub use denylist_calls::{denylist_calls, DenylistCall};
+pub use denied_function_call::{denied_function_call, DeniedFunctionCall};
 pub use exec_used::{exec_used, ExecBuiltin};
 pub use hardcoded_bind_all_interfaces::{
     hardcoded_bind_all_interfaces, HardcodedBindAllInterfaces,
@@ -31,7 +31,7 @@ pub use unsafe_yaml_load::{unsafe_yaml_load, UnsafeYAMLLoad};
 
 mod assert_used;
 mod bad_file_permissions;
-mod denylist_calls;
+mod denied_function_call;
 mod exec_used;
 mod hardcoded_bind_all_interfaces;
 mod hardcoded_password_default;

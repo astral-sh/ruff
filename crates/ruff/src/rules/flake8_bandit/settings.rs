@@ -5,7 +5,15 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
-use crate::rules::flake8_bandit::helpers::Severity;
+#[derive(
+    Debug, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema, Hash, CacheKey, PartialOrd,
+)]
+pub enum Severity {
+    #[default]
+    Low,
+    Medium,
+    High,
+}
 
 fn default_tmp_dirs() -> Vec<String> {
     ["/tmp", "/var/tmp", "/dev/shm"]
@@ -46,8 +54,10 @@ pub struct Options {
     /// exception types. By default, `try`-`except`-`pass` is only
     /// disallowed for `Exception` and `BaseException`.
     pub check_typed_exception: Option<bool>,
-    #[option(default = "", value_type = "str", example = "severity = low")]
-    /// The minimum severity to catch. Choose from `low`, `medium`, `high`,
+    #[option(default = "low", value_type = "str", example = "severity = \"high\"")]
+    /// The minimum severity to enforce for denied function calls.
+    ///
+    /// Valid values are `low`, `medium`, and `high`.
     pub severity: Option<Severity>,
 }
 
