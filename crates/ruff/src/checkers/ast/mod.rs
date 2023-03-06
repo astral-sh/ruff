@@ -14,6 +14,7 @@ use rustpython_parser::ast::{
 };
 
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::ast::context::Context;
 use crate::ast::helpers::{binding_range, extract_handled_exceptions, to_module_path, Exceptions};
@@ -31,7 +32,6 @@ use crate::docstrings::definition::{
     transition_scope, Definition, DefinitionKind, Docstring, Documentable,
 };
 use crate::registry::{Diagnostic, Rule};
-use crate::resolver::is_interface_definition_path;
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
@@ -58,7 +58,7 @@ pub struct Checker<'a> {
     pub path: &'a Path,
     module_path: Option<Vec<String>>,
     package: Option<&'a Path>,
-    is_interface_definition: bool,
+    is_stub: bool,
     autofix: flags::Autofix,
     noqa: flags::Noqa,
     pub settings: &'a Settings,
@@ -97,7 +97,7 @@ impl<'a> Checker<'a> {
             path,
             package,
             module_path: module_path.clone(),
-            is_interface_definition: is_interface_definition_path(path),
+            is_stub: is_python_stub_file(path),
             locator,
             stylist: style,
             indexer,
@@ -378,7 +378,7 @@ where
                     }
                 }
 
-                if self.is_interface_definition {
+                if self.is_stub {
                     if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
                         flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
@@ -756,7 +756,7 @@ where
                     flake8_bugbear::rules::useless_expression(self, body);
                 }
 
-                if !self.is_interface_definition {
+                if !self.is_stub {
                     if self
                         .settings
                         .rules
@@ -771,7 +771,7 @@ where
                         );
                     }
                 }
-                if self.is_interface_definition {
+                if self.is_stub {
                     if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
                         flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
@@ -1805,7 +1805,7 @@ where
                     }
                 }
 
-                if self.is_interface_definition {
+                if self.is_stub {
                     if self.settings.rules.enabled(&Rule::PrefixTypeParams) {
                         flake8_pyi::rules::prefix_type_params(self, value, targets);
                     }
@@ -3301,7 +3301,7 @@ where
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
                 }
 
-                if self.is_interface_definition {
+                if self.is_stub {
                     if self
                         .settings
                         .rules
@@ -3886,7 +3886,7 @@ where
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
         }
 
-        if self.is_interface_definition {
+        if self.is_stub {
             if self
                 .settings
                 .rules
@@ -3895,7 +3895,7 @@ where
                 flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
             }
         }
-        if self.is_interface_definition {
+        if self.is_stub {
             if self.settings.rules.enabled(&Rule::ArgumentSimpleDefaults) {
                 flake8_pyi::rules::argument_simple_defaults(self, arguments);
             }
@@ -4710,7 +4710,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_dead_scopes(&mut self) {
-        let enforce_typing_imports = !self.is_interface_definition
+        let enforce_typing_imports = !self.is_stub
             && (self
                 .settings
                 .rules
@@ -5241,7 +5241,7 @@ impl<'a> Checker<'a> {
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
-            if self.is_interface_definition {
+            if self.is_stub {
                 if self.settings.rules.enabled(&Rule::DocstringInStub) {
                     flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
                 }

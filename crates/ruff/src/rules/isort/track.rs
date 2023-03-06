@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use ruff_python_stdlib::path::is_python_stub_file;
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
@@ -9,7 +10,6 @@ use rustpython_parser::ast::{
 use super::helpers;
 use crate::ast::visitor::Visitor;
 use crate::directives::IsortDirectives;
-use crate::resolver::is_interface_definition_path;
 use crate::source_code::Locator;
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ pub struct Block<'a> {
 pub struct ImportTracker<'a> {
     locator: &'a Locator<'a>,
     directives: &'a IsortDirectives,
-    pyi: bool,
+    is_stub: bool,
     blocks: Vec<Block<'a>>,
     split_index: usize,
     nested: bool,
@@ -40,7 +40,7 @@ impl<'a> ImportTracker<'a> {
         Self {
             locator,
             directives,
-            pyi: is_interface_definition_path(path),
+            is_stub: is_python_stub_file(path),
             blocks: vec![Block::default()],
             split_index: 0,
             nested: false,
@@ -65,7 +65,7 @@ impl<'a> ImportTracker<'a> {
             return None;
         }
 
-        Some(if self.pyi {
+        Some(if self.is_stub {
             // Black treats interface files differently, limiting to one newline
             // (`Trailing::Sibling`).
             Trailer::Sibling
