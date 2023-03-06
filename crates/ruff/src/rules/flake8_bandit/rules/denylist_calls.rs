@@ -9,24 +9,24 @@ use crate::rules::flake8_bandit::helpers::Severity;
 use crate::violation::Violation;
 
 define_violation!(
-    pub struct BlacklistCall {
+    pub struct DenylistCall {
         pub message: String,
     }
 );
-impl Violation for BlacklistCall {
+impl Violation for DenylistCall {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("{}", self.message)
     }
 }
 
-struct BLCall<'a> {
+struct DLCall<'a> {
     calls: &'a [&'a [&'a str]],
     message: &'a str,
     severity: Severity,
 }
 
-impl<'a> BLCall<'a> {
+impl<'a> DLCall<'a> {
     pub const fn new(calls: &'a [&'a [&'a str]], message: &'a str, severity: Severity) -> Self {
         Self {
             calls,
@@ -37,8 +37,8 @@ impl<'a> BLCall<'a> {
 }
 
 // List comes from: https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html
-const BLACKLISTED_CALLS: &[BLCall] = &[
-    BLCall::new(
+const DENYLIST_CALLS: &[DLCall] = &[
+    DLCall::new(
         &[
             &["pickle", "loads"],
             &["pickle", "load"],
@@ -55,7 +55,7 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
         "Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue",
         Severity::Medium
     ),
-    BLCall::new(
+    DLCall::new(
         &[
             &["marshal", "loads"],
             &["marshal", "load"],
@@ -63,7 +63,7 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
         "Deserialization with the marshal module is possibly dangerous",
         Severity::Medium
     ),
-    BLCall::new(
+    DLCall::new(
         &[
             &["hashlib", "md5"],
             &["hashlib", "sha1"],
@@ -83,7 +83,7 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
         "Use of insecure MD2, MD4, MD5, or SHA1 hash function",
         Severity::Medium
     ),
-    BLCall::new(
+    DLCall::new(
         &[
             &["Crypto", "Cipher", "ARC2", "new"],
             &["Crypto", "Cipher", "ARC2", "new"],
@@ -103,10 +103,10 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
         "Use of insecure cipher or cipher mode, replace with a known secure cipher such as AES",
         Severity::High
     ),
-    BLCall::new(&[&["tempfile", "mktemp"]], "Use of insecure and deprecated function (mktemp)", Severity::Medium),
-    BLCall::new(&[&["eval"]], "Use of possibly insecure function - consider using safer ast.literal_eval", Severity::Medium),
-    BLCall::new(&[&["django", "utils", "safestring", "mark_safe"]], "Use of mark_safe() may expose cross-site scripting vulnerabilities and should be reviewed.", Severity::Medium),
-    BLCall::new(
+    DLCall::new(&[&["tempfile", "mktemp"]], "Use of insecure and deprecated function (mktemp)", Severity::Medium),
+    DLCall::new(&[&["eval"]], "Use of possibly insecure function - consider using safer ast.literal_eval", Severity::Medium),
+    DLCall::new(&[&["django", "utils", "safestring", "mark_safe"]], "Use of mark_safe() may expose cross-site scripting vulnerabilities and should be reviewed.", Severity::Medium),
+    DLCall::new(
         &[
             &["urllib", "urlopen"],
             &["urllib", "request", "urlopen"],
@@ -126,7 +126,7 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
         "Audit url open for permitted schemes. Allowing use of ‘file:’’ or custom schemes is often unexpected",
         Severity::Medium
     ),
-    BLCall::new(
+    DLCall::new(
         &[
             &["random", "random"],
             &["random", "randrange"],
@@ -139,7 +139,7 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
         "Standard pseudo-random generators are not suitable for security/cryptographic purposes",
         Severity::Low
         ),
-    BLCall::new(&[
+    DLCall::new(&[
             &["xml", "etree", "cElementTree", "parse"],
             &["xml", "etree", "cElementTree", "iterparse"],
             &["xml", "etree", "cElementTree", "fromstring"],
@@ -168,7 +168,7 @@ const BLACKLISTED_CALLS: &[BLCall] = &[
         "Using various XLM methods to parse untrusted XML data is known to be vulnerable to XML attacks. Methods should be replaced with their defusedxml equivalents",
         Severity::High
     ),
-    BLCall::new(&[&["ssl", "_create_unverified_context"]], "Python allows using an insecure context via the _create_unverified_context that reverts to the previous behavior that does not validate certificates or perform hostname checks", Severity::Medium)
+    DLCall::new(&[&["ssl", "_create_unverified_context"]], "Python allows using an insecure context via the _create_unverified_context that reverts to the previous behavior that does not validate certificates or perform hostname checks", Severity::Medium)
 ];
 
 fn comp_small_norm(small: &SmallVec<[&str; 8]>, norm: &&[&str]) -> bool {
@@ -184,10 +184,10 @@ fn comp_small_norm(small: &SmallVec<[&str; 8]>, norm: &&[&str]) -> bool {
 }
 
 /// S001
-pub fn blacklist_calls(checker: &mut Checker, expr: &Expr) {
+pub fn denylist_calls(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Call { func, .. } = &expr.node {
         if let Some(message) = checker.resolve_call_path(func).and_then(|call_path| {
-            for bl_call in BLACKLISTED_CALLS {
+            for bl_call in DENYLIST_CALLS {
                 if bl_call.severity >= checker.settings.flake8_bandit.severity {
                     for path in bl_call.calls {
                         if comp_small_norm(&call_path, path) {
@@ -206,7 +206,7 @@ pub fn blacklist_calls(checker: &mut Checker, expr: &Expr) {
             }
             None
         }) {
-            let issue = BlacklistCall {
+            let issue = DenylistCall {
                 message: message.to_string(),
             };
             checker

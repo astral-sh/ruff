@@ -429,7 +429,7 @@ ruff_macros::register_rules!(
     rules::eradicate::rules::CommentedOutCode,
     // flake8-bandit
     rules::flake8_bandit::rules::Assert,
-    rules::flake8_bandit::rules::BlacklistCall,
+    rules::flake8_bandit::rules::DenylistCall,
     rules::flake8_bandit::rules::ExecBuiltin,
     rules::flake8_bandit::rules::BadFilePermissions,
     rules::flake8_bandit::rules::HardcodedBindAllInterfaces,

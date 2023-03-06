@@ -463,7 +463,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Eradicate, "001") => Rule::CommentedOutCode,
 
         // flake8-bandit
-        (Flake8Bandit, "001") => Rule::BlacklistCall,
+        (Flake8Bandit, "001") => Rule::DenylistCall,
         (Flake8Bandit, "101") => Rule::Assert,
         (Flake8Bandit, "102") => Rule::ExecBuiltin,
         (Flake8Bandit, "103") => Rule::BadFilePermissions,
