@@ -1,5 +1,6 @@
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::ast::strings::leading_quote;
 use crate::ast::types::Range;
 use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
@@ -7,7 +8,6 @@ use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
-use crate::rules::pydocstyle::helpers::leading_quote;
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]

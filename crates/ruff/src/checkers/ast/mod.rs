@@ -43,7 +43,7 @@ use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
 use crate::source_code::{Indexer, Locator, Stylist};
 use crate::visibility::transition_scope;
-use crate::{autofix, docstrings, noqa, visibility};
+use crate::{ast, autofix, docstrings, noqa, visibility};
 
 mod deferred;
 
@@ -5298,7 +5298,7 @@ impl<'a> Checker<'a> {
                     Location::new(expr.location.row(), expr.location.column()),
                 ));
 
-                let body = pydocstyle::helpers::raw_contents(contents);
+                let body = ast::strings::raw_contents(contents);
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,

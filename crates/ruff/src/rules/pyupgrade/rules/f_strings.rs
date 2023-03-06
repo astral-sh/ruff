@@ -6,11 +6,11 @@ use rustpython_common::format::{
 use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use crate::ast::strings::{leading_quote, trailing_quote};
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violation::AlwaysAutofixableViolation;

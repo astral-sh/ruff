@@ -10,12 +10,12 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_stdlib::keyword::KWLIST;
 
+use crate::ast::strings::{leading_quote, trailing_quote};
 use crate::ast::types::Range;
 use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violation::AlwaysAutofixableViolation;
 

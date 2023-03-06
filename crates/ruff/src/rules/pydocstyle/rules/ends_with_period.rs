@@ -2,6 +2,7 @@ use strum::IntoEnumIterator;
 
 use ruff_macros::{derive_message_formats, violation};
 
+use crate::ast::strings::leading_quote;
 use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -9,7 +10,7 @@ use crate::docstrings::sections::SectionKind;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::Diagnostic;
-use crate::rules::pydocstyle::helpers::{leading_quote, logical_line};
+use crate::rules::pydocstyle::helpers::logical_line;
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
