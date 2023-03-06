@@ -17,20 +17,6 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  cargo-build:
-    name: "cargo build"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - uses: Swatinem/rust-cache@v1
-      - run: cargo build --all
-      - run: ./target/debug/ruff_dev generate-all
-      - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo dev generate-all'."
-      - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo dev generate-all'."
-      - run: git diff --exit-code -- README.md ruff.schema.json docs
-
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest

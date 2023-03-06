@@ -184,6 +184,20 @@ impl JsonSchema for RuleSelector {
                 std::iter::once("ALL".to_string())
                     .chain(
                         RuleCodePrefix::iter()
+                            .filter(|p| {
+                                // Once logical lines are active by default, please remove this.
+                                // This is here because generate-all output otherwise depends on
+                                // the feature sets which makes the test running with
+                                // `--all-features` fail
+                                !Rule::from_code(&format!(
+                                    "{}{}",
+                                    p.linter().common_prefix(),
+                                    p.short_code()
+                                ))
+                                .unwrap()
+                                .lint_source()
+                                .is_logical_lines()
+                            })
                             .map(|p| {
                                 let prefix = p.linter().common_prefix();
                                 let code = p.short_code();
