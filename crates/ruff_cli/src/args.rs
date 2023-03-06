@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
@@ -112,6 +113,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -121,6 +123,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -131,6 +134,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -140,6 +144,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide = true
     )]
@@ -170,6 +175,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -180,6 +186,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -401,6 +408,11 @@ impl CheckArgs {
             },
         )
     }
+}
+
+fn parse_rule_selector(env: &str) -> Result<RuleSelector, std::io::Error> {
+    RuleSelector::from_str(env)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))
 }
 
 fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {

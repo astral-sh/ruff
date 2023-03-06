@@ -51,7 +51,7 @@ impl FromStr for RuleSelector {
 
             Ok(Self::Prefix {
                 prefix: RuleCodePrefix::parse(&linter, code)
-                    .map_err(|_| ParseError::Unknown(code.to_string()))?,
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?,
                 redirected_from,
             })
         }
@@ -60,7 +60,7 @@ impl FromStr for RuleSelector {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
-    #[error("Unknown rule selector `{0}`")]
+    #[error("Unknown rule selector: `{0}`")]
     // TODO(martin): tell the user how to discover rule codes via the CLI once such a command is
     // implemented (but that should of course be done only in ruff_cli and not here)
     Unknown(String),
