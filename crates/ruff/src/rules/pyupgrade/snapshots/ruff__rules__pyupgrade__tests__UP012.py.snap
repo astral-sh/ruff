@@ -124,137 +124,188 @@ expression: diagnostics
 - kind:
     UnnecessaryEncodeUTF8: ~
   location:
-    row: 26
+    row: 16
+    column: 4
+  end_location:
+    row: 17
+    column: 20
+  fix:
+    content: "b\"Lorem \"\n    b\"Ipsum\""
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 17
+      column: 20
+  parent: ~
+- kind:
+    UnnecessaryEncodeUTF8: ~
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 21
+    column: 20
+  fix:
+    content: "b\"Lorem \"  # Comment\n    b\"Ipsum\""
+    location:
+      row: 20
+      column: 4
+    end_location:
+      row: 21
+      column: 20
+  parent: ~
+- kind:
+    UnnecessaryEncodeUTF8: ~
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 24
+    column: 29
+  fix:
+    content: "b\"Lorem \" b\"Ipsum\""
+    location:
+      row: 24
+      column: 4
+    end_location:
+      row: 24
+      column: 29
+  parent: ~
+- kind:
+    UnnecessaryEncodeUTF8: ~
+  location:
+    row: 32
     column: 0
   end_location:
-    row: 26
+    row: 32
     column: 27
   fix:
     content: ""
     location:
-      row: 26
+      row: 32
       column: 19
     end_location:
-      row: 26
+      row: 32
       column: 26
   parent: ~
 - kind:
     UnnecessaryEncodeUTF8: ~
   location:
-    row: 44
+    row: 50
     column: 0
   end_location:
-    row: 44
+    row: 50
     column: 31
   fix:
     content: ""
     location:
-      row: 44
+      row: 50
       column: 23
     end_location:
-      row: 44
+      row: 50
       column: 30
   parent: ~
 - kind:
     UnnecessaryEncodeUTF8: ~
   location:
-    row: 46
+    row: 52
     column: 0
   end_location:
-    row: 46
+    row: 52
     column: 39
   fix:
     content: ""
     location:
-      row: 46
+      row: 52
       column: 23
     end_location:
-      row: 46
+      row: 52
       column: 38
   parent: ~
 - kind:
     UnnecessaryEncodeUTF8: ~
   location:
-    row: 48
+    row: 54
     column: 0
   end_location:
-    row: 48
+    row: 54
     column: 24
   fix:
     content: "br\"foo\\o\""
     location:
-      row: 48
+      row: 54
       column: 0
     end_location:
-      row: 48
+      row: 54
       column: 24
   parent: ~
 - kind:
     UnnecessaryEncodeUTF8: ~
   location:
-    row: 49
+    row: 55
     column: 0
   end_location:
-    row: 49
+    row: 55
     column: 22
   fix:
     content: "b\"foo\""
     location:
-      row: 49
+      row: 55
       column: 0
     end_location:
-      row: 49
+      row: 55
       column: 22
   parent: ~
 - kind:
     UnnecessaryEncodeUTF8: ~
   location:
-    row: 50
+    row: 56
     column: 0
   end_location:
-    row: 50
+    row: 56
     column: 24
   fix:
     content: "bR\"foo\\o\""
     location:
-      row: 50
+      row: 56
       column: 0
     end_location:
-      row: 50
+      row: 56
       column: 24
   parent: ~
 - kind:
     UnnecessaryEncodeUTF8: ~
   location:
-    row: 51
+    row: 57
     column: 0
   end_location:
-    row: 51
+    row: 57
     column: 22
   fix:
     content: "b\"foo\""
     location:
-      row: 51
+      row: 57
       column: 0
     end_location:
-      row: 51
+      row: 57
       column: 22
   parent: ~
 - kind:
     UnnecessaryEncodeUTF8: ~
   location:
-    row: 52
+    row: 58
     column: 6
   end_location:
-    row: 52
+    row: 58
     column: 20
   fix:
     content: "b\"foo\""
     location:
-      row: 52
+      row: 58
       column: 6
     end_location:
-      row: 52
+      row: 58
       column: 20
   parent: ~
 
