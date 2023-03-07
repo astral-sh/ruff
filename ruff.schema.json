@@ -908,7 +908,7 @@
             "type": "string"
           }
         },
-        "runtime-evaluated-baseclasses": {
+        "runtime-evaluated-base-classes": {
           "description": "Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.",
           "type": [
             "array",

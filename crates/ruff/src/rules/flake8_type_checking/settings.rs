@@ -38,12 +38,12 @@ pub struct Options {
         default = "[]",
         value_type = "list[str]",
         example = r#"
-            runtime-evaluated-baseclasses = ["pydantic.BaseModel"]
+            runtime-evaluated-base-classes = ["pydantic.BaseModel"]
         "#
     )]
     /// Exempt classes that list any of the enumerated classes as a base class
     /// from needing to be moved into type-checking blocks.
-    pub runtime_evaluated_baseclasses: Option<Vec<String>>,
+    pub runtime_evaluated_base_classes: Option<Vec<String>>,
     #[option(
         default = "[]",
         value_type = "list[str]",
@@ -60,7 +60,7 @@ pub struct Options {
 pub struct Settings {
     pub strict: bool,
     pub exempt_modules: Vec<String>,
-    pub runtime_evaluated_baseclasses: Vec<String>,
+    pub runtime_evaluated_base_classes: Vec<String>,
     pub runtime_evaluated_decorators: Vec<String>,
 }
 
@@ -69,7 +69,7 @@ impl Default for Settings {
         Self {
             strict: false,
             exempt_modules: vec!["typing".to_string()],
-            runtime_evaluated_baseclasses: vec![],
+            runtime_evaluated_base_classes: vec![],
             runtime_evaluated_decorators: vec![],
         }
     }
@@ -82,8 +82,8 @@ impl From<Options> for Settings {
             exempt_modules: options
                 .exempt_modules
                 .unwrap_or_else(|| vec!["typing".to_string()]),
-            runtime_evaluated_baseclasses: options
-                .runtime_evaluated_baseclasses
+            runtime_evaluated_base_classes: options
+                .runtime_evaluated_base_classes
                 .unwrap_or_default(),
             runtime_evaluated_decorators: options.runtime_evaluated_decorators.unwrap_or_default(),
         }
@@ -95,7 +95,7 @@ impl From<Settings> for Options {
         Self {
             strict: Some(settings.strict),
             exempt_modules: Some(settings.exempt_modules),
-            runtime_evaluated_baseclasses: Some(settings.runtime_evaluated_baseclasses),
+            runtime_evaluated_base_classes: Some(settings.runtime_evaluated_base_classes),
             runtime_evaluated_decorators: Some(settings.runtime_evaluated_decorators),
         }
     }
