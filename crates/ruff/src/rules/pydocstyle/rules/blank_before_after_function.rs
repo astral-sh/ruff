@@ -64,7 +64,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
     {
         let before = checker
             .locator
-            .slice(&Range::new(parent.location, docstring.expr.location));
+            .slice(Range::new(parent.location, docstring.expr.location));
 
         let blank_lines_before = before
             .lines()
@@ -95,7 +95,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
         .rules
         .enabled(&Rule::NoBlankLineAfterFunction)
     {
-        let after = checker.locator.slice(&Range::new(
+        let after = checker.locator.slice(Range::new(
             docstring.expr.end_location.unwrap(),
             parent.end_location.unwrap(),
         ));

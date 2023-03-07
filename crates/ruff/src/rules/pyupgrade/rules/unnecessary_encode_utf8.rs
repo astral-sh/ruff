@@ -100,7 +100,7 @@ fn replace_with_bytes_literal(
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
     if patch {
-        let content = locator.slice(&Range::new(
+        let content = locator.slice(Range::new(
             constant.location,
             constant.end_location.unwrap(),
         ));

@@ -227,7 +227,7 @@ pub fn remove_unused_imports<'a>(
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let module_text = locator.slice(&Range::from_located(stmt));
+    let module_text = locator.slice(Range::from_located(stmt));
     let mut tree = match_module(module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {

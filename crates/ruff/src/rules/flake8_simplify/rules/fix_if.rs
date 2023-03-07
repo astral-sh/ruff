@@ -39,7 +39,7 @@ pub(crate) fn fix_nested_if_statements(
     };
 
     // Extract the module text.
-    let contents = locator.slice(&Range::new(
+    let contents = locator.slice(Range::new(
         Location::new(stmt.location.row(), 0),
         Location::new(stmt.end_location.unwrap().row() + 1, 0),
     ));

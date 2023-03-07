@@ -52,7 +52,7 @@ pub fn invalid_escape_sequence(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let text = locator.slice(&Range::new(start, end));
+    let text = locator.slice(Range::new(start, end));
 
     // Determine whether the string is single- or triple-quoted.
     let Ok(quote) = extract_quote(text) else {

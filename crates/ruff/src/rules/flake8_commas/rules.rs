@@ -308,7 +308,7 @@ pub fn trailing_commas(
                 // rather than just inserting a comma at the end. This prevents the UP034 autofix
                 // removing any brackets in the same linter pass - doing both at the same time could
                 // lead to a syntax error.
-                let contents = locator.slice(&Range::new(missing_comma.0, missing_comma.2));
+                let contents = locator.slice(Range::new(missing_comma.0, missing_comma.2));
                 diagnostic.amend(Fix::replacement(
                     format!("{contents},"),
                     missing_comma.0,

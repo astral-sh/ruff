@@ -142,7 +142,7 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 fn clean_params_tuple(checker: &mut Checker, right: &Expr) -> String {
     let mut contents = checker
         .locator
-        .slice(&Range::from_located(right))
+        .slice(Range::from_located(right))
         .to_string();
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
@@ -196,7 +196,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                             }
                         }
 
-                        let value_string = checker.locator.slice(&Range::from_located(value));
+                        let value_string = checker.locator.slice(Range::from_located(value));
                         arguments.push(format!("{key_string}={value_string}"));
                     } else {
                         // If there are any non-string keys, abort.
@@ -204,7 +204,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                     }
                 }
                 None => {
-                    let value_string = checker.locator.slice(&Range::from_located(value));
+                    let value_string = checker.locator.slice(Range::from_located(value));
                     arguments.push(format!("**{value_string}"));
                 }
             }
@@ -320,7 +320,7 @@ pub(crate) fn printf_string_formatting(
     let mut strings: Vec<(Location, Location)> = vec![];
     let mut extension = None;
     for (start, tok, end) in lexer::lex_located(
-        checker.locator.slice(&Range::from_located(expr)),
+        checker.locator.slice(Range::from_located(expr)),
         Mode::Module,
         expr.location,
     )
@@ -345,7 +345,7 @@ pub(crate) fn printf_string_formatting(
     // Parse each string segment.
     let mut format_strings = vec![];
     for (start, end) in &strings {
-        let string = checker.locator.slice(&Range::new(*start, *end));
+        let string = checker.locator.slice(Range::new(*start, *end));
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
@@ -383,10 +383,10 @@ pub(crate) fn printf_string_formatting(
         // Add the content before the string segment.
         match prev {
             None => {
-                contents.push_str(checker.locator.slice(&Range::new(expr.location, *start)));
+                contents.push_str(checker.locator.slice(Range::new(expr.location, *start)));
             }
             Some(prev) => {
-                contents.push_str(checker.locator.slice(&Range::new(prev, *start)));
+                contents.push_str(checker.locator.slice(Range::new(prev, *start)));
             }
         }
         // Add the string itself.
@@ -395,7 +395,7 @@ pub(crate) fn printf_string_formatting(
     }
 
     if let Some((.., end)) = extension {
-        contents.push_str(checker.locator.slice(&Range::new(prev.unwrap(), end)));
+        contents.push_str(checker.locator.slice(Range::new(prev.unwrap(), end)));
     }
 
     // Add the `.format` call.

@@ -55,7 +55,7 @@ pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stm
                 && !match_leading_content(stmt, checker.locator)
                 && !match_trailing_content(stmt, checker.locator)
             {
-                let first_line = checker.locator.slice(&Range::new(
+                let first_line = checker.locator.slice(Range::new(
                     Location::new(stmt.location.row(), 0),
                     Location::new(stmt.location.row() + 1, 0),
                 ));
