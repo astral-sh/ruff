@@ -1,4 +1,5 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
@@ -59,7 +60,7 @@ fn is_default_encode(args: &[Expr], kwargs: &[Keyword]) -> bool {
         (1, 0) => is_utf8_encoding_arg(&args[0]),
         // .encode(kwarg=kwarg)
         (0, 1) => {
-            kwargs[0].node.arg == Some("encoding".to_string())
+            kwargs[0].node.arg.as_ref().unwrap() == "encoding"
                 && is_utf8_encoding_arg(&kwargs[0].node.value)
         }
         // .encode(*args, **kwargs)
@@ -67,8 +68,8 @@ fn is_default_encode(args: &[Expr], kwargs: &[Keyword]) -> bool {
     }
 }
 
-// Return a Fix for a default `encode` call removing the encoding argument,
-// keyword, or positional.
+/// Return a [`Fix`] for a default `encode` call removing the encoding argument,
+/// keyword, or positional.
 fn delete_default_encode_arg_or_kwarg(
     expr: &Expr,
     args: &[Expr],
@@ -92,7 +93,7 @@ fn delete_default_encode_arg_or_kwarg(
     }
 }
 
-// Return a Fix replacing the call to encode by a `"b"` prefix on the string.
+/// Return a [`Fix`] replacing the call to encode by a `"b"` prefix on the string.
 fn replace_with_bytes_literal(
     expr: &Expr,
     constant: &Expr,
@@ -101,16 +102,34 @@ fn replace_with_bytes_literal(
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
     if patch {
-        let content = locator.slice(Range::new(
+        // Build up a replacement string by prefixing all string tokens with `b`.
+        let contents = locator.slice(Range::new(
             constant.location,
             constant.end_location.unwrap(),
         ));
-        let content = format!(
-            "b{}",
-            content.trim_start_matches('u').trim_start_matches('U')
-        );
+        let mut replacement = String::with_capacity(contents.len() + 1);
+        let mut prev = None;
+        for (start, tok, end) in
+            lexer::lex_located(contents, Mode::Module, constant.location).flatten()
+        {
+            if matches!(tok, Tok::String { .. }) {
+                if let Some(prev) = prev {
+                    replacement.push_str(locator.slice(Range::new(prev, start)));
+                }
+                let string = locator.slice(Range::new(start, end));
+                replacement.push_str(&format!(
+                    "b{}",
+                    &string.trim_start_matches('u').trim_start_matches('U')
+                ));
+            } else {
+                if let Some(prev) = prev {
+                    replacement.push_str(locator.slice(Range::new(prev, end)));
+                }
+            }
+            prev = Some(end);
+        }
         diagnostic.amend(Fix::replacement(
-            content,
+            replacement,
             expr.location,
             expr.end_location.unwrap(),
         ));

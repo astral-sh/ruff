@@ -12,11 +12,17 @@ Ipsum
 """.encode(
     "utf-8"
 )
-# b"""
-# Lorem
-#
-# Ipsum
-# """
+(
+    "Lorem "
+    "Ipsum".encode()
+)
+(
+    "Lorem "  # Comment
+    "Ipsum".encode()  # Comment
+)
+(
+    "Lorem " "Ipsum".encode()
+)
 
 # `encode` on variables should not be processed.
 string = "hello there"
