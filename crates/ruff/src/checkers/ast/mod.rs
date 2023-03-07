@@ -185,7 +185,6 @@ where
                 }
             }
         }
-
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
@@ -2086,11 +2085,30 @@ where
                 // If we're in a class or module scope, then the annotation needs to be
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = !self.ctx.annotations_future_enabled
-                    && matches!(
+                let runtime_annotation = if self.ctx.annotations_future_enabled {
+                    if matches!(self.ctx.current_scope().kind, ScopeKind::Class(..)) {
+                        let baseclasses = &self
+                            .settings
+                            .flake8_type_checking
+                            .runtime_evaluated_baseclasses;
+                        let decorators = &self
+                            .settings
+                            .flake8_type_checking
+                            .runtime_evaluated_decorators;
+                        flake8_type_checking::helpers::runtime_evaluated(
+                            &self.ctx,
+                            baseclasses,
+                            decorators,
+                        )
+                    } else {
+                        false
+                    }
+                } else {
+                    matches!(
                         self.ctx.current_scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
-                    );
+                    )
+                };
 
                 if runtime_annotation {
                     visit_type_definition!(self, annotation);
@@ -5490,7 +5508,6 @@ pub fn check_ast(
     } else {
         python_ast
     };
-
     // Iterate over the AST.
     checker.visit_body(python_ast);
 
