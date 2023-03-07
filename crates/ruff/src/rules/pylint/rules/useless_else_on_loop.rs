@@ -1,7 +1,8 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{ExcepthandlerKind, MatchCase, Stmt, StmtKind};
 
-use crate::ast::helpers;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;

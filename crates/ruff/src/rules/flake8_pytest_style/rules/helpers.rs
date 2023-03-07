@@ -1,7 +1,8 @@
 use num_traits::identities::Zero;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::{collect_call_path, map_callable};
+use ruff_python_ast::helpers::{collect_call_path, map_callable};
+
 use crate::checkers::ast::Checker;
 
 const ITERABLE_INITIALIZERS: &[&str] = &["dict", "frozenset", "list", "tuple", "set"];

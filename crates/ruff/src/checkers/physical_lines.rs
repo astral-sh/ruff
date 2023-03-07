@@ -15,7 +15,7 @@ use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
-use crate::source_code::Stylist;
+use ruff_python_ast::source_code::Stylist;
 
 pub fn check_physical_lines(
     path: &Path,
@@ -185,7 +185,7 @@ mod tests {
     use super::check_physical_lines;
     use crate::registry::Rule;
     use crate::settings::{flags, Settings};
-    use crate::source_code::{Locator, Stylist};
+    use ruff_python_ast::source_code::{Locator, Stylist};
 
     #[test]
     fn e501_non_ascii_char() {

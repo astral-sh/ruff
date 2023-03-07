@@ -1,15 +1,16 @@
 use itertools::Itertools;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Alias, AliasData, Stmt};
 
-use crate::ast::types::Range;
-use crate::ast::whitespace::indentation;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::indentation;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
-use crate::source_code::{Locator, Stylist};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]

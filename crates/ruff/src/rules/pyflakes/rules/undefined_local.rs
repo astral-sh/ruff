@@ -1,8 +1,8 @@
 use std::string::ToString;
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Binding, Scope, ScopeKind};
 
-use crate::ast::types::{Binding, Scope, ScopeKind};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 

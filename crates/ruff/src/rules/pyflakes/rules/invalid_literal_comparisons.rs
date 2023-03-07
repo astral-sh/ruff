@@ -1,13 +1,14 @@
 use itertools::izip;
 use log::error;
 use once_cell::unsync::Lazy;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Cmpop, Expr};
 use serde::{Deserialize, Serialize};
 
-use crate::ast::helpers;
-use crate::ast::operations::locate_cmpops;
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
+use ruff_python_ast::operations::locate_cmpops;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;

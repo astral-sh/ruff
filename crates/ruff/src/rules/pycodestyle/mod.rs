@@ -13,9 +13,10 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
+    use ruff_python_ast::source_code::LineEnding;
+
     use crate::registry::Rule;
     use crate::settings;
-    use crate::source_code::LineEnding;
     use crate::test::test_path;
 
     use super::settings::Settings;

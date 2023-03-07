@@ -3,11 +3,11 @@ use log::error;
 use rustpython_parser::ast::Location;
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]

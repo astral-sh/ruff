@@ -11,16 +11,16 @@ use rustpython_parser::ast::{
 };
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{has_comments_in, unparse_stmt};
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{visitor, whitespace};
 
-use crate::ast::helpers::{has_comments_in, unparse_stmt};
-use crate::ast::types::Range;
-use crate::ast::visitor::Visitor;
-use crate::ast::{visitor, whitespace};
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::match_module;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::{Locator, Stylist};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::helpers::is_falsy_constant;

@@ -5,13 +5,13 @@
 //!
 //! [Ruff]: https://github.com/charliermarsh/ruff
 
-pub use ast::types::Range;
 use cfg_if::cfg_if;
+pub use ruff_python_ast::source_code::round_trip;
+pub use ruff_python_ast::types::Range;
 pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;
 pub use violation::{AutofixKind, Availability as AutofixAvailability};
 
-mod ast;
 mod autofix;
 mod checkers;
 mod codes;
@@ -33,7 +33,6 @@ mod rule_redirects;
 mod rule_selector;
 mod rules;
 pub mod settings;
-pub mod source_code;
 mod violation;
 
 cfg_if! {

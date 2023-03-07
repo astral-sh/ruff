@@ -1,8 +1,9 @@
 //! Settings for the `flake8-self` plugin.
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 // By default, ignore the `namedtuple` methods and attributes, which are underscore-prefixed to
 // prevent conflicts with field names.

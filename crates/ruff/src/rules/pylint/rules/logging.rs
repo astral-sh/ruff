@@ -1,10 +1,10 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{is_logger_candidate, SimpleCallArgs};
+use ruff_python_ast::logging::LoggingLevel;
+use ruff_python_ast::types::Range;
 
-use crate::ast::helpers::{is_logger_candidate, SimpleCallArgs};
-use crate::ast::logging::LoggingLevel;
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pyflakes::cformat::CFormatSummary;
@@ -105,7 +105,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     }
 
     if let ExprKind::Attribute { attr, .. } = &func.node {
-        if LoggingLevel::from_str(attr.as_str()).is_some() {
+        if LoggingLevel::from_attribute(attr.as_str()).is_some() {
             let call_args = SimpleCallArgs::new(args, keywords);
             if let Some(msg) = call_args.get_argument("msg", Some(0)) {
                 if let ExprKind::Constant {

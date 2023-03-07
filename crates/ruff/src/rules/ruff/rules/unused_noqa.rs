@@ -1,6 +1,7 @@
 use itertools::Itertools;
-use ruff_macros::{derive_message_formats, violation};
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{derive_message_formats, violation};
 
 use crate::violation::AlwaysAutofixableViolation;
 

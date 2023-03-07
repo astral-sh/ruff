@@ -1,9 +1,9 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::collect_call_path;
+use ruff_python_ast::types::Range;
 
-use crate::ast::helpers::collect_call_path;
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violation::Violation;

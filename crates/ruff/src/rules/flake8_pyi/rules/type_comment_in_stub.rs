@@ -4,10 +4,10 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
-use crate::Range;
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub

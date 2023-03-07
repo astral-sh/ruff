@@ -2,8 +2,8 @@ use std::str::Lines;
 
 use rustpython_parser::ast::{Located, Location};
 
-use crate::ast::types::Range;
 use crate::source_code::Locator;
+use crate::types::Range;
 
 /// Extract the leading indentation from a line.
 pub fn indentation<'a, T>(locator: &'a Locator, located: &'a Located<T>) -> Option<&'a str> {

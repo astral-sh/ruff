@@ -1,9 +1,9 @@
 use rustpython_parser::ast::{ExprKind, Stmt};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::RaiseStatementVisitor;
+use ruff_python_ast::visitor::Visitor;
 
-use crate::ast::helpers::RaiseStatementVisitor;
-use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;

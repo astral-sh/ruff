@@ -5,12 +5,12 @@ use rustc_hash::FxHashSet;
 use rustpython_parser::ast::StmtKind;
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visibility::is_staticmethod;
+use ruff_python_ast::whitespace::LinesWithTrailingNewline;
+use ruff_python_ast::{cast, whitespace};
 
-use crate::ast::helpers::identifier_range;
-use crate::ast::types::Range;
-use crate::ast::visibility::is_staticmethod;
-use crate::ast::whitespace::LinesWithTrailingNewline;
-use crate::ast::{cast, whitespace};
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::docstrings::sections::{section_contexts, SectionContext, SectionKind};

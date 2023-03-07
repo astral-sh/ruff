@@ -1,7 +1,7 @@
 use strum_macros::EnumIter;
 
-use crate::ast::whitespace;
 use crate::docstrings::styles::SectionStyle;
+use ruff_python_ast::whitespace;
 
 #[derive(EnumIter, PartialEq, Eq, Debug, Clone, Copy)]
 pub enum SectionKind {

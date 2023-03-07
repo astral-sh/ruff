@@ -1,11 +1,12 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Comprehension, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
-use crate::ast::helpers::collect_arg_names;
-use crate::ast::types::{Node, Range};
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::collect_arg_names;
+use ruff_python_ast::types::{Node, Range};
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;

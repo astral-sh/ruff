@@ -4,18 +4,19 @@ use libcst_native::{
     ImportAlias, ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 use serde::{Deserialize, Serialize};
 
-use crate::ast::helpers::collect_call_path;
-use crate::ast::types::Range;
-use crate::ast::whitespace::indentation;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::collect_call_path;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::indentation;
+
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
-use crate::source_code::{Locator, Stylist};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

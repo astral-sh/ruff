@@ -6,7 +6,7 @@ use rustpython_parser::ast::{
     Cmpop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
 };
 
-use crate::ast::helpers::{create_expr, create_stmt};
+use ruff_python_ast::helpers::{create_expr, create_stmt};
 
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain

@@ -3,7 +3,7 @@
 use once_cell::unsync::OnceCell;
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
+use crate::types::Range;
 
 pub struct Locator<'a> {
     contents: &'a str,
@@ -145,7 +145,7 @@ impl<'a> Locator<'a> {
 mod tests {
     use rustpython_parser::ast::Location;
 
-    use crate::source_code::locator::{index_ascii, index_utf8, truncate_ascii, truncate_utf8};
+    use super::{index_ascii, index_utf8, truncate_ascii, truncate_utf8};
 
     #[test]
     fn ascii_index() {

@@ -1,7 +1,8 @@
-use crate::ast::helpers::is_logger_candidate;
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
 use rustpython_parser::ast::{Expr, ExprKind};
+
+use ruff_python_ast::helpers::is_logger_candidate;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
 #[derive(Default)]
 /// Collect `logging`-like calls from an AST.

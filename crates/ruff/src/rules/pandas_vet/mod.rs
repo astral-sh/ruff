@@ -13,10 +13,11 @@ mod tests {
     use test_case::test_case;
     use textwrap::dedent;
 
+    use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+
     use crate::linter::{check_path, LinterResult};
     use crate::registry::{Linter, Rule};
     use crate::settings::flags;
-    use crate::source_code::{Indexer, Locator, Stylist};
     use crate::test::test_path;
     use crate::{directives, settings};
 

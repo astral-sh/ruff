@@ -1,6 +1,6 @@
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Binding, BindingKind, ExecutionContext};
 
-use crate::ast::types::{Binding, BindingKind, ExecutionContext};
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 

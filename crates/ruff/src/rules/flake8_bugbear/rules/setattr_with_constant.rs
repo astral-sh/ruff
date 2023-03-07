@@ -1,15 +1,15 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_stmt;
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use ruff_python_stdlib::keyword::KWLIST;
 
-use crate::ast::helpers::unparse_stmt;
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]

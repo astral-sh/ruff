@@ -1,8 +1,9 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::ast::whitespace::leading_space;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::leading_space;
+
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
 

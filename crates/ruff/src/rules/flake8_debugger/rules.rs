@@ -1,12 +1,14 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Stmt};
 
-use super::types::DebuggerUsingType;
-use crate::ast::helpers::format_call_path;
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::format_call_path;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
+
+use super::types::DebuggerUsingType;
 
 // flake8-debugger
 

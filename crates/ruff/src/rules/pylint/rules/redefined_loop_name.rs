@@ -1,16 +1,16 @@
-use regex::Regex;
 use std::{fmt, iter};
 
+use regex::Regex;
 use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind, Withitem};
 use serde::{Deserialize, Serialize};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::{Node, Range};
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
-use crate::ast::comparable::ComparableExpr;
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::{Node, Range};
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;

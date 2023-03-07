@@ -18,14 +18,15 @@
 //!     method()
 //! ```
 
-use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
-use crate::ast::types::{Range, RefEquality};
-use crate::ast::visitor::Visitor;
-use crate::ast::{helpers, visitor};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{helpers, visitor};
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;

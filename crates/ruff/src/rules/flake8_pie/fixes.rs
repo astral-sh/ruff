@@ -1,10 +1,11 @@
 use anyhow::{bail, Result};
 use libcst_native::{Codegen, CodegenState, Expression, GeneratorExp};
 
-use crate::ast::types::Range;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+
 use crate::cst::matchers::{match_expr, match_module};
 use crate::fix::Fix;
-use crate::source_code::{Locator, Stylist};
 
 /// (PIE802) Convert `[i for i in a]` into `i for i in a`
 pub fn fix_unnecessary_comprehension_any_all(

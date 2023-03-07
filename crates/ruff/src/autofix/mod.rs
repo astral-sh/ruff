@@ -4,11 +4,11 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
 use crate::fix::Fix;
 use crate::linter::FixTable;
 use crate::registry::Diagnostic;
-use crate::source_code::Locator;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
 pub mod helpers;
 
@@ -100,7 +100,7 @@ mod tests {
     use crate::registry::Diagnostic;
     use crate::rules::pycodestyle::rules::NoNewLineAtEndOfFile;
 
-    use crate::source_code::Locator;
+    use ruff_python_ast::source_code::Locator;
 
     #[test]
     fn empty_file() {

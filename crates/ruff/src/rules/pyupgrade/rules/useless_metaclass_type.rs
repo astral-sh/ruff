@@ -1,8 +1,9 @@
 use log::error;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;

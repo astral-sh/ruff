@@ -1,14 +1,16 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind, Operator};
 
-use super::super::helpers::string_literal;
-use crate::ast::helpers::{any_over_expr, unparse_expr};
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{any_over_expr, unparse_expr};
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
+
+use super::super::helpers::string_literal;
 
 static SQL_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)(select\s.*from\s|delete\s+from\s|insert\s+into\s.*values\s|update\s.*set\s)")

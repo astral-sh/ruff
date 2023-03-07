@@ -1,5 +1,6 @@
+use ruff_python_ast::source_code::Stylist;
+
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
-use crate::source_code::Stylist;
 
 // Guess a capacity to use for string allocation.
 const CAPACITY: usize = 200;

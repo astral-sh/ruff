@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use rustpython_parser::ast::Expr;
 
-use crate::ast::comparable::ComparableExpr;
+use crate::comparable::ComparableExpr;
 
 /// Wrapper around `Expr` that implements `Hash` and `PartialEq`.
 pub struct HashableExpr<'a>(&'a Expr);
@@ -30,11 +30,11 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
 }
 
 impl<'a> HashableExpr<'a> {
-    pub(crate) const fn from_expr(expr: &'a Expr) -> Self {
+    pub const fn from_expr(expr: &'a Expr) -> Self {
         Self(expr)
     }
 
-    pub(crate) const fn as_expr(&self) -> &'a Expr {
+    pub const fn as_expr(&self) -> &'a Expr {
         self.0
     }
 }

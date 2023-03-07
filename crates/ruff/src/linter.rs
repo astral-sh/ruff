@@ -24,8 +24,8 @@ use crate::noqa::{add_noqa, rule_is_ignored};
 use crate::registry::{Diagnostic, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
 use crate::{directives, fs};
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");

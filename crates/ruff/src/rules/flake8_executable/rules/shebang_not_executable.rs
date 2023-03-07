@@ -5,8 +5,8 @@ use std::path::Path;
 use rustpython_parser::ast::Location;
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::registry::Diagnostic;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;

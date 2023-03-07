@@ -4,13 +4,14 @@ use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
-use ruff_rustpython::vendor;
 use rustpython_parser::ast::Location;
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::strings::leading_quote;
-use crate::ast::types::Range;
 use crate::source_code::Locator;
+use ruff_rustpython::vendor;
+
+use crate::strings::leading_quote;
+use crate::types::Range;
 
 pub struct Stylist<'a> {
     contents: &'a str,

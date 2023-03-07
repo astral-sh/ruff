@@ -2,9 +2,10 @@
 
 use std::collections::BTreeSet;
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 use super::categorize::ImportType;
 

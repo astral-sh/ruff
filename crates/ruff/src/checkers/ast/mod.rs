@@ -13,20 +13,25 @@ use rustpython_parser::ast::{
     Suite,
 };
 
-use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
-use ruff_python_stdlib::path::is_python_stub_file;
-
-use crate::ast::context::Context;
-use crate::ast::helpers::{binding_range, extract_handled_exceptions, to_module_path, Exceptions};
-use crate::ast::operations::{extract_all_names, AllNamesFlags};
-use crate::ast::relocate::relocate_expr;
-use crate::ast::types::{
+use ruff_python_ast::context::Context;
+use ruff_python_ast::helpers::{
+    binding_range, extract_handled_exceptions, to_module_path, Exceptions,
+};
+use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
+use ruff_python_ast::relocate::relocate_expr;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::types::{
     Binding, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
     RefEquality, Scope, ScopeKind,
 };
-use crate::ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
-use crate::ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
-use crate::ast::{branch_detection, cast, helpers, operations, typing, visibility, visitor};
+use ruff_python_ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
+use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
+use ruff_python_ast::{
+    branch_detection, cast, helpers, operations, strings, typing, visibility, visitor,
+};
+use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
+use ruff_python_stdlib::path::is_python_stub_file;
+
 use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::definition::{
     transition_scope, Definition, DefinitionKind, Docstring, Documentable,
@@ -43,8 +48,7 @@ use crate::rules::{
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
-use crate::{ast, autofix, docstrings, noqa};
+use crate::{autofix, docstrings, noqa};
 
 mod deferred;
 
@@ -2127,7 +2131,7 @@ where
             StmtKind::If { test, body, orelse } => {
                 self.visit_expr(test);
 
-                if flake8_type_checking::helpers::is_type_checking_block(self, test) {
+                if flake8_type_checking::helpers::is_type_checking_block(&self.ctx, test) {
                     if self.settings.rules.enabled(&Rule::EmptyTypeCheckingBlock) {
                         flake8_type_checking::rules::empty_type_checking_block(self, stmt, body);
                     }
@@ -5288,7 +5292,7 @@ impl<'a> Checker<'a> {
                     Location::new(expr.location.row(), expr.location.column()),
                 ));
 
-                let body = ast::strings::raw_contents(contents);
+                let body = strings::raw_contents(contents);
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,

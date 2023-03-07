@@ -34,16 +34,15 @@ pub use star_arg_unpacking_after_keyword_arg::{
 };
 pub use strip_with_multi_characters::{strip_with_multi_characters, StripWithMultiCharacters};
 pub use unary_prefix_increment::{unary_prefix_increment, UnaryPrefixIncrement};
+pub use unintentional_type_annotation::{
+    unintentional_type_annotation, UnintentionalTypeAnnotation,
+};
 pub use unreliable_callable_check::{unreliable_callable_check, UnreliableCallableCheck};
 pub use unused_loop_control_variable::{unused_loop_control_variable, UnusedLoopControlVariable};
 pub use useless_comparison::{useless_comparison, UselessComparison};
 pub use useless_contextlib_suppress::{useless_contextlib_suppress, UselessContextlibSuppress};
 pub use useless_expression::{useless_expression, UselessExpression};
 pub use zip_without_explicit_strict::{zip_without_explicit_strict, ZipWithoutExplicitStrict};
-
-pub use unintentional_type_annotation::{
-    unintentional_type_annotation, UnintentionalTypeAnnotation,
-};
 
 mod abstract_base_class;
 mod assert_false;

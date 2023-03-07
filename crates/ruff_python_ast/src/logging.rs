@@ -9,7 +9,7 @@ pub enum LoggingLevel {
 }
 
 impl LoggingLevel {
-    pub fn from_str(level: &str) -> Option<Self> {
+    pub fn from_attribute(level: &str) -> Option<Self> {
         match level {
             "debug" => Some(LoggingLevel::Debug),
             "critical" => Some(LoggingLevel::Critical),

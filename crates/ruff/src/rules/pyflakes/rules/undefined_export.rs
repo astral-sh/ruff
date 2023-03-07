@@ -1,8 +1,9 @@
-use crate::ast::types::{Range, Scope};
-use crate::registry::Diagnostic;
-use ruff_macros::{derive_message_formats, violation};
 use std::path::Path;
 
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Range, Scope};
+
+use crate::registry::Diagnostic;
 use crate::violation::Violation;
 
 #[violation]

@@ -1,12 +1,14 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, Keyword};
 
-use super::helpers::{is_empty_or_null_string, is_pytest_fail};
-use crate::ast::helpers::SimpleCallArgs;
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;
+
+use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 
 #[violation]
 pub struct FailWithoutMessage;

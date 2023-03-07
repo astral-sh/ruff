@@ -3,13 +3,13 @@ use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_macros::{derive_message_formats, violation};
-
-use crate::ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
-use crate::ast::helpers::{
+use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
+use ruff_python_ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
 };
-use crate::ast::types::Range;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;

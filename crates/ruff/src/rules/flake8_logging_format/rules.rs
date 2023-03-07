@@ -1,8 +1,9 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location, Operator};
 
-use crate::ast::helpers::{find_keyword, is_logger_candidate, SimpleCallArgs};
-use crate::ast::logging::LoggingLevel;
-use crate::ast::types::Range;
+use ruff_python_ast::helpers::{find_keyword, is_logger_candidate, SimpleCallArgs};
+use ruff_python_ast::logging::LoggingLevel;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};
@@ -134,7 +135,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     }
 
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
-        if let Some(logging_level) = LoggingLevel::from_str(attr.as_str()) {
+        if let Some(logging_level) = LoggingLevel::from_attribute(attr.as_str()) {
             let call_args = SimpleCallArgs::new(args, keywords);
             let level_call_range = Range::new(
                 Location::new(

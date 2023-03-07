@@ -1,13 +1,14 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Location, Stmt, StmtKind};
 
-use crate::ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
-use crate::ast::types::{Range, ScopeKind};
-use crate::ast::whitespace::leading_space;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::{Range, ScopeKind};
+use ruff_python_ast::whitespace::leading_space;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]

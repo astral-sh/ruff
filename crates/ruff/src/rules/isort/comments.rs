@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use rustpython_parser::ast::Location;
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::types::Range;
-use crate::source_code::Locator;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
 #[derive(Debug)]
 pub struct Comment<'a> {

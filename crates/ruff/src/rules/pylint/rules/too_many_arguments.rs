@@ -1,8 +1,8 @@
 use rustpython_parser::ast::{Arguments, Stmt};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
 
-use crate::ast::helpers::identifier_range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;

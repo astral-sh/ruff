@@ -1,12 +1,13 @@
 use std::hash::{BuildHasherDefault, Hash};
 
-use ruff_macros::{derive_message_formats, violation};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::comparable::{ComparableConstant, ComparableExpr};
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::Range;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr};
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::{Diagnostic, Rule};

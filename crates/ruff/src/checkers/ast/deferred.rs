@@ -1,10 +1,11 @@
 use rustpython_parser::ast::{Expr, Stmt};
 
-use crate::ast::types::RefEquality;
-use crate::ast::visibility::{Visibility, VisibleScope};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::types::RefEquality;
+use ruff_python_ast::visibility::{Visibility, VisibleScope};
+
 use crate::checkers::ast::AnnotationContext;
 use crate::docstrings::definition::Definition;
-use crate::Range;
 
 type Context<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
 

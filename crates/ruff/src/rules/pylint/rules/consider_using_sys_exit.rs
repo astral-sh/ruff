@@ -1,7 +1,8 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::{BindingKind, Range};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{BindingKind, Range};
+
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;

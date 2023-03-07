@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::ExcepthandlerKind::ExceptHandler;
 use rustpython_parser::ast::{Stmt, StmtKind};
 
-use crate::ast::types::RefEquality;
+use crate::types::RefEquality;
 
 /// Return the common ancestor of `left` and `right` below `stop`, or `None`.
 fn common_ancestor<'a>(

@@ -18,6 +18,7 @@ doctest = false
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }
 ruff_macros = { path = "../ruff_macros" }
+ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_rustpython = { path = "../ruff_rustpython" }
 

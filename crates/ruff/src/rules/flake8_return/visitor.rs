@@ -1,8 +1,8 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Expr, ExprKind, Location, Stmt, StmtKind};
 
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
 #[derive(Default)]
 pub struct Stack<'a> {

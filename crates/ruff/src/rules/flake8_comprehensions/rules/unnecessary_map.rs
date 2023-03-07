@@ -2,8 +2,8 @@ use log::error;
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::rules::flake8_comprehensions::fixes;

@@ -1,16 +1,17 @@
 use itertools::Itertools;
 use log::error;
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::helpers::contains_effect;
-use crate::ast::types::{Range, RefEquality, ScopeKind};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::{Range, RefEquality, ScopeKind};
+
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::registry::Diagnostic;
-use crate::source_code::Locator;
 use crate::violation::AlwaysAutofixableViolation;
 
 /// ## What it does

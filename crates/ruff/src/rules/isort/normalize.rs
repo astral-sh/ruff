@@ -1,6 +1,7 @@
+use crate::rules::isort::types::TrailingComma;
+
 use super::types::{AliasData, ImportBlock, ImportFromData};
 use super::AnnotatedImport;
-use crate::rules::isort::types::TrailingComma;
 
 pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) -> ImportBlock {
     let mut block = ImportBlock::default();

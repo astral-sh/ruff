@@ -1,8 +1,9 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::{checkers::ast::Checker, registry::Diagnostic, violation::Violation, Range};
+use crate::{checkers::ast::Checker, registry::Diagnostic, violation::Violation};
 
 /// ## What it does
 /// Checks for the use of `locals()` in `render` functions.

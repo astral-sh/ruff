@@ -1,10 +1,10 @@
 use rustpython_parser::ast::{ExprKind, Stmt};
 
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::RaiseStatementVisitor;
+use ruff_python_ast::visitor;
 use ruff_python_stdlib::str::is_lower;
 
-use crate::ast::helpers::RaiseStatementVisitor;
-use crate::ast::visitor;
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
 use crate::violation::Violation;

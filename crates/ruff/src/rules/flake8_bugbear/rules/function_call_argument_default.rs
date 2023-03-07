@@ -1,14 +1,16 @@
-use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
-use super::mutable_argument_default::is_mutable_func;
-use crate::ast::helpers::{compose_call_path, to_call_path};
-use crate::ast::types::{CallPath, Range};
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{compose_call_path, to_call_path};
+use ruff_python_ast::types::{CallPath, Range};
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
+
 use crate::checkers::ast::Checker;
 use crate::registry::{Diagnostic, DiagnosticKind};
 use crate::violation::Violation;
+
+use super::mutable_argument_default::is_mutable_func;
 
 #[violation]
 pub struct FunctionCallArgumentDefault {

@@ -1,4 +1,4 @@
-use crate::ast::visibility::{
+use ruff_python_ast::visibility::{
     class_visibility, function_visibility, method_visibility, Modifier, Visibility, VisibleScope,
 };
 use rustpython_parser::ast::{Expr, Stmt};
