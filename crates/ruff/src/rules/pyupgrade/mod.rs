@@ -59,7 +59,7 @@ mod tests {
     #[test_case(Rule::FString, Path::new("UP032.py"); "UP032")]
     #[test_case(Rule::FunctoolsCache, Path::new("UP033.py"); "UP033")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]
-    #[test_case(Rule::ImportReplacements, Path::new("UP035.py"); "UP035")]
+    #[test_case(Rule::DeprecatedImport, Path::new("UP035.py"); "UP035")]
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_0.py"); "UP036_0")]
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_1.py"); "UP036_1")]
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_2.py"); "UP036_2")]

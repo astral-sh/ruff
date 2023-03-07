@@ -1138,8 +1138,8 @@ where
                 if self.settings.rules.enabled(&Rule::RewriteCElementTree) {
                     pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
-                if self.settings.rules.enabled(&Rule::ImportReplacements) {
-                    pyupgrade::rules::import_replacements(
+                if self.settings.rules.enabled(&Rule::DeprecatedImport) {
+                    pyupgrade::rules::deprecated_import(
                         self,
                         stmt,
                         names,

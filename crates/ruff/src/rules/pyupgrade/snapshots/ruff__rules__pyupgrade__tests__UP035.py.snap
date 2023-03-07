@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 38
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 41
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -103,7 +103,7 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -123,7 +123,7 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -143,7 +143,7 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -163,7 +163,7 @@ expression: diagnostics
       column: 50
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -183,7 +183,7 @@ expression: diagnostics
       column: 51
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -203,7 +203,7 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -223,7 +223,7 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -243,7 +243,7 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -263,7 +263,7 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`, `Callable`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -283,7 +283,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Callable`"
     suggestion: "Import from `collections.abc`"
     fixable: true
@@ -292,18 +292,18 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 62
+    column: 75
   fix:
-    content: "from typing import Match, Pattern, List, OrderedDict\nfrom collections.abc import Callable"
+    content: "from typing import Match, Pattern, List, OrderedDict, AbstractSet\nfrom collections.abc import Callable"
     location:
       row: 44
       column: 0
     end_location:
       row: 44
-      column: 62
+      column: 75
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `collections` instead: `OrderedDict`"
     suggestion: "Import from `collections`"
     fixable: true
@@ -312,18 +312,18 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 62
+    column: 75
   fix:
-    content: "from typing import Callable, Match, Pattern, List\nfrom collections import OrderedDict"
+    content: "from typing import Callable, Match, Pattern, List, AbstractSet\nfrom collections import OrderedDict"
     location:
       row: 44
       column: 0
     end_location:
       row: 44
-      column: 62
+      column: 75
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
     body: "Import from `re` instead: `Match`, `Pattern`"
     suggestion: "Import from `re`"
     fixable: true
@@ -332,18 +332,44 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 62
+    column: 75
   fix:
-    content: "from typing import Callable, List, OrderedDict\nfrom re import Match, Pattern"
+    content: "from typing import Callable, List, OrderedDict, AbstractSet\nfrom re import Match, Pattern"
     location:
       row: 44
       column: 0
     end_location:
       row: 44
-      column: 62
+      column: 75
   parent: ~
 - kind:
-    name: ImportReplacements
+    name: DeprecatedImport
+    body: "`typing.List` is deprecated, use `list` instead"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 75
+  fix: ~
+  parent: ~
+- kind:
+    name: DeprecatedImport
+    body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 75
+  fix: ~
+  parent: ~
+- kind:
+    name: DeprecatedImport
     body: "Import from `collections.abc` instead: `Mapping`"
     suggestion: ~
     fixable: false
