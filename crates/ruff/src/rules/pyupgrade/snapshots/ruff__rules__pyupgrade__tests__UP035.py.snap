@@ -310,15 +310,36 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 49
+    column: 62
   fix:
-    content: "from typing import Match, Pattern, List\nfrom collections.abc import Callable"
+    content: "from typing import Match, Pattern, List, OrderedDict\nfrom collections.abc import Callable"
     location:
       row: 44
       column: 0
     end_location:
       row: 44
-      column: 49
+      column: 62
+  parent: ~
+- kind:
+    ImportReplacements:
+      module: collections
+      members:
+        - OrderedDict
+      fixable: true
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 62
+  fix:
+    content: "from typing import Callable, Match, Pattern, List\nfrom collections import OrderedDict"
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 44
+      column: 62
   parent: ~
 - kind:
     ImportReplacements:
@@ -332,15 +353,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 49
+    column: 62
   fix:
-    content: "from typing import Callable, List\nfrom re import Match, Pattern"
+    content: "from typing import Callable, List, OrderedDict\nfrom re import Match, Pattern"
     location:
       row: 44
       column: 0
     end_location:
       row: 44
-      column: 49
+      column: 62
   parent: ~
 - kind:
     ImportReplacements:
