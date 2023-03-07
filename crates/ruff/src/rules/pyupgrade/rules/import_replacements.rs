@@ -134,11 +134,9 @@ const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
     "AsyncIterator",
     "Awaitable",
     "ByteString",
-    "ChainMap",
     "Collection",
     "Container",
     "Coroutine",
-    "Counter",
     "Generator",
     "Hashable",
     "ItemsView",
@@ -155,6 +153,9 @@ const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
     "Sized",
     "ValuesView",
 ];
+
+// Members of `typing` that have been moved to `collections`.
+const TYPING_TO_COLLECTIONS_39: &[&str] = &["ChainMap", "Counter", "OrderedDict"];
 
 // Members of `typing` that have been moved to `typing.re`.
 const TYPING_TO_RE_39: &[&str] = &["Match", "Pattern"];
@@ -298,6 +299,15 @@ impl<'a> ImportReplacer<'a> {
                 if let Some(replacement) =
                     self.try_replace(&typing_to_collections_abc, "collections.abc")
                 {
+                    replacements.push(replacement);
+                }
+
+                // `typing` to `collections`
+                let mut typing_to_collections = vec![];
+                if self.version >= PythonVersion::Py39 {
+                    typing_to_collections.extend(TYPING_TO_COLLECTIONS_39);
+                }
+                if let Some(replacement) = self.try_replace(&typing_to_collections, "collections") {
                     replacements.push(replacement);
                 }
 
