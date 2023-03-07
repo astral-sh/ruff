@@ -54,7 +54,7 @@ fn apply_fixes<'a>(
         }
 
         // Add all contents from `last_pos` to `fix.location`.
-        let slice = locator.slice(&Range::new(last_pos, fix.location));
+        let slice = locator.slice(Range::new(last_pos, fix.location));
         output.push_str(slice);
 
         // Add the patch itself.
@@ -78,7 +78,7 @@ pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
     let mut output = String::with_capacity(locator.len());
 
     // Add all contents from `last_pos` to `fix.location`.
-    let slice = locator.slice(&Range::new(Location::new(1, 0), fix.location));
+    let slice = locator.slice(Range::new(Location::new(1, 0), fix.location));
     output.push_str(slice);
 
     // Add the patch itself.

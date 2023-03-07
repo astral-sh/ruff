@@ -56,7 +56,7 @@ fn fix_f_string_missing_placeholders(
     tok_range: &Range,
     checker: &mut Checker,
 ) -> Fix {
-    let content = checker.locator.slice(&Range::new(
+    let content = checker.locator.slice(Range::new(
         prefix_range.end_location,
         tok_range.end_location,
     ));

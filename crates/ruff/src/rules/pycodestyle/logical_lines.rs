@@ -89,7 +89,7 @@ fn build_line<'a>(
             s = format!("\"{}\"", "x".repeat(value.len()).clone());
             &s
         } else {
-            locator.slice(&Range {
+            locator.slice(Range {
                 location: *start,
                 end_location: *end,
             })
@@ -97,7 +97,7 @@ fn build_line<'a>(
 
         if let Some(prev) = prev {
             if prev.row() != start.row() {
-                let prev_text = locator.slice(&Range {
+                let prev_text = locator.slice(Range {
                     location: Location::new(prev.row(), prev.column() - 1),
                     end_location: Location::new(prev.row(), prev.column()),
                 });
@@ -109,7 +109,7 @@ fn build_line<'a>(
                     length += 1;
                 }
             } else if prev.column() != start.column() {
-                let prev_text = locator.slice(&Range {
+                let prev_text = locator.slice(Range {
                     location: *prev,
                     end_location: *start,
                 });

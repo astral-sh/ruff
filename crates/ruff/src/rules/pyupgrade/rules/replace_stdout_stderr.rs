@@ -81,7 +81,7 @@ fn generate_fix(
     };
     let mut contents = String::from("capture_output=True");
     if let Some(middle) =
-        extract_middle(locator.slice(&Range::new(first.end_location.unwrap(), last.location)))
+        extract_middle(locator.slice(Range::new(first.end_location.unwrap(), last.location)))
     {
         if middle.multi_line {
             let Some(indent) = indentation(locator, first) else {

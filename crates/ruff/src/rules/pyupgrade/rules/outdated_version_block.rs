@@ -56,7 +56,7 @@ fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata>
 
     // Start the selection at the start-of-line. This ensures consistent indentation
     // in the token stream, in the event that the entire block is indented.
-    let text = locator.slice(&Range::new(
+    let text = locator.slice(Range::new(
         Location::new(located.location.row(), 0),
         located.end_location.unwrap(),
     ));
@@ -198,7 +198,7 @@ fn fix_py2_block(
             Some(Fix::replacement(
                 checker
                     .locator
-                    .slice(&Range::new(start.location, end.end_location.unwrap()))
+                    .slice(Range::new(start.location, end.end_location.unwrap()))
                     .to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
@@ -265,7 +265,7 @@ fn fix_py3_block(
                 Some(Fix::replacement(
                     checker
                         .locator
-                        .slice(&Range::new(start.location, end.end_location.unwrap()))
+                        .slice(Range::new(start.location, end.end_location.unwrap()))
                         .to_string(),
                     stmt.location,
                     stmt.end_location.unwrap(),
@@ -297,7 +297,7 @@ fn fix_py3_block(
             // Replace the `elif` with an `else, preserve the body of the elif, and remove
             // the rest.
             let end = body.last().unwrap();
-            let text = checker.locator.slice(&Range::new(
+            let text = checker.locator.slice(Range::new(
                 test.end_location.unwrap(),
                 end.end_location.unwrap(),
             ));

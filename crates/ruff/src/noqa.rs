@@ -126,7 +126,7 @@ pub fn rule_is_ignored(
     locator: &Locator,
 ) -> bool {
     let noqa_lineno = noqa_line_for.get(&lineno).unwrap_or(&lineno);
-    let line = locator.slice(&Range::new(
+    let line = locator.slice(Range::new(
         Location::new(*noqa_lineno, 0),
         Location::new(noqa_lineno + 1, 0),
     ));

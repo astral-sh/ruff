@@ -138,7 +138,7 @@ pub fn extraneous_parentheses(
                 let mut diagnostic =
                     Diagnostic::new(ExtraneousParentheses, Range::new(*start, *end));
                 if autofix.into() && settings.rules.should_fix(&Rule::ExtraneousParentheses) {
-                    let contents = locator.slice(&Range::new(*start, *end));
+                    let contents = locator.slice(Range::new(*start, *end));
                     diagnostic.amend(Fix::replacement(
                         contents[1..contents.len() - 1].to_string(),
                         *start,

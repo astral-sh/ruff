@@ -328,7 +328,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     };
 
     // Extract the module text.
-    let contents = locator.slice(&Range::new(
+    let contents = locator.slice(Range::new(
         Location::new(stmt.location.row(), 0),
         Location::new(stmt.end_location.unwrap().row() + 1, 0),
     ));

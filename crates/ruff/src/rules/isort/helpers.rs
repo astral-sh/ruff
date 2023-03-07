@@ -9,7 +9,7 @@ use crate::source_code::Locator;
 /// Return `true` if a `StmtKind::ImportFrom` statement ends with a magic
 /// trailing comma.
 pub fn trailing_comma(stmt: &Stmt, locator: &Locator) -> TrailingComma {
-    let contents = locator.slice(&Range::from_located(stmt));
+    let contents = locator.slice(Range::from_located(stmt));
     let mut count: usize = 0;
     let mut trailing_comma = TrailingComma::Absent;
     for (_, tok, _) in lexer::lex_located(contents, Mode::Module, stmt.location).flatten() {

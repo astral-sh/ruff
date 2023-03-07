@@ -105,7 +105,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                     | DefinitionKind::NestedFunction(parent)
                     | DefinitionKind::Method(parent) = &docstring.kind
                     {
-                        let parent_indentation = checker.locator.slice(&Range::new(
+                        let parent_indentation = checker.locator.slice(Range::new(
                             Location::new(parent.location.row(), 0),
                             Location::new(parent.location.row(), parent.location.column()),
                         ));

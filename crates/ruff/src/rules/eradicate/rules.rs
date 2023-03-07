@@ -55,7 +55,7 @@ pub fn commented_out_code(
 ) -> Option<Diagnostic> {
     let location = Location::new(start.row(), 0);
     let end_location = Location::new(end.row() + 1, 0);
-    let line = locator.slice(&Range::new(location, end_location));
+    let line = locator.slice(Range::new(location, end_location));
 
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {

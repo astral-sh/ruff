@@ -24,7 +24,7 @@ pub fn collapsible_else_if(orelse: &[Stmt], locator: &Locator) -> Option<Diagnos
         if matches!(first.node, StmtKind::If { .. }) {
             // Determine whether this is an `elif`, or an `if` in an `else` block.
             if locator
-                .slice(&Range {
+                .slice(Range {
                     location: first.location,
                     end_location: first.end_location.unwrap(),
                 })
