@@ -2090,7 +2090,7 @@ where
                         let baseclasses = &self
                             .settings
                             .flake8_type_checking
-                            .runtime_evaluated_baseclasses;
+                            .runtime_evaluated_base_classes;
                         let decorators = &self
                             .settings
                             .flake8_type_checking

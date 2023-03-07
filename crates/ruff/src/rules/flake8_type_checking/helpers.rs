@@ -63,7 +63,7 @@ pub fn runtime_evaluated(
     decorators: &[String],
 ) -> bool {
     if !base_classes.is_empty() {
-        if runtime_evaluated_baseclass(context, base_classes) {
+        if runtime_evaluated_base_class(context, base_classes) {
             return true;
         }
     }
@@ -75,7 +75,7 @@ pub fn runtime_evaluated(
     false
 }
 
-fn runtime_evaluated_baseclass(context: &Context, base_classes: &[String]) -> bool {
+fn runtime_evaluated_base_class(context: &Context, base_classes: &[String]) -> bool {
     if let ScopeKind::Class(class_def) = &context.current_scope().kind {
         for base in class_def.bases.iter() {
             if let Some(call_path) = context.resolve_call_path(base) {
