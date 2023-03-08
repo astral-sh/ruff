@@ -1,9 +1,12 @@
 ---
-source: src/rules/tryceratops/mod.rs
+source: crates/ruff/src/rules/tryceratops/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ErrorInsteadOfException: ~
+    name: ErrorInsteadOfException
+    body: "Use `logging.exception` instead of `logging.error`"
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 8
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ErrorInsteadOfException: ~
+    name: ErrorInsteadOfException
+    body: "Use `logging.exception` instead of `logging.error`"
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 12
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ErrorInsteadOfException: ~
+    name: ErrorInsteadOfException
+    body: "Use `logging.exception` instead of `logging.error`"
+    commit: ~
+    fixable: false
   location:
     row: 25
     column: 8
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ErrorInsteadOfException: ~
+    name: ErrorInsteadOfException
+    body: "Use `logging.exception` instead of `logging.error`"
+    commit: ~
+    fixable: false
   location:
     row: 28
     column: 12
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ErrorInsteadOfException: ~
+    name: ErrorInsteadOfException
+    body: "Use `logging.exception` instead of `logging.error`"
+    commit: ~
+    fixable: false
   location:
     row: 35
     column: 8
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ErrorInsteadOfException: ~
+    name: ErrorInsteadOfException
+    body: "Use `logging.exception` instead of `logging.error`"
+    commit: ~
+    fixable: false
   location:
     row: 38
     column: 12
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ErrorInsteadOfException: ~
+    name: ErrorInsteadOfException
+    body: "Use `logging.exception` instead of `logging.error`"
+    commit: ~
+    fixable: false
   location:
     row: 45
     column: 8
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ErrorInsteadOfException: ~
+    name: ErrorInsteadOfException
+    body: "Use `logging.exception` instead of `logging.error`"
+    commit: ~
+    fixable: false
   location:
     row: 48
     column: 12

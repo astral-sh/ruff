@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingRequiredImport: import os
+    name: MissingRequiredImport
+    body: "Missing required import: `import os`"
+    commit: "Insert required import: `import os`"
+    fixable: true
   location:
     row: 1
     column: 0

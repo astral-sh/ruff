@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SuperCallWithParameters: ~
+    name: SuperCallWithParameters
+    body: "Use `super()` instead of `super(__class__, self)`"
+    commit: "Remove `__super__` parameters"
+    fixable: true
   location:
     row: 17
     column: 17
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    SuperCallWithParameters: ~
+    name: SuperCallWithParameters
+    body: "Use `super()` instead of `super(__class__, self)`"
+    commit: "Remove `__super__` parameters"
+    fixable: true
   location:
     row: 18
     column: 8
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    SuperCallWithParameters: ~
+    name: SuperCallWithParameters
+    body: "Use `super()` instead of `super(__class__, self)`"
+    commit: "Remove `__super__` parameters"
+    fixable: true
   location:
     row: 19
     column: 8
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    SuperCallWithParameters: ~
+    name: SuperCallWithParameters
+    body: "Use `super()` instead of `super(__class__, self)`"
+    commit: "Remove `__super__` parameters"
+    fixable: true
   location:
     row: 36
     column: 8
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    SuperCallWithParameters: ~
+    name: SuperCallWithParameters
+    body: "Use `super()` instead of `super(__class__, self)`"
+    commit: "Remove `__super__` parameters"
+    fixable: true
   location:
     row: 50
     column: 12

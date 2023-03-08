@@ -1,12 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImportStarUsage:
-      name: name
-      sources:
-        - mymodule
+    name: ImportStarUsage
+    body: "`name` may be undefined, or defined from star imports: `mymodule`"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 10
@@ -16,10 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportStarUsage:
-      name: a
-      sources:
-        - mymodule
+    name: ImportStarUsage
+    body: "`a` may be undefined, or defined from star imports: `mymodule`"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 0

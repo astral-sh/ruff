@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_datetimez/mod.rs
+source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CallDatetimeNowWithoutTzinfo: ~
+    name: CallDatetimeNowWithoutTzinfo
+    body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CallDatetimeNowWithoutTzinfo: ~
+    name: CallDatetimeNowWithoutTzinfo
+    body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CallDatetimeNowWithoutTzinfo: ~
+    name: CallDatetimeNowWithoutTzinfo
+    body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 0
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CallDatetimeNowWithoutTzinfo: ~
+    name: CallDatetimeNowWithoutTzinfo
+    body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 0
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CallDatetimeNowWithoutTzinfo: ~
+    name: CallDatetimeNowWithoutTzinfo
+    body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 0

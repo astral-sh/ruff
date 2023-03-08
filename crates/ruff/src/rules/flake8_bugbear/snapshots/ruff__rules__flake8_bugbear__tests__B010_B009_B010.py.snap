@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SetAttrWithConstant: ~
+    name: SetAttrWithConstant
+    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
+    commit: "Replace `setattr` with assignment"
+    fixable: true
   location:
     row: 40
     column: 0
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    SetAttrWithConstant: ~
+    name: SetAttrWithConstant
+    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
+    commit: "Replace `setattr` with assignment"
+    fixable: true
   location:
     row: 41
     column: 0
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    SetAttrWithConstant: ~
+    name: SetAttrWithConstant
+    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
+    commit: "Replace `setattr` with assignment"
+    fixable: true
   location:
     row: 42
     column: 0
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    SetAttrWithConstant: ~
+    name: SetAttrWithConstant
+    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
+    commit: "Replace `setattr` with assignment"
+    fixable: true
   location:
     row: 43
     column: 0
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    SetAttrWithConstant: ~
+    name: SetAttrWithConstant
+    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
+    commit: "Replace `setattr` with assignment"
+    fixable: true
   location:
     row: 44
     column: 0
@@ -88,7 +103,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    SetAttrWithConstant: ~
+    name: SetAttrWithConstant
+    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
+    commit: "Replace `setattr` with assignment"
+    fixable: true
   location:
     row: 45
     column: 0

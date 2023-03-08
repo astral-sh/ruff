@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoBlankLineAfterFunction:
-      num_lines: 2
+    name: NoBlankLineAfterFunction
+    body: No blank lines allowed after function docstring (found 2)
+    commit: Remove blank line(s) after function docstring
+    fixable: true
   location:
     row: 57
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoBlankLineAfterFunction:
-      num_lines: 2
+    name: NoBlankLineAfterFunction
+    body: No blank lines allowed after function docstring (found 2)
+    commit: Remove blank line(s) after function docstring
+    fixable: true
   location:
     row: 68
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoBlankLineAfterFunction:
-      num_lines: 1
+    name: NoBlankLineAfterFunction
+    body: No blank lines allowed after function docstring (found 1)
+    commit: Remove blank line(s) after function docstring
+    fixable: true
   location:
     row: 80
     column: 4

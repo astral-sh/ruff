@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedImport:
-      name: ".background.BackgroundTasks"
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`.background.BackgroundTasks` imported but unused"
+    commit: "Remove unused import: `.background.BackgroundTasks`"
+    fixable: true
   location:
     row: 7
     column: 24
@@ -23,10 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: ".datastructures.UploadFile"
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`.datastructures.UploadFile` imported but unused"
+    commit: "Remove unused import: `.datastructures.UploadFile`"
+    fixable: true
   location:
     row: 10
     column: 28
@@ -43,10 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: background
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`background` imported but unused"
+    commit: "Remove unused import: `background`"
+    fixable: true
   location:
     row: 16
     column: 7
@@ -63,10 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: datastructures
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`datastructures` imported but unused"
+    commit: "Remove unused import: `datastructures`"
+    fixable: true
   location:
     row: 19
     column: 7

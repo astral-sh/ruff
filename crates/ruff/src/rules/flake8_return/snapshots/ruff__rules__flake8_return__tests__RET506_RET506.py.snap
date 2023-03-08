@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_return/mod.rs
+source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SuperfluousElseRaise:
-      branch: Elif
+    name: SuperfluousElseRaise
+    body: "Unnecessary `elif` after `raise` statement"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseRaise:
-      branch: Elif
+    name: SuperfluousElseRaise
+    body: "Unnecessary `elif` after `raise` statement"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 4
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseRaise:
-      branch: Else
+    name: SuperfluousElseRaise
+    body: "Unnecessary `else` after `raise` statement"
+    commit: ~
+    fixable: false
   location:
     row: 34
     column: 4
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseRaise:
-      branch: Else
+    name: SuperfluousElseRaise
+    body: "Unnecessary `else` after `raise` statement"
+    commit: ~
+    fixable: false
   location:
     row: 45
     column: 8
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseRaise:
-      branch: Else
+    name: SuperfluousElseRaise
+    body: "Unnecessary `else` after `raise` statement"
+    commit: ~
+    fixable: false
   location:
     row: 60
     column: 4
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseRaise:
-      branch: Else
+    name: SuperfluousElseRaise
+    body: "Unnecessary `else` after `raise` statement"
+    commit: ~
+    fixable: false
   location:
     row: 70
     column: 8
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseRaise:
-      branch: Else
+    name: SuperfluousElseRaise
+    body: "Unnecessary `else` after `raise` statement"
+    commit: ~
+    fixable: false
   location:
     row: 80
     column: 4

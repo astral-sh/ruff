@@ -1,10 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImportStarNotPermitted:
-      name: F634
+    name: ImportStarNotPermitted
+    body: "`from F634 import *` only allowed at module level"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportStarNotPermitted:
-      name: F634
+    name: ImportStarNotPermitted
+    body: "`from F634 import *` only allowed at module level"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 4

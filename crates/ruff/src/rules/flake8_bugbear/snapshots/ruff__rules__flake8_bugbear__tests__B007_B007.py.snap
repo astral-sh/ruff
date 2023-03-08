@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedLoopControlVariable:
-      name: i
-      rename: _i
-      certainty: Certain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `i` not used within loop body"
+    commit: "Rename unused `i` to `_i`"
+    fixable: true
   location:
     row: 6
     column: 4
@@ -16,10 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: k
-      rename: _k
-      certainty: Certain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `k` not used within loop body"
+    commit: "Rename unused `k` to `_k`"
+    fixable: true
   location:
     row: 18
     column: 12
@@ -36,10 +36,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: i
-      rename: _i
-      certainty: Certain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `i` not used within loop body"
+    commit: "Rename unused `i` to `_i`"
+    fixable: true
   location:
     row: 30
     column: 4
@@ -49,10 +49,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: k
-      rename: _k
-      certainty: Certain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `k` not used within loop body"
+    commit: "Rename unused `k` to `_k`"
+    fixable: true
   location:
     row: 30
     column: 12
@@ -69,10 +69,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: bar
-      rename: _bar
-      certainty: Uncertain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `bar` may not be used within loop body"
+    commit: ~
+    fixable: false
   location:
     row: 34
     column: 9
@@ -82,10 +82,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: bar
-      rename: _bar
-      certainty: Uncertain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `bar` may not be used within loop body"
+    commit: ~
+    fixable: false
   location:
     row: 38
     column: 9
@@ -95,10 +95,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: bar
-      rename: _bar
-      certainty: Uncertain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `bar` may not be used within loop body"
+    commit: ~
+    fixable: false
   location:
     row: 42
     column: 9
@@ -108,10 +108,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: bar
-      rename: _bar
-      certainty: Uncertain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `bar` may not be used within loop body"
+    commit: ~
+    fixable: false
   location:
     row: 46
     column: 9
@@ -121,10 +121,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: bar
-      rename: _bar
-      certainty: Certain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `bar` not used within loop body"
+    commit: "Rename unused `bar` to `_bar`"
+    fixable: true
   location:
     row: 52
     column: 13
@@ -141,10 +141,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: bar
-      rename: _bar
-      certainty: Certain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `bar` not used within loop body"
+    commit: "Rename unused `bar` to `_bar`"
+    fixable: true
   location:
     row: 59
     column: 13
@@ -154,10 +154,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: bar
-      rename: _bar
-      certainty: Certain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `bar` not used within loop body"
+    commit: "Rename unused `bar` to `_bar`"
+    fixable: true
   location:
     row: 68
     column: 13
@@ -174,10 +174,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: bar
-      rename: _bar
-      certainty: Certain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `bar` not used within loop body"
+    commit: "Rename unused `bar` to `_bar`"
+    fixable: true
   location:
     row: 77
     column: 13
@@ -194,10 +194,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    UnusedLoopControlVariable:
-      name: line_
-      rename: ~
-      certainty: Certain
+    name: UnusedLoopControlVariable
+    body: "Loop control variable `line_` not used within loop body"
+    commit: ~
+    fixable: false
   location:
     row: 87
     column: 4

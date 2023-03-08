@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_builtins/mod.rs
+source: crates/ruff/src/rules/flake8_builtins/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BuiltinVariableShadowing:
-      name: sum
+    name: BuiltinVariableShadowing
+    body: "Variable `sum` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: int
+    name: BuiltinVariableShadowing
+    body: "Variable `int` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: print
+    name: BuiltinVariableShadowing
+    body: "Variable `print` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 0
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: copyright
+    name: BuiltinVariableShadowing
+    body: "Variable `copyright` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: complex
+    name: BuiltinVariableShadowing
+    body: "Variable `complex` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 1
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: float
+    name: BuiltinVariableShadowing
+    body: "Variable `float` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 0
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: object
+    name: BuiltinVariableShadowing
+    body: "Variable `object` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 8
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: min
+    name: BuiltinVariableShadowing
+    body: "Variable `min` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: max
+    name: BuiltinVariableShadowing
+    body: "Variable `max` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 5
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: bytes
+    name: BuiltinVariableShadowing
+    body: "Variable `bytes` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 0
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: slice
+    name: BuiltinVariableShadowing
+    body: "Variable `slice` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 16
     column: 0
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: ValueError
+    name: BuiltinVariableShadowing
+    body: "Variable `ValueError` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 21
     column: 0
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: memoryview
+    name: BuiltinVariableShadowing
+    body: "Variable `memoryview` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 4
@@ -146,8 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: bytearray
+    name: BuiltinVariableShadowing
+    body: "Variable `bytearray` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 17
@@ -157,8 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: str
+    name: BuiltinVariableShadowing
+    body: "Variable `str` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 21
@@ -168,8 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: all
+    name: BuiltinVariableShadowing
+    body: "Variable `all` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 44
@@ -179,8 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: any
+    name: BuiltinVariableShadowing
+    body: "Variable `any` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 49
@@ -190,8 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinVariableShadowing:
-      name: sum
+    name: BuiltinVariableShadowing
+    body: "Variable `sum` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 30
     column: 7

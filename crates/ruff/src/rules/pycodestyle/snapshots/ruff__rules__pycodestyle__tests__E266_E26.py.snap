@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultipleLeadingHashesForBlockComment: ~
+    name: MultipleLeadingHashesForBlockComment
+    body: "Too many leading `#` before block comment"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleLeadingHashesForBlockComment: ~
+    name: MultipleLeadingHashesForBlockComment
+    body: "Too many leading `#` before block comment"
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleLeadingHashesForBlockComment: ~
+    name: MultipleLeadingHashesForBlockComment
+    body: "Too many leading `#` before block comment"
+    commit: ~
+    fixable: false
   location:
     row: 26
     column: 0

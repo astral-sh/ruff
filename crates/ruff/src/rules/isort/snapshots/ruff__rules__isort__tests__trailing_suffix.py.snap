@@ -1,9 +1,12 @@
 ---
-source: src/rules/isort/mod.rs
+source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnsortedImports: ~
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    commit: Organize imports
+    fixable: true
   location:
     row: 1
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnsortedImports: ~
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    commit: Organize imports
+    fixable: true
   location:
     row: 5
     column: 4

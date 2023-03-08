@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IsLiteral:
-      cmpop: Is
+    name: IsLiteral
+    body: "Use `==` to compare constant literals"
+    commit: "Replace `is` with `==`"
+    fixable: true
   location:
     row: 1
     column: 3
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    IsLiteral:
-      cmpop: IsNot
+    name: IsLiteral
+    body: "Use `!=` to compare constant literals"
+    commit: "Replace `is not` with `!=`"
+    fixable: true
   location:
     row: 4
     column: 3
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    IsLiteral:
-      cmpop: IsNot
+    name: IsLiteral
+    body: "Use `!=` to compare constant literals"
+    commit: "Replace `is not` with `!=`"
+    fixable: true
   location:
     row: 7
     column: 3
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    IsLiteral:
-      cmpop: Is
+    name: IsLiteral
+    body: "Use `==` to compare constant literals"
+    commit: "Replace `is` with `==`"
+    fixable: true
   location:
     row: 11
     column: 3
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    IsLiteral:
-      cmpop: Is
+    name: IsLiteral
+    body: "Use `==` to compare constant literals"
+    commit: "Replace `is` with `==`"
+    fixable: true
   location:
     row: 14
     column: 3
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    IsLiteral:
-      cmpop: Is
+    name: IsLiteral
+    body: "Use `==` to compare constant literals"
+    commit: "Replace `is` with `==`"
+    fixable: true
   location:
     row: 17
     column: 3
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    IsLiteral:
-      cmpop: Is
+    name: IsLiteral
+    body: "Use `==` to compare constant literals"
+    commit: "Replace `is` with `==`"
+    fixable: true
   location:
     row: 20
     column: 13

@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedImport:
-      name: typing.Union
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`typing.Union` imported but unused"
+    commit: "Remove unused import: `typing.Union`"
+    fixable: true
   location:
     row: 30
     column: 4
@@ -25,10 +25,10 @@ expression: diagnostics
     row: 28
     column: 0
 - kind:
-    UnusedImport:
-      name: typing.Awaitable
-      ignore_init: false
-      multiple: true
+    name: UnusedImport
+    body: "`typing.Awaitable` imported but unused"
+    commit: Remove unused import
+    fixable: true
   location:
     row: 66
     column: 19
@@ -45,10 +45,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: typing.AwaitableGenerator
-      ignore_init: false
-      multiple: true
+    name: UnusedImport
+    body: "`typing.AwaitableGenerator` imported but unused"
+    commit: Remove unused import
+    fixable: true
   location:
     row: 66
     column: 30

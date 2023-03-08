@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryBuiltinImport:
-      names:
-        - "*"
+    name: UnnecessaryBuiltinImport
+    body: "Unnecessary builtin import: `*`"
+    commit: Remove unnecessary builtin import
+    fixable: true
   location:
     row: 1
     column: 0
@@ -22,10 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnnecessaryBuiltinImport:
-      names:
-        - ascii
-        - bytes
+    name: UnnecessaryBuiltinImport
+    body: "Unnecessary builtin imports: `ascii`, `bytes`"
+    commit: Remove unnecessary builtin import
+    fixable: true
   location:
     row: 2
     column: 0
@@ -42,10 +43,10 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    UnnecessaryBuiltinImport:
-      names:
-        - filter
-        - zip
+    name: UnnecessaryBuiltinImport
+    body: "Unnecessary builtin imports: `filter`, `zip`"
+    commit: Remove unnecessary builtin import
+    fixable: true
   location:
     row: 4
     column: 0
@@ -62,9 +63,10 @@ expression: diagnostics
       column: 46
   parent: ~
 - kind:
-    UnnecessaryBuiltinImport:
-      names:
-        - open
+    name: UnnecessaryBuiltinImport
+    body: "Unnecessary builtin import: `open`"
+    commit: Remove unnecessary builtin import
+    fixable: true
   location:
     row: 5
     column: 0

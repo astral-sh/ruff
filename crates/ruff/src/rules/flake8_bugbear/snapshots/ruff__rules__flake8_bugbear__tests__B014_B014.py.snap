@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DuplicateHandlerException:
-      names:
-        - OSError
+    name: DuplicateHandlerException
+    body: "Exception handler with duplicate exception: `OSError`"
+    commit: De-duplicate exceptions
+    fixable: true
   location:
     row: 17
     column: 7
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    DuplicateHandlerException:
-      names:
-        - MyError
+    name: DuplicateHandlerException
+    body: "Exception handler with duplicate exception: `MyError`"
+    commit: De-duplicate exceptions
+    fixable: true
   location:
     row: 28
     column: 7
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    DuplicateHandlerException:
-      names:
-        - re.error
+    name: DuplicateHandlerException
+    body: "Exception handler with duplicate exception: `re.error`"
+    commit: De-duplicate exceptions
+    fixable: true
   location:
     row: 49
     column: 7

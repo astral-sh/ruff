@@ -20,7 +20,7 @@ use ruff_python_ast::{visitor, whitespace};
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::match_module;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::helpers::is_falsy_constant;

@@ -3,12 +3,10 @@ source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - F401
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `F401`)"
+    commit: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 1
     column: 18

@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 #[violation]

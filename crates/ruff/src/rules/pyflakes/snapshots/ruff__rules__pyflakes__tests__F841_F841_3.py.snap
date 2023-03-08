@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedVariable:
-      name: x
+    name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    commit: "Remove assignment to unused variable `x`"
+    fixable: true
   location:
     row: 5
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable:
-      name: y
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    commit: "Remove assignment to unused variable `y`"
+    fixable: true
   location:
     row: 6
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable:
-      name: x
+    name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    commit: "Remove assignment to unused variable `x`"
+    fixable: true
   location:
     row: 13
     column: 4
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable:
-      name: y
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    commit: "Remove assignment to unused variable `y`"
+    fixable: true
   location:
     row: 14
     column: 4
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable:
-      name: x1
+    name: UnusedVariable
+    body: "Local variable `x1` is assigned to but never used"
+    commit: "Remove assignment to unused variable `x1`"
+    fixable: true
   location:
     row: 21
     column: 18
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UnusedVariable:
-      name: x3
+    name: UnusedVariable
+    body: "Local variable `x3` is assigned to but never used"
+    commit: "Remove assignment to unused variable `x3`"
+    fixable: true
   location:
     row: 27
     column: 19
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnusedVariable:
-      name: y3
+    name: UnusedVariable
+    body: "Local variable `y3` is assigned to but never used"
+    commit: "Remove assignment to unused variable `y3`"
+    fixable: true
   location:
     row: 27
     column: 32
@@ -129,8 +143,10 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    UnusedVariable:
-      name: z3
+    name: UnusedVariable
+    body: "Local variable `z3` is assigned to but never used"
+    commit: "Remove assignment to unused variable `z3`"
+    fixable: true
   location:
     row: 27
     column: 45
@@ -147,8 +163,10 @@ expression: diagnostics
       column: 47
   parent: ~
 - kind:
-    UnusedVariable:
-      name: x1
+    name: UnusedVariable
+    body: "Local variable `x1` is assigned to but never used"
+    commit: "Remove assignment to unused variable `x1`"
+    fixable: true
   location:
     row: 32
     column: 5
@@ -158,8 +176,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable:
-      name: y1
+    name: UnusedVariable
+    body: "Local variable `y1` is assigned to but never used"
+    commit: "Remove assignment to unused variable `y1`"
+    fixable: true
   location:
     row: 32
     column: 9
@@ -169,8 +189,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable:
-      name: coords2
+    name: UnusedVariable
+    body: "Local variable `coords2` is assigned to but never used"
+    commit: "Remove assignment to unused variable `coords2`"
+    fixable: true
   location:
     row: 33
     column: 15
@@ -187,8 +209,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    UnusedVariable:
-      name: coords3
+    name: UnusedVariable
+    body: "Local variable `coords3` is assigned to but never used"
+    commit: "Remove assignment to unused variable `coords3`"
+    fixable: true
   location:
     row: 34
     column: 4
@@ -205,8 +229,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    UnusedVariable:
-      name: x1
+    name: UnusedVariable
+    body: "Local variable `x1` is assigned to but never used"
+    commit: "Remove assignment to unused variable `x1`"
+    fixable: true
   location:
     row: 40
     column: 25
@@ -223,8 +249,10 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    UnusedVariable:
-      name: x2
+    name: UnusedVariable
+    body: "Local variable `x2` is assigned to but never used"
+    commit: "Remove assignment to unused variable `x2`"
+    fixable: true
   location:
     row: 45
     column: 46
@@ -241,8 +269,10 @@ expression: diagnostics
       column: 48
   parent: ~
 - kind:
-    UnusedVariable:
-      name: x
+    name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    commit: "Remove assignment to unused variable `x`"
+    fixable: true
   location:
     row: 50
     column: 4
@@ -259,8 +289,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    UnusedVariable:
-      name: y
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    commit: "Remove assignment to unused variable `y`"
+    fixable: true
   location:
     row: 56
     column: 4
@@ -277,8 +309,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    UnusedVariable:
-      name: x
+    name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    commit: "Remove assignment to unused variable `x`"
+    fixable: true
   location:
     row: 61
     column: 4
@@ -295,8 +329,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    UnusedVariable:
-      name: y
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    commit: "Remove assignment to unused variable `y`"
+    fixable: true
   location:
     row: 67
     column: 4
@@ -313,8 +349,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable:
-      name: cm
+    name: UnusedVariable
+    body: "Local variable `cm` is assigned to but never used"
+    commit: "Remove assignment to unused variable `cm`"
+    fixable: true
   location:
     row: 72
     column: 23
@@ -331,8 +369,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    UnusedVariable:
-      name: cm
+    name: UnusedVariable
+    body: "Local variable `cm` is assigned to but never used"
+    commit: "Remove assignment to unused variable `cm`"
+    fixable: true
   location:
     row: 77
     column: 24
@@ -349,8 +389,10 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    UnusedVariable:
-      name: toplevel
+    name: UnusedVariable
+    body: "Local variable `toplevel` is assigned to but never used"
+    commit: "Remove assignment to unused variable `toplevel`"
+    fixable: true
   location:
     row: 87
     column: 4
@@ -367,8 +409,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UnusedVariable:
-      name: toplevel
+    name: UnusedVariable
+    body: "Local variable `toplevel` is assigned to but never used"
+    commit: "Remove assignment to unused variable `toplevel`"
+    fixable: true
   location:
     row: 93
     column: 4
@@ -385,8 +429,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UnusedVariable:
-      name: tt
+    name: UnusedVariable
+    body: "Local variable `tt` is assigned to but never used"
+    commit: "Remove assignment to unused variable `tt`"
+    fixable: true
   location:
     row: 93
     column: 15
@@ -403,8 +449,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UnusedVariable:
-      name: toplevel
+    name: UnusedVariable
+    body: "Local variable `toplevel` is assigned to but never used"
+    commit: "Remove assignment to unused variable `toplevel`"
+    fixable: true
   location:
     row: 97
     column: 4
@@ -421,8 +469,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UnusedVariable:
-      name: toplevel
+    name: UnusedVariable
+    body: "Local variable `toplevel` is assigned to but never used"
+    commit: "Remove assignment to unused variable `toplevel`"
+    fixable: true
   location:
     row: 101
     column: 13
@@ -439,8 +489,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    UnusedVariable:
-      name: toplevel
+    name: UnusedVariable
+    body: "Local variable `toplevel` is assigned to but never used"
+    commit: "Remove assignment to unused variable `toplevel`"
+    fixable: true
   location:
     row: 105
     column: 4
@@ -457,8 +509,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UnusedVariable:
-      name: tt
+    name: UnusedVariable
+    body: "Local variable `tt` is assigned to but never used"
+    commit: "Remove assignment to unused variable `tt`"
+    fixable: true
   location:
     row: 105
     column: 15

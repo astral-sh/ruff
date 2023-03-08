@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnrecognizedPlatformName:
-      platform: linus
+    name: UnrecognizedPlatformName
+    body: "Unrecognized platform `linus`"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 19

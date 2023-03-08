@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    Jinja2AutoescapeFalse:
-      value: true
+    name: Jinja2AutoescapeFalse
+    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 67
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Jinja2AutoescapeFalse:
-      value: true
+    name: Jinja2AutoescapeFalse
+    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 44
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Jinja2AutoescapeFalse:
-      value: true
+    name: Jinja2AutoescapeFalse
+    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 23
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Jinja2AutoescapeFalse:
-      value: false
+    name: Jinja2AutoescapeFalse
+    body: "By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities."
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 0
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Jinja2AutoescapeFalse:
-      value: true
+    name: Jinja2AutoescapeFalse
+    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 46

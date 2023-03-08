@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NonImperativeMood: Returns foo.
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Returns foo.\""
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: Constructor for a foo.
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Constructor for a foo.\""
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: Constructor for a boa.
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Constructor for a boa.\""
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 4
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: Runs something
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Runs something\""
+    commit: ~
+    fixable: false
   location:
     row: 26
     column: 4
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: "Runs other things, nested"
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Runs other things, nested\""
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 8
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: Writes a logical line that
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Writes a logical line that\""
+    commit: ~
+    fixable: false
   location:
     row: 35
     column: 4
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: This method docstring should be written in imperative mood.
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"This method docstring should be written in imperative mood.\""
+    commit: ~
+    fixable: false
   location:
     row: 74
     column: 8

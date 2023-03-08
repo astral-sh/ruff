@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IndentationWithInvalidMultipleComment:
-      indent_size: 4
+    name: IndentationWithInvalidMultipleComment
+    body: Indentation is not a multiple of 4 (comment)
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 5

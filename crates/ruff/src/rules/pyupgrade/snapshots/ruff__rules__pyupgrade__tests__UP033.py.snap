@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FunctoolsCache: ~
+    name: FunctoolsCache
+    body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
+    commit: "Rewrite with `@functools.cache"
+    fixable: true
   location:
     row: 5
     column: 20
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    FunctoolsCache: ~
+    name: FunctoolsCache
+    body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
+    commit: "Rewrite with `@functools.cache"
+    fixable: true
   location:
     row: 10
     column: 10
@@ -30,7 +36,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctoolsCache: ~
+    name: FunctoolsCache
+    body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
+    commit: "Rewrite with `@functools.cache"
+    fixable: true
   location:
     row: 16
     column: 20
@@ -47,7 +56,10 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    FunctoolsCache: ~
+    name: FunctoolsCache
+    body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
+    commit: "Rewrite with `@functools.cache"
+    fixable: true
   location:
     row: 21
     column: 20

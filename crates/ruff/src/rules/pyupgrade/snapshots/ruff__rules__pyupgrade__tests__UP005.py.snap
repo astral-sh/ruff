@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DeprecatedUnittestAlias:
-      alias: assertEquals
-      target: assertEqual
+    name: DeprecatedUnittestAlias
+    body: "`assertEquals` is deprecated, use `assertEqual`"
+    commit: "Replace `assertEqual` with `assertEquals`"
+    fixable: true
   location:
     row: 6
     column: 8
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    DeprecatedUnittestAlias:
-      alias: assertEquals
-      target: assertEqual
+    name: DeprecatedUnittestAlias
+    body: "`assertEquals` is deprecated, use `assertEqual`"
+    commit: "Replace `assertEqual` with `assertEquals`"
+    fixable: true
   location:
     row: 7
     column: 8
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    DeprecatedUnittestAlias:
-      alias: failUnlessAlmostEqual
-      target: assertAlmostEqual
+    name: DeprecatedUnittestAlias
+    body: "`failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`"
+    commit: "Replace `assertAlmostEqual` with `failUnlessAlmostEqual`"
+    fixable: true
   location:
     row: 9
     column: 8
@@ -60,9 +63,10 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    DeprecatedUnittestAlias:
-      alias: assertNotRegexpMatches
-      target: assertNotRegex
+    name: DeprecatedUnittestAlias
+    body: "`assertNotRegexpMatches` is deprecated, use `assertNotRegex`"
+    commit: "Replace `assertNotRegex` with `assertNotRegexpMatches`"
+    fixable: true
   location:
     row: 10
     column: 8

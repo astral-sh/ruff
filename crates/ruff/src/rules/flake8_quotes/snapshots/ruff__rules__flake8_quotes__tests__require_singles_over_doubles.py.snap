@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    commit: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 1
     column: 24
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    commit: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 2
     column: 24
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 46
   parent: ~
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    commit: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 3
     column: 24

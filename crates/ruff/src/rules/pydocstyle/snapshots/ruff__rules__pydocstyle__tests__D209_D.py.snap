@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NewLineAfterLastParagraph: ~
+    name: NewLineAfterLastParagraph
+    body: Multi-line docstring closing quotes should be on a separate line
+    commit: Move closing quotes to new line
+    fixable: true
   location:
     row: 281
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    NewLineAfterLastParagraph: ~
+    name: NewLineAfterLastParagraph
+    body: Multi-line docstring closing quotes should be on a separate line
+    commit: Move closing quotes to new line
+    fixable: true
   location:
     row: 588
     column: 4

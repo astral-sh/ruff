@@ -13,7 +13,7 @@ use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 use super::fixes;

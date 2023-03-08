@@ -4,7 +4,7 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use crate::lex::docstring_detection::StateMachine;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
     eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, pycodestyle,

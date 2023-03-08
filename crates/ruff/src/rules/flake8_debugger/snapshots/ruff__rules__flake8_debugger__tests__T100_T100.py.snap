@@ -1,11 +1,12 @@
 ---
-source: src/rules/flake8_debugger/mod.rs
+source: crates/ruff/src/rules/flake8_debugger/mod.rs
 expression: diagnostics
 ---
 - kind:
-    Debugger:
-      using_type:
-        Call: breakpoint
+    name: Debugger
+    body: "Trace found: `breakpoint` used"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Debugger:
-      using_type:
-        Import: pdb
+    name: Debugger
+    body: "Import for `pdb` found"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Debugger:
-      using_type:
-        Import: builtins.breakpoint
+    name: Debugger
+    body: "Import for `builtins.breakpoint` found"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 0
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Debugger:
-      using_type:
-        Import: pdb.set_trace
+    name: Debugger
+    body: "Import for `pdb.set_trace` found"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Debugger:
-      using_type:
-        Import: celery.contrib.rdb.set_trace
+    name: Debugger
+    body: "Import for `celery.contrib.rdb.set_trace` found"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 0
@@ -63,9 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Debugger:
-      using_type:
-        Import: celery.contrib.rdb
+    name: Debugger
+    body: "Import for `celery.contrib.rdb` found"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -75,9 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Debugger:
-      using_type:
-        Call: builtins.breakpoint
+    name: Debugger
+    body: "Trace found: `builtins.breakpoint` used"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 0
@@ -87,9 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Debugger:
-      using_type:
-        Call: pdb.set_trace
+    name: Debugger
+    body: "Trace found: `pdb.set_trace` used"
+    commit: ~
+    fixable: false
   location:
     row: 12
     column: 0
@@ -99,9 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Debugger:
-      using_type:
-        Call: celery.contrib.rdb.set_trace
+    name: Debugger
+    body: "Trace found: `celery.contrib.rdb.set_trace` used"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 0

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoIndentedBlock: ~
+    name: NoIndentedBlock
+    body: Expected an indented block
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 4
     column: 17
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 10
     column: 5
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 16
     column: 5
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 23
     column: 5
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    TrailingCommaOnBareTupleProhibited: ~
+    name: TrailingCommaOnBareTupleProhibited
+    body: Trailing comma on bare tuple prohibited
+    commit: ~
+    fixable: false
   location:
     row: 36
     column: 7
@@ -81,7 +96,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TrailingCommaOnBareTupleProhibited: ~
+    name: TrailingCommaOnBareTupleProhibited
+    body: Trailing comma on bare tuple prohibited
+    commit: ~
+    fixable: false
   location:
     row: 38
     column: 18
@@ -91,7 +109,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TrailingCommaOnBareTupleProhibited: ~
+    name: TrailingCommaOnBareTupleProhibited
+    body: Trailing comma on bare tuple prohibited
+    commit: ~
+    fixable: false
   location:
     row: 45
     column: 7
@@ -101,7 +122,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TrailingCommaOnBareTupleProhibited: ~
+    name: TrailingCommaOnBareTupleProhibited
+    body: Trailing comma on bare tuple prohibited
+    commit: ~
+    fixable: false
   location:
     row: 49
     column: 9
@@ -111,7 +135,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TrailingCommaOnBareTupleProhibited: ~
+    name: TrailingCommaOnBareTupleProhibited
+    body: Trailing comma on bare tuple prohibited
+    commit: ~
+    fixable: false
   location:
     row: 56
     column: 31
@@ -121,7 +148,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TrailingCommaOnBareTupleProhibited: ~
+    name: TrailingCommaOnBareTupleProhibited
+    body: Trailing comma on bare tuple prohibited
+    commit: ~
+    fixable: false
   location:
     row: 58
     column: 25
@@ -131,7 +161,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TrailingCommaOnBareTupleProhibited: ~
+    name: TrailingCommaOnBareTupleProhibited
+    body: Trailing comma on bare tuple prohibited
+    commit: ~
+    fixable: false
   location:
     row: 61
     column: 16
@@ -141,7 +174,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 70
     column: 7
@@ -158,7 +194,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 78
     column: 7
@@ -175,7 +214,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 86
     column: 7
@@ -192,7 +234,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 152
     column: 5
@@ -209,7 +254,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 158
     column: 10
@@ -226,7 +274,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 293
     column: 14
@@ -243,7 +294,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 304
     column: 13
@@ -260,7 +314,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 310
     column: 13
@@ -277,7 +334,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 316
     column: 9
@@ -294,7 +354,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 322
     column: 14
@@ -311,7 +374,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 368
     column: 14
@@ -328,7 +394,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 375
     column: 14
@@ -345,7 +414,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 404
     column: 14
@@ -362,7 +434,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 432
     column: 14
@@ -379,7 +454,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 485
     column: 20
@@ -396,7 +474,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 487
     column: 12
@@ -413,7 +494,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 489
     column: 17
@@ -430,7 +514,10 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 494
     column: 5
@@ -447,7 +534,10 @@ expression: diagnostics
       column: 6
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 496
     column: 20
@@ -464,7 +554,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 498
     column: 12
@@ -481,7 +574,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 500
     column: 17
@@ -498,7 +594,10 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 505
     column: 5
@@ -515,7 +614,10 @@ expression: diagnostics
       column: 6
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 511
     column: 9
@@ -532,7 +634,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    TrailingCommaProhibited: ~
+    name: TrailingCommaProhibited
+    body: Trailing comma prohibited
+    commit: Remove trailing comma
+    fixable: true
   location:
     row: 513
     column: 8
@@ -549,7 +654,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 519
     column: 12
@@ -566,7 +674,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 526
     column: 9
@@ -583,7 +694,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 534
     column: 15
@@ -600,7 +714,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 541
     column: 12
@@ -617,7 +734,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 547
     column: 23
@@ -634,7 +754,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 554
     column: 14
@@ -651,7 +774,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 561
     column: 12
@@ -668,7 +794,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 565
     column: 12
@@ -685,7 +814,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 573
     column: 9
@@ -702,7 +834,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 577
     column: 9
@@ -719,7 +854,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 583
     column: 9
@@ -736,7 +874,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 590
     column: 12
@@ -753,7 +894,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 598
     column: 14
@@ -770,7 +914,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 627
     column: 19
@@ -787,7 +934,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    TrailingCommaMissing: ~
+    name: TrailingCommaMissing
+    body: Trailing comma missing
+    commit: Add trailing comma
+    fixable: true
   location:
     row: 632
     column: 41

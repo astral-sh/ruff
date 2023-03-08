@@ -5,7 +5,7 @@ use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
 use crate::rules::pycodestyle::rules::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,

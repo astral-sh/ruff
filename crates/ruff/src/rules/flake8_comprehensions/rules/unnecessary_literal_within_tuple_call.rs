@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 54
     column: 12
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 58
     column: 3
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 60
     column: 7
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 62
     column: 11
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 64
     column: 9
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 66
     column: 8
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 68
     column: 14
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 70
     column: 11
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 72
     column: 14
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 74
     column: 11
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 76
     column: 2
@@ -113,7 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 76
     column: 3
@@ -123,7 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 78
     column: 2
@@ -133,7 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 78
     column: 5
@@ -143,7 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 88
     column: 7
@@ -153,7 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 90
     column: 5
@@ -163,7 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 92
     column: 2
@@ -173,7 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 94
     column: 3
@@ -183,7 +237,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 98
     column: 8
@@ -193,7 +250,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 100
     column: 6
@@ -203,7 +263,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundOperator: ~
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    commit: ~
+    fixable: false
   location:
     row: 154
     column: 12

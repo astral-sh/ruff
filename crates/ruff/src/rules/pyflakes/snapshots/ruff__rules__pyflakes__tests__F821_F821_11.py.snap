@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UndefinedName:
-      name: os
+    name: UndefinedName
+    body: "Undefined name `os`"
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 26
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: Baz
+    name: UndefinedName
+    body: "Undefined name `Baz`"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 12

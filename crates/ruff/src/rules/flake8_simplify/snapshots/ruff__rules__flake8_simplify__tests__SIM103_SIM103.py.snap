@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NeedlessBool:
-      condition: a
-      fixable: true
+    name: NeedlessBool
+    body: "Return the condition `a` directly"
+    commit: "Replace with `return a`"
+    fixable: true
   location:
     row: 3
     column: 4
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    NeedlessBool:
-      condition: a == b
-      fixable: true
+    name: NeedlessBool
+    body: "Return the condition `a == b` directly"
+    commit: "Replace with `return a == b`"
+    fixable: true
   location:
     row: 11
     column: 4
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    NeedlessBool:
-      condition: b
-      fixable: true
+    name: NeedlessBool
+    body: "Return the condition `b` directly"
+    commit: "Replace with `return b`"
+    fixable: true
   location:
     row: 21
     column: 4
@@ -60,9 +63,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    NeedlessBool:
-      condition: b
-      fixable: true
+    name: NeedlessBool
+    body: "Return the condition `b` directly"
+    commit: "Replace with `return b`"
+    fixable: true
   location:
     row: 32
     column: 8
@@ -79,9 +83,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    NeedlessBool:
-      condition: a
-      fixable: false
+    name: NeedlessBool
+    body: "Return the condition `a` directly"
+    commit: ~
+    fixable: false
   location:
     row: 57
     column: 4
@@ -91,9 +96,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NeedlessBool:
-      condition: a
-      fixable: false
+    name: NeedlessBool
+    body: "Return the condition `a` directly"
+    commit: ~
+    fixable: false
   location:
     row: 83
     column: 4

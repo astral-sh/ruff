@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_logging_format/mod.rs
+source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LoggingWarn: ~
+    name: LoggingWarn
+    body: "Logging statement uses `warn` instead of `warning`"
+    commit: "Convert to `warn`"
+    fixable: true
   location:
     row: 3
     column: 8

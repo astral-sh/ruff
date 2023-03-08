@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ZipWithoutExplicitStrict: ~
+    name: ZipWithoutExplicitStrict
+    body: "`zip()` without an explicit `strict=` parameter"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ZipWithoutExplicitStrict: ~
+    name: ZipWithoutExplicitStrict
+    body: "`zip()` without an explicit `strict=` parameter"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ZipWithoutExplicitStrict: ~
+    name: ZipWithoutExplicitStrict
+    body: "`zip()` without an explicit `strict=` parameter"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ZipWithoutExplicitStrict: ~
+    name: ZipWithoutExplicitStrict
+    body: "`zip()` without an explicit `strict=` parameter"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ZipWithoutExplicitStrict: ~
+    name: ZipWithoutExplicitStrict
+    body: "`zip()` without an explicit `strict=` parameter"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 15
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ZipWithoutExplicitStrict: ~
+    name: ZipWithoutExplicitStrict
+    body: "`zip()` without an explicit `strict=` parameter"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 4
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ZipWithoutExplicitStrict: ~
+    name: ZipWithoutExplicitStrict
+    body: "`zip()` without an explicit `strict=` parameter"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 0

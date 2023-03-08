@@ -1,9 +1,12 @@
 ---
-source: src/rules/pygrep_hooks/mod.rs
+source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DeprecatedLogWarn: ~
+    name: DeprecatedLogWarn
+    body: "`warn` is deprecated in favor of `warning`"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DeprecatedLogWarn: ~
+    name: DeprecatedLogWarn
+    body: "`warn` is deprecated in favor of `warning`"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 0

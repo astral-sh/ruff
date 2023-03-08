@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UselessMetaclassType: ~
+    name: UselessMetaclassType
+    body: "`__metaclass__ = type` is implied"
+    commit: "Remove `__metaclass__ = type`"
+    fixable: true
   location:
     row: 2
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    UselessMetaclassType: ~
+    name: UselessMetaclassType
+    body: "`__metaclass__ = type` is implied"
+    commit: "Remove `__metaclass__ = type`"
+    fixable: true
   location:
     row: 6
     column: 4

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TabBeforeOperator: ~
+    name: TabBeforeOperator
+    body: Tab before operator
+    commit: ~
+    fixable: false
   location:
     row: 43
     column: 1

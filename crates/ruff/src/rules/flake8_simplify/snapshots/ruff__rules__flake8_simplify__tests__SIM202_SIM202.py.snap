@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NegateNotEqualOp:
-      left: a
-      right: b
+    name: NegateNotEqualOp
+    body: "Use `a == b` instead of `not a != b`"
+    commit: "Replace with `==` operator"
+    fixable: true
   location:
     row: 2
     column: 3
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    NegateNotEqualOp:
-      left: a
-      right: b + c
+    name: NegateNotEqualOp
+    body: "Use `a == b + c` instead of `not a != b + c`"
+    commit: "Replace with `==` operator"
+    fixable: true
   location:
     row: 6
     column: 3
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    NegateNotEqualOp:
-      left: a + b
-      right: c
+    name: NegateNotEqualOp
+    body: "Use `a + b == c` instead of `not a + b != c`"
+    commit: "Replace with `==` operator"
+    fixable: true
   location:
     row: 10
     column: 3

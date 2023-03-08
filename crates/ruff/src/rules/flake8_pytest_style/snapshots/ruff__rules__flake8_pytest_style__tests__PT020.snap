@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_pytest_style/mod.rs
+source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DeprecatedYieldFixture: ~
+    name: DeprecatedYieldFixture
+    body: "`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`"
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 1
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DeprecatedYieldFixture: ~
+    name: DeprecatedYieldFixture
+    body: "`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 1

@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_boolean_trap/mod.rs
+source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BooleanDefaultValueInFunctionDefinition: ~
+    name: BooleanDefaultValueInFunctionDefinition
+    body: Boolean default value in function definition
+    commit: ~
+    fixable: false
   location:
     row: 12
     column: 30
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanDefaultValueInFunctionDefinition: ~
+    name: BooleanDefaultValueInFunctionDefinition
+    body: Boolean default value in function definition
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 42
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanDefaultValueInFunctionDefinition: ~
+    name: BooleanDefaultValueInFunctionDefinition
+    body: Boolean default value in function definition
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 40
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanDefaultValueInFunctionDefinition: ~
+    name: BooleanDefaultValueInFunctionDefinition
+    body: Boolean default value in function definition
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 45

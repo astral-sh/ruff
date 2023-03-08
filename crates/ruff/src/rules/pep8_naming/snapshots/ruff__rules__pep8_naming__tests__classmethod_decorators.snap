@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    InvalidFirstArgumentNameForMethod: ~
+    name: InvalidFirstArgumentNameForMethod
+    body: "First argument of a method should be named `self`"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 19
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    InvalidFirstArgumentNameForMethod: ~
+    name: InvalidFirstArgumentNameForMethod
+    body: "First argument of a method should be named `self`"
+    commit: ~
+    fixable: false
   location:
     row: 12
     column: 29
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    InvalidFirstArgumentNameForMethod: ~
+    name: InvalidFirstArgumentNameForMethod
+    body: "First argument of a method should be named `self`"
+    commit: ~
+    fixable: false
   location:
     row: 60
     column: 28

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypingOnlyThirdPartyImport:
-      full_name: pandas
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `pandas` into a type-checking block"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 11
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypingOnlyThirdPartyImport:
-      full_name: pandas.DataFrame
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `pandas.DataFrame` into a type-checking block"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 23
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypingOnlyThirdPartyImport:
-      full_name: pandas.DataFrame
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `pandas.DataFrame` into a type-checking block"
+    commit: ~
+    fixable: false
   location:
     row: 17
     column: 23
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypingOnlyThirdPartyImport:
-      full_name: pandas
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `pandas` into a type-checking block"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 11
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypingOnlyThirdPartyImport:
-      full_name: pandas.DataFrame
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `pandas.DataFrame` into a type-checking block"
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 23
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypingOnlyThirdPartyImport:
-      full_name: pandas.DataFrame
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `pandas.DataFrame` into a type-checking block"
+    commit: ~
+    fixable: false
   location:
     row: 35
     column: 23
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypingOnlyThirdPartyImport:
-      full_name: pandas
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `pandas` into a type-checking block"
+    commit: ~
+    fixable: false
   location:
     row: 41
     column: 11
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypingOnlyThirdPartyImport:
-      full_name: pandas
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `pandas` into a type-checking block"
+    commit: ~
+    fixable: false
   location:
     row: 47
     column: 11

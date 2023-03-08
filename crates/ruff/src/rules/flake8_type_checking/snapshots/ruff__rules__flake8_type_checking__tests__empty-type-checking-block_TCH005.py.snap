@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 expression: diagnostics
 ---
 - kind:
-    EmptyTypeCheckingBlock: ~
+    name: EmptyTypeCheckingBlock
+    body: Found empty type-checking block
+    commit: Delete empty type-checking block
+    fixable: true
   location:
     row: 4
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    EmptyTypeCheckingBlock: ~
+    name: EmptyTypeCheckingBlock
+    body: Found empty type-checking block
+    commit: Delete empty type-checking block
+    fixable: true
   location:
     row: 8
     column: 4
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    EmptyTypeCheckingBlock: ~
+    name: EmptyTypeCheckingBlock
+    body: Found empty type-checking block
+    commit: Delete empty type-checking block
+    fixable: true
   location:
     row: 11
     column: 4
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    EmptyTypeCheckingBlock: ~
+    name: EmptyTypeCheckingBlock
+    body: Found empty type-checking block
+    commit: Delete empty type-checking block
+    fixable: true
   location:
     row: 16
     column: 8
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    EmptyTypeCheckingBlock: ~
+    name: EmptyTypeCheckingBlock
+    body: Found empty type-checking block
+    commit: Delete empty type-checking block
+    fixable: true
   location:
     row: 22
     column: 8

@@ -7,7 +7,7 @@ use ruff_python_ast::types::Range;
 
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, DiagnosticKind};
+use crate::registry::{AsRule, Diagnostic, DiagnosticKind};
 use crate::rules::ruff::rules::Context;
 use crate::settings::{flags, Settings};
 use crate::violation::AlwaysAutofixableViolation;

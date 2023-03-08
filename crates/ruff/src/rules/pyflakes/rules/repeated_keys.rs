@@ -10,7 +10,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]

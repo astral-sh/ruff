@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_executable/mod.rs
+source: crates/ruff/src/rules/flake8_executable/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ShebangPython: ~
+    name: ShebangPython
+    body: "Shebang should contain `python`"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0

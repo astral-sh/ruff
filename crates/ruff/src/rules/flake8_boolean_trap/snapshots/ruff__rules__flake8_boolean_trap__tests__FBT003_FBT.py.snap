@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_boolean_trap/mod.rs
+source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BooleanPositionalValueInFunctionCall: ~
+    name: BooleanPositionalValueInFunctionCall
+    body: Boolean positional value in function call
+    commit: ~
+    fixable: false
   location:
     row: 42
     column: 10
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalValueInFunctionCall: ~
+    name: BooleanPositionalValueInFunctionCall
+    body: Boolean positional value in function call
+    commit: ~
+    fixable: false
   location:
     row: 57
     column: 10
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalValueInFunctionCall: ~
+    name: BooleanPositionalValueInFunctionCall
+    body: Boolean positional value in function call
+    commit: ~
+    fixable: false
   location:
     row: 57
     column: 16

@@ -1,9 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PercentFormatExpectedMapping: ~
+    name: PercentFormatExpectedMapping
+    body: "`%`-format string expected mapping but got sequence"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PercentFormatExpectedMapping: ~
+    name: PercentFormatExpectedMapping
+    body: "`%`-format string expected mapping but got sequence"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PercentFormatExpectedMapping: ~
+    name: PercentFormatExpectedMapping
+    body: "`%`-format string expected mapping but got sequence"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 0
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PercentFormatExpectedMapping: ~
+    name: PercentFormatExpectedMapping
+    body: "`%`-format string expected mapping but got sequence"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PercentFormatExpectedMapping: ~
+    name: PercentFormatExpectedMapping
+    body: "`%`-format string expected mapping but got sequence"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 0
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PercentFormatExpectedMapping: ~
+    name: PercentFormatExpectedMapping
+    body: "`%`-format string expected mapping but got sequence"
+    commit: ~
+    fixable: false
   location:
     row: 12
     column: 0
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PercentFormatExpectedMapping: ~
+    name: PercentFormatExpectedMapping
+    body: "`%`-format string expected mapping but got sequence"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 0

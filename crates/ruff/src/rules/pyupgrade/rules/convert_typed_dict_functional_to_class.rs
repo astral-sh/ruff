@@ -11,7 +11,7 @@ use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{Availability, Violation};
 use crate::AutofixKind;
 

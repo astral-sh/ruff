@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedImport:
-      name: typing.Union
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`typing.Union` imported but unused"
+    commit: "Remove unused import: `typing.Union`"
+    fixable: true
   location:
     row: 37
     column: 8
@@ -25,12 +25,10 @@ expression: diagnostics
     row: 35
     column: 4
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - F401
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `F401`)"
+    commit: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 52
     column: 19
@@ -47,12 +45,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - F401
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `F401`)"
+    commit: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 59
     column: 19
@@ -69,12 +65,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled:
-          - F501
-        unmatched: []
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (non-enabled: `F501`)"
+    commit: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 66
     column: 15
@@ -91,12 +85,10 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled:
-          - F501
-        unmatched: []
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (non-enabled: `F501`)"
+    commit: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 72
     column: 26
@@ -113,10 +105,10 @@ expression: diagnostics
       column: 38
   parent: ~
 - kind:
-    UnusedImport:
-      name: typing.Awaitable
-      ignore_init: false
-      multiple: true
+    name: UnusedImport
+    body: "`typing.Awaitable` imported but unused"
+    commit: Remove unused import
+    fixable: true
   location:
     row: 89
     column: 23
@@ -133,10 +125,10 @@ expression: diagnostics
       column: 52
   parent: ~
 - kind:
-    UnusedImport:
-      name: typing.AwaitableGenerator
-      ignore_init: false
-      multiple: true
+    name: UnusedImport
+    body: "`typing.AwaitableGenerator` imported but unused"
+    commit: Remove unused import
+    fixable: true
   location:
     row: 89
     column: 34
@@ -153,12 +145,10 @@ expression: diagnostics
       column: 52
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled:
-          - F501
-        unmatched: []
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (non-enabled: `F501`)"
+    commit: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 89
     column: 54

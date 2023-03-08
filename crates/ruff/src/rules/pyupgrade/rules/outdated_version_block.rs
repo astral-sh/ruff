@@ -13,7 +13,7 @@ use ruff_python_ast::whitespace::indentation;
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pyupgrade::fixes::adjust_indentation;
 use crate::settings::types::PythonVersion;
 use crate::violation::AlwaysAutofixableViolation;

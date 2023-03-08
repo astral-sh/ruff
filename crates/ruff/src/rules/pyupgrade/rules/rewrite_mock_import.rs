@@ -16,7 +16,7 @@ use ruff_python_ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

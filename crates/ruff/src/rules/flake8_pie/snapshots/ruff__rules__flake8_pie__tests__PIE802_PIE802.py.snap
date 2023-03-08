@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryComprehensionAnyAll: ~
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    commit: Remove unnecessary list comprehension
+    fixable: true
   location:
     row: 9
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    UnnecessaryComprehensionAnyAll: ~
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    commit: Remove unnecessary list comprehension
+    fixable: true
   location:
     row: 10
     column: 4

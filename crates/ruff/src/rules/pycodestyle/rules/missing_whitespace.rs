@@ -7,8 +7,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
 use crate::registry::DiagnosticKind;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
 use crate::violation::AlwaysAutofixableViolation;
 use crate::violation::Violation;

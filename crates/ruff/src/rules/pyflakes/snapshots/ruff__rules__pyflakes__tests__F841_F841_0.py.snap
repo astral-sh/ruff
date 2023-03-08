@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedVariable:
-      name: e
+    name: UnusedVariable
+    body: "Local variable `e` is assigned to but never used"
+    commit: "Remove assignment to unused variable `e`"
+    fixable: true
   location:
     row: 3
     column: 21
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    UnusedVariable:
-      name: z
+    name: UnusedVariable
+    body: "Local variable `z` is assigned to but never used"
+    commit: "Remove assignment to unused variable `z`"
+    fixable: true
   location:
     row: 16
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable:
-      name: foo
+    name: UnusedVariable
+    body: "Local variable `foo` is assigned to but never used"
+    commit: "Remove assignment to unused variable `foo`"
+    fixable: true
   location:
     row: 20
     column: 4
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable:
-      name: a
+    name: UnusedVariable
+    body: "Local variable `a` is assigned to but never used"
+    commit: "Remove assignment to unused variable `a`"
+    fixable: true
   location:
     row: 21
     column: 5
@@ -68,8 +76,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable:
-      name: b
+    name: UnusedVariable
+    body: "Local variable `b` is assigned to but never used"
+    commit: "Remove assignment to unused variable `b`"
+    fixable: true
   location:
     row: 21
     column: 8
@@ -79,8 +89,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable:
-      name: baz
+    name: UnusedVariable
+    body: "Local variable `baz` is assigned to but never used"
+    commit: "Remove assignment to unused variable `baz`"
+    fixable: true
   location:
     row: 26
     column: 13
@@ -97,8 +109,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    UnusedVariable:
-      name: b
+    name: UnusedVariable
+    body: "Local variable `b` is assigned to but never used"
+    commit: "Remove assignment to unused variable `b`"
+    fixable: true
   location:
     row: 51
     column: 8
@@ -115,8 +129,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UnusedVariable:
-      name: my_file
+    name: UnusedVariable
+    body: "Local variable `my_file` is assigned to but never used"
+    commit: "Remove assignment to unused variable `my_file`"
+    fixable: true
   location:
     row: 79
     column: 25
@@ -133,8 +149,10 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    UnusedVariable:
-      name: my_file
+    name: UnusedVariable
+    body: "Local variable `my_file` is assigned to but never used"
+    commit: "Remove assignment to unused variable `my_file`"
+    fixable: true
   location:
     row: 85
     column: 24
@@ -151,8 +169,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    UnusedVariable:
-      name: msg3
+    name: UnusedVariable
+    body: "Local variable `msg3` is assigned to but never used"
+    commit: "Remove assignment to unused variable `msg3`"
+    fixable: true
   location:
     row: 102
     column: 4
@@ -169,8 +189,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedVariable:
-      name: Baz
+    name: UnusedVariable
+    body: "Local variable `Baz` is assigned to but never used"
+    commit: "Remove assignment to unused variable `Baz`"
+    fixable: true
   location:
     row: 115
     column: 4
@@ -187,8 +209,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    UnusedVariable:
-      name: y
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    commit: "Remove assignment to unused variable `y`"
+    fixable: true
   location:
     row: 122
     column: 13

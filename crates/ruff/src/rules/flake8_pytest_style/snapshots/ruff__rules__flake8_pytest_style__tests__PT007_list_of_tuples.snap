@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 34
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 4
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 4
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 8
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 8
@@ -63,9 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 50
     column: 8
@@ -75,9 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 51
     column: 8
@@ -87,9 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 61
     column: 8
@@ -99,9 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 62
     column: 8
@@ -111,9 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeValuesWrongType:
-      values: list
-      row: tuple
+    name: ParametrizeValuesWrongType
+    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 81
     column: 37

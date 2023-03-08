@@ -9,7 +9,7 @@ use crate::docstrings::definition::Docstring;
 use crate::docstrings::sections::SectionKind;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pydocstyle::helpers::logical_line;
 use crate::violation::AlwaysAutofixableViolation;
 

@@ -1,11 +1,12 @@
 ---
-source: src/rules/flake8_tidy_imports/banned_api.rs
+source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 expression: diagnostics
 ---
 - kind:
-    BannedApi:
-      name: cgi
-      message: The cgi module is deprecated.
+    name: BannedApi
+    body: "`cgi` is banned: The cgi module is deprecated."
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 7
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: cgi
-      message: The cgi module is deprecated.
+    name: BannedApi
+    body: "`cgi` is banned: The cgi module is deprecated."
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: cgi
-      message: The cgi module is deprecated.
+    name: BannedApi
+    body: "`cgi` is banned: The cgi module is deprecated."
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: cgi
-      message: The cgi module is deprecated.
+    name: BannedApi
+    body: "`cgi` is banned: The cgi module is deprecated."
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 7
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: cgi
-      message: The cgi module is deprecated.
+    name: BannedApi
+    body: "`cgi` is banned: The cgi module is deprecated."
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 0
@@ -63,9 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: cgi
-      message: The cgi module is deprecated.
+    name: BannedApi
+    body: "`cgi` is banned: The cgi module is deprecated."
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 0
@@ -75,9 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: typing.TypedDict
-      message: Use typing_extensions.TypedDict instead.
+    name: BannedApi
+    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+    commit: ~
+    fixable: false
   location:
     row: 17
     column: 19
@@ -87,9 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: typing.TypedDict
-      message: Use typing_extensions.TypedDict instead.
+    name: BannedApi
+    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 0
@@ -99,9 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: typing.TypedDict
-      message: Use typing_extensions.TypedDict instead.
+    name: BannedApi
+    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 0
@@ -111,9 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: typing.TypedDict
-      message: Use typing_extensions.TypedDict instead.
+    name: BannedApi
+    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 0
@@ -123,9 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: typing.TypedDict
-      message: Use typing_extensions.TypedDict instead.
+    name: BannedApi
+    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 0
@@ -135,9 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BannedApi:
-      name: typing.TypedDict
-      message: Use typing_extensions.TypedDict instead.
+    name: BannedApi
+    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+    commit: ~
+    fixable: false
   location:
     row: 33
     column: 0

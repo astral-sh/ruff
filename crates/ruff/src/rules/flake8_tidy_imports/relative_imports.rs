@@ -10,7 +10,7 @@ use ruff_python_stdlib::identifiers::is_module_name;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 pub type Settings = Strictness;

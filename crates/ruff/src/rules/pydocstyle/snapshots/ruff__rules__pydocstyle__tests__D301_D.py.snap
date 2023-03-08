@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    EscapeSequenceInDocstring: ~
+    name: EscapeSequenceInDocstring
+    body: "Use `r\"\"\"` if any backslashes in a docstring"
+    commit: ~
+    fixable: false
   location:
     row: 328
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EscapeSequenceInDocstring: ~
+    name: EscapeSequenceInDocstring
+    body: "Use `r\"\"\"` if any backslashes in a docstring"
+    commit: ~
+    fixable: false
   location:
     row: 333
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EscapeSequenceInDocstring: ~
+    name: EscapeSequenceInDocstring
+    body: "Use `r\"\"\"` if any backslashes in a docstring"
+    commit: ~
+    fixable: false
   location:
     row: 338
     column: 4

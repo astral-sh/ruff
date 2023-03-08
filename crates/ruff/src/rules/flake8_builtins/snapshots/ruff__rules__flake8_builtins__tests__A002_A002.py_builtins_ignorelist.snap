@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_builtins/mod.rs
+source: crates/ruff/src/rules/flake8_builtins/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BuiltinArgumentShadowing:
-      name: str
+    name: BuiltinArgumentShadowing
+    body: "Argument `str` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 10
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing:
-      name: type
+    name: BuiltinArgumentShadowing
+    body: "Argument `type` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 18
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing:
-      name: complex
+    name: BuiltinArgumentShadowing
+    body: "Argument `complex` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 25
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing:
-      name: Exception
+    name: BuiltinArgumentShadowing
+    body: "Argument `Exception` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 34
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing:
-      name: getattr
+    name: BuiltinArgumentShadowing
+    body: "Argument `getattr` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 47
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing:
-      name: bytes
+    name: BuiltinArgumentShadowing
+    body: "Argument `bytes` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 16
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinArgumentShadowing:
-      name: float
+    name: BuiltinArgumentShadowing
+    body: "Argument `float` is shadowing a python builtin"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 15

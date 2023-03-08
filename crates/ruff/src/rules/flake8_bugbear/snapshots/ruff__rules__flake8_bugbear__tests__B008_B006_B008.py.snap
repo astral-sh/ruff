@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FunctionCallArgumentDefault:
-      name: range
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `range` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 85
     column: 60
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: range
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `range` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 89
     column: 63
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: range
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `range` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 93
     column: 59
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: time.time
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `time.time` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 109
     column: 38
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: dt.datetime.now
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `dt.datetime.now` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 113
     column: 11
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: dt.timedelta
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `dt.timedelta` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 113
     column: 31
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: ~
+    name: FunctionCallArgumentDefault
+    body: Do not perform function call in argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 117
     column: 29
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: float
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `float` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 155
     column: 33
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: float
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `float` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 160
     column: 29
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: float
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `float` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 164
     column: 44
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: float
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `float` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 170
     column: 20
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: dt.datetime.now
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `dt.datetime.now` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 170
     column: 30
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: map
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `map` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 176
     column: 21
@@ -146,8 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: random.randint
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `random.randint` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 181
     column: 18
@@ -157,8 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionCallArgumentDefault:
-      name: dt.datetime.now
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `dt.datetime.now` in argument defaults"
+    commit: ~
+    fixable: false
   location:
     row: 181
     column: 36

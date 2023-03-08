@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_type_checking/mod.rs
+source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypingOnlyStandardLibraryImport:
-      full_name: os
+    name: TypingOnlyStandardLibraryImport
+    body: "Move standard library import `os` into a type-checking block"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 11

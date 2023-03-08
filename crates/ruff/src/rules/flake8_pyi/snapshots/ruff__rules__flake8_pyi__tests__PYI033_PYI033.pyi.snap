@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 21
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 21
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 21
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 21
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 19
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 19
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 11
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 10
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 28
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 21
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeCommentInStub: ~
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 25

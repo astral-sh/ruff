@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultipleSpacesBeforeKeyword: ~
+    name: MultipleSpacesBeforeKeyword
+    body: Multiple spaces before keyword
+    commit: ~
+    fixable: false
   location:
     row: 20
     column: 1
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesBeforeKeyword: ~
+    name: MultipleSpacesBeforeKeyword
+    body: Multiple spaces before keyword
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 1
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesBeforeKeyword: ~
+    name: MultipleSpacesBeforeKeyword
+    body: Multiple spaces before keyword
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 4

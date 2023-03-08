@@ -36,7 +36,7 @@ use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::definition::{
     transition_scope, Definition, DefinitionKind, Docstring, Documentable,
 };
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,

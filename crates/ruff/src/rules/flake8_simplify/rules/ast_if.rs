@@ -12,7 +12,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violation::{AutofixKind, Availability, Violation};
 

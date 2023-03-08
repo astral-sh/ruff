@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    InvalidModuleName:
-      name: file-with-dashes
+    name: InvalidModuleName
+    body: "Invalid module name: 'file-with-dashes'"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0

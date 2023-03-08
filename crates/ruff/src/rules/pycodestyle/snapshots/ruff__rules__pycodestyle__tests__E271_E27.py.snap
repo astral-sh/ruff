@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultipleSpacesAfterKeyword: ~
+    name: MultipleSpacesAfterKeyword
+    body: Multiple spaces after keyword
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 8
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesAfterKeyword: ~
+    name: MultipleSpacesAfterKeyword
+    body: Multiple spaces after keyword
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesAfterKeyword: ~
+    name: MultipleSpacesAfterKeyword
+    body: Multiple spaces after keyword
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 2
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesAfterKeyword: ~
+    name: MultipleSpacesAfterKeyword
+    body: Multiple spaces after keyword
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 5
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesAfterKeyword: ~
+    name: MultipleSpacesAfterKeyword
+    body: Multiple spaces after keyword
+    commit: ~
+    fixable: false
   location:
     row: 16
     column: 5
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesAfterKeyword: ~
+    name: MultipleSpacesAfterKeyword
+    body: Multiple spaces after keyword
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 5
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesAfterKeyword: ~
+    name: MultipleSpacesAfterKeyword
+    body: Multiple spaces after keyword
+    commit: ~
+    fixable: false
   location:
     row: 20
     column: 6
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesAfterKeyword: ~
+    name: MultipleSpacesAfterKeyword
+    body: Multiple spaces after keyword
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 6
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleSpacesAfterKeyword: ~
+    name: MultipleSpacesAfterKeyword
+    body: Multiple spaces after keyword
+    commit: ~
+    fixable: false
   location:
     row: 35
     column: 13

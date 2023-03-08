@@ -1,15 +1,16 @@
 //! Registry of [`Rule`] to [`DiagnosticKind`] mappings.
 
-use ruff_macros::RuleNamespace;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter};
+
+use ruff_macros::RuleNamespace;
+use ruff_python_ast::types::Range;
 
 use crate::codes::{self, RuleCodePrefix};
 use crate::fix::Fix;
 use crate::rules;
 use crate::violation::Violation;
-use ruff_python_ast::types::Range;
 
 ruff_macros::register_rules!(
     // pycodestyle errors
@@ -881,6 +882,18 @@ impl Rule {
             _ => &LintSource::Ast,
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiagnosticKind {
+    /// The identifier of the corresponding [`Rule`].
+    pub name: String,
+    /// The message body to display to the user, to explain the diagnostic.
+    pub body: String,
+    /// The message to display to the user, to explain the suggested fix.
+    pub commit: Option<String>,
+    /// Whether the diagnostic is automatically fixable.
+    pub fixable: bool,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

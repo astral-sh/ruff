@@ -1,10 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UndefinedName:
-      name: InnerClass
+    name: UndefinedName
+    body: "Undefined name `InnerClass`"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 29

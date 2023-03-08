@@ -1,9 +1,12 @@
 ---
-source: src/rules/pep8_naming/mod.rs
+source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DunderFunctionName: ~
+    name: DunderFunctionName
+    body: "Function name should not start and end with `__`"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DunderFunctionName: ~
+    name: DunderFunctionName
+    body: "Function name should not start and end with `__`"
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 8

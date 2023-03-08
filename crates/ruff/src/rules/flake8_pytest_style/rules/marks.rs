@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
 use super::helpers::{get_mark_decorators, get_mark_name};

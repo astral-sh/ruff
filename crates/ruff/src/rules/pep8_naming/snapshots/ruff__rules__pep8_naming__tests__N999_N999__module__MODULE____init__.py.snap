@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    InvalidModuleName:
-      name: MODULE
+    name: InvalidModuleName
+    body: "Invalid module name: 'MODULE'"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0

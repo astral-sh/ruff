@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Binding, BindingKind, Range, Scope};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 use super::super::fixes;

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UTF8EncodingDeclaration: ~
+    name: UTF8EncodingDeclaration
+    body: UTF-8 encoding declaration is unnecessary
+    commit: Remove unnecessary coding comment
+    fixable: true
   location:
     row: 1
     column: 0

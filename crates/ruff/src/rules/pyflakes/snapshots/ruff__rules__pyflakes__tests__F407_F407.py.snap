@@ -1,10 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FutureFeatureNotDefined:
-      name: non_existent_feature
+    name: FutureFeatureNotDefined
+    body: "Future feature `non_existent_feature` is not defined"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 23

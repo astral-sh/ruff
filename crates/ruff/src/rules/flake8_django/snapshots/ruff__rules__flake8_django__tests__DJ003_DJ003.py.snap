@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LocalsInRenderFunction: ~
+    name: LocalsInRenderFunction
+    body: "Avoid passing `locals()` as context to a `render` function"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 41
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    LocalsInRenderFunction: ~
+    name: LocalsInRenderFunction
+    body: "Avoid passing `locals()` as context to a `render` function"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 49
@@ -22,3 +28,4 @@ expression: diagnostics
     column: 57
   fix: ~
   parent: ~
+

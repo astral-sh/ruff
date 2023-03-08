@@ -1,10 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedAnnotation:
-      name: name
+    name: UnusedAnnotation
+    body: "Local variable `name` is annotated but never used"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedAnnotation:
-      name: age
+    name: UnusedAnnotation
+    body: "Local variable `age` is annotated but never used"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 4

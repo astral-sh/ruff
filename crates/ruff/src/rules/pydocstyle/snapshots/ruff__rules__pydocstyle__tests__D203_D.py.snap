@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    OneBlankLineBeforeClass:
-      lines: 0
+    name: OneBlankLineBeforeClass
+    body: 1 blank line required before class docstring
+    commit: Insert 1 blank line before class docstring
+    fixable: true
   location:
     row: 161
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    OneBlankLineBeforeClass:
-      lines: 0
+    name: OneBlankLineBeforeClass
+    body: 1 blank line required before class docstring
+    commit: Insert 1 blank line before class docstring
+    fixable: true
   location:
     row: 192
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    OneBlankLineBeforeClass:
-      lines: 0
+    name: OneBlankLineBeforeClass
+    body: 1 blank line required before class docstring
+    commit: Insert 1 blank line before class docstring
+    fixable: true
   location:
     row: 526
     column: 4

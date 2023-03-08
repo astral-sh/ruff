@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 355
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 406
     column: 24
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 410
     column: 4
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 416
     column: 4
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 422
     column: 34
@@ -88,7 +103,10 @@ expression: diagnostics
       column: 46
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 429
     column: 48
@@ -105,7 +123,10 @@ expression: diagnostics
       column: 60
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 470
     column: 4
@@ -122,7 +143,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 475
     column: 4
@@ -139,7 +163,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 480
     column: 4
@@ -156,7 +183,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 487
     column: 4
@@ -173,7 +203,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 520
     column: 4
@@ -190,7 +223,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 581
     column: 4
@@ -207,7 +243,10 @@ expression: diagnostics
       column: 47
   parent: ~
 - kind:
-    EndsInPunctuation: ~
+    name: EndsInPunctuation
+    body: "First line should end with a period, question mark, or exclamation point"
+    commit: Add closing punctuation
+    fixable: true
   location:
     row: 615
     column: 4

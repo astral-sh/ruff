@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    WhitespaceBeforePunctuation: ~
+    name: WhitespaceBeforePunctuation
+    body: "Whitespace before ',', ';', or ':'"
+    commit: ~
+    fixable: false
   location:
     row: 51
     column: 9
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforePunctuation: ~
+    name: WhitespaceBeforePunctuation
+    body: "Whitespace before ',', ';', or ':'"
+    commit: ~
+    fixable: false
   location:
     row: 55
     column: 9
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforePunctuation: ~
+    name: WhitespaceBeforePunctuation
+    body: "Whitespace before ',', ';', or ':'"
+    commit: ~
+    fixable: false
   location:
     row: 60
     column: 14
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforePunctuation: ~
+    name: WhitespaceBeforePunctuation
+    body: "Whitespace before ',', ';', or ':'"
+    commit: ~
+    fixable: false
   location:
     row: 63
     column: 14
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforePunctuation: ~
+    name: WhitespaceBeforePunctuation
+    body: "Whitespace before ',', ';', or ':'"
+    commit: ~
+    fixable: false
   location:
     row: 67
     column: 12
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforePunctuation: ~
+    name: WhitespaceBeforePunctuation
+    body: "Whitespace before ',', ';', or ':'"
+    commit: ~
+    fixable: false
   location:
     row: 71
     column: 12

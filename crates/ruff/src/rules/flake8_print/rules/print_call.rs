@@ -5,7 +5,7 @@ use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::Violation;
 
 #[violation]

@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnconventionalImportAlias:
-      - xml.dom.minidom
-      - md
+    name: UnconventionalImportAlias
+    body: "`xml.dom.minidom` should be imported as `md`"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - xml.dom.minidom
-      - md
+    name: UnconventionalImportAlias
+    body: "`xml.dom.minidom` should be imported as `md`"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - xml.dom.minidom
-      - md
+    name: UnconventionalImportAlias
+    body: "`xml.dom.minidom` should be imported as `md`"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 0
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - xml.dom.minidom
-      - md
+    name: UnconventionalImportAlias
+    body: "`xml.dom.minidom` should be imported as `md`"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - xml.dom.minidom.parseString
-      - pstr
+    name: UnconventionalImportAlias
+    body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 0
@@ -63,9 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - xml.dom.minidom.parseString
-      - pstr
+    name: UnconventionalImportAlias
+    body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 0
@@ -75,9 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - xml.dom.minidom.parseString
-      - pstr
+    name: UnconventionalImportAlias
+    body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -87,9 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - xml.dom.minidom.parseString
-      - pstr
+    name: UnconventionalImportAlias
+    body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 0

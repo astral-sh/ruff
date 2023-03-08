@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 2
     column: 6
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 5
     column: 6
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 8
     column: 6
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 11
     column: 6
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 14
     column: 6
@@ -88,7 +103,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 18
     column: 4
@@ -105,7 +123,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 23
     column: 4
@@ -122,7 +143,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 30
     column: 12
@@ -139,7 +163,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 35
     column: 8
@@ -156,7 +183,10 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    ExtraneousParentheses: ~
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    commit: Remove extraneous parentheses
+    fixable: true
   location:
     row: 39
     column: 6

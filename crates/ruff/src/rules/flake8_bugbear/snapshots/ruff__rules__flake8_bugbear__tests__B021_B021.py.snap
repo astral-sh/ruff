@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 4
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 30
     column: 4
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 38
     column: 4
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 46
     column: 4
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 54
     column: 4
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 62
     column: 4
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 70
     column: 4
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringDocstring: ~
+    name: FStringDocstring
+    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+    commit: ~
+    fixable: false
   location:
     row: 74
     column: 4

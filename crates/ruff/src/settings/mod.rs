@@ -372,7 +372,7 @@ impl From<&Configuration> for RuleTable {
 
         for rule in select_set {
             let fix = fixable_set.contains(&rule);
-            rules.enable(rule.clone(), fix);
+            rules.enable(rule, fix);
         }
 
         // If a docstring convention is specified, force-disable any incompatible error

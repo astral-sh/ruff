@@ -11,7 +11,7 @@ use ruff_python_ast::{cast, helpers};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 use super::fixes;

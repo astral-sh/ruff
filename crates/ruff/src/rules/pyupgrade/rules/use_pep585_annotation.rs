@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 // TODO: document referencing [PEP 585]: https://peps.python.org/pep-0585/

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ModelWithoutDunderStr: ~
+    name: ModelWithoutDunderStr
+    body: "Model does not define `__str__` method"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelWithoutDunderStr: ~
+    name: ModelWithoutDunderStr
+    body: "Model does not define `__str__` method"
+    commit: ~
+    fixable: false
   location:
     row: 21
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModelWithoutDunderStr: ~
+    name: ModelWithoutDunderStr
+    body: "Model does not define `__str__` method"
+    commit: ~
+    fixable: false
   location:
     row: 36
     column: 0

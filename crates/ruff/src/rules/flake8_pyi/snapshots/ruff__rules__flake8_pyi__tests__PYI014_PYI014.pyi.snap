@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 6
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 6
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 6
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 21
     column: 6
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 10
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 6
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 6
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 35
     column: 6
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 38
     column: 6
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 41
     column: 6
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ArgumentSimpleDefaults: ~
+    name: ArgumentSimpleDefaults
+    body: Only simple default values allowed for arguments
+    commit: ~
+    fixable: false
   location:
     row: 44
     column: 6

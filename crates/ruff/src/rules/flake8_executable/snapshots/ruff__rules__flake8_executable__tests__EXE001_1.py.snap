@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_executable/mod.rs
+source: crates/ruff/src/rules/flake8_executable/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ShebangNotExecutable: ~
+    name: ShebangNotExecutable
+    body: Shebang is present but file is not executable
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 2

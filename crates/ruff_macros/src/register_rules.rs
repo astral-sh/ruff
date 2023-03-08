@@ -4,14 +4,10 @@ use syn::{Attribute, Ident, Path, Token};
 
 pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
     let mut rule_variants = quote!();
-    let mut diagnostic_kind_variants = quote!();
     let mut rule_message_formats_match_arms = quote!();
     let mut rule_autofixable_match_arms = quote!();
     let mut rule_explanation_match_arms = quote!();
-    let mut diagnostic_kind_code_match_arms = quote!();
-    let mut diagnostic_kind_body_match_arms = quote!();
-    let mut diagnostic_kind_fixable_match_arms = quote!();
-    let mut diagnostic_kind_commit_match_arms = quote!();
+
     let mut from_impls_for_diagnostic_kind = quote!();
 
     for (path, name, attr) in &input.entries {
@@ -19,31 +15,16 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             #(#attr)*
             #name,
         });
-        diagnostic_kind_variants.extend(quote! {#(#attr)* #name(#path),});
-
         // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
         rule_message_formats_match_arms
             .extend(quote! {#(#attr)* Self::#name => <#path as Violation>::message_formats(),});
         rule_autofixable_match_arms
             .extend(quote! {#(#attr)* Self::#name => <#path as Violation>::AUTOFIX,});
         rule_explanation_match_arms.extend(quote! {#(#attr)* Self::#name => #path::explanation(),});
-        diagnostic_kind_code_match_arms
-            .extend(quote! {#(#attr)* Self::#name(..) => &Rule::#name, });
-        diagnostic_kind_body_match_arms
-            .extend(quote! {#(#attr)* Self::#name(x) => Violation::message(x), });
-        diagnostic_kind_fixable_match_arms
-            .extend(quote! {#(#attr)* Self::#name(x) => x.autofix_title_formatter().is_some(),});
-        diagnostic_kind_commit_match_arms.extend(
-            quote! {#(#attr)* Self::#name(x) => x.autofix_title_formatter().map(|f| f(x)), },
-        );
-        from_impls_for_diagnostic_kind.extend(quote! {
-            #(#attr)*
-            impl From<#path> for DiagnosticKind {
-                fn from(x: #path) -> Self {
-                    DiagnosticKind::#name(x)
-                }
-            }
-        });
+
+        // Enable conversion from `DiagnosticKind` to `Rule`.
+        from_impls_for_diagnostic_kind
+            .extend(quote! {#(#attr)* stringify!(#name) => &Rule::#name,});
     }
 
     quote! {
@@ -63,47 +44,35 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
         #[strum(serialize_all = "kebab-case")]
         pub enum Rule { #rule_variants }
 
-        #[derive(AsRefStr, Debug, PartialEq, Eq, Serialize, Deserialize)]
-        pub enum DiagnosticKind { #diagnostic_kind_variants }
-
         impl Rule {
             /// Returns the format strings used to report violations of this rule.
             pub fn message_formats(&self) -> &'static [&'static str] {
                 match self { #rule_message_formats_match_arms }
             }
 
+            /// Returns the documentation for this rule.
             pub fn explanation(&self) -> Option<&'static str> {
                 match self { #rule_explanation_match_arms }
             }
 
+            /// Returns the autofix status of this rule.
             pub fn autofixable(&self) -> Option<crate::violation::AutofixKind> {
                 match self { #rule_autofixable_match_arms }
             }
         }
 
-        impl DiagnosticKind {
-            /// The rule of the diagnostic.
-            pub fn rule(&self) -> &'static Rule {
-                match self { #diagnostic_kind_code_match_arms }
-            }
-
-            /// The body text for the diagnostic.
-            pub fn body(&self) -> String {
-                match self { #diagnostic_kind_body_match_arms }
-            }
-
-            /// Whether the diagnostic is (potentially) fixable.
-            pub fn fixable(&self) -> bool {
-                match self { #diagnostic_kind_fixable_match_arms }
-            }
-
-            /// The message used to describe the fix action for a given `DiagnosticKind`.
-            pub fn commit(&self) -> Option<String> {
-                match self { #diagnostic_kind_commit_match_arms }
-            }
+        pub trait AsRule {
+            fn rule(&self) -> &'static Rule;
         }
 
-        #from_impls_for_diagnostic_kind
+        impl AsRule for DiagnosticKind {
+            fn rule(&self) -> &'static Rule {
+                match self.name.as_str() {
+                    #from_impls_for_diagnostic_kind
+                    _ => unreachable!("invalid rule name: {}", self.name),
+                }
+            }
+        }
     }
 }
 

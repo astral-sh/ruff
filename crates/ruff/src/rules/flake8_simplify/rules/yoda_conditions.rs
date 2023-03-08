@@ -10,7 +10,7 @@ use ruff_python_stdlib::str::{self};
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]

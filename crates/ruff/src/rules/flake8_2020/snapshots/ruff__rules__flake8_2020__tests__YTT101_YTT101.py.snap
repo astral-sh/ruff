@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_2020/mod.rs
+source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SysVersionSlice3Referenced: ~
+    name: SysVersionSlice3Referenced
+    body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 6
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SysVersionSlice3Referenced: ~
+    name: SysVersionSlice3Referenced
+    body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 6
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SysVersionSlice3Referenced: ~
+    name: SysVersionSlice3Referenced
+    body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 6

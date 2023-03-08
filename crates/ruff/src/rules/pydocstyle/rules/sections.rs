@@ -17,7 +17,7 @@ use crate::docstrings::sections::{section_contexts, SectionContext, SectionKind}
 use crate::docstrings::styles::SectionStyle;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::rules::pydocstyle::settings::Convention;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 

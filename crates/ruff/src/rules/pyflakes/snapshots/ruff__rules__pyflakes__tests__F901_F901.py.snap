@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RaiseNotImplemented: ~
+    name: RaiseNotImplemented
+    body: "`raise NotImplemented` should be `raise NotImplementedError`"
+    commit: "Use `raise NotImplementedError`"
+    fixable: true
   location:
     row: 2
     column: 10
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    RaiseNotImplemented: ~
+    name: RaiseNotImplemented
+    body: "`raise NotImplemented` should be `raise NotImplementedError`"
+    commit: "Use `raise NotImplementedError`"
+    fixable: true
   location:
     row: 6
     column: 10

@@ -1,9 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PercentFormatExpectedMapping: ~
+    name: PercentFormatExpectedMapping
+    body: "`%`-format string expected mapping but got sequence"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0

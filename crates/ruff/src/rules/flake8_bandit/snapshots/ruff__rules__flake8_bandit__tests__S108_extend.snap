@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HardcodedTempFile:
-      string: /tmp/abc
+    name: HardcodedTempFile
+    body: "Probable insecure usage of temporary file or directory: \"/tmp/abc\""
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 10
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedTempFile:
-      string: /var/tmp/123
+    name: HardcodedTempFile
+    body: "Probable insecure usage of temporary file or directory: \"/var/tmp/123\""
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 10
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedTempFile:
-      string: /dev/shm/unit/test
+    name: HardcodedTempFile
+    body: "Probable insecure usage of temporary file or directory: \"/dev/shm/unit/test\""
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 10
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedTempFile:
-      string: /foo/bar
+    name: HardcodedTempFile
+    body: "Probable insecure usage of temporary file or directory: \"/foo/bar\""
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 10
