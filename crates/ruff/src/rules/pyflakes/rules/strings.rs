@@ -4,12 +4,12 @@ use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, KeywordData};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::AsRule;
 
 use super::super::cformat::CFormatSummary;
 use super::super::fixes::{

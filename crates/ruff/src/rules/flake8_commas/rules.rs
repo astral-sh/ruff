@@ -2,14 +2,14 @@ use itertools::Itertools;
 use rustpython_parser::lexer::{LexResult, Spanned};
 use rustpython_parser::Tok;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Rule;
 use crate::settings::{flags, Settings};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]

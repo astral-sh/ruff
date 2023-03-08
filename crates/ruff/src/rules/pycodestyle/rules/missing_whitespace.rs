@@ -3,15 +3,15 @@
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
+use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Fix;
+use ruff_diagnostics::Violation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::fix::Fix;
-use crate::registry::DiagnosticKind;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
-use crate::violation::AlwaysAutofixableViolation;
-use crate::violation::Violation;
 
 #[violation]
 pub struct MissingWhitespace {

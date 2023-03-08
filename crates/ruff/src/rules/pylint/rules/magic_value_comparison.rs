@@ -1,14 +1,13 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
 use crate::rules::pylint::settings::ConstantType;
-use crate::violation::Violation;
 
 #[violation]
 pub struct MagicValueComparison {

@@ -1982,6 +1982,7 @@ dependencies = [
  "regex",
  "result-like",
  "ruff_cache",
+ "ruff_diagnostics",
  "ruff_macros",
  "ruff_python_ast",
  "ruff_python_stdlib",
@@ -2042,6 +2043,7 @@ dependencies = [
  "regex",
  "ruff",
  "ruff_cache",
+ "ruff_diagnostics",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2067,6 +2069,7 @@ dependencies = [
  "regex",
  "ruff",
  "ruff_cli",
+ "ruff_diagnostics",
  "rustpython-common",
  "rustpython-parser",
  "schemars",
@@ -2074,6 +2077,15 @@ dependencies = [
  "strum",
  "strum_macros",
  "textwrap",
+]
+
+[[package]]
+name = "ruff_diagnostics"
+version = "0.0.0"
+dependencies = [
+ "ruff_python_ast",
+ "rustpython-parser",
+ "serde",
 ]
 
 [[package]]

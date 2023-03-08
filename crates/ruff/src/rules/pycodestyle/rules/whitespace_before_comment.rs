@@ -3,12 +3,11 @@
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
+use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
-
-use crate::registry::DiagnosticKind;
-use crate::violation::Violation;
 
 #[violation]
 pub struct TooFewSpacesBeforeInlineComment;

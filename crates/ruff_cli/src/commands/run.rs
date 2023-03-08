@@ -1,4 +1,4 @@
-use std::io::{self};
+use std::io;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -10,10 +10,11 @@ use log::{debug, error};
 use rayon::prelude::*;
 
 use ruff::message::{Location, Message};
-use ruff::registry::{Diagnostic, Rule};
+use ruff::registry::Rule;
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError, Range};
+use ruff_diagnostics::Diagnostic;
 
 use crate::args::Overrides;
 use crate::cache;

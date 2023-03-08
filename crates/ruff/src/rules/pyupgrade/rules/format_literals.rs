@@ -4,16 +4,15 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::Expr;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call, match_expression};
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::pyflakes::format::FormatSummary;
-use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
 pub struct FormatLiterals;

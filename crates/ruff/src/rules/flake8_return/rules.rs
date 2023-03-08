@@ -1,6 +1,8 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{elif_else_range, end_of_statement};
 use ruff_python_ast::types::Range;
@@ -8,9 +10,7 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic, Rule};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::{AsRule, Rule};
 
 use super::branch::Branch;
 use super::helpers::result_exists;

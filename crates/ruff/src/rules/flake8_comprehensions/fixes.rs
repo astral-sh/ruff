@@ -7,10 +7,10 @@ use libcst_native::{
     RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace, Tuple,
 };
 
+use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::cst::matchers::{match_expr, match_module};
-use crate::fix::Fix;
 
 fn match_call<'a, 'b>(expr: &'a mut Expr<'b>) -> Result<&'a mut Call<'b>> {
     if let Expression::Call(call) = &mut expr.value {

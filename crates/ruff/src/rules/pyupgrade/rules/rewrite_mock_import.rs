@@ -7,6 +7,7 @@ use log::error;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 use serde::{Deserialize, Serialize};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::collect_call_path;
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -15,9 +16,7 @@ use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic, Rule};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::{AsRule, Rule};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MockReference {

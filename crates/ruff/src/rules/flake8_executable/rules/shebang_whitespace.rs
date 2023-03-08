@@ -1,12 +1,10 @@
 use rustpython_parser::ast::Location;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
-use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
 pub struct ShebangWhitespace;

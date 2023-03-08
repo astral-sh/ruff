@@ -1,10 +1,8 @@
 use rustpython_parser::ast::Keyword;
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
-
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 use super::super::helpers::{matches_password_name, string_literal};
 

@@ -1,5 +1,7 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
+use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{compose_call_path, to_call_path};
 use ruff_python_ast::types::{CallPath, Range};
@@ -7,8 +9,6 @@ use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::violation::Violation;
 
 use super::mutable_argument_default::is_mutable_func;
 

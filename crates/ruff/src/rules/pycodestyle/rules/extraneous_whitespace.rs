@@ -3,10 +3,9 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-
-use crate::registry::DiagnosticKind;
-use crate::violation::Violation;
 
 #[violation]
 pub struct WhitespaceAfterOpenBracket;

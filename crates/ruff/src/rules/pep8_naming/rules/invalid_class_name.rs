@@ -1,11 +1,9 @@
 use rustpython_parser::ast::Stmt;
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
-
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 /// ## What it does
 /// Checks for class names that do not follow the `CamelCase` convention.

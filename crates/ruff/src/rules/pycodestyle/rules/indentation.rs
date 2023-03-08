@@ -1,10 +1,10 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
+use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::registry::DiagnosticKind;
 use crate::rules::pycodestyle::logical_lines::LogicalLine;
-use crate::violation::Violation;
 
 #[violation]
 pub struct IndentationWithInvalidMultiple {

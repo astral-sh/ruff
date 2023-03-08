@@ -4,6 +4,8 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::StmtKind;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::types::Range;
@@ -15,11 +17,9 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::docstrings::sections::{section_contexts, SectionContext, SectionKind};
 use crate::docstrings::styles::SectionStyle;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{AsRule, Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rules::pydocstyle::settings::Convention;
-use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 #[violation]
 pub struct SectionNotOverIndented {

@@ -5,6 +5,7 @@ use num_bigint::{BigInt, Sign};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::{Range, RefEquality};
@@ -12,11 +13,9 @@ use ruff_python_ast::whitespace::indentation;
 
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes::adjust_indentation;
 use crate::settings::types::PythonVersion;
-use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
 pub struct OutdatedVersionBlock;

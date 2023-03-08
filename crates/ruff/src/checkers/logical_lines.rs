@@ -5,7 +5,11 @@ use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
-use crate::registry::{AsRule, Diagnostic, Rule};
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+
+use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
 use crate::rules::pycodestyle::rules::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
@@ -14,8 +18,6 @@ use crate::rules::pycodestyle::rules::{
     whitespace_before_parameters,
 };
 use crate::settings::{flags, Settings};
-use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of 8.
 fn expand_indent(mut line: &str) -> usize {
@@ -225,8 +227,9 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
-    use crate::checkers::logical_lines::iter_logical_lines;
     use ruff_python_ast::source_code::Locator;
+
+    use crate::checkers::logical_lines::iter_logical_lines;
 
     #[test]
     fn split_logical_lines() {

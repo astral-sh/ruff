@@ -1,11 +1,10 @@
 use std::path::{Path, PathBuf};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::fs;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 /// ## What it does
 /// Checks for packages that are missing an `__init__.py` file.

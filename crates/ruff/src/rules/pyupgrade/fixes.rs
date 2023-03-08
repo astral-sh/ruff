@@ -6,12 +6,12 @@ use libcst_native::{
 use rustpython_parser::ast::{Expr, Keyword, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
 use crate::autofix::helpers::remove_argument;
 use crate::cst::matchers::match_module;
-use crate::fix::Fix;
 
 /// Safely adjust the indentation of the indented block at [`Range`].
 pub fn adjust_indentation(

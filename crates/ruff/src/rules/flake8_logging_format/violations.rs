@@ -1,6 +1,5 @@
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_macros::{derive_message_formats, violation};
-
-use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 #[violation]
 pub struct LoggingStringFormat;

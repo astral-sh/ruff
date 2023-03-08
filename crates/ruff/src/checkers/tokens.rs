@@ -4,13 +4,14 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use crate::lex::docstring_detection::StateMachine;
-use crate::registry::{AsRule, Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
     eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, pycodestyle,
     pyupgrade, ruff,
 };
 use crate::settings::{flags, Settings};
+use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Locator;
 
 pub fn check_tokens(

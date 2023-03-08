@@ -1,13 +1,12 @@
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::{find_keyword, is_const_true};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[violation]
 pub struct BlindExcept {

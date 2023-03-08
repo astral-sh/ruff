@@ -4,6 +4,7 @@ use itertools::{EitherOrBoth, Itertools};
 use rustpython_parser::ast::{Location, Stmt};
 use textwrap::indent;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{
     count_trailing_lines, followed_by_multi_statement_line, preceded_by_multi_statement_line,
@@ -12,10 +13,8 @@ use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::leading_space;
 
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::settings::{flags, Settings};
-use crate::violation::AlwaysAutofixableViolation;
 
 use super::super::track::Block;
 use super::super::{comments, format_imports};
