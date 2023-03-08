@@ -340,13 +340,15 @@ pub fn unnecessary_comprehension_any_all(
                 return;
             }
             if let ExprKind::ListComp { .. } = args[0].node {
-                let mut diagnostic =
-                    Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from_located(expr));
+                let mut diagnostic = Diagnostic::new(
+                    UnnecessaryComprehensionAnyAll,
+                    Range::from_located(&args[0]),
+                );
                 if checker.patch(diagnostic.kind.rule()) {
                     match fixes::fix_unnecessary_comprehension_any_all(
                         checker.locator,
                         checker.stylist,
-                        &args[0],
+                        expr,
                     ) {
                         Ok(fix) => {
                             diagnostic.amend(fix);

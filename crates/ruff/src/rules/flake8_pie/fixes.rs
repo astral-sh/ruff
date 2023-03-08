@@ -4,7 +4,7 @@ use libcst_native::{Codegen, CodegenState, Expression, GeneratorExp};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
-use crate::cst::matchers::{match_expr, match_module};
+use crate::cst::matchers::{match_call, match_expression};
 use crate::fix::Fix;
 
 /// (PIE802) Convert `[i for i in a]` into `i for i in a`
@@ -14,22 +14,27 @@ pub fn fix_unnecessary_comprehension_any_all(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(ListComp) -> Expr(GeneratorExp)
-    let module_text = locator.slice(Range::from_located(expr));
-    let mut tree = match_module(module_text)?;
-    let mut body = match_expr(&mut tree)?;
+    let expression_text = locator.slice(Range::from_located(expr));
+    let mut tree = match_expression(expression_text)?;
+    let call = match_call(&mut tree)?;
 
-    let Expression::ListComp(list_comp) = &body.value else {
+    let Expression::ListComp(list_comp) = &call.args[0].value else {
         bail!(
             "Expected Expression::ListComp"
         );
     };
 
-    body.value = Expression::GeneratorExp(Box::new(GeneratorExp {
+    call.args[0].value = Expression::GeneratorExp(Box::new(GeneratorExp {
         elt: list_comp.elt.clone(),
         for_in: list_comp.for_in.clone(),
         lpar: list_comp.lpar.clone(),
         rpar: list_comp.rpar.clone(),
     }));
+
+    if let Some(comma) = &call.args[0].comma {
+        call.args[0].whitespace_after_arg = comma.whitespace_after.clone();
+        call.args[0].comma = None;
+    }
 
     let mut state = CodegenState {
         default_newline: stylist.line_ending(),
