@@ -16,7 +16,7 @@ struct FloatAtom {
 impl Format<ASTFormatContext<'_>> for FloatAtom {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         let locator = f.context().locator();
-        let contents = locator.contents();
+        let contents = f.context().contents();
         let start_index = locator.offset(self.range.location);
         let end_index = locator.offset(self.range.end_location);
 
@@ -76,7 +76,7 @@ pub struct FloatLiteral {
 impl Format<ASTFormatContext<'_>> for FloatLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         let locator = f.context().locator();
-        let contents = locator.contents();
+        let contents = f.context().contents();
         let start_index = locator.offset(self.range.location);
         let end_index = locator.offset(self.range.end_location);
 
@@ -132,7 +132,7 @@ pub struct IntLiteral {
 impl Format<ASTFormatContext<'_>> for IntLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         let locator = f.context().locator();
-        let contents = locator.contents();
+        let contents = f.context().contents();
         let start_index = locator.offset(self.range.location);
         let end_index = locator.offset(self.range.end_location);
 
@@ -181,7 +181,7 @@ pub struct ComplexLiteral {
 impl Format<ASTFormatContext<'_>> for ComplexLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         let locator = f.context().locator();
-        let contents = locator.contents();
+        let contents = f.context().contents();
         let start_index = locator.offset(self.range.location);
         let end_index = locator.offset(self.range.end_location);
 

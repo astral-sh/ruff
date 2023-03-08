@@ -73,8 +73,8 @@ pub struct Literal {
 
 impl Format<ASTFormatContext<'_>> for Literal {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
+        let text = f.context().contents();
         let locator = f.context().locator();
-        let text = locator.contents();
         let start_index = locator.offset(self.range.location);
         let end_index = locator.offset(self.range.end_location);
 

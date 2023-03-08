@@ -17,7 +17,7 @@ pub struct StringLiteralPart {
 impl Format<ASTFormatContext<'_>> for StringLiteralPart {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         let locator = f.context().locator();
-        let contents = locator.contents();
+        let contents = f.context().contents();
         let start_index = locator.offset(self.range.location);
         let end_index = locator.offset(self.range.end_location);
 

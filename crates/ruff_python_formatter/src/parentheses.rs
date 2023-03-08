@@ -1,7 +1,6 @@
 use rustpython_parser::ast::Constant;
 
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::core::helpers::is_radix_literal;
 use crate::core::visitor;
@@ -156,8 +155,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
                     },
                 ) {
                     // TODO(charlie): Encode this in the AST via separate node types.
-                    let range: Range = (&**value).into();
-                    if !is_radix_literal(self.locator.slice(range)) {
+                    if !is_radix_literal(self.locator.slice(&**value)) {
                         value.parentheses = Parenthesize::Always;
                     }
                 }
