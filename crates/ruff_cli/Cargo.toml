@@ -12,6 +12,15 @@ license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "ruff"
+
+# Since the name of the binary is the same as the name of the `ruff` crate
+# running `cargo doc --no-deps --all` results in an `output filename collision`
+# See also https://github.com/rust-lang/cargo/issues/6313.
+# We therefore disable the documentation generation for the binary.
+doc = false
+
 [dependencies]
 ruff = { path = "../ruff" }
 ruff_cache = { path = "../ruff_cache" }
