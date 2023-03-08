@@ -1,9 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PercentFormatMixedPositionalAndNamed: ~
+    name: PercentFormatMixedPositionalAndNamed
+    body: "`%`-format string has mixed positional and named placeholders"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PercentFormatMixedPositionalAndNamed: ~
+    name: PercentFormatMixedPositionalAndNamed
+    body: "`%`-format string has mixed positional and named placeholders"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PercentFormatMixedPositionalAndNamed: ~
+    name: PercentFormatMixedPositionalAndNamed
+    body: "`%`-format string has mixed positional and named placeholders"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 0

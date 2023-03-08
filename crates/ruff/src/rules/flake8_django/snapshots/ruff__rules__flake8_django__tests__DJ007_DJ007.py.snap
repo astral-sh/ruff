@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AllWithModelForm: ~
+    name: AllWithModelForm
+    body: "Do not use `__all__` with `ModelForm`, use `fields` instead"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 8
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AllWithModelForm: ~
+    name: AllWithModelForm
+    body: "Do not use `__all__` with `ModelForm`, use `fields` instead"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 8
@@ -22,3 +28,4 @@ expression: diagnostics
     column: 27
   fix: ~
   parent: ~
+

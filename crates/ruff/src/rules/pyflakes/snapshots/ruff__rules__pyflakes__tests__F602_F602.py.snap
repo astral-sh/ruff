@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 4
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 4
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 12
     column: 4
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: true
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: "Remove repeated key `a`"
+    fixable: true
   location:
     row: 13
     column: 4
@@ -58,9 +62,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 4
@@ -70,9 +75,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 4
@@ -82,9 +88,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: true
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: "Remove repeated key `a`"
+    fixable: true
   location:
     row: 20
     column: 4
@@ -101,9 +108,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 21
     column: 4
@@ -113,9 +121,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: true
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: "Remove repeated key `a`"
+    fixable: true
   location:
     row: 26
     column: 4
@@ -132,9 +141,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 4
@@ -144,9 +154,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 28
     column: 4
@@ -156,9 +167,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 4
@@ -168,9 +180,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: true
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: "Remove repeated key `a`"
+    fixable: true
   location:
     row: 35
     column: 4
@@ -187,9 +200,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 37
     column: 4
@@ -199,9 +213,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 39
     column: 4
@@ -211,9 +226,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: false
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 41
     column: 4
@@ -223,9 +239,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: true
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: "Remove repeated key `a`"
+    fixable: true
   location:
     row: 44
     column: 11
@@ -242,9 +259,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    MultiValueRepeatedKeyVariable:
-      name: a
-      repeated_value: true
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    commit: "Remove repeated key `a`"
+    fixable: true
   location:
     row: 45
     column: 17

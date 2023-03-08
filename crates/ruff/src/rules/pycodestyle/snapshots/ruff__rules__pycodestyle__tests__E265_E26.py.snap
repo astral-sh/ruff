@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoSpaceAfterBlockComment: ~
+    name: NoSpaceAfterBlockComment
+    body: "Block comment should start with `# `"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoSpaceAfterBlockComment: ~
+    name: NoSpaceAfterBlockComment
+    body: "Block comment should start with `# `"
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoSpaceAfterBlockComment: ~
+    name: NoSpaceAfterBlockComment
+    body: "Block comment should start with `# `"
+    commit: ~
+    fixable: false
   location:
     row: 25
     column: 0
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoSpaceAfterBlockComment: ~
+    name: NoSpaceAfterBlockComment
+    body: "Block comment should start with `# `"
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 0

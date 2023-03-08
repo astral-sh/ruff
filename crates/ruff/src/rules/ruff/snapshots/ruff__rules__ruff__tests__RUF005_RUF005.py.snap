@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "[1, 2, 3, *foo]"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `[1, 2, 3, *foo]` instead of concatenation"
+    commit: "Replace with `[1, 2, 3, *foo]`"
+    fixable: true
   location:
     row: 10
     column: 6
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "(7, 8, 9, *zoob)"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `(7, 8, 9, *zoob)` instead of concatenation"
+    commit: "Replace with `(7, 8, 9, *zoob)`"
+    fixable: true
   location:
     row: 12
     column: 7
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "(*quux, 10, 11, 12)"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `(*quux, 10, 11, 12)` instead of concatenation"
+    commit: "Replace with `(*quux, 10, 11, 12)`"
+    fixable: true
   location:
     row: 13
     column: 7
@@ -60,9 +63,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "[*spom, 13, 14, 15]"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `[*spom, 13, 14, 15]` instead of concatenation"
+    commit: "Replace with `[*spom, 13, 14, 15]`"
+    fixable: true
   location:
     row: 15
     column: 7
@@ -79,9 +83,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "(\"we all say\", *yay())"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `(\"we all say\", *yay())` instead of concatenation"
+    commit: "Replace with `(\"we all say\", *yay())`"
+    fixable: true
   location:
     row: 16
     column: 12
@@ -98,9 +103,10 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "(\"we all think\", *Fun().yay())"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `(\"we all think\", *Fun().yay())` instead of concatenation"
+    commit: "Replace with `(\"we all think\", *Fun().yay())`"
+    fixable: true
   location:
     row: 17
     column: 13
@@ -117,9 +123,10 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "(\"we all feel\", *Fun.words)"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `(\"we all feel\", *Fun.words)` instead of concatenation"
+    commit: "Replace with `(\"we all feel\", *Fun.words)`"
+    fixable: true
   location:
     row: 18
     column: 15
@@ -136,9 +143,10 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "[\"a\", \"b\", \"c\", *eggs]"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `[\"a\", \"b\", \"c\", *eggs]` instead of concatenation"
+    commit: "Replace with `[\"a\", \"b\", \"c\", *eggs]`"
+    fixable: true
   location:
     row: 20
     column: 8
@@ -155,9 +163,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "(\"yes\", \"no\", \"pants\", *zoob)"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `(\"yes\", \"no\", \"pants\", *zoob)` instead of concatenation"
+    commit: "Replace with `(\"yes\", \"no\", \"pants\", *zoob)`"
+    fixable: true
   location:
     row: 20
     column: 38
@@ -174,9 +183,10 @@ expression: diagnostics
       column: 67
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "(*zoob,)"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `(*zoob,)` instead of concatenation"
+    commit: "Replace with `(*zoob,)`"
+    fixable: true
   location:
     row: 22
     column: 6
@@ -193,9 +203,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "[*first, 4, 5, 6]"
-      fixable: false
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `[*first, 4, 5, 6]` instead of concatenation"
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 9
@@ -205,9 +216,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "[*foo]"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `[*foo]` instead of concatenation"
+    commit: "Replace with `[*foo]`"
+    fixable: true
   location:
     row: 41
     column: 0
@@ -224,9 +236,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    UnpackInsteadOfConcatenatingToCollectionLiteral:
-      expr: "[*foo]"
-      fixable: true
+    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    body: "Consider `[*foo]` instead of concatenation"
+    commit: "Replace with `[*foo]`"
+    fixable: true
   location:
     row: 44
     column: 0

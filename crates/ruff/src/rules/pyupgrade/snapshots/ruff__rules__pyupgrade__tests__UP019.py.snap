@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypingTextStrAlias: ~
+    name: TypingTextStrAlias
+    body: "`typing.Text` is deprecated, use `str`"
+    commit: "Replace with `str`"
+    fixable: true
   location:
     row: 7
     column: 21
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    TypingTextStrAlias: ~
+    name: TypingTextStrAlias
+    body: "`typing.Text` is deprecated, use `str`"
+    commit: "Replace with `str`"
+    fixable: true
   location:
     row: 11
     column: 28
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 39
   parent: ~
 - kind:
-    TypingTextStrAlias: ~
+    name: TypingTextStrAlias
+    body: "`typing.Text` is deprecated, use `str`"
+    commit: "Replace with `str`"
+    fixable: true
   location:
     row: 15
     column: 27
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    TypingTextStrAlias: ~
+    name: TypingTextStrAlias
+    body: "`typing.Text` is deprecated, use `str`"
+    commit: "Replace with `str`"
+    fixable: true
   location:
     row: 19
     column: 28

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+    name: MissingWhitespaceAroundBitwiseOrShiftOperator
+    body: Missing whitespace around bitwise or shift operator
+    commit: ~
+    fixable: false
   location:
     row: 121
     column: 11
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+    name: MissingWhitespaceAroundBitwiseOrShiftOperator
+    body: Missing whitespace around bitwise or shift operator
+    commit: ~
+    fixable: false
   location:
     row: 123
     column: 11
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+    name: MissingWhitespaceAroundBitwiseOrShiftOperator
+    body: Missing whitespace around bitwise or shift operator
+    commit: ~
+    fixable: false
   location:
     row: 125
     column: 5
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+    name: MissingWhitespaceAroundBitwiseOrShiftOperator
+    body: Missing whitespace around bitwise or shift operator
+    commit: ~
+    fixable: false
   location:
     row: 127
     column: 5
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundBitwiseOrShiftOperator: ~
+    name: MissingWhitespaceAroundBitwiseOrShiftOperator
+    body: Missing whitespace around bitwise or shift operator
+    commit: ~
+    fixable: false
   location:
     row: 129
     column: 5

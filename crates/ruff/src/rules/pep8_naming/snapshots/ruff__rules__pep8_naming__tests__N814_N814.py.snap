@@ -1,11 +1,12 @@
 ---
-source: src/rules/pep8_naming/mod.rs
+source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CamelcaseImportedAsConstant:
-      name: Camel
-      asname: CAMEL
+    name: CamelcaseImportedAsConstant
+    body: "Camelcase `Camel` imported as constant `CAMEL`"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CamelcaseImportedAsConstant:
-      name: CamelCase
-      asname: CAMELCASE
+    name: CamelcaseImportedAsConstant
+    body: "Camelcase `CamelCase` imported as constant `CAMELCASE`"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CamelcaseImportedAsConstant:
-      name: AnotherCamelCase
-      asname: ANOTHER_CAMELCASE
+    name: CamelcaseImportedAsConstant
+    body: "Camelcase `AnotherCamelCase` imported as constant `ANOTHER_CAMELCASE`"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0

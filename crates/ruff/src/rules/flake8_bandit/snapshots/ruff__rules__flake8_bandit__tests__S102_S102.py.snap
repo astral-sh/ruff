@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ExecBuiltin: ~
+    name: ExecBuiltin
+    body: "Use of `exec` detected"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ExecBuiltin: ~
+    name: ExecBuiltin
+    body: "Use of `exec` detected"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 0

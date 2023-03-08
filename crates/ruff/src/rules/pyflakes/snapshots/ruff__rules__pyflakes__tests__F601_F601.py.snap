@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 4
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "1"
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `1` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 4
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "b\"123\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `b\"123\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 4
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 16
     column: 4
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 17
     column: 4
@@ -63,9 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: true
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: "Remove repeated key literal `\"a\"`"
+    fixable: true
   location:
     row: 18
     column: 4
@@ -82,9 +88,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 4
@@ -94,9 +101,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 4
@@ -106,9 +114,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: true
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: "Remove repeated key literal `\"a\"`"
+    fixable: true
   location:
     row: 25
     column: 4
@@ -125,9 +134,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 26
     column: 4
@@ -137,9 +147,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: true
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: "Remove repeated key literal `\"a\"`"
+    fixable: true
   location:
     row: 31
     column: 4
@@ -156,9 +167,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 4
@@ -168,9 +180,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 33
     column: 4
@@ -180,9 +193,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 34
     column: 4
@@ -192,9 +206,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 41
     column: 4
@@ -204,9 +219,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: false
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: ~
+    fixable: false
   location:
     row: 43
     column: 4
@@ -216,9 +232,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: true
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: "Remove repeated key literal `\"a\"`"
+    fixable: true
   location:
     row: 45
     column: 4
@@ -235,9 +252,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: true
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: "Remove repeated key literal `\"a\"`"
+    fixable: true
   location:
     row: 49
     column: 13
@@ -254,9 +272,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    MultiValueRepeatedKeyLiteral:
-      name: "\"a\""
-      repeated_value: true
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    commit: "Remove repeated key literal `\"a\"`"
+    fixable: true
   location:
     row: 50
     column: 21

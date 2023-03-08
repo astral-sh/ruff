@@ -1,9 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IfTuple: ~
+    name: IfTuple
+    body: "If test is a tuple, which is always `True`"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IfTuple: ~
+    name: IfTuple
+    body: "If test is a tuple, which is always `True`"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 4

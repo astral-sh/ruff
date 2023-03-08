@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingWhitespaceAfterKeyword: ~
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    commit: ~
+    fixable: false
   location:
     row: 37
     column: 13
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAfterKeyword: ~
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    commit: ~
+    fixable: false
   location:
     row: 39
     column: 29
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAfterKeyword: ~
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    commit: ~
+    fixable: false
   location:
     row: 42
     column: 33
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAfterKeyword: ~
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    commit: ~
+    fixable: false
   location:
     row: 46
     column: 2
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAfterKeyword: ~
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    commit: ~
+    fixable: false
   location:
     row: 54
     column: 10

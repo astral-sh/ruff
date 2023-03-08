@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TrueFalseComparison:
-      - true
-      - Eq
+    name: TrueFalseComparison
+    body: "Comparison to `True` should be `cond is True`"
+    commit: "Replace with `cond is True`"
+    fixable: true
   location:
     row: 2
     column: 10
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - false
-      - NotEq
+    name: TrueFalseComparison
+    body: "Comparison to `False` should be `cond is not False`"
+    commit: "Replace with `cond is not False`"
+    fixable: true
   location:
     row: 5
     column: 10
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - true
-      - NotEq
+    name: TrueFalseComparison
+    body: "Comparison to `True` should be `cond is not True`"
+    commit: "Replace with `cond is not True`"
+    fixable: true
   location:
     row: 8
     column: 3
@@ -60,9 +63,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - false
-      - Eq
+    name: TrueFalseComparison
+    body: "Comparison to `False` should be `cond is False`"
+    commit: "Replace with `cond is False`"
+    fixable: true
   location:
     row: 11
     column: 3
@@ -79,9 +83,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - true
-      - Eq
+    name: TrueFalseComparison
+    body: "Comparison to `True` should be `cond is True`"
+    commit: "Replace with `cond is True`"
+    fixable: true
   location:
     row: 14
     column: 13
@@ -98,9 +103,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - false
-      - NotEq
+    name: TrueFalseComparison
+    body: "Comparison to `False` should be `cond is not False`"
+    commit: "Replace with `cond is not False`"
+    fixable: true
   location:
     row: 17
     column: 13
@@ -117,9 +123,10 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - true
-      - Eq
+    name: TrueFalseComparison
+    body: "Comparison to `True` should be `cond is True`"
+    commit: "Replace with `cond is True`"
+    fixable: true
   location:
     row: 20
     column: 19
@@ -136,9 +143,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - false
-      - Eq
+    name: TrueFalseComparison
+    body: "Comparison to `False` should be `cond is False`"
+    commit: "Replace with `cond is False`"
+    fixable: true
   location:
     row: 20
     column: 43
@@ -155,9 +163,10 @@ expression: diagnostics
       column: 48
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - true
-      - Eq
+    name: TrueFalseComparison
+    body: "Comparison to `True` should be `cond is True`"
+    commit: "Replace with `cond is True`"
+    fixable: true
   location:
     row: 22
     column: 4
@@ -174,9 +183,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - true
-      - Eq
+    name: TrueFalseComparison
+    body: "Comparison to `True` should be `cond is True`"
+    commit: "Replace with `cond is True`"
+    fixable: true
   location:
     row: 25
     column: 10
@@ -193,9 +203,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    TrueFalseComparison:
-      - false
-      - NotEq
+    name: TrueFalseComparison
+    body: "Comparison to `False` should be `cond is not False`"
+    commit: "Replace with `cond is not False`"
+    fixable: true
   location:
     row: 25
     column: 18

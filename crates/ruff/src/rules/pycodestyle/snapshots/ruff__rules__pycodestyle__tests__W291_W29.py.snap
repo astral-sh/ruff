@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TrailingWhitespace: ~
+    name: TrailingWhitespace
+    body: Trailing whitespace
+    commit: Remove trailing whitespace
+    fixable: true
   location:
     row: 4
     column: 5
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 6
   parent: ~
 - kind:
-    TrailingWhitespace: ~
+    name: TrailingWhitespace
+    body: Trailing whitespace
+    commit: Remove trailing whitespace
+    fixable: true
   location:
     row: 11
     column: 34
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    TrailingWhitespace: ~
+    name: TrailingWhitespace
+    body: Trailing whitespace
+    commit: Remove trailing whitespace
+    fixable: true
   location:
     row: 13
     column: 5

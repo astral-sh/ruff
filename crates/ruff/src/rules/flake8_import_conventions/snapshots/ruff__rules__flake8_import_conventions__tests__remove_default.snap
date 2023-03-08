@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnconventionalImportAlias:
-      - altair
-      - alt
+    name: UnconventionalImportAlias
+    body: "`altair` should be imported as `alt`"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - matplotlib.pyplot
-      - plt
+    name: UnconventionalImportAlias
+    body: "`matplotlib.pyplot` should be imported as `plt`"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - pandas
-      - pd
+    name: UnconventionalImportAlias
+    body: "`pandas` should be imported as `pd`"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - seaborn
-      - sns
+    name: UnconventionalImportAlias
+    body: "`seaborn` should be imported as `sns`"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 0
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - altair
-      - alt
+    name: UnconventionalImportAlias
+    body: "`altair` should be imported as `alt`"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -63,9 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - matplotlib.pyplot
-      - plt
+    name: UnconventionalImportAlias
+    body: "`matplotlib.pyplot` should be imported as `plt`"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 0
@@ -75,9 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - pandas
-      - pd
+    name: UnconventionalImportAlias
+    body: "`pandas` should be imported as `pd`"
+    commit: ~
+    fixable: false
   location:
     row: 12
     column: 0
@@ -87,9 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - seaborn
-      - sns
+    name: UnconventionalImportAlias
+    body: "`seaborn` should be imported as `sns`"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 0

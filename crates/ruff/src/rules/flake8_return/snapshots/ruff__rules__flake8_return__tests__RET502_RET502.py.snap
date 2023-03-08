@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImplicitReturnValue: ~
+    name: ImplicitReturnValue
+    body: "Do not implicitly `return None` in function able to return non-`None` value"
+    commit: "Add explicit `None` return value"
+    fixable: true
   location:
     row: 3
     column: 8

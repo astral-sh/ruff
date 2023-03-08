@@ -1,9 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AmbiguousFunctionName: l
+    name: AmbiguousFunctionName
+    body: "Ambiguous function name: `l`"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousFunctionName: I
+    name: AmbiguousFunctionName
+    body: "Ambiguous function name: `I`"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousFunctionName: O
+    name: AmbiguousFunctionName
+    body: "Ambiguous function name: `O`"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 8

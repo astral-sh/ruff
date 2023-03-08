@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IfExprWithTrueFalse:
-      expr: b
+    name: IfExprWithTrueFalse
+    body: "Use `bool(b)` instead of `True if b else False`"
+    commit: "Replace with `not b"
+    fixable: true
   location:
     row: 1
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    IfExprWithTrueFalse:
-      expr: b != c
+    name: IfExprWithTrueFalse
+    body: "Use `bool(b != c)` instead of `True if b != c else False`"
+    commit: "Replace with `not b != c"
+    fixable: true
   location:
     row: 3
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    IfExprWithTrueFalse:
-      expr: b + c
+    name: IfExprWithTrueFalse
+    body: "Use `bool(b + c)` instead of `True if b + c else False`"
+    commit: "Replace with `not b + c"
+    fixable: true
   location:
     row: 5
     column: 4
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    IfExprWithTrueFalse:
-      expr: b
+    name: IfExprWithTrueFalse
+    body: "Use `bool(b)` instead of `True if b else False`"
+    commit: "Replace with `not b"
+    fixable: true
   location:
     row: 14
     column: 8

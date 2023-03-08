@@ -1,9 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PercentFormatStarRequiresSequence: ~
+    name: PercentFormatStarRequiresSequence
+    body: "`%`-format string `*` specifier requires sequence"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 0

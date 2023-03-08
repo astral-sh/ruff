@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_unused_arguments/mod.rs
+source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedLambdaArgument:
-      name: x
+    name: UnusedLambdaArgument
+    body: "Unused lambda argument: `x`"
+    commit: ~
+    fixable: false
   location:
     row: 28
     column: 7

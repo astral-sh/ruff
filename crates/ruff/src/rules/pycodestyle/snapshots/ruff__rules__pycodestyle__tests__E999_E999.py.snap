@@ -1,10 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SyntaxError:
-      message: unindent does not match any outer indentation level
+    name: SyntaxError
+    body: "SyntaxError: unindent does not match any outer indentation level"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0

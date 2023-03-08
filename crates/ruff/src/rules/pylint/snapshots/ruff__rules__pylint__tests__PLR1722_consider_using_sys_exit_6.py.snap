@@ -1,10 +1,12 @@
 ---
-source: src/rules/pylint/mod.rs
+source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ConsiderUsingSysExit:
-      name: exit
+    name: ConsiderUsingSysExit
+    body: "Use `sys.exit()` instead of `exit`"
+    commit: "Replace `exit` with `sys.exit()`"
+    fixable: true
   location:
     row: 1
     column: 0
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ConsiderUsingSysExit:
-      name: quit
+    name: ConsiderUsingSysExit
+    body: "Use `sys.exit()` instead of `quit`"
+    commit: "Replace `quit` with `sys.exit()`"
+    fixable: true
   location:
     row: 2
     column: 0

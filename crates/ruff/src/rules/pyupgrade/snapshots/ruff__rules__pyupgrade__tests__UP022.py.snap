@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ReplaceStdoutStderr: ~
+    name: ReplaceStdoutStderr
+    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
+    commit: "Replace with `capture_output` keyword argument"
+    fixable: true
   location:
     row: 4
     column: 9
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 68
   parent: ~
 - kind:
-    ReplaceStdoutStderr: ~
+    name: ReplaceStdoutStderr
+    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
+    commit: "Replace with `capture_output` keyword argument"
+    fixable: true
   location:
     row: 6
     column: 9
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 79
   parent: ~
 - kind:
-    ReplaceStdoutStderr: ~
+    name: ReplaceStdoutStderr
+    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
+    commit: "Replace with `capture_output` keyword argument"
+    fixable: true
   location:
     row: 8
     column: 9
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 85
   parent: ~
 - kind:
-    ReplaceStdoutStderr: ~
+    name: ReplaceStdoutStderr
+    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
+    commit: "Replace with `capture_output` keyword argument"
+    fixable: true
   location:
     row: 10
     column: 9
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 71
   parent: ~
 - kind:
-    ReplaceStdoutStderr: ~
+    name: ReplaceStdoutStderr
+    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
+    commit: "Replace with `capture_output` keyword argument"
+    fixable: true
   location:
     row: 14
     column: 9
@@ -88,7 +103,10 @@ expression: diagnostics
       column: 71
   parent: ~
 - kind:
-    ReplaceStdoutStderr: ~
+    name: ReplaceStdoutStderr
+    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
+    commit: "Replace with `capture_output` keyword argument"
+    fixable: true
   location:
     row: 18
     column: 9
@@ -105,7 +123,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    ReplaceStdoutStderr: ~
+    name: ReplaceStdoutStderr
+    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
+    commit: "Replace with `capture_output` keyword argument"
+    fixable: true
   location:
     row: 29
     column: 13

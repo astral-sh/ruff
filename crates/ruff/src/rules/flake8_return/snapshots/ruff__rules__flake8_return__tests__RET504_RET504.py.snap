@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_return/mod.rs
+source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryAssign: ~
+    name: UnnecessaryAssign
+    body: "Unnecessary variable assignment before `return` statement"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 11
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryAssign: ~
+    name: UnnecessaryAssign
+    body: "Unnecessary variable assignment before `return` statement"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 11
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryAssign: ~
+    name: UnnecessaryAssign
+    body: "Unnecessary variable assignment before `return` statement"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 15
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryAssign: ~
+    name: UnnecessaryAssign
+    body: "Unnecessary variable assignment before `return` statement"
+    commit: ~
+    fixable: false
   location:
     row: 31
     column: 11
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessaryAssign: ~
+    name: UnnecessaryAssign
+    body: "Unnecessary variable assignment before `return` statement"
+    commit: ~
+    fixable: false
   location:
     row: 39
     column: 11

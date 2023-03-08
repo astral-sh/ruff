@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AssignmentToOsEnviron: ~
+    name: AssignmentToOsEnviron
+    body: "Assigning to `os.environ` doesn't clear the environment"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 1
     column: 0
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 2
     column: 0
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 3
     column: 0
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 4
     column: 0
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 5
     column: 0
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 6
     column: 0
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 7
     column: 0
@@ -129,8 +143,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"w\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"w\"\""
+    commit: "Replace with \"\"w\"\""
+    fixable: true
   location:
     row: 8
     column: 0
@@ -147,8 +163,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 10
     column: 5
@@ -165,8 +183,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 12
     column: 5
@@ -183,8 +203,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 14
     column: 5
@@ -201,8 +223,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 16
     column: 5
@@ -219,8 +243,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 18
     column: 5
@@ -237,8 +263,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 20
     column: 5
@@ -255,8 +283,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 22
     column: 5
@@ -273,8 +303,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"w\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"w\"\""
+    commit: "Replace with \"\"w\"\""
+    fixable: true
   location:
     row: 24
     column: 5
@@ -291,8 +323,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 27
     column: 0
@@ -309,8 +343,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 28
     column: 0
@@ -327,8 +363,10 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 30
     column: 5
@@ -345,8 +383,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 32
     column: 5
@@ -363,8 +403,10 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 35
     column: 5
@@ -381,8 +423,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 35
     column: 29
@@ -399,8 +443,10 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 37
     column: 5
@@ -417,8 +463,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 37
     column: 30
@@ -435,8 +483,10 @@ expression: diagnostics
       column: 46
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 40
     column: 0
@@ -453,8 +503,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 41
     column: 0
@@ -471,8 +523,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 42
     column: 0
@@ -489,8 +543,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 44
     column: 5
@@ -507,8 +563,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 46
     column: 5
@@ -525,8 +583,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 48
     column: 5
@@ -543,8 +603,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 51
     column: 0
@@ -561,8 +623,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 52
     column: 0
@@ -579,8 +643,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 53
     column: 0
@@ -597,8 +663,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 55
     column: 5
@@ -615,8 +683,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 57
     column: 5
@@ -633,8 +703,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 59
     column: 5
@@ -651,8 +723,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 62
     column: 0
@@ -669,8 +743,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 63
     column: 0
@@ -687,8 +763,10 @@ expression: diagnostics
       column: 109
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 64
     column: 0
@@ -705,8 +783,10 @@ expression: diagnostics
       column: 68
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: ~
+    name: RedundantOpenModes
+    body: Unnecessary open mode parameters
+    commit: Remove open mode parameters
+    fixable: true
   location:
     row: 65
     column: 0
@@ -723,8 +803,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 67
     column: 0
@@ -741,8 +823,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 68
     column: 0
@@ -759,8 +843,10 @@ expression: diagnostics
       column: 110
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 69
     column: 0
@@ -777,8 +863,10 @@ expression: diagnostics
       column: 69
   parent: ~
 - kind:
-    RedundantOpenModes:
-      replacement: "\"rb\""
+    name: RedundantOpenModes
+    body: "Unnecessary open mode parameters, use \"\"rb\"\""
+    commit: "Replace with \"\"rb\"\""
+    fixable: true
   location:
     row: 70
     column: 0

@@ -1,10 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UndefinedExport:
-      name: b
+    name: UndefinedExport
+    body: "Undefined name `b` in `__all__`"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0

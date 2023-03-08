@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryListCall: ~
+    name: UnnecessaryListCall
+    body: "Unnecessary `list` call (remove the outer call to `list()`)"
+    commit: "Remove outer `list` call"
+    fixable: true
   location:
     row: 2
     column: 0

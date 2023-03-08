@@ -1,9 +1,12 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PublicMethod: ~
+    name: PublicMethod
+    body: Missing docstring in public method
+    commit: ~
+    fixable: false
   location:
     row: 16
     column: 8

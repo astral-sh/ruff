@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultiLineSummaryFirstLine: ~
+    name: MultiLineSummaryFirstLine
+    body: Multi-line docstring summary should start at the first line
+    commit: Remove whitespace after opening quotes
+    fixable: true
   location:
     row: 129
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 4
   parent: ~
 - kind:
-    MultiLineSummaryFirstLine: ~
+    name: MultiLineSummaryFirstLine
+    body: Multi-line docstring summary should start at the first line
+    commit: Remove whitespace after opening quotes
+    fixable: true
   location:
     row: 597
     column: 4
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 4
   parent: ~
 - kind:
-    MultiLineSummaryFirstLine: ~
+    name: MultiLineSummaryFirstLine
+    body: Multi-line docstring summary should start at the first line
+    commit: Remove whitespace after opening quotes
+    fixable: true
   location:
     row: 624
     column: 4

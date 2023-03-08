@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_raise/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryParenOnRaiseException: ~
+    name: UnnecessaryParenOnRaiseException
+    body: Unnecessary parentheses on raised exception
+    commit: Remove unnecessary parentheses
+    fixable: true
   location:
     row: 5
     column: 20
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    UnnecessaryParenOnRaiseException: ~
+    name: UnnecessaryParenOnRaiseException
+    body: Unnecessary parentheses on raised exception
+    commit: Remove unnecessary parentheses
+    fixable: true
   location:
     row: 13
     column: 15
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    UnnecessaryParenOnRaiseException: ~
+    name: UnnecessaryParenOnRaiseException
+    body: Unnecessary parentheses on raised exception
+    commit: Remove unnecessary parentheses
+    fixable: true
   location:
     row: 16
     column: 16
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    UnnecessaryParenOnRaiseException: ~
+    name: UnnecessaryParenOnRaiseException
+    body: Unnecessary parentheses on raised exception
+    commit: Remove unnecessary parentheses
+    fixable: true
   location:
     row: 20
     column: 4
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 6
   parent: ~
 - kind:
-    UnnecessaryParenOnRaiseException: ~
+    name: UnnecessaryParenOnRaiseException
+    body: Unnecessary parentheses on raised exception
+    commit: Remove unnecessary parentheses
+    fixable: true
   location:
     row: 23
     column: 15
@@ -88,7 +103,10 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UnnecessaryParenOnRaiseException: ~
+    name: UnnecessaryParenOnRaiseException
+    body: Unnecessary parentheses on raised exception
+    commit: Remove unnecessary parentheses
+    fixable: true
   location:
     row: 28
     column: 15

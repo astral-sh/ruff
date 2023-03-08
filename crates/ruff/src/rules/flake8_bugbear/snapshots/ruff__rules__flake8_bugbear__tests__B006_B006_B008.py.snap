@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 60
     column: 24
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 64
     column: 29
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 68
     column: 19
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 72
     column: 19
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 76
     column: 31
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 80
     column: 25
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 85
     column: 45
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 89
     column: 45
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 93
     column: 44
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 97
     column: 32
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 170
     column: 19
@@ -113,7 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 203
     column: 26
@@ -123,7 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 204
     column: 34
@@ -133,7 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MutableArgumentDefault: ~
+    name: MutableArgumentDefault
+    body: Do not use mutable data structures for argument defaults
+    commit: ~
+    fixable: false
   location:
     row: 205
     column: 61

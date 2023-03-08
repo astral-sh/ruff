@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_unused_arguments/mod.rs
+source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedClassMethodArgument:
-      name: x
+    name: UnusedClassMethodArgument
+    body: "Unused class method argument: `x`"
+    commit: ~
+    fixable: false
   location:
     row: 45
     column: 15

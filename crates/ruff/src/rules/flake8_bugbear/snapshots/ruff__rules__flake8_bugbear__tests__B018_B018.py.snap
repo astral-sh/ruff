@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 12
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 4
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 4
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 4
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 16
     column: 4
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 17
     column: 4
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 4
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 4
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 20
     column: 4
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 4
@@ -113,7 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 4
@@ -123,7 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 39
     column: 4
@@ -133,7 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 40
     column: 4
@@ -143,7 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 41
     column: 4
@@ -153,7 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 42
     column: 4
@@ -163,7 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 43
     column: 4
@@ -173,7 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 44
     column: 4
@@ -183,7 +237,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 45
     column: 4
@@ -193,7 +250,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 46
     column: 4
@@ -203,7 +263,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 47
     column: 4
@@ -213,7 +276,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 48
     column: 4
@@ -223,7 +289,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 52
     column: 4
@@ -233,7 +302,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessExpression: ~
+    name: UselessExpression
+    body: Found useless expression. Either assign it to a variable or remove it.
+    commit: ~
+    fixable: false
   location:
     row: 55
     column: 4

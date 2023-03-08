@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnintentionalTypeAnnotation: ~
+    name: UnintentionalTypeAnnotation
+    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnintentionalTypeAnnotation: ~
+    name: UnintentionalTypeAnnotation
+    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnintentionalTypeAnnotation: ~
+    name: UnintentionalTypeAnnotation
+    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+    commit: ~
+    fixable: false
   location:
     row: 12
     column: 0
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnintentionalTypeAnnotation: ~
+    name: UnintentionalTypeAnnotation
+    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 0
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnintentionalTypeAnnotation: ~
+    name: UnintentionalTypeAnnotation
+    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+    commit: ~
+    fixable: false
   location:
     row: 16
     column: 0
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnintentionalTypeAnnotation: ~
+    name: UnintentionalTypeAnnotation
+    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+    commit: ~
+    fixable: false
   location:
     row: 17
     column: 0
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnintentionalTypeAnnotation: ~
+    name: UnintentionalTypeAnnotation
+    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 0
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnintentionalTypeAnnotation: ~
+    name: UnintentionalTypeAnnotation
+    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 0

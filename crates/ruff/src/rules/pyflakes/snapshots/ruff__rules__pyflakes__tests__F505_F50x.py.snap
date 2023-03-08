@@ -1,11 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PercentFormatMissingArgument:
-      missing:
-        - bar
+    name: PercentFormatMissingArgument
+    body: "`%`-format string is missing argument(s) for placeholder(s): bar"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 0

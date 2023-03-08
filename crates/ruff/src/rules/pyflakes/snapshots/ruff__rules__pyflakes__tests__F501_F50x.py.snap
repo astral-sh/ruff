@@ -1,10 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PercentFormatInvalidFormat:
-      message: incomplete format
+    name: PercentFormatInvalidFormat
+    body: "`%`-format string has invalid format string: incomplete format"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0

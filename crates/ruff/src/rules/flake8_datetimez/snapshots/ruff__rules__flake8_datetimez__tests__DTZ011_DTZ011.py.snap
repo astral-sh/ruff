@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_datetimez/mod.rs
+source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CallDateToday: ~
+    name: CallDateToday
+    body: "The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CallDateToday: ~
+    name: CallDateToday
+    body: "The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0

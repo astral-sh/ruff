@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnsortedImports: ~
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    commit: Organize imports
+    fixable: true
   location:
     row: 3
     column: 0

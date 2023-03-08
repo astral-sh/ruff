@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    EmptyMethodWithoutAbstractDecorator:
-      name: AbstractClass.empty_1
+    name: EmptyMethodWithoutAbstractDecorator
+    body: "`AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyMethodWithoutAbstractDecorator:
-      name: AbstractClass.empty_2
+    name: EmptyMethodWithoutAbstractDecorator
+    body: "`AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator"
+    commit: ~
+    fixable: false
   location:
     row: 16
     column: 4
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyMethodWithoutAbstractDecorator:
-      name: AbstractClass.empty_3
+    name: EmptyMethodWithoutAbstractDecorator
+    body: "`AbstractClass.empty_3` is an empty method in an abstract base class, but has no abstract decorator"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 4
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyMethodWithoutAbstractDecorator:
-      name: AbstractClass.empty_4
+    name: EmptyMethodWithoutAbstractDecorator
+    body: "`AbstractClass.empty_4` is an empty method in an abstract base class, but has no abstract decorator"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 4

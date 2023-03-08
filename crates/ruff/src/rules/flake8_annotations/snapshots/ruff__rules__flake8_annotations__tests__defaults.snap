@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingReturnTypePublicFunction:
-      name: foo
+    name: MissingReturnTypePublicFunction
+    body: "Missing return type annotation for public function `foo`"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeFunctionArgument:
-      name: a
+    name: MissingTypeFunctionArgument
+    body: "Missing type annotation for function argument `a`"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 8
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeFunctionArgument:
-      name: b
+    name: MissingTypeFunctionArgument
+    body: "Missing type annotation for function argument `b`"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 11
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingReturnTypePublicFunction:
-      name: foo
+    name: MissingReturnTypePublicFunction
+    body: "Missing return type annotation for public function `foo`"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 4
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeFunctionArgument:
-      name: b
+    name: MissingTypeFunctionArgument
+    body: "Missing type annotation for function argument `b`"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 16
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeFunctionArgument:
-      name: b
+    name: MissingTypeFunctionArgument
+    body: "Missing type annotation for function argument `b`"
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 16
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingReturnTypePublicFunction:
-      name: foo
+    name: MissingReturnTypePublicFunction
+    body: "Missing return type annotation for public function `foo`"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 4
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingReturnTypePublicFunction:
-      name: foo
+    name: MissingReturnTypePublicFunction
+    body: "Missing return type annotation for public function `foo`"
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 4
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: a
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `a`"
+    commit: ~
+    fixable: false
   location:
     row: 44
     column: 11
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: foo
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `foo`"
+    commit: ~
+    fixable: false
   location:
     row: 49
     column: 46
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: "*args"
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `*args`"
+    commit: ~
+    fixable: false
   location:
     row: 54
     column: 23
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: "**kwargs"
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`"
+    commit: ~
+    fixable: false
   location:
     row: 54
     column: 38
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: "*args"
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `*args`"
+    commit: ~
+    fixable: false
   location:
     row: 59
     column: 23
@@ -146,8 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: "**kwargs"
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`"
+    commit: ~
+    fixable: false
   location:
     row: 64
     column: 38
@@ -157,8 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeSelf:
-      name: self
+    name: MissingTypeSelf
+    body: "Missing type annotation for `self` in method"
+    commit: ~
+    fixable: false
   location:
     row: 74
     column: 12
@@ -168,8 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: a
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `a`"
+    commit: ~
+    fixable: false
   location:
     row: 78
     column: 28
@@ -179,8 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: foo
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `foo`"
+    commit: ~
+    fixable: false
   location:
     row: 82
     column: 66
@@ -190,8 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: "*params"
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `*params`"
+    commit: ~
+    fixable: false
   location:
     row: 86
     column: 42
@@ -201,8 +237,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: "**options"
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `**options`"
+    commit: ~
+    fixable: false
   location:
     row: 86
     column: 58
@@ -212,8 +250,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: "*params"
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `*params`"
+    commit: ~
+    fixable: false
   location:
     row: 90
     column: 42
@@ -223,8 +263,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: "**options"
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `**options`"
+    commit: ~
+    fixable: false
   location:
     row: 94
     column: 58
@@ -234,8 +276,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeCls:
-      name: cls
+    name: MissingTypeCls
+    body: "Missing type annotation for `cls` in classmethod"
+    commit: ~
+    fixable: false
   location:
     row: 104
     column: 12
@@ -245,8 +289,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingTypeSelf:
-      name: self
+    name: MissingTypeSelf
+    body: "Missing type annotation for `self` in method"
+    commit: ~
+    fixable: false
   location:
     row: 108
     column: 12

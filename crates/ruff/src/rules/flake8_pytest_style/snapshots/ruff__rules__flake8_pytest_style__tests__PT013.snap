@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_pytest_style/mod.rs
+source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IncorrectPytestImport: ~
+    name: IncorrectPytestImport
+    body: "Found incorrect import of pytest, use simple `import pytest` instead"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IncorrectPytestImport: ~
+    name: IncorrectPytestImport
+    body: "Found incorrect import of pytest, use simple `import pytest` instead"
+    commit: ~
+    fixable: false
   location:
     row: 12
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IncorrectPytestImport: ~
+    name: IncorrectPytestImport
+    body: "Found incorrect import of pytest, use simple `import pytest` instead"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 0

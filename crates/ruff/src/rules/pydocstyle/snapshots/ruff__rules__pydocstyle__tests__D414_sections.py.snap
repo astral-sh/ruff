@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    EmptyDocstringSection:
-      name: Returns
+    name: EmptyDocstringSection
+    body: "Section has no content (\"Returns\")"
+    commit: ~
+    fixable: false
   location:
     row: 54
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyDocstringSection:
-      name: Returns
+    name: EmptyDocstringSection
+    body: "Section has no content (\"Returns\")"
+    commit: ~
+    fixable: false
   location:
     row: 67
     column: 4
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyDocstringSection:
-      name: Yields
+    name: EmptyDocstringSection
+    body: "Section has no content (\"Yields\")"
+    commit: ~
+    fixable: false
   location:
     row: 67
     column: 4
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyDocstringSection:
-      name: Returns
+    name: EmptyDocstringSection
+    body: "Section has no content (\"Returns\")"
+    commit: ~
+    fixable: false
   location:
     row: 161
     column: 4
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyDocstringSection:
-      name: Returns
+    name: EmptyDocstringSection
+    body: "Section has no content (\"Returns\")"
+    commit: ~
+    fixable: false
   location:
     row: 252
     column: 4

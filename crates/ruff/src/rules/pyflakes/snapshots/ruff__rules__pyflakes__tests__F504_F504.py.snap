@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PercentFormatExtraNamedArguments:
-      missing:
-        - b
+    name: PercentFormatExtraNamedArguments
+    body: "`%`-format string has unused named argument(s): b"
+    commit: "Remove extra named arguments: b"
+    fixable: true
   location:
     row: 3
     column: 0
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    PercentFormatExtraNamedArguments:
-      missing:
-        - b
+    name: PercentFormatExtraNamedArguments
+    body: "`%`-format string has unused named argument(s): b"
+    commit: "Remove extra named arguments: b"
+    fixable: true
   location:
     row: 8
     column: 0
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    PercentFormatExtraNamedArguments:
-      missing:
-        - b
+    name: PercentFormatExtraNamedArguments
+    body: "`%`-format string has unused named argument(s): b"
+    commit: "Remove extra named arguments: b"
+    fixable: true
   location:
     row: 9
     column: 0

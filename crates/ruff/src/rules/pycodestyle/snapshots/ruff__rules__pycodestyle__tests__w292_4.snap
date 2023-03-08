@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoNewLineAtEndOfFile: ~
+    name: NoNewLineAtEndOfFile
+    body: No newline at end of file
+    commit: Add trailing newline
+    fixable: true
   location:
     row: 1
     column: 1

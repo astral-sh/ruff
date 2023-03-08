@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_unused_arguments/mod.rs
+source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedMethodArgument:
-      name: x
+    name: UnusedMethodArgument
+    body: "Unused method argument: `x`"
+    commit: ~
+    fixable: false
   location:
     row: 35
     column: 16
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedMethodArgument:
-      name: x
+    name: UnusedMethodArgument
+    body: "Unused method argument: `x`"
+    commit: ~
+    fixable: false
   location:
     row: 38
     column: 19
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedMethodArgument:
-      name: x
+    name: UnusedMethodArgument
+    body: "Unused method argument: `x`"
+    commit: ~
+    fixable: false
   location:
     row: 41
     column: 15
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedMethodArgument:
-      name: x
+    name: UnusedMethodArgument
+    body: "Unused method argument: `x`"
+    commit: ~
+    fixable: false
   location:
     row: 190
     column: 23

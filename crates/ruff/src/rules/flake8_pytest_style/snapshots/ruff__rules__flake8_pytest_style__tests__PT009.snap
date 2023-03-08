@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnittestAssertion:
-      assertion: assertTrue
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+    commit: "Replace `assertTrue(...)` with `assert ...`"
+    fixable: true
   location:
     row: 11
     column: 8
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertTrue
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+    commit: "Replace `assertTrue(...)` with `assert ...`"
+    fixable: true
   location:
     row: 12
     column: 8
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertTrue
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+    commit: "Replace `assertTrue(...)` with `assert ...`"
+    fixable: true
   location:
     row: 13
     column: 8
@@ -60,9 +63,10 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertTrue
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+    commit: "Replace `assertTrue(...)` with `assert ...`"
+    fixable: true
   location:
     row: 14
     column: 8
@@ -79,9 +83,10 @@ expression: diagnostics
       column: 43
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertTrue
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+    commit: "Replace `assertTrue(...)` with `assert ...`"
+    fixable: true
   location:
     row: 15
     column: 8
@@ -98,9 +103,10 @@ expression: diagnostics
       column: 43
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertTrue
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+    commit: "Replace `assertTrue(...)` with `assert ...`"
+    fixable: true
   location:
     row: 16
     column: 8
@@ -110,9 +116,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertTrue
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+    commit: "Replace `assertTrue(...)` with `assert ...`"
+    fixable: true
   location:
     row: 17
     column: 8
@@ -122,9 +129,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertTrue
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+    commit: "Replace `assertTrue(...)` with `assert ...`"
+    fixable: true
   location:
     row: 18
     column: 8
@@ -134,9 +142,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertTrue
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+    commit: "Replace `assertTrue(...)` with `assert ...`"
+    fixable: true
   location:
     row: 19
     column: 8
@@ -146,9 +155,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertIsNotNone
-      fixable: false
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertIsNotNone`"
+    commit: ~
+    fixable: false
   location:
     row: 21
     column: 12
@@ -158,9 +168,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertIsNone
-      fixable: false
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertIsNone`"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 17
@@ -170,9 +181,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertEqual
-      fixable: false
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertEqual`"
+    commit: ~
+    fixable: false
   location:
     row: 25
     column: 15
@@ -182,9 +194,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertFalse
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertFalse`"
+    commit: "Replace `assertFalse(...)` with `assert ...`"
+    fixable: true
   location:
     row: 28
     column: 8
@@ -201,9 +214,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertEqual
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertEqual`"
+    commit: "Replace `assertEqual(...)` with `assert ...`"
+    fixable: true
   location:
     row: 31
     column: 8
@@ -220,9 +234,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertNotEqual
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertNotEqual`"
+    commit: "Replace `assertNotEqual(...)` with `assert ...`"
+    fixable: true
   location:
     row: 34
     column: 8
@@ -239,9 +254,10 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertGreater
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertGreater`"
+    commit: "Replace `assertGreater(...)` with `assert ...`"
+    fixable: true
   location:
     row: 37
     column: 8
@@ -258,9 +274,10 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertGreaterEqual
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertGreaterEqual`"
+    commit: "Replace `assertGreaterEqual(...)` with `assert ...`"
+    fixable: true
   location:
     row: 40
     column: 8
@@ -277,9 +294,10 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertLess
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertLess`"
+    commit: "Replace `assertLess(...)` with `assert ...`"
+    fixable: true
   location:
     row: 43
     column: 8
@@ -296,9 +314,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertLessEqual
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertLessEqual`"
+    commit: "Replace `assertLessEqual(...)` with `assert ...`"
+    fixable: true
   location:
     row: 46
     column: 8
@@ -315,9 +334,10 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertIn
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertIn`"
+    commit: "Replace `assertIn(...)` with `assert ...`"
+    fixable: true
   location:
     row: 49
     column: 8
@@ -334,9 +354,10 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertNotIn
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertNotIn`"
+    commit: "Replace `assertNotIn(...)` with `assert ...`"
+    fixable: true
   location:
     row: 52
     column: 8
@@ -353,9 +374,10 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertIsNone
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertIsNone`"
+    commit: "Replace `assertIsNone(...)` with `assert ...`"
+    fixable: true
   location:
     row: 55
     column: 8
@@ -372,9 +394,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertIsNotNone
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertIsNotNone`"
+    commit: "Replace `assertIsNotNone(...)` with `assert ...`"
+    fixable: true
   location:
     row: 58
     column: 8
@@ -391,9 +414,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertIs
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertIs`"
+    commit: "Replace `assertIs(...)` with `assert ...`"
+    fixable: true
   location:
     row: 61
     column: 8
@@ -410,9 +434,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertIsNot
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertIsNot`"
+    commit: "Replace `assertIsNot(...)` with `assert ...`"
+    fixable: true
   location:
     row: 64
     column: 8
@@ -429,9 +454,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertIsInstance
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertIsInstance`"
+    commit: "Replace `assertIsInstance(...)` with `assert ...`"
+    fixable: true
   location:
     row: 67
     column: 8
@@ -448,9 +474,10 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertNotIsInstance
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertNotIsInstance`"
+    commit: "Replace `assertNotIsInstance(...)` with `assert ...`"
+    fixable: true
   location:
     row: 70
     column: 8
@@ -467,9 +494,10 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertRegex
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertRegex`"
+    commit: "Replace `assertRegex(...)` with `assert ...`"
+    fixable: true
   location:
     row: 73
     column: 8
@@ -486,9 +514,10 @@ expression: diagnostics
       column: 39
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertNotRegex
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertNotRegex`"
+    commit: "Replace `assertNotRegex(...)` with `assert ...`"
+    fixable: true
   location:
     row: 76
     column: 8
@@ -505,9 +534,10 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertRegexpMatches
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertRegexpMatches`"
+    commit: "Replace `assertRegexpMatches(...)` with `assert ...`"
+    fixable: true
   location:
     row: 79
     column: 8
@@ -524,9 +554,10 @@ expression: diagnostics
       column: 47
   parent: ~
 - kind:
-    UnittestAssertion:
-      assertion: assertNotRegex
-      fixable: true
+    name: UnittestAssertion
+    body: "Use a regular `assert` instead of unittest-style `assertNotRegex`"
+    commit: "Replace `assertNotRegex(...)` with `assert ...`"
+    fixable: true
   location:
     row: 82
     column: 8

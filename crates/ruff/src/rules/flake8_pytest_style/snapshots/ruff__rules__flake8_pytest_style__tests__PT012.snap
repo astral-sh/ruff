@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_pytest_style/mod.rs
+source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RaisesWithMultipleStatements: ~
+    name: RaisesWithMultipleStatements
+    body: "`pytest.raises()` block should contain a single simple statement"
+    commit: ~
+    fixable: false
   location:
     row: 28
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesWithMultipleStatements: ~
+    name: RaisesWithMultipleStatements
+    body: "`pytest.raises()` block should contain a single simple statement"
+    commit: ~
+    fixable: false
   location:
     row: 34
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesWithMultipleStatements: ~
+    name: RaisesWithMultipleStatements
+    body: "`pytest.raises()` block should contain a single simple statement"
+    commit: ~
+    fixable: false
   location:
     row: 38
     column: 4
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesWithMultipleStatements: ~
+    name: RaisesWithMultipleStatements
+    body: "`pytest.raises()` block should contain a single simple statement"
+    commit: ~
+    fixable: false
   location:
     row: 42
     column: 4
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesWithMultipleStatements: ~
+    name: RaisesWithMultipleStatements
+    body: "`pytest.raises()` block should contain a single simple statement"
+    commit: ~
+    fixable: false
   location:
     row: 46
     column: 4
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesWithMultipleStatements: ~
+    name: RaisesWithMultipleStatements
+    body: "`pytest.raises()` block should contain a single simple statement"
+    commit: ~
+    fixable: false
   location:
     row: 50
     column: 4
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesWithMultipleStatements: ~
+    name: RaisesWithMultipleStatements
+    body: "`pytest.raises()` block should contain a single simple statement"
+    commit: ~
+    fixable: false
   location:
     row: 54
     column: 4
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesWithMultipleStatements: ~
+    name: RaisesWithMultipleStatements
+    body: "`pytest.raises()` block should contain a single simple statement"
+    commit: ~
+    fixable: false
   location:
     row: 60
     column: 4

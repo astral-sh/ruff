@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedImport:
-      name: a.b.c
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`a.b.c` imported but unused"
+    commit: "Remove unused import: `a.b.c`"
+    fixable: true
   location:
     row: 2
     column: 16
@@ -23,10 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: d.e.f
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`d.e.f` imported but unused"
+    commit: "Remove unused import: `d.e.f`"
+    fixable: true
   location:
     row: 3
     column: 16
@@ -43,10 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: h.i
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`h.i` imported but unused"
+    commit: "Remove unused import: `h.i`"
+    fixable: true
   location:
     row: 4
     column: 7
@@ -63,10 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: j.k
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`j.k` imported but unused"
+    commit: "Remove unused import: `j.k`"
+    fixable: true
   location:
     row: 5
     column: 7

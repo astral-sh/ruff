@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedImport:
-      name: functools
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`functools` imported but unused"
+    commit: "Remove unused import: `functools`"
+    fixable: true
   location:
     row: 2
     column: 7
@@ -23,10 +23,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UnusedImport:
-      name: collections.OrderedDict
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`collections.OrderedDict` imported but unused"
+    commit: "Remove unused import: `collections.OrderedDict`"
+    fixable: true
   location:
     row: 6
     column: 4
@@ -45,10 +45,10 @@ expression: diagnostics
     row: 4
     column: 0
 - kind:
-    UnusedImport:
-      name: logging.handlers
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`logging.handlers` imported but unused"
+    commit: "Remove unused import: `logging.handlers`"
+    fixable: true
   location:
     row: 12
     column: 7
@@ -65,10 +65,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: shelve
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`shelve` imported but unused"
+    commit: "Remove unused import: `shelve`"
+    fixable: true
   location:
     row: 32
     column: 11
@@ -85,10 +85,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: importlib
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`importlib` imported but unused"
+    commit: "Remove unused import: `importlib`"
+    fixable: true
   location:
     row: 33
     column: 11
@@ -105,10 +105,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UnusedImport:
-      name: pathlib
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`pathlib` imported but unused"
+    commit: "Remove unused import: `pathlib`"
+    fixable: true
   location:
     row: 37
     column: 11
@@ -125,10 +125,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: pickle
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`pickle` imported but unused"
+    commit: "Remove unused import: `pickle`"
+    fixable: true
   location:
     row: 52
     column: 15
@@ -145,10 +145,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnusedImport:
-      name: x
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`x` imported but unused"
+    commit: "Remove unused import: `x`"
+    fixable: true
   location:
     row: 93
     column: 15
@@ -165,10 +165,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: y
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`y` imported but unused"
+    commit: "Remove unused import: `y`"
+    fixable: true
   location:
     row: 94
     column: 15

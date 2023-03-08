@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HashlibInsecureHashFunction:
-      string: md5
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `md5`"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 12
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: md4
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `md4`"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 12
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: md5
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `md5`"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 17
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: MD4
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `MD4`"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 12
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: sha1
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 12
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: sha1
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
+    commit: ~
+    fixable: false
   location:
     row: 17
     column: 12
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: sha
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `sha`"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 12
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: SHA
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `SHA`"
+    commit: ~
+    fixable: false
   location:
     row: 21
     column: 17
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: sha
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `sha`"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 0
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: md5
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `md5`"
+    commit: ~
+    fixable: false
   location:
     row: 25
     column: 0
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: sha1
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 12
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: sha1
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 0
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HashlibInsecureHashFunction:
-      string: sha1
+    name: HashlibInsecureHashFunction
+    body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 12

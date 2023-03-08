@@ -1,9 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 3
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 3
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 3
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 3
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 7
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 20
     column: 7
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 7
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 7
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 26
     column: 7
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 28
     column: 7
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 30
     column: 7
@@ -113,7 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 7
@@ -123,7 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 34
     column: 7
@@ -133,7 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 40
     column: 7
@@ -143,7 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypeComparison: ~
+    name: TypeComparison
+    body: "Do not compare types, use `isinstance()`"
+    commit: ~
+    fixable: false
   location:
     row: 42
     column: 7

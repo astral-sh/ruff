@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TabAfterOperator: ~
+    name: TabAfterOperator
+    body: Tab after operator
+    commit: ~
+    fixable: false
   location:
     row: 48
     column: 4

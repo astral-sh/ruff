@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CollapsibleIf:
-      fixable: true
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: "Combine `if` statements using `and`"
+    fixable: true
   location:
     row: 2
     column: 0
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CollapsibleIf:
-      fixable: true
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: "Combine `if` statements using `and`"
+    fixable: true
   location:
     row: 7
     column: 0
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CollapsibleIf:
-      fixable: true
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: "Combine `if` statements using `and`"
+    fixable: true
   location:
     row: 15
     column: 0
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CollapsibleIf:
-      fixable: false
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: ~
+    fixable: false
   location:
     row: 20
     column: 0
@@ -68,8 +76,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CollapsibleIf:
-      fixable: true
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: "Combine `if` statements using `and`"
+    fixable: true
   location:
     row: 26
     column: 0
@@ -86,8 +96,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CollapsibleIf:
-      fixable: true
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: "Combine `if` statements using `and`"
+    fixable: true
   location:
     row: 51
     column: 4
@@ -104,8 +116,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CollapsibleIf:
-      fixable: true
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: "Combine `if` statements using `and`"
+    fixable: true
   location:
     row: 67
     column: 0
@@ -122,8 +136,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CollapsibleIf:
-      fixable: true
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: "Combine `if` statements using `and`"
+    fixable: true
   location:
     row: 83
     column: 4
@@ -140,8 +156,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CollapsibleIf:
-      fixable: true
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: "Combine `if` statements using `and`"
+    fixable: true
   location:
     row: 90
     column: 0
@@ -158,8 +176,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CollapsibleIf:
-      fixable: true
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    commit: "Combine `if` statements using `and`"
+    fixable: true
   location:
     row: 117
     column: 4

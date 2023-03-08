@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UseTernaryOperator:
-      contents: b = c if a else d
-      fixable: true
+    name: UseTernaryOperator
+    body: "Use ternary operator `b = c if a else d` instead of `if`-`else`-block"
+    commit: "Replace `if`-`else`-block with `b = c if a else d`"
+    fixable: true
   location:
     row: 2
     column: 0
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    UseTernaryOperator:
-      contents: abc = x if x > 0 else -x
-      fixable: false
+    name: UseTernaryOperator
+    body: "Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block"
+    commit: ~
+    fixable: false
   location:
     row: 58
     column: 0
@@ -34,9 +36,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseTernaryOperator:
-      contents: b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
-      fixable: true
+    name: UseTernaryOperator
+    body: "Use ternary operator `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd` instead of `if`-`else`-block"
+    commit: "Replace `if`-`else`-block with `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd`"
+    fixable: true
   location:
     row: 82
     column: 0
@@ -53,9 +56,10 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    UseTernaryOperator:
-      contents: exitcode = 0 if True else 1
-      fixable: false
+    name: UseTernaryOperator
+    body: "Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block"
+    commit: ~
+    fixable: false
   location:
     row: 97
     column: 0
@@ -65,9 +69,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseTernaryOperator:
-      contents: x = 3 if True else 5
-      fixable: false
+    name: UseTernaryOperator
+    body: "Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block"
+    commit: ~
+    fixable: false
   location:
     row: 104
     column: 0
@@ -77,9 +82,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseTernaryOperator:
-      contents: x = 3 if True else 5
-      fixable: false
+    name: UseTernaryOperator
+    body: "Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block"
+    commit: ~
+    fixable: false
   location:
     row: 109
     column: 0

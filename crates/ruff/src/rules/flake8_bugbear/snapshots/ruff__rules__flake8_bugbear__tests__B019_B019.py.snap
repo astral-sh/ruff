@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CachedInstanceMethod: ~
+    name: CachedInstanceMethod
+    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+    commit: ~
+    fixable: false
   location:
     row: 78
     column: 5
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CachedInstanceMethod: ~
+    name: CachedInstanceMethod
+    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+    commit: ~
+    fixable: false
   location:
     row: 82
     column: 5
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CachedInstanceMethod: ~
+    name: CachedInstanceMethod
+    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+    commit: ~
+    fixable: false
   location:
     row: 86
     column: 5
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CachedInstanceMethod: ~
+    name: CachedInstanceMethod
+    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+    commit: ~
+    fixable: false
   location:
     row: 90
     column: 5
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CachedInstanceMethod: ~
+    name: CachedInstanceMethod
+    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+    commit: ~
+    fixable: false
   location:
     row: 94
     column: 5
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CachedInstanceMethod: ~
+    name: CachedInstanceMethod
+    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+    commit: ~
+    fixable: false
   location:
     row: 98
     column: 5
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CachedInstanceMethod: ~
+    name: CachedInstanceMethod
+    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+    commit: ~
+    fixable: false
   location:
     row: 102
     column: 5
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CachedInstanceMethod: ~
+    name: CachedInstanceMethod
+    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
+    commit: ~
+    fixable: false
   location:
     row: 106
     column: 5

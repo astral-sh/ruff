@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_simplify/mod.rs
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UseContextlibSuppress:
-      exception: ValueError
+    name: UseContextlibSuppress
+    body: "Use `contextlib.suppress(ValueError)` instead of try-except-pass"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseContextlibSuppress:
-      exception: "ValueError, OSError"
+    name: UseContextlibSuppress
+    body: "Use `contextlib.suppress(ValueError, OSError)` instead of try-except-pass"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseContextlibSuppress:
-      exception: Exception
+    name: UseContextlibSuppress
+    body: "Use `contextlib.suppress(Exception)` instead of try-except-pass"
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 0
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UseContextlibSuppress:
-      exception: "a.Error, b.Error"
+    name: UseContextlibSuppress
+    body: "Use `contextlib.suppress(a.Error, b.Error)` instead of try-except-pass"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 0

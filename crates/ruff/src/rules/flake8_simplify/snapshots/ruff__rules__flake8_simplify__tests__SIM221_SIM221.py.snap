@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ExprOrNotExpr:
-      name: a
+    name: ExprOrNotExpr
+    body: "Use `True` instead of `a or not a`"
+    commit: "Replace with `True`"
+    fixable: true
   location:
     row: 1
     column: 3
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    ExprOrNotExpr:
-      name: a
+    name: ExprOrNotExpr
+    body: "Use `True` instead of `a or not a`"
+    commit: "Replace with `True`"
+    fixable: true
   location:
     row: 4
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    ExprOrNotExpr:
-      name: a
+    name: ExprOrNotExpr
+    body: "Use `True` instead of `a or not a`"
+    commit: "Replace with `True`"
+    fixable: true
   location:
     row: 7
     column: 4

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 11
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 8
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 9
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 16
     column: 6
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 17
     column: 9
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 18
     column: 8
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 10
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 20
     column: 18
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 21
     column: 18
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 11
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 11
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 25
     column: 16
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 26
     column: 12
@@ -146,8 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 14
@@ -157,8 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 28
     column: 11
@@ -168,8 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 14
@@ -179,8 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 30
     column: 13
@@ -190,8 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 31
     column: 15
@@ -201,8 +237,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 23
@@ -212,8 +250,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 33
     column: 23
@@ -223,8 +263,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 37
     column: 15
@@ -234,8 +276,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 41
     column: 19
@@ -245,8 +289,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 42
     column: 16
@@ -256,8 +302,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 43
     column: 17
@@ -267,8 +315,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 44
     column: 14
@@ -278,8 +328,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 45
     column: 17
@@ -289,8 +341,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 46
     column: 16
@@ -300,8 +354,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 47
     column: 18
@@ -311,8 +367,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 49
     column: 12
@@ -322,8 +380,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 50
     column: 9
@@ -333,8 +393,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 51
     column: 10
@@ -344,8 +406,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 52
     column: 7
@@ -355,8 +419,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 53
     column: 10
@@ -366,8 +432,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 54
     column: 9
@@ -377,8 +445,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 55
     column: 11
@@ -388,8 +458,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: s3cr3t
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"s3cr3t\""
+    commit: ~
+    fixable: false
   location:
     row: 56
     column: 20
@@ -399,8 +471,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: "1\n2"
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"1\\n2\""
+    commit: ~
+    fixable: false
   location:
     row: 58
     column: 12
@@ -410,8 +484,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: "3\t4"
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"3\\t4\""
+    commit: ~
+    fixable: false
   location:
     row: 61
     column: 12
@@ -421,8 +497,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordString:
-      string: "5\r6"
+    name: HardcodedPasswordString
+    body: "Possible hardcoded password: \"5\\r6\""
+    commit: ~
+    fixable: false
   location:
     row: 64
     column: 12

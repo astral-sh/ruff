@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    WhitespaceBeforeParameters:
-      bracket: "'('"
+    name: WhitespaceBeforeParameters
+    body: "Whitespace before '('"
+    commit: "Removed whitespace before '('"
+    fixable: true
   location:
     row: 2
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    WhitespaceBeforeParameters:
-      bracket: "'['"
+    name: WhitespaceBeforeParameters
+    body: "Whitespace before '['"
+    commit: "Removed whitespace before '['"
+    fixable: true
   location:
     row: 4
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    WhitespaceBeforeParameters:
-      bracket: "'['"
+    name: WhitespaceBeforeParameters
+    body: "Whitespace before '['"
+    commit: "Removed whitespace before '['"
+    fixable: true
   location:
     row: 4
     column: 19
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    WhitespaceBeforeParameters:
-      bracket: "'['"
+    name: WhitespaceBeforeParameters
+    body: "Whitespace before '['"
+    commit: "Removed whitespace before '['"
+    fixable: true
   location:
     row: 6
     column: 11

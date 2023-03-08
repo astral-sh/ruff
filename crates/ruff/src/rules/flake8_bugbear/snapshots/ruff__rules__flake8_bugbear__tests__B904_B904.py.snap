@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RaiseWithoutFromInsideExcept: ~
+    name: RaiseWithoutFromInsideExcept
+    body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 8
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaiseWithoutFromInsideExcept: ~
+    name: RaiseWithoutFromInsideExcept
+    body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaiseWithoutFromInsideExcept: ~
+    name: RaiseWithoutFromInsideExcept
+    body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
+    commit: ~
+    fixable: false
   location:
     row: 16
     column: 4
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaiseWithoutFromInsideExcept: ~
+    name: RaiseWithoutFromInsideExcept
+    body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
+    commit: ~
+    fixable: false
   location:
     row: 62
     column: 8
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaiseWithoutFromInsideExcept: ~
+    name: RaiseWithoutFromInsideExcept
+    body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
+    commit: ~
+    fixable: false
   location:
     row: 64
     column: 8
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaiseWithoutFromInsideExcept: ~
+    name: RaiseWithoutFromInsideExcept
+    body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
+    commit: ~
+    fixable: false
   location:
     row: 72
     column: 12

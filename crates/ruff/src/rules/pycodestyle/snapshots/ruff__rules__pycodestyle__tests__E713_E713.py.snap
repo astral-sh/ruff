@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NotInTest: ~
+    name: NotInTest
+    body: "Test for membership should be `not in`"
+    commit: "Convert to `not in`"
+    fixable: true
   location:
     row: 2
     column: 7
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    NotInTest: ~
+    name: NotInTest
+    body: "Test for membership should be `not in`"
+    commit: "Convert to `not in`"
+    fixable: true
   location:
     row: 5
     column: 7
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    NotInTest: ~
+    name: NotInTest
+    body: "Test for membership should be `not in`"
+    commit: "Convert to `not in`"
+    fixable: true
   location:
     row: 8
     column: 7
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    NotInTest: ~
+    name: NotInTest
+    body: "Test for membership should be `not in`"
+    commit: "Convert to `not in`"
+    fixable: true
   location:
     row: 11
     column: 22
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    NotInTest: ~
+    name: NotInTest
+    body: "Test for membership should be `not in`"
+    commit: "Convert to `not in`"
+    fixable: true
   location:
     row: 14
     column: 8

@@ -1,11 +1,12 @@
 ---
-source: src/rules/pep8_naming/mod.rs
+source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CamelcaseImportedAsLowercase:
-      name: Camel
-      asname: camel
+    name: CamelcaseImportedAsLowercase
+    body: "Camelcase `Camel` imported as lowercase `camel`"
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CamelcaseImportedAsLowercase:
-      name: CamelCase
-      asname: camelcase
+    name: CamelcaseImportedAsLowercase
+    body: "Camelcase `CamelCase` imported as lowercase `camelcase`"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CamelcaseImportedAsLowercase:
-      name: AnotherCamelCase
-      asname: another_camelcase
+    name: CamelcaseImportedAsLowercase
+    body: "Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0

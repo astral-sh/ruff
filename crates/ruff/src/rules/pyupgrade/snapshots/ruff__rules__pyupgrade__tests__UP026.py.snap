@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 3
     column: 11
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 6
     column: 11
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 9
     column: 7
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 12
     column: 19
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 15
     column: 7
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 19
     column: 0
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 22
     column: 0
@@ -129,8 +143,10 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 28
     column: 0
@@ -147,8 +163,10 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 36
     column: 0
@@ -165,8 +183,10 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 42
     column: 0
@@ -183,8 +203,10 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 48
     column: 0
@@ -201,8 +223,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 49
     column: 0
@@ -219,8 +243,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 53
     column: 8
@@ -237,8 +263,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 64
     column: 7
@@ -255,8 +283,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 64
     column: 13
@@ -273,8 +303,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 67
     column: 7
@@ -291,8 +323,10 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 70
     column: 0
@@ -309,8 +343,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 74
     column: 11
@@ -327,8 +363,10 @@ expression: diagnostics
       column: 41
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 74
     column: 24
@@ -345,8 +383,10 @@ expression: diagnostics
       column: 41
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 74
     column: 37
@@ -363,8 +403,10 @@ expression: diagnostics
       column: 41
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 77
     column: 11
@@ -381,8 +423,10 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 77
     column: 24
@@ -399,8 +443,10 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 77
     column: 37
@@ -417,8 +463,10 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 81
     column: 4
@@ -435,8 +483,10 @@ expression: diagnostics
       column: 51
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Attribute
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    commit: "Replace `mock.mock` with `mock`"
+    fixable: true
   location:
     row: 88
     column: 4

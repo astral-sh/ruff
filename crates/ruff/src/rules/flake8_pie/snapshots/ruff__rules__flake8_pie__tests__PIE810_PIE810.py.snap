@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SingleStartsEndsWith:
-      attr: startswith
+    name: SingleStartsEndsWith
+    body: "Call `startswith` once with a `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 25
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SingleStartsEndsWith:
-      attr: endswith
+    name: SingleStartsEndsWith
+    body: "Call `endswith` once with a `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 23
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SingleStartsEndsWith:
-      attr: startswith
+    name: SingleStartsEndsWith
+    body: "Call `startswith` once with a `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 23
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SingleStartsEndsWith:
-      attr: startswith
+    name: SingleStartsEndsWith
+    body: "Call `startswith` once with a `tuple`"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 23

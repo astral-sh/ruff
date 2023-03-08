@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    Assert: ~
+    name: Assert
+    body: "Use of `assert` detected"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Assert: ~
+    name: Assert
+    body: "Use of `assert` detected"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    Assert: ~
+    name: Assert
+    body: "Use of `assert` detected"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 4

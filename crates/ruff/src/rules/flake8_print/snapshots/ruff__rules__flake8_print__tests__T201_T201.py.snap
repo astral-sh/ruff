@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_print/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PrintFound: ~
+    name: PrintFound
+    body: "`print` found"
+    commit: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PrintFound: ~
+    name: PrintFound
+    body: "`print` found"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PrintFound: ~
+    name: PrintFound
+    body: "`print` found"
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PrintFound: ~
+    name: PrintFound
+    body: "`print` found"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 0

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UndefinedName:
-      name: captured
+    name: UndefinedName
+    body: "Undefined name `captured`"
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 19

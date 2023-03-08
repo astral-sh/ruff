@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryListComprehensionDict: ~
+    name: UnnecessaryListComprehensionDict
+    body: "Unnecessary `list` comprehension (rewrite as a `dict` comprehension)"
+    commit: "Rewrite as a `dict` comprehension"
+    fixable: true
   location:
     row: 1
     column: 0

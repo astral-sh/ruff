@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoUnderIndentation: ~
+    name: NoUnderIndentation
+    body: Docstring is under-indented
+    commit: Increase indentation
+    fixable: true
   location:
     row: 232
     column: 0
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnderIndentation: ~
+    name: NoUnderIndentation
+    body: Docstring is under-indented
+    commit: Increase indentation
+    fixable: true
   location:
     row: 244
     column: 0
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoUnderIndentation: ~
+    name: NoUnderIndentation
+    body: Docstring is under-indented
+    commit: Increase indentation
+    fixable: true
   location:
     row: 440
     column: 0
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 4
   parent: ~
 - kind:
-    NoUnderIndentation: ~
+    name: NoUnderIndentation
+    body: Docstring is under-indented
+    commit: Increase indentation
+    fixable: true
   location:
     row: 441
     column: 0

@@ -1,9 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DefaultExceptNotLast: ~
+    name: DefaultExceptNotLast
+    body: "An `except` block as not the last exception handler"
+    commit: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DefaultExceptNotLast: ~
+    name: DefaultExceptNotLast
+    body: "An `except` block as not the last exception handler"
+    commit: ~
+    fixable: false
   location:
     row: 10
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DefaultExceptNotLast: ~
+    name: DefaultExceptNotLast
+    body: "An `except` block as not the last exception handler"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 0

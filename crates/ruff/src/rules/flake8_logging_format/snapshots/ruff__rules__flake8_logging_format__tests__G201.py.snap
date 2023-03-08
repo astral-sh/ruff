@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_logging_format/mod.rs
+source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LoggingExcInfo: ~
+    name: LoggingExcInfo
+    body: "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 12
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    LoggingExcInfo: ~
+    name: LoggingExcInfo
+    body: "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 12

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoIndentedBlockComment: ~
+    name: NoIndentedBlockComment
+    body: Expected an indented block (comment)
+    commit: ~
+    fixable: false
   location:
     row: 30
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoIndentedBlockComment: ~
+    name: NoIndentedBlockComment
+    body: Expected an indented block (comment)
+    commit: ~
+    fixable: false
   location:
     row: 31
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoIndentedBlockComment: ~
+    name: NoIndentedBlockComment
+    body: Expected an indented block (comment)
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 0
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoIndentedBlockComment: ~
+    name: NoIndentedBlockComment
+    body: Expected an indented block (comment)
+    commit: ~
+    fixable: false
   location:
     row: 33
     column: 0
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoIndentedBlockComment: ~
+    name: NoIndentedBlockComment
+    body: Expected an indented block (comment)
+    commit: ~
+    fixable: false
   location:
     row: 34
     column: 0
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NoIndentedBlockComment: ~
+    name: NoIndentedBlockComment
+    body: Expected an indented block (comment)
+    commit: ~
+    fixable: false
   location:
     row: 35
     column: 0

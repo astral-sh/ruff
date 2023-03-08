@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    WhitespaceBeforeCloseBracket: ~
+    name: WhitespaceBeforeCloseBracket
+    body: "Whitespace before ')'"
+    commit: ~
+    fixable: false
   location:
     row: 19
     column: 22
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforeCloseBracket: ~
+    name: WhitespaceBeforeCloseBracket
+    body: "Whitespace before ')'"
+    commit: ~
+    fixable: false
   location:
     row: 21
     column: 21
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforeCloseBracket: ~
+    name: WhitespaceBeforeCloseBracket
+    body: "Whitespace before ')'"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 10
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforeCloseBracket: ~
+    name: WhitespaceBeforeCloseBracket
+    body: "Whitespace before ')'"
+    commit: ~
+    fixable: false
   location:
     row: 25
     column: 22
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforeCloseBracket: ~
+    name: WhitespaceBeforeCloseBracket
+    body: "Whitespace before ')'"
+    commit: ~
+    fixable: false
   location:
     row: 27
     column: 21
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceBeforeCloseBracket: ~
+    name: WhitespaceBeforeCloseBracket
+    body: "Whitespace before ')'"
+    commit: ~
+    fixable: false
   location:
     row: 29
     column: 10

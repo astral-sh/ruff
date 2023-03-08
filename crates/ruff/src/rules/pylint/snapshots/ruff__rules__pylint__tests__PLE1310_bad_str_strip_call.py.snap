@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 2
     column: 20
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 20
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 20
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 20
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 14
     column: 20
@@ -63,9 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 17
     column: 20
@@ -75,9 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 20
     column: 20
@@ -87,9 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 23
     column: 20
@@ -99,9 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 26
     column: 20
@@ -111,9 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 30
     column: 4
@@ -123,9 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 36
     column: 20
@@ -135,9 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 42
     column: 4
@@ -147,9 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 49
     column: 4
@@ -159,9 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: Strip
-      removal: ~
+    name: BadStrStripCall
+    body: "String `strip` call contains duplicate characters"
+    commit: ~
+    fixable: false
   location:
     row: 61
     column: 10
@@ -171,9 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: LStrip
-      removal: RemovePrefix
+    name: BadStrStripCall
+    body: "String `lstrip` call contains duplicate characters (did you mean `removeprefix`?)"
+    commit: ~
+    fixable: false
   location:
     row: 64
     column: 11
@@ -183,9 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BadStrStripCall:
-      strip: RStrip
-      removal: RemoveSuffix
+    name: BadStrStripCall
+    body: "String `rstrip` call contains duplicate characters (did you mean `removesuffix`?)"
+    commit: ~
+    fixable: false
   location:
     row: 67
     column: 11

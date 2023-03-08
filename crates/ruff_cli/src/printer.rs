@@ -37,7 +37,7 @@ bitflags! {
 #[derive(Serialize)]
 struct ExpandedFix<'a> {
     content: &'a str,
-    message: Option<String>,
+    message: Option<&'a str>,
     location: &'a Location,
     end_location: &'a Location,
 }
@@ -193,7 +193,7 @@ impl Printer {
                                     content: &fix.content,
                                     location: &fix.location,
                                     end_location: &fix.end_location,
-                                    message: message.kind.commit.clone(),
+                                    message: message.kind.commit.as_deref(),
                                 }),
                                 location: message.location,
                                 end_location: message.end_location,

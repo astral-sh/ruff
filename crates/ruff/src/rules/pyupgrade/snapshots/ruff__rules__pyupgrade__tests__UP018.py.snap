@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NativeLiterals:
-      literal_type: Str
+    name: NativeLiterals
+    body: "Unnecessary call to `str`"
+    commit: "Replace with `str`"
+    fixable: true
   location:
     row: 20
     column: 0
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    NativeLiterals:
-      literal_type: Str
+    name: NativeLiterals
+    body: "Unnecessary call to `str`"
+    commit: "Replace with `str`"
+    fixable: true
   location:
     row: 21
     column: 0
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    NativeLiterals:
-      literal_type: Str
+    name: NativeLiterals
+    body: "Unnecessary call to `str`"
+    commit: "Replace with `str`"
+    fixable: true
   location:
     row: 22
     column: 0
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    NativeLiterals:
-      literal_type: Bytes
+    name: NativeLiterals
+    body: "Unnecessary call to `bytes`"
+    commit: "Replace with `bytes`"
+    fixable: true
   location:
     row: 24
     column: 0
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    NativeLiterals:
-      literal_type: Bytes
+    name: NativeLiterals
+    body: "Unnecessary call to `bytes`"
+    commit: "Replace with `bytes`"
+    fixable: true
   location:
     row: 25
     column: 0
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    NativeLiterals:
-      literal_type: Bytes
+    name: NativeLiterals
+    body: "Unnecessary call to `bytes`"
+    commit: "Replace with `bytes`"
+    fixable: true
   location:
     row: 26
     column: 0

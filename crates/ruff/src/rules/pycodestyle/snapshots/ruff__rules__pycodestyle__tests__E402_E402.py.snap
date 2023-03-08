@@ -1,9 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ModuleImportNotAtTopOfFile: ~
+    name: ModuleImportNotAtTopOfFile
+    body: Module level import not at top of file
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 0

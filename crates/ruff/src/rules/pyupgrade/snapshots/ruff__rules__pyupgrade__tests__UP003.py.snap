@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypeOfPrimitive:
-      primitive: Str
+    name: TypeOfPrimitive
+    body: "Use `str` instead of `type(...)`"
+    commit: "Replace `type(...)` with `str`"
+    fixable: true
   location:
     row: 1
     column: 0
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    TypeOfPrimitive:
-      primitive: Bytes
+    name: TypeOfPrimitive
+    body: "Use `bytes` instead of `type(...)`"
+    commit: "Replace `type(...)` with `bytes`"
+    fixable: true
   location:
     row: 2
     column: 0
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TypeOfPrimitive:
-      primitive: Int
+    name: TypeOfPrimitive
+    body: "Use `int` instead of `type(...)`"
+    commit: "Replace `type(...)` with `int`"
+    fixable: true
   location:
     row: 3
     column: 0
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    TypeOfPrimitive:
-      primitive: Float
+    name: TypeOfPrimitive
+    body: "Use `float` instead of `type(...)`"
+    commit: "Replace `type(...)` with `float`"
+    fixable: true
   location:
     row: 4
     column: 0
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    TypeOfPrimitive:
-      primitive: Complex
+    name: TypeOfPrimitive
+    body: "Use `complex` instead of `type(...)`"
+    commit: "Replace `type(...)` with `complex`"
+    fixable: true
   location:
     row: 5
     column: 0

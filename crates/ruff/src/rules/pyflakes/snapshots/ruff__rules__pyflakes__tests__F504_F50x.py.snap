@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PercentFormatExtraNamedArguments:
-      missing:
-        - baz
+    name: PercentFormatExtraNamedArguments
+    body: "`%`-format string has unused named argument(s): baz"
+    commit: "Remove extra named arguments: baz"
+    fixable: true
   location:
     row: 8
     column: 0

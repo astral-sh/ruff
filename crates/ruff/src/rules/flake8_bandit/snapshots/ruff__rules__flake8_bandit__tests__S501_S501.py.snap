@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RequestWithNoCertValidation:
-      string: requests
+    name: RequestWithNoCertValidation
+    body: "Probable use of `requests` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 5
     column: 53
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: requests
+    name: RequestWithNoCertValidation
+    body: "Probable use of `requests` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 54
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: requests
+    name: RequestWithNoCertValidation
+    body: "Probable use of `requests` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 9
     column: 53
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: requests
+    name: RequestWithNoCertValidation
+    body: "Probable use of `requests` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 11
     column: 56
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: requests
+    name: RequestWithNoCertValidation
+    body: "Probable use of `requests` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 13
     column: 55
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: requests
+    name: RequestWithNoCertValidation
+    body: "Probable use of `requests` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 15
     column: 57
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: requests
+    name: RequestWithNoCertValidation
+    body: "Probable use of `requests` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 17
     column: 54
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 20
     column: 49
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 22
     column: 38
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 24
     column: 42
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 26
     column: 39
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 28
     column: 39
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 30
     column: 38
@@ -146,8 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 32
     column: 40
@@ -157,8 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 34
     column: 41
@@ -168,8 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 36
     column: 41
@@ -179,8 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 38
     column: 20
@@ -190,8 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RequestWithNoCertValidation:
-      string: httpx
+    name: RequestWithNoCertValidation
+    body: "Probable use of `httpx` call with `verify=False` disabling SSL certificate checks"
+    commit: ~
+    fixable: false
   location:
     row: 40
     column: 25

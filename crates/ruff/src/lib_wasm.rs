@@ -214,7 +214,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
             end_location: message.end_location,
             fix: message.fix.map(|fix| ExpandedFix {
                 content: fix.content,
-                message: message.kind.commit.clone(),
+                message: message.kind.commit,
                 location: fix.location,
                 end_location: fix.end_location,
             }),

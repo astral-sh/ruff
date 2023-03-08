@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 6
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 7
     column: 4
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 9
     column: 4
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 13
     column: 4
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 14
     column: 4
@@ -88,7 +103,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 16
     column: 4
@@ -105,7 +123,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 17
     column: 4
@@ -122,7 +143,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 19
     column: 4
@@ -139,7 +163,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 25
     column: 12
@@ -156,7 +183,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 34
     column: 6
@@ -173,7 +203,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 35
     column: 3
@@ -190,7 +223,10 @@ expression: diagnostics
       column: 6
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 36
     column: 0
@@ -207,7 +243,10 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 37
     column: 0
@@ -224,7 +263,10 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 38
     column: 0
@@ -241,7 +283,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    FStringMissingPlaceholders: ~
+    name: FStringMissingPlaceholders
+    body: f-string without any placeholders
+    commit: "Remove extraneous `f` prefix"
+    fixable: true
   location:
     row: 39
     column: 0

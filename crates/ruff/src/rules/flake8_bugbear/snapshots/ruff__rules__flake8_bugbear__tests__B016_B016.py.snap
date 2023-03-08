@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CannotRaiseLiteral: ~
+    name: CannotRaiseLiteral
+    body: Cannot raise a literal. Did you intend to return it or raise an Exception?
+    commit: ~
+    fixable: false
   location:
     row: 6
     column: 6
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CannotRaiseLiteral: ~
+    name: CannotRaiseLiteral
+    body: Cannot raise a literal. Did you intend to return it or raise an Exception?
+    commit: ~
+    fixable: false
   location:
     row: 7
     column: 6
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CannotRaiseLiteral: ~
+    name: CannotRaiseLiteral
+    body: Cannot raise a literal. Did you intend to return it or raise an Exception?
+    commit: ~
+    fixable: false
   location:
     row: 8
     column: 6

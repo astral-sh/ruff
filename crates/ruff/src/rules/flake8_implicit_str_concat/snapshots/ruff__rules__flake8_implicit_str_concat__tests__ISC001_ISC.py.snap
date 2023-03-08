@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_implicit_str_concat/mod.rs
+source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SingleLineImplicitStringConcatenation: ~
+    name: SingleLineImplicitStringConcatenation
+    body: Implicitly concatenated string literals on one line
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SingleLineImplicitStringConcatenation: ~
+    name: SingleLineImplicitStringConcatenation
+    body: Implicitly concatenated string literals on one line
+    commit: ~
+    fixable: false
   location:
     row: 1
     column: 8
