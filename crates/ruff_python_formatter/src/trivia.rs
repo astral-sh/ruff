@@ -3,7 +3,8 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::core::types::Range;
+use ruff_python_ast::types::Range;
+
 use crate::cst::{
     Alias, Arg, Body, BoolOp, CmpOp, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword,
     Operator, Pattern, PatternKind, SliceIndex, SliceIndexKind, Stmt, StmtKind, UnaryOp,

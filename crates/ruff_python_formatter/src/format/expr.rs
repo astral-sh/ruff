@@ -4,10 +4,10 @@ use rustpython_parser::ast::Constant;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format_args, write};
+use ruff_python_ast::types::Range;
 use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
-use crate::core::types::Range;
 use crate::cst::{
     Arguments, BoolOp, CmpOp, Comprehension, Expr, ExprKind, Keyword, Operator, OperatorKind,
     SliceIndex, SliceIndexKind, UnaryOp, UnaryOpKind,

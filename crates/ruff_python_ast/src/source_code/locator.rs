@@ -133,6 +133,17 @@ impl<'a> Locator<'a> {
         &self.contents[start..end]
     }
 
+    /// Return the byte offset of the given [`Location`].
+    pub fn offset(&self, location: Location) -> usize {
+        let index = self.get_or_init_index();
+        truncate(location, index, self.contents)
+    }
+
+    /// Return the underlying source code.
+    pub fn contents(&self) -> &'a str {
+        self.contents
+    }
+
     pub const fn len(&self) -> usize {
         self.contents.len()
     }

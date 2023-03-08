@@ -1,9 +1,9 @@
 use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
+use ruff_python_ast::types::Range;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::context::ASTFormatContext;
-use crate::core::types::Range;
 use crate::cst::{Body, Stmt};
 use crate::shared_traits::AsFormat;
 use crate::trivia::{Relationship, TriviaKind};
@@ -73,10 +73,17 @@ pub struct Literal {
 
 impl Format<ASTFormatContext<'_>> for Literal {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let (text, start, end) = f.context().locator().slice(self.range);
+        let text = f.context().contents();
+        let locator = f.context().locator();
+        let start_index = locator.offset(self.range.location);
+        let end_index = locator.offset(self.range.end_location);
+
         f.write_element(FormatElement::StaticTextSlice {
             text,
-            range: TextRange::new(start.try_into().unwrap(), end.try_into().unwrap()),
+            range: TextRange::new(
+                start_index.try_into().unwrap(),
+                end_index.try_into().unwrap(),
+            ),
         })
     }
 }
