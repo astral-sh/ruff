@@ -6,6 +6,7 @@ use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
 use crate::registry::{AsRule, Diagnostic};
+use crate::rules::pydocstyle::helpers::LinesWhenConsiderLineContinuation;
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
@@ -13,9 +14,13 @@ pub struct BlankLineAfterSummary {
     pub num_lines: usize,
 }
 
-fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String {
-    "Insert single blank line".to_string()
+fn fmt_blank_line_after_summary_autofix_msg(info: &BlankLineAfterSummary) -> String {
+    if info.num_lines == 0 {
+        return "Insert single blank line".to_string();
+    }
+    "Remove redundant blank lines".to_string()
 }
+
 impl Violation for BlankLineAfterSummary {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -32,58 +37,161 @@ impl Violation for BlankLineAfterSummary {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let BlankLineAfterSummary { num_lines } = self;
-        if *num_lines > 0 {
-            return Some(fmt_blank_line_after_summary_autofix_msg);
-        }
-        None
+        Some(fmt_blank_line_after_summary_autofix_msg)
     }
+}
+
+enum Strategy {
+    // start
+    InsertNewLineOrLineContinuation(usize),
+    // start, count, total_blank_lines
+    RemoveRedundantLine(usize, usize, usize),
+    None,
+}
+
+fn do_raw_string_line_count(content: &str) -> Strategy {
+    let mut lines = content.trim().lines().skip(1);
+
+    // Count lines in second block after the first block
+    // second_block_lines_count > 0 means we have no blank lines after first line
+    let has_second_block = match lines.next() {
+        Some(line) => !line.trim().is_empty(),
+        None => return Strategy::None,
+    };
+
+    // If we have second block, we need to insert a new line
+    // to separate it from the one-line summary
+    if has_second_block {
+        return Strategy::InsertNewLineOrLineContinuation(1);
+    }
+
+    // We have one line that separates summary and description
+    // But we may have redundant blank lines
+    let mut blanks_to_remove = 0_usize;
+    for line in lines {
+        if !line.trim().is_empty() {
+            break;
+        }
+        blanks_to_remove += 1;
+    }
+
+    // No redundant blank lines
+    if blanks_to_remove == 0 {
+        return Strategy::None;
+    }
+
+    // start = 1 summary + 1 blank line
+    // count = blanks line to remove
+    // total blank = count + 1
+    Strategy::RemoveRedundantLine(2, blanks_to_remove, blanks_to_remove + 1)
+}
+
+// Behaviors are similar to above
+fn do_normal_string_line_count(content: &str) -> Strategy {
+    let mut lines = LinesWhenConsiderLineContinuation::new(content.trim());
+
+    let mut first_block_lines_count = 0_usize;
+    match lines.next() {
+        Some((_, actual_lines)) => {
+            first_block_lines_count += actual_lines;
+        }
+        None => {
+            return Strategy::None;
+        }
+    };
+
+    let (has_second_block, actual_lines_for_first_blank) = match lines.next() {
+        Some((line, actual_lines_count)) => (!line.trim().is_empty(), actual_lines_count),
+        None => return Strategy::None,
+    };
+
+    if has_second_block {
+        return Strategy::InsertNewLineOrLineContinuation(first_block_lines_count);
+    }
+
+    let mut blanks_count = 1;
+    let mut actual_lines_to_remove = 0_usize;
+    for (line, actual_line_count) in lines {
+        if !line.trim().is_empty() {
+            break;
+        }
+        blanks_count += 1;
+        actual_lines_to_remove += actual_line_count;
+    }
+
+    if blanks_count == 1 {
+        return Strategy::None;
+    }
+
+    Strategy::RemoveRedundantLine(
+        first_block_lines_count + actual_lines_for_first_blank,
+        actual_lines_to_remove,
+        blanks_count,
+    )
 }
 
 /// D205
 pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body;
 
-    let mut lines_count = 1;
-    let mut blanks_count = 0;
-    for line in body.trim().lines().skip(1) {
-        lines_count += 1;
-        if line.trim().is_empty() {
-            blanks_count += 1;
-        } else {
-            break;
+    // Consider r and ur docstring
+    let strategy = (|| {
+        let contents = docstring.contents;
+        if contents.starts_with('r') || contents.starts_with("ur") {
+            return do_raw_string_line_count(body);
         }
-    }
-    if lines_count > 1 && blanks_count != 1 {
-        let mut diagnostic = Diagnostic::new(
-            BlankLineAfterSummary {
-                num_lines: blanks_count,
-            },
-            Range::from(docstring.expr),
-        );
-        if checker.patch(diagnostic.kind.rule()) {
-            if blanks_count > 1 {
-                // Find the "summary" line (defined as the first non-blank line).
-                let mut summary_line = 0;
-                for line in body.lines() {
-                    if line.trim().is_empty() {
-                        summary_line += 1;
-                    } else {
-                        break;
-                    }
-                }
+        do_normal_string_line_count(body)
+    })();
 
-                // Insert one blank line after the summary (replacing any existing lines).
-                diagnostic.amend(Fix::replacement(
+    // Count # of lines trimmed when doing line count
+    let count_trimmed_lines = || {
+        // Find the "summary" line (defined as the first non-blank line).
+        let mut trimmed_lines = 0;
+        for line in body.lines() {
+            if !line.trim().is_empty() {
+                break;
+            }
+            trimmed_lines += 1;
+        }
+        trimmed_lines
+    };
+
+    match strategy {
+        Strategy::InsertNewLineOrLineContinuation(start) => {
+            let mut diagnostic = Diagnostic::new(
+                BlankLineAfterSummary { num_lines: 0 },
+                Range::from(docstring.expr),
+            );
+
+            // Assume users prefer a new line rather than a line continuation
+            let summary_line = count_trimmed_lines();
+            if checker.patch(diagnostic.kind.rule()) {
+                let start = docstring.expr.location.row() + summary_line + start;
+                diagnostic.amend(Fix::insertion(
                     checker.stylist.line_ending().to_string(),
-                    Location::new(docstring.expr.location.row() + summary_line + 1, 0),
-                    Location::new(
-                        docstring.expr.location.row() + summary_line + 1 + blanks_count,
-                        0,
-                    ),
+                    Location::new(start, 0),
                 ));
             }
+            checker.diagnostics.push(diagnostic);
         }
-        checker.diagnostics.push(diagnostic);
+        Strategy::RemoveRedundantLine(start, count, blanks_count) => {
+            let mut diagnostic = Diagnostic::new(
+                BlankLineAfterSummary {
+                    num_lines: blanks_count,
+                },
+                Range::from(docstring.expr),
+            );
+
+            let summary_line = count_trimmed_lines();
+            if checker.patch(diagnostic.kind.rule()) {
+                let start = docstring.expr.location.row() + summary_line + start;
+                diagnostic.amend(Fix::deletion(
+                    Location::new(start, 0),
+                    Location::new(start + count, 0),
+                ));
+            }
+            checker.diagnostics.push(diagnostic);
+        }
+        Strategy::None => {}
     }
 }

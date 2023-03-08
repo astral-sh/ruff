@@ -20,7 +20,8 @@ mod tests {
 
     #[test_case(Rule::BlankLineAfterLastSection, Path::new("sections.py"); "D413")]
     #[test_case(Rule::BlankLineAfterSection, Path::new("sections.py"); "D410")]
-    #[test_case(Rule::BlankLineAfterSummary, Path::new("D.py"); "D205")]
+    #[test_case(Rule::BlankLineAfterSummary, Path::new("D.py"); "D205_1")]
+    #[test_case(Rule::BlankLineAfterSummary, Path::new("D205.py"); "D205_2")]
     #[test_case(Rule::BlankLineBeforeSection, Path::new("sections.py"); "D411")]
     #[test_case(Rule::CapitalizeSectionName, Path::new("sections.py"); "D405")]
     #[test_case(Rule::DashedUnderlineAfterSection, Path::new("sections.py"); "D407")]

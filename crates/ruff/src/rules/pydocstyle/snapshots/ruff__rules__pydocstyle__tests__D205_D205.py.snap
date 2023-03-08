@@ -8,38 +8,58 @@ expression: diagnostics
     suggestion: Insert single blank line
     fixable: true
   location:
-    row: 200
+    row: 13
     column: 4
   end_location:
-    row: 203
-    column: 7
+    row: 15
+    column: 8
   fix:
     content: "\n"
     location:
-      row: 201
+      row: 14
       column: 0
     end_location:
-      row: 201
+      row: 14
       column: 0
   parent: ~
 - kind:
     name: BlankLineAfterSummary
-    body: 1 blank line required between summary line and description (found 2)
+    body: 1 blank line required between summary line and description
+    suggestion: Insert single blank line
+    fixable: true
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 38
+    column: 22
+  fix:
+    content: "\n"
+    location:
+      row: 35
+      column: 0
+    end_location:
+      row: 35
+      column: 0
+  parent: ~
+- kind:
+    name: BlankLineAfterSummary
+    body: 1 blank line required between summary line and description (found 3)
     suggestion: Remove redundant blank lines
     fixable: true
   location:
-    row: 210
+    row: 42
     column: 4
   end_location:
-    row: 215
-    column: 7
+    row: 53
+    column: 22
   fix:
     content: ""
     location:
-      row: 212
+      row: 48
       column: 0
     end_location:
-      row: 213
+      row: 50
       column: 0
   parent: ~
 
