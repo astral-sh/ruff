@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`typing.Union` imported but unused"
-    commit: "Remove unused import: `typing.Union`"
+    suggestion: "Remove unused import: `typing.Union`"
     fixable: true
   location:
     row: 30
@@ -27,7 +27,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`typing.Awaitable` imported but unused"
-    commit: Remove unused import
+    suggestion: Remove unused import
     fixable: true
   location:
     row: 66
@@ -47,7 +47,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`typing.AwaitableGenerator` imported but unused"
-    commit: Remove unused import
+    suggestion: Remove unused import
     fixable: true
   location:
     row: 66

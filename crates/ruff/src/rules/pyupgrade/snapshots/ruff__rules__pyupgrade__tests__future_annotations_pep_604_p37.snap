@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypingUnion
     body: "Use `X | Y` for type annotations"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 40

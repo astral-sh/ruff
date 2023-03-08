@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedCollectionType
     body: "Use `list` instead of `List` for type annotations"
-    commit: "Replace `List` with `list`"
+    suggestion: "Replace `List` with `list`"
     fixable: true
   location:
     row: 34

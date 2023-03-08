@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseRaise
     body: "Unnecessary `elif` after `raise` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseRaise
     body: "Unnecessary `elif` after `raise` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseRaise
     body: "Unnecessary `else` after `raise` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 34
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseRaise
     body: "Unnecessary `else` after `raise` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 45
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseRaise
     body: "Unnecessary `else` after `raise` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 60
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseRaise
     body: "Unnecessary `else` after `raise` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 70
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseRaise
     body: "Unnecessary `else` after `raise` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 80

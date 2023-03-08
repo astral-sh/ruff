@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`altair` should be imported as `alt`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`dask.array` should be imported as `da`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`dask.dataframe` should be imported as `dd`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`matplotlib.pyplot` should be imported as `plt`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`numpy` should be imported as `np`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`pandas` should be imported as `pd`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`seaborn` should be imported as `sns`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`tensorflow` should be imported as `tf`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`holoviews` should be imported as `hv`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`panel` should be imported as `pn`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`plotly.express` should be imported as `px`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`matplotlib` should be imported as `mpl`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`polars` should be imported as `pl`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`pyarrow` should be imported as `pa`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`altair` should be imported as `alt`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -200,7 +200,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`matplotlib.pyplot` should be imported as `plt`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -213,7 +213,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`dask.array` should be imported as `da`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -226,7 +226,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`dask.dataframe` should be imported as `dd`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -239,7 +239,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`numpy` should be imported as `np`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -252,7 +252,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`pandas` should be imported as `pd`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`seaborn` should be imported as `sns`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -278,7 +278,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`tensorflow` should be imported as `tf`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 25
@@ -291,7 +291,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`holoviews` should be imported as `hv`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26
@@ -304,7 +304,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`panel` should be imported as `pn`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -317,7 +317,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`plotly.express` should be imported as `px`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -330,7 +330,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`matplotlib` should be imported as `mpl`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -343,7 +343,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`polars` should be imported as `pl`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30
@@ -356,7 +356,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`pyarrow` should be imported as `pa`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31

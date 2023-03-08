@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 4
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 6
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 8
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 10
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 12
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `False` should be `cond is False`"
-    commit: "Replace with `cond is False`"
+    suggestion: "Replace with `cond is False`"
     fixable: true
   location:
     row: 14
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is None`"
-    commit: "Replace with `cond is None`"
+    suggestion: "Replace with `cond is None`"
     fixable: true
   location:
     row: 14
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is None`"
-    commit: "Replace with `cond is None`"
+    suggestion: "Replace with `cond is None`"
     fixable: true
   location:
     row: 16
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `False` should be `cond is False`"
-    commit: "Replace with `cond is False`"
+    suggestion: "Replace with `cond is False`"
     fixable: true
   location:
     row: 16

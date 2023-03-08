@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DupeClassFieldDefinitions
     body: "Class field `name` is defined multiple times"
-    commit: "Remove duplicate field definition for `name`"
+    suggestion: "Remove duplicate field definition for `name`"
     fixable: true
   location:
     row: 4
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: DupeClassFieldDefinitions
     body: "Class field `name` is defined multiple times"
-    commit: "Remove duplicate field definition for `name`"
+    suggestion: "Remove duplicate field definition for `name`"
     fixable: true
   location:
     row: 13
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: DupeClassFieldDefinitions
     body: "Class field `bar` is defined multiple times"
-    commit: "Remove duplicate field definition for `bar`"
+    suggestion: "Remove duplicate field definition for `bar`"
     fixable: true
   location:
     row: 23
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: DupeClassFieldDefinitions
     body: "Class field `bar` is defined multiple times"
-    commit: "Remove duplicate field definition for `bar`"
+    suggestion: "Remove duplicate field definition for `bar`"
     fixable: true
   location:
     row: 40

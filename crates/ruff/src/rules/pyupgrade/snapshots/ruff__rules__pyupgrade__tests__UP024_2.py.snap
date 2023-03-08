@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `socket.error` with builtin `OSError`"
+    suggestion: "Replace `socket.error` with builtin `OSError`"
     fixable: true
   location:
     row: 10
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `mmap.error` with builtin `OSError`"
+    suggestion: "Replace `mmap.error` with builtin `OSError`"
     fixable: true
   location:
     row: 11
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `select.error` with builtin `OSError`"
+    suggestion: "Replace `select.error` with builtin `OSError`"
     fixable: true
   location:
     row: 12
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `socket.error` with builtin `OSError`"
+    suggestion: "Replace `socket.error` with builtin `OSError`"
     fixable: true
   location:
     row: 14
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `mmap.error` with builtin `OSError`"
+    suggestion: "Replace `mmap.error` with builtin `OSError`"
     fixable: true
   location:
     row: 15
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `select.error` with builtin `OSError`"
+    suggestion: "Replace `select.error` with builtin `OSError`"
     fixable: true
   location:
     row: 16
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `socket.error` with builtin `OSError`"
+    suggestion: "Replace `socket.error` with builtin `OSError`"
     fixable: true
   location:
     row: 18
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `error` with builtin `OSError`"
+    suggestion: "Replace `error` with builtin `OSError`"
     fixable: true
   location:
     row: 25
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `error` with builtin `OSError`"
+    suggestion: "Replace `error` with builtin `OSError`"
     fixable: true
   location:
     row: 28
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `error` with builtin `OSError`"
+    suggestion: "Replace `error` with builtin `OSError`"
     fixable: true
   location:
     row: 31
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `EnvironmentError` with builtin `OSError`"
+    suggestion: "Replace `EnvironmentError` with builtin `OSError`"
     fixable: true
   location:
     row: 34
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `IOError` with builtin `OSError`"
+    suggestion: "Replace `IOError` with builtin `OSError`"
     fixable: true
   location:
     row: 35
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `WindowsError` with builtin `OSError`"
+    suggestion: "Replace `WindowsError` with builtin `OSError`"
     fixable: true
   location:
     row: 36
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `EnvironmentError` with builtin `OSError`"
+    suggestion: "Replace `EnvironmentError` with builtin `OSError`"
     fixable: true
   location:
     row: 38
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `IOError` with builtin `OSError`"
+    suggestion: "Replace `IOError` with builtin `OSError`"
     fixable: true
   location:
     row: 39
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `WindowsError` with builtin `OSError`"
+    suggestion: "Replace `WindowsError` with builtin `OSError`"
     fixable: true
   location:
     row: 40
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `EnvironmentError` with builtin `OSError`"
+    suggestion: "Replace `EnvironmentError` with builtin `OSError`"
     fixable: true
   location:
     row: 42
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `WindowsError` with builtin `OSError`"
+    suggestion: "Replace `WindowsError` with builtin `OSError`"
     fixable: true
   location:
     row: 48
@@ -365,7 +365,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `EnvironmentError` with builtin `OSError`"
+    suggestion: "Replace `EnvironmentError` with builtin `OSError`"
     fixable: true
   location:
     row: 49
@@ -385,7 +385,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace `IOError` with builtin `OSError`"
+    suggestion: "Replace `IOError` with builtin `OSError`"
     fixable: true
   location:
     row: 50

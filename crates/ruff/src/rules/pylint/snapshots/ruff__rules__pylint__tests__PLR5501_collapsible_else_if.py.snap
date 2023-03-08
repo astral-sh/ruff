@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CollapsibleElseIf
     body: "Consider using `elif` instead of `else` then `if` to remove one indentation level"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 38
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: CollapsibleElseIf
     body: "Consider using `elif` instead of `else` then `if` to remove one indentation level"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 46

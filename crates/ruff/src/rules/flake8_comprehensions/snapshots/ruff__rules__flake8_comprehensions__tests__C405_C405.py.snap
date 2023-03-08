@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralSet
     body: "Unnecessary `list` literal (rewrite as a `set` literal)"
-    commit: "Rewrite as a `set` literal"
+    suggestion: "Rewrite as a `set` literal"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralSet
     body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    commit: "Rewrite as a `set` literal"
+    suggestion: "Rewrite as a `set` literal"
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralSet
     body: "Unnecessary `list` literal (rewrite as a `set` literal)"
-    commit: "Rewrite as a `set` literal"
+    suggestion: "Rewrite as a `set` literal"
     fixable: true
   location:
     row: 3
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralSet
     body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    commit: "Rewrite as a `set` literal"
+    suggestion: "Rewrite as a `set` literal"
     fixable: true
   location:
     row: 4
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralSet
     body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    commit: "Rewrite as a `set` literal"
+    suggestion: "Rewrite as a `set` literal"
     fixable: true
   location:
     row: 6
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralSet
     body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    commit: "Rewrite as a `set` literal"
+    suggestion: "Rewrite as a `set` literal"
     fixable: true
   location:
     row: 7
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralSet
     body: "Unnecessary `list` literal (rewrite as a `set` literal)"
-    commit: "Rewrite as a `set` literal"
+    suggestion: "Rewrite as a `set` literal"
     fixable: true
   location:
     row: 10
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralSet
     body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    commit: "Rewrite as a `set` literal"
+    suggestion: "Rewrite as a `set` literal"
     fixable: true
   location:
     row: 13
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralSet
     body: "Unnecessary `list` literal (rewrite as a `set` literal)"
-    commit: "Rewrite as a `set` literal"
+    suggestion: "Rewrite as a `set` literal"
     fixable: true
   location:
     row: 16

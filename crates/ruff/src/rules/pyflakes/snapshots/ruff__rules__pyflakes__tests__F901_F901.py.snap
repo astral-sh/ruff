@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RaiseNotImplemented
     body: "`raise NotImplemented` should be `raise NotImplementedError`"
-    commit: "Use `raise NotImplementedError`"
+    suggestion: "Use `raise NotImplementedError`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: RaiseNotImplemented
     body: "`raise NotImplemented` should be `raise NotImplementedError`"
-    commit: "Use `raise NotImplementedError`"
+    suggestion: "Use `raise NotImplementedError`"
     fixable: true
   location:
     row: 6

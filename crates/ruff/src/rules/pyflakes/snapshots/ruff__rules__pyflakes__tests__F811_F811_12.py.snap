@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RedefinedWhileUnused
     body: "Redefinition of unused `mixer` from line 2"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6

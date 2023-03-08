@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TooManyReturnStatements
     body: Too many return statements (2/1)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1

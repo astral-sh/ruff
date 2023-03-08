@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ConsiderMergingIsinstance
     body: "Merge these isinstance calls: `isinstance(var[3], (float, int))`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ConsiderMergingIsinstance
     body: "Merge these isinstance calls: `isinstance(var[4], (float, int))`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: ConsiderMergingIsinstance
     body: "Merge these isinstance calls: `isinstance(var[5], (float, int))`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: ConsiderMergingIsinstance
     body: "Merge these isinstance calls: `isinstance(var[10], (list, str))`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: ConsiderMergingIsinstance
     body: "Merge these isinstance calls: `isinstance(var[11], (float, int))`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: ConsiderMergingIsinstance
     body: "Merge these isinstance calls: `isinstance(var[12], (float, int, list))`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `y`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 40
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 42
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `a`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 50
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `a_`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 51
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 52
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `c`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 53
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `j`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 61
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `k`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 61
@@ -200,7 +200,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `l`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 68
@@ -213,7 +213,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `i`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 82
@@ -226,7 +226,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 117
@@ -239,7 +239,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 118
@@ -252,7 +252,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 119
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 120
@@ -278,7 +278,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 121
@@ -291,7 +291,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `name`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 171
@@ -304,7 +304,7 @@ expression: diagnostics
 - kind:
     name: FunctionUsesLoopVariable
     body: "Function definition does not bind loop variable `i`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 174

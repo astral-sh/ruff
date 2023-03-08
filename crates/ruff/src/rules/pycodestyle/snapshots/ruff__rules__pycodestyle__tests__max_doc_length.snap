@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DocLineTooLong
     body: Doc line too long (57 > 50 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: DocLineTooLong
     body: Doc line too long (56 > 50 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: DocLineTooLong
     body: Doc line too long (56 > 50 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: DocLineTooLong
     body: Doc line too long (61 > 50 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15

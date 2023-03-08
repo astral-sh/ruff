@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DocstringStartsWithThis
     body: "First word of the docstring should not be \"This\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 631
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: DocstringStartsWithThis
     body: "First word of the docstring should not be \"This\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 636

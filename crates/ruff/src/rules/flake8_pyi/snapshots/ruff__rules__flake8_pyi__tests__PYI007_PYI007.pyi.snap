@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnrecognizedPlatformCheck
     body: "Unrecognized `sys.platform` check"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnrecognizedPlatformCheck
     body: "Unrecognized `sys.platform` check"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnrecognizedPlatformCheck
     body: "Unrecognized `sys.platform` check"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

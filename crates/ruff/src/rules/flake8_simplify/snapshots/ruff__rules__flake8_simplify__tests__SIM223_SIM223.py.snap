@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ExprAndFalse
     body: "Use `False` instead of `... and False`"
-    commit: "Replace with `False`"
+    suggestion: "Replace with `False`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ExprAndFalse
     body: "Use `False` instead of `... and False`"
-    commit: "Replace with `False`"
+    suggestion: "Replace with `False`"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ExprAndFalse
     body: "Use `False` instead of `... and False`"
-    commit: "Replace with `False`"
+    suggestion: "Replace with `False`"
     fixable: true
   location:
     row: 7

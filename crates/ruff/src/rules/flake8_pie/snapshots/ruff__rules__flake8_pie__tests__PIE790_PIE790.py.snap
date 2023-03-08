@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 4
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 9
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 14
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 21
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 28
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 35
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 42
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 50
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 58
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 65
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 74
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 79
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 83
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 87
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 92
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 96
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryPass
     body: "Unnecessary `pass` statement"
-    commit: "Remove unnecessary `pass`"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 101

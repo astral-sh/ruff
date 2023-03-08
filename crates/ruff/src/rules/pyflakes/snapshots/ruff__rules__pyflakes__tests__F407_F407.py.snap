@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FutureFeatureNotDefined
     body: "Future feature `non_existent_feature` is not defined"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2

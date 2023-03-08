@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: InvalidPrintSyntax
     body: "Use of `>>` is invalid with `print` function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ImportStarNotPermitted
     body: "`from F634 import *` only allowed at module level"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ImportStarNotPermitted
     body: "`from F634 import *` only allowed at module level"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

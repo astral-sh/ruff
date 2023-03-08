@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FailWithoutMessage
     body: "No message passed to `pytest.fail()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: FailWithoutMessage
     body: "No message passed to `pytest.fail()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: FailWithoutMessage
     body: "No message passed to `pytest.fail()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: FailWithoutMessage
     body: "No message passed to `pytest.fail()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: FailWithoutMessage
     body: "No message passed to `pytest.fail()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17

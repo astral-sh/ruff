@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeStrptimeWithoutZone
     body: "The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeStrptimeWithoutZone
     body: "The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeStrptimeWithoutZone
     body: "The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeStrptimeWithoutZone
     body: "The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeStrptimeWithoutZone
     body: "The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 35

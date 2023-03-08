@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ErroneousUseFixturesOnFixture
     body: "`pytest.mark.usefixtures` has no effect on fixtures"
-    commit: "Remove `pytest.mark.usefixtures`"
+    suggestion: "Remove `pytest.mark.usefixtures`"
     fixable: true
   location:
     row: 9
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ErroneousUseFixturesOnFixture
     body: "`pytest.mark.usefixtures` has no effect on fixtures"
-    commit: "Remove `pytest.mark.usefixtures`"
+    suggestion: "Remove `pytest.mark.usefixtures`"
     fixable: true
   location:
     row: 16

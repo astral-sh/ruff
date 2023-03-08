@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o227` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o7` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o777` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o770` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o776` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o777` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o777` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o777` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o777` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o777` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o777` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o10` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: BadFilePermissions
     body: "`os.chmod` setting a permissive mask `0o2` on file or directory"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DuplicateHandlerException
     body: "Exception handler with duplicate exception: `OSError`"
-    commit: De-duplicate exceptions
+    suggestion: De-duplicate exceptions
     fixable: true
   location:
     row: 17
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: DuplicateHandlerException
     body: "Exception handler with duplicate exception: `MyError`"
-    commit: De-duplicate exceptions
+    suggestion: De-duplicate exceptions
     fixable: true
   location:
     row: 28
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: DuplicateHandlerException
     body: "Exception handler with duplicate exception: `re.error`"
-    commit: De-duplicate exceptions
+    suggestion: De-duplicate exceptions
     fixable: true
   location:
     row: 49

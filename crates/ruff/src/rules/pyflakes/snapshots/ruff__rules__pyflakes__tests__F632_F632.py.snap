@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `!=` to compare constant literals"
-    commit: "Replace `is not` with `!=`"
+    suggestion: "Replace `is not` with `!=`"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `!=` to compare constant literals"
-    commit: "Replace `is not` with `!=`"
+    suggestion: "Replace `is not` with `!=`"
     fixable: true
   location:
     row: 7
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 11
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 14
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 17
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: IsLiteral
     body: "Use `==` to compare constant literals"
-    commit: "Replace `is` with `==`"
+    suggestion: "Replace `is` with `==`"
     fixable: true
   location:
     row: 20

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `list` call within `list()`"
-    commit: "Remove the inner `list` call"
+    suggestion: "Remove the inner `list` call"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `tuple` call within `list()`"
-    commit: "Remove the inner `tuple` call"
+    suggestion: "Remove the inner `tuple` call"
     fixable: true
   location:
     row: 3
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `list` call within `tuple()`"
-    commit: "Remove the inner `list` call"
+    suggestion: "Remove the inner `list` call"
     fixable: true
   location:
     row: 4
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `tuple` call within `tuple()`"
-    commit: "Remove the inner `tuple` call"
+    suggestion: "Remove the inner `tuple` call"
     fixable: true
   location:
     row: 5
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `set` call within `set()`"
-    commit: "Remove the inner `set` call"
+    suggestion: "Remove the inner `set` call"
     fixable: true
   location:
     row: 6
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `list` call within `set()`"
-    commit: "Remove the inner `list` call"
+    suggestion: "Remove the inner `list` call"
     fixable: true
   location:
     row: 7
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `tuple` call within `set()`"
-    commit: "Remove the inner `tuple` call"
+    suggestion: "Remove the inner `tuple` call"
     fixable: true
   location:
     row: 8
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `sorted` call within `set()`"
-    commit: "Remove the inner `sorted` call"
+    suggestion: "Remove the inner `sorted` call"
     fixable: true
   location:
     row: 9
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `reversed` call within `set()`"
-    commit: "Remove the inner `reversed` call"
+    suggestion: "Remove the inner `reversed` call"
     fixable: true
   location:
     row: 10
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `list` call within `sorted()`"
-    commit: "Remove the inner `list` call"
+    suggestion: "Remove the inner `list` call"
     fixable: true
   location:
     row: 11
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `tuple` call within `sorted()`"
-    commit: "Remove the inner `tuple` call"
+    suggestion: "Remove the inner `tuple` call"
     fixable: true
   location:
     row: 12
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `sorted` call within `sorted()`"
-    commit: "Remove the inner `sorted` call"
+    suggestion: "Remove the inner `sorted` call"
     fixable: true
   location:
     row: 13
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `reversed` call within `sorted()`"
-    commit: "Remove the inner `reversed` call"
+    suggestion: "Remove the inner `reversed` call"
     fixable: true
   location:
     row: 14
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `list` call within `tuple()`"
-    commit: "Remove the inner `list` call"
+    suggestion: "Remove the inner `list` call"
     fixable: true
   location:
     row: 15

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 5
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 10
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 16
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 24
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 31
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 37
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 45
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 53
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 61
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 69
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `B` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 75
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `B` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 79
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `B` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 84
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `B` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 92
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `B` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 98
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `B` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 108
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 114
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 119
@@ -365,7 +365,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 125
@@ -385,7 +385,7 @@ expression: diagnostics
 - kind:
     name: UselessObjectInheritance
     body: "Class `A` inherits from `object`"
-    commit: "Remove `object` inheritance"
+    suggestion: "Remove `object` inheritance"
     fixable: true
   location:
     row: 131

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LoggingRedundantExcInfo
     body: "Logging statement has redundant `exc_info`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: LoggingRedundantExcInfo
     body: "Logging statement has redundant `exc_info`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13

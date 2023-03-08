@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedCollectionType
     body: "Use `list` instead of `List` for type annotations"
-    commit: "Replace `List` with `list`"
+    suggestion: "Replace `List` with `list`"
     fixable: true
   location:
     row: 4
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedCollectionType
     body: "Use `list` instead of `List` for type annotations"
-    commit: "Replace `List` with `list`"
+    suggestion: "Replace `List` with `list`"
     fixable: true
   location:
     row: 11
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedCollectionType
     body: "Use `list` instead of `List` for type annotations"
-    commit: "Replace `List` with `list`"
+    suggestion: "Replace `List` with `list`"
     fixable: true
   location:
     row: 18
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedCollectionType
     body: "Use `list` instead of `List` for type annotations"
-    commit: "Replace `List` with `list`"
+    suggestion: "Replace `List` with `list`"
     fixable: true
   location:
     row: 25
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedCollectionType
     body: "Use `list` instead of `List` for type annotations"
-    commit: "Replace `List` with `list`"
+    suggestion: "Replace `List` with `list`"
     fixable: true
   location:
     row: 36

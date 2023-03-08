@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`models.Nut` imported but unused"
-    commit: "Remove unused import: `models.Nut`"
+    suggestion: "Remove unused import: `models.Nut`"
     fixable: true
   location:
     row: 8
@@ -27,7 +27,7 @@ expression: diagnostics
 - kind:
     name: UndefinedName
     body: "Undefined name `Bar`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26

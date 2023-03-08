@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 4
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 6
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 8
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 10
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 12
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 12
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 14
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 16
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 18
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 20
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 22
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 24
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 26
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 28
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 30
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 33
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 38
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 40
@@ -365,7 +365,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 42
@@ -385,7 +385,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 47
@@ -405,7 +405,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 49
@@ -425,7 +425,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 51
@@ -445,7 +445,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 53
@@ -465,7 +465,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 56
@@ -485,7 +485,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 61
@@ -505,7 +505,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 67
@@ -525,7 +525,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 71
@@ -545,7 +545,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 73
@@ -565,7 +565,7 @@ expression: diagnostics
 - kind:
     name: PrintfStringFormatting
     body: Use format specifiers instead of percent format
-    commit: Replace with format specifiers
+    suggestion: Replace with format specifiers
     fixable: true
   location:
     row: 75

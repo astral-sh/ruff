@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ImportShadowedByLoopVar
     body: "Import `os` from line 1 shadowed by loop variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ImportShadowedByLoopVar
     body: "Import `path` from line 2 shadowed by loop variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8

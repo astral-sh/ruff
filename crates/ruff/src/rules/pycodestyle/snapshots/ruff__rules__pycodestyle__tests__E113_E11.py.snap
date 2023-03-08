@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnexpectedIndentation
     body: Unexpected indentation
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12

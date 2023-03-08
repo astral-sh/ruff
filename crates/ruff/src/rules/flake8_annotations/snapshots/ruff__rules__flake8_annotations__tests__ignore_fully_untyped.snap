@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `error_partially_typed_1`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeFunctionArgument
     body: "Missing type annotation for function argument `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeFunctionArgument
     body: "Missing type annotation for function argument `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `error_partially_typed_3`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 32
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `error_typed_self`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 43

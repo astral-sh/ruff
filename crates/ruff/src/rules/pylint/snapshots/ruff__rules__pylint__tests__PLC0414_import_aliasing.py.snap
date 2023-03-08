@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UselessImportAlias
     body: Import alias does not rename original package
-    commit: Remove import alias
+    suggestion: Remove import alias
     fixable: true
   location:
     row: 6
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UselessImportAlias
     body: Import alias does not rename original package
-    commit: Remove import alias
+    suggestion: Remove import alias
     fixable: true
   location:
     row: 7
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UselessImportAlias
     body: Import alias does not rename original package
-    commit: Remove import alias
+    suggestion: Remove import alias
     fixable: true
   location:
     row: 16
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UselessImportAlias
     body: Import alias does not rename original package
-    commit: Remove import alias
+    suggestion: Remove import alias
     fixable: true
   location:
     row: 19
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UselessImportAlias
     body: Import alias does not rename original package
-    commit: Remove import alias
+    suggestion: Remove import alias
     fixable: true
   location:
     row: 20
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UselessImportAlias
     body: Import alias does not rename original package
-    commit: Remove import alias
+    suggestion: Remove import alias
     fixable: true
   location:
     row: 22
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: UselessImportAlias
     body: Import alias does not rename original package
-    commit: Remove import alias
+    suggestion: Remove import alias
     fixable: true
   location:
     row: 23
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: UselessImportAlias
     body: Import alias does not rename original package
-    commit: Remove import alias
+    suggestion: Remove import alias
     fixable: true
   location:
     row: 25

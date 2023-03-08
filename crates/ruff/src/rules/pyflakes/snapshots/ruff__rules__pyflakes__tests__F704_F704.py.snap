@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: YieldOutsideFunction
     body: "`yield` statement outside of a function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: YieldOutsideFunction
     body: "`yield` statement outside of a function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: YieldOutsideFunction
     body: "`yield from` statement outside of a function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: YieldOutsideFunction
     body: "`await` statement outside of a function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

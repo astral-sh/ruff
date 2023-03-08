@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LineTooLong
     body: Line too long (149 > 88 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: LineTooLong
     body: Line too long (148 > 88 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: LineTooLong
     body: Line too long (155 > 88 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: LineTooLong
     body: Line too long (150 > 88 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: LineTooLong
     body: Line too long (149 > 88 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: LineTooLong
     body: Line too long (156 > 88 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6

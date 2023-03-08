@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SysVersionSlice3Referenced
     body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: SysVersionSlice3Referenced
     body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: SysVersionSlice3Referenced
     body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8

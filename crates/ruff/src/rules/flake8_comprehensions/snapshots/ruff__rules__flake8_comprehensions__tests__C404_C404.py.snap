@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryListComprehensionDict
     body: "Unnecessary `list` comprehension (rewrite as a `dict` comprehension)"
-    commit: "Rewrite as a `dict` comprehension"
+    suggestion: "Rewrite as a `dict` comprehension"
     fixable: true
   location:
     row: 1

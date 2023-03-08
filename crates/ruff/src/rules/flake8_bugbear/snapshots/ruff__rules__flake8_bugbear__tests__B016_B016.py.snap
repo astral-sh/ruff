@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CannotRaiseLiteral
     body: Cannot raise a literal. Did you intend to return it or raise an Exception?
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: CannotRaiseLiteral
     body: Cannot raise a literal. Did you intend to return it or raise an Exception?
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: CannotRaiseLiteral
     body: Cannot raise a literal. Did you intend to return it or raise an Exception?
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedClassMethodArgument
     body: "Unused class method argument: `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 45

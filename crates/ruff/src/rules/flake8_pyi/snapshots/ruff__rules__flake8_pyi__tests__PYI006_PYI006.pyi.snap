@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BadVersionInfoComparison
     body: "Use `<` or `>=` for version info comparisons"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BadVersionInfoComparison
     body: "Use `<` or `>=` for version info comparisons"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BadVersionInfoComparison
     body: "Use `<` or `>=` for version info comparisons"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BadVersionInfoComparison
     body: "Use `<` or `>=` for version info comparisons"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: BadVersionInfoComparison
     body: "Use `<` or `>=` for version info comparisons"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: BadVersionInfoComparison
     body: "Use `<` or `>=` for version info comparisons"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundModuloOperator
     body: Missing whitespace around modulo operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 131
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundModuloOperator
     body: Missing whitespace around modulo operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 133
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundModuloOperator
     body: Missing whitespace around modulo operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 135

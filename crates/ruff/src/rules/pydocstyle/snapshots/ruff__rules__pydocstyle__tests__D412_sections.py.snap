@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoBlankLinesBetweenHeaderAndContent
     body: "No blank lines allowed between a section header and its content (\"Short summary\")"
-    commit: Remove blank line(s)
+    suggestion: Remove blank line(s)
     fixable: true
   location:
     row: 207

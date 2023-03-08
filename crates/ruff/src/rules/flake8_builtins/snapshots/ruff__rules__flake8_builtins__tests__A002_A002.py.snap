@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BuiltinArgumentShadowing
     body: "Argument `str` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BuiltinArgumentShadowing
     body: "Argument `type` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BuiltinArgumentShadowing
     body: "Argument `complex` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BuiltinArgumentShadowing
     body: "Argument `Exception` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: BuiltinArgumentShadowing
     body: "Argument `getattr` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: BuiltinArgumentShadowing
     body: "Argument `bytes` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: BuiltinArgumentShadowing
     body: "Argument `id` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: BuiltinArgumentShadowing
     body: "Argument `dir` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: BuiltinArgumentShadowing
     body: "Argument `float` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

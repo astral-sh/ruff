@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LRUCacheWithoutParameters
     body: "Unnecessary parameters to `functools.lru_cache`"
-    commit: Remove unnecessary parameters
+    suggestion: Remove unnecessary parameters
     fixable: true
   location:
     row: 5
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: LRUCacheWithoutParameters
     body: "Unnecessary parameters to `functools.lru_cache`"
-    commit: Remove unnecessary parameters
+    suggestion: Remove unnecessary parameters
     fixable: true
   location:
     row: 10
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: LRUCacheWithoutParameters
     body: "Unnecessary parameters to `functools.lru_cache`"
-    commit: Remove unnecessary parameters
+    suggestion: Remove unnecessary parameters
     fixable: true
   location:
     row: 16
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: LRUCacheWithoutParameters
     body: "Unnecessary parameters to `functools.lru_cache`"
-    commit: Remove unnecessary parameters
+    suggestion: Remove unnecessary parameters
     fixable: true
   location:
     row: 21

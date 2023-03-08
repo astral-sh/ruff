@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`altair` should be imported as `alt`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`matplotlib.pyplot` should be imported as `plt`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`numpy` should be imported as `nmp`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`pandas` should be imported as `pd`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`seaborn` should be imported as `sns`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`altair` should be imported as `alt`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`matplotlib.pyplot` should be imported as `plt`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`numpy` should be imported as `nmp`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`pandas` should be imported as `pd`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`seaborn` should be imported as `sns`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13

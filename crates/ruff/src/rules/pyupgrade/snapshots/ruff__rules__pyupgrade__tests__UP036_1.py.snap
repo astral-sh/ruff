@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 3
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 8
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 13
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 18
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 23
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 28
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 35
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 42
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 49
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 56
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 62
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 67
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: OutdatedVersionBlock
     body: Version block is outdated for minimum Python version
-    commit: Remove outdated version block
+    suggestion: Remove outdated version block
     fixable: true
   location:
     row: 75

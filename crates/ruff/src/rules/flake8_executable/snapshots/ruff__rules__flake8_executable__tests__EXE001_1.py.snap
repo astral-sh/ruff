@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ShebangNotExecutable
     body: Shebang is present but file is not executable
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1

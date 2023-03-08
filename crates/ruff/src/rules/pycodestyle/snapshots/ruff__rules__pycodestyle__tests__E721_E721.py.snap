@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 32
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 34
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 40
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: TypeComparison
     body: "Do not compare types, use `isinstance()`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 42

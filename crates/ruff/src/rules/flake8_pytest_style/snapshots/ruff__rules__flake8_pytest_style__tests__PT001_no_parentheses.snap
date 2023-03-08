@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IncorrectFixtureParenthesesStyle
     body: "Use `@pytest.fixture` over `@pytest.fixture()`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 14
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: IncorrectFixtureParenthesesStyle
     body: "Use `@pytest.fixture` over `@pytest.fixture()`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 24
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: IncorrectFixtureParenthesesStyle
     body: "Use `@pytest.fixture` over `@pytest.fixture()`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 39
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: IncorrectFixtureParenthesesStyle
     body: "Use `@pytest.fixture` over `@pytest.fixture()`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 49
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: IncorrectFixtureParenthesesStyle
     body: "Use `@pytest.fixture` over `@pytest.fixture()`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 64
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: IncorrectFixtureParenthesesStyle
     body: "Use `@pytest.fixture` over `@pytest.fixture()`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 74

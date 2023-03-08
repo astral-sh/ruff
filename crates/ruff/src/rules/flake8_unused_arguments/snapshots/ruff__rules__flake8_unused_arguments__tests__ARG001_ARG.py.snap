@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `self`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `cls`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `self`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `cls`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `x`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21

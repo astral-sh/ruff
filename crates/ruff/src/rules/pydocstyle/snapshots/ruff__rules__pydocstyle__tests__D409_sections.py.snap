@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SectionUnderlineMatchesSectionLength
     body: "Section underline should match the length of its name (\"Returns\")"
-    commit: "Adjust underline length to match \"Returns\""
+    suggestion: "Adjust underline length to match \"Returns\""
     fixable: true
   location:
     row: 99
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: SectionUnderlineMatchesSectionLength
     body: "Section underline should match the length of its name (\"Returns\")"
-    commit: "Adjust underline length to match \"Returns\""
+    suggestion: "Adjust underline length to match \"Returns\""
     fixable: true
   location:
     row: 207

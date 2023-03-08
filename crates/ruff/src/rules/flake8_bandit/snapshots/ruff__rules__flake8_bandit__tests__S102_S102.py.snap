@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ExecBuiltin
     body: "Use of `exec` detected"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ExecBuiltin
     body: "Use of `exec` detected"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5

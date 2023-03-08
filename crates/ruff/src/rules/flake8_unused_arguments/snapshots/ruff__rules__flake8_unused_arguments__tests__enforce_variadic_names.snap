@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `a`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `a`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `args`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: UnusedFunctionArgument
     body: "Unused function argument: `kwargs`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: UnusedMethodArgument
     body: "Unused method argument: `a`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: UnusedMethodArgument
     body: "Unused method argument: `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: UnusedMethodArgument
     body: "Unused method argument: `a`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: UnusedMethodArgument
     body: "Unused method argument: `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: UnusedMethodArgument
     body: "Unused method argument: `args`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: UnusedMethodArgument
     body: "Unused method argument: `kwargs`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13

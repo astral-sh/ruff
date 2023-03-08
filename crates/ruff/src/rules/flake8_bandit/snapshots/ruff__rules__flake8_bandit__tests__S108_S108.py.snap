@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: HardcodedTempFile
     body: "Probable insecure usage of temporary file or directory: \"/tmp/abc\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: HardcodedTempFile
     body: "Probable insecure usage of temporary file or directory: \"/var/tmp/123\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: HardcodedTempFile
     body: "Probable insecure usage of temporary file or directory: \"/dev/shm/unit/test\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

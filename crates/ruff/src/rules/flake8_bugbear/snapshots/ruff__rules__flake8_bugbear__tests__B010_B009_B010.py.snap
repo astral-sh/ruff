@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SetAttrWithConstant
     body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `setattr` with assignment"
+    suggestion: "Replace `setattr` with assignment"
     fixable: true
   location:
     row: 40
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: SetAttrWithConstant
     body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `setattr` with assignment"
+    suggestion: "Replace `setattr` with assignment"
     fixable: true
   location:
     row: 41
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: SetAttrWithConstant
     body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `setattr` with assignment"
+    suggestion: "Replace `setattr` with assignment"
     fixable: true
   location:
     row: 42
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: SetAttrWithConstant
     body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `setattr` with assignment"
+    suggestion: "Replace `setattr` with assignment"
     fixable: true
   location:
     row: 43
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: SetAttrWithConstant
     body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `setattr` with assignment"
+    suggestion: "Replace `setattr` with assignment"
     fixable: true
   location:
     row: 44
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: SetAttrWithConstant
     body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `setattr` with assignment"
+    suggestion: "Replace `setattr` with assignment"
     fixable: true
   location:
     row: 45

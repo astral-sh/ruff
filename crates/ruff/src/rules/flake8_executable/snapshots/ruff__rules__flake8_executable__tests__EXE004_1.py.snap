@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ShebangWhitespace
     body: Avoid whitespace before shebang
-    commit: Remove whitespace before shebang
+    suggestion: Remove whitespace before shebang
     fixable: true
   location:
     row: 1

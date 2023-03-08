@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: KeyInDict
     body: "Use `key in obj` instead of `key in obj.keys()`"
-    commit: "Convert to `key in obj`"
+    suggestion: "Convert to `key in obj`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: KeyInDict
     body: "Use `foo[\"bar\"] in obj` instead of `foo[\"bar\"] in obj.keys()`"
-    commit: "Convert to `foo[\"bar\"] in obj`"
+    suggestion: "Convert to `foo[\"bar\"] in obj`"
     fixable: true
   location:
     row: 3
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: KeyInDict
     body: "Use `foo['bar'] in obj` instead of `foo['bar'] in obj.keys()`"
-    commit: "Convert to `foo['bar'] in obj`"
+    suggestion: "Convert to `foo['bar'] in obj`"
     fixable: true
   location:
     row: 5
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: KeyInDict
     body: "Use `foo() in obj` instead of `foo() in obj.keys()`"
-    commit: "Convert to `foo() in obj`"
+    suggestion: "Convert to `foo() in obj`"
     fixable: true
   location:
     row: 7
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: KeyInDict
     body: "Use `key in obj` instead of `key in obj.keys()`"
-    commit: "Convert to `key in obj`"
+    suggestion: "Convert to `key in obj`"
     fixable: true
   location:
     row: 9
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: KeyInDict
     body: "Use `k in obj` instead of `k in obj.keys()`"
-    commit: "Convert to `k in obj`"
+    suggestion: "Convert to `k in obj`"
     fixable: true
   location:
     row: 16
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: KeyInDict
     body: "Use `k in obj` instead of `k in obj.keys()`"
-    commit: "Convert to `k in obj`"
+    suggestion: "Convert to `k in obj`"
     fixable: true
   location:
     row: 18
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: KeyInDict
     body: "Use `k in obj` instead of `k in obj.keys()`"
-    commit: "Convert to `k in obj`"
+    suggestion: "Convert to `k in obj`"
     fixable: true
   location:
     row: 20
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: KeyInDict
     body: "Use `k in obj` instead of `k in obj.keys()`"
-    commit: "Convert to `k in obj`"
+    suggestion: "Convert to `k in obj`"
     fixable: true
   location:
     row: 22

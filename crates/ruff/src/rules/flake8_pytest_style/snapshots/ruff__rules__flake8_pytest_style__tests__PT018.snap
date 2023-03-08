@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 14
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 15
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 16
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 17
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 18
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 19
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 20
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 21
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 26
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 27
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30
@@ -218,7 +218,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31
@@ -231,7 +231,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 33
@@ -244,7 +244,7 @@ expression: diagnostics
 - kind:
     name: CompositeAssertion
     body: Assertion should be broken down into multiple parts
-    commit: Break down assertion into multiple parts
+    suggestion: Break down assertion into multiple parts
     fixable: true
   location:
     row: 35

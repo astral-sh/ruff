@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IfWithSameArms
     body: "Combine `if` branches using logical `or` operator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: IfWithSameArms
     body: "Combine `if` branches using logical `or` operator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: IfWithSameArms
     body: "Combine `if` branches using logical `or` operator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: IfWithSameArms
     body: "Combine `if` branches using logical `or` operator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: IfWithSameArms
     body: "Combine `if` branches using logical `or` operator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: IfWithSameArms
     body: "Combine `if` branches using logical `or` operator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: IfWithSameArms
     body: "Combine `if` branches using logical `or` operator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 38
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: IfWithSameArms
     body: "Combine `if` branches using logical `or` operator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 62

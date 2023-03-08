@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UselessMetaclassType
     body: "`__metaclass__ = type` is implied"
-    commit: "Remove `__metaclass__ = type`"
+    suggestion: "Remove `__metaclass__ = type`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UselessMetaclassType
     body: "`__metaclass__ = type` is implied"
-    commit: "Remove `__metaclass__ = type`"
+    suggestion: "Remove `__metaclass__ = type`"
     fixable: true
   location:
     row: 6

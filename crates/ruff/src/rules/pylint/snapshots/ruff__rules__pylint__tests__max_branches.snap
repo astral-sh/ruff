@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TooManyBranches
     body: Too many branches (2/1)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: TooManyBranches
     body: Too many branches (2/1)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforePunctuation
     body: "Whitespace before ',', ';', or ':'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 51
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforePunctuation
     body: "Whitespace before ',', ';', or ':'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 55
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforePunctuation
     body: "Whitespace before ',', ';', or ':'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 60
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforePunctuation
     body: "Whitespace before ',', ';', or ':'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 63
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforePunctuation
     body: "Whitespace before ',', ';', or ':'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 67
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforePunctuation
     body: "Whitespace before ',', ';', or ':'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 71

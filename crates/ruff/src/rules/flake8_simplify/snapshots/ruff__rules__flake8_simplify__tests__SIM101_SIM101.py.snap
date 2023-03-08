@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DuplicateIsinstanceCall
     body: "Multiple `isinstance` calls for `a`, merge into a single call"
-    commit: "Merge `isinstance` calls for `a`"
+    suggestion: "Merge `isinstance` calls for `a`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: DuplicateIsinstanceCall
     body: "Multiple `isinstance` calls for `a`, merge into a single call"
-    commit: "Merge `isinstance` calls for `a`"
+    suggestion: "Merge `isinstance` calls for `a`"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: DuplicateIsinstanceCall
     body: "Multiple `isinstance` calls for `a`, merge into a single call"
-    commit: "Merge `isinstance` calls for `a`"
+    suggestion: "Merge `isinstance` calls for `a`"
     fixable: true
   location:
     row: 7
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: DuplicateIsinstanceCall
     body: "Multiple `isinstance` calls for `a`, merge into a single call"
-    commit: "Merge `isinstance` calls for `a`"
+    suggestion: "Merge `isinstance` calls for `a`"
     fixable: true
   location:
     row: 10
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: DuplicateIsinstanceCall
     body: "Multiple `isinstance` calls for `a`, merge into a single call"
-    commit: "Merge `isinstance` calls for `a`"
+    suggestion: "Merge `isinstance` calls for `a`"
     fixable: true
   location:
     row: 13
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: DuplicateIsinstanceCall
     body: "Multiple `isinstance` calls for `a`, merge into a single call"
-    commit: "Merge `isinstance` calls for `a`"
+    suggestion: "Merge `isinstance` calls for `a`"
     fixable: true
   location:
     row: 16

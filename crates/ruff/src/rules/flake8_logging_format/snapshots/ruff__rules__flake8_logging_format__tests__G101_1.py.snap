@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LoggingExtraAttrClash
     body: "Logging statement uses an extra field that clashes with a LogRecord field: `name`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6

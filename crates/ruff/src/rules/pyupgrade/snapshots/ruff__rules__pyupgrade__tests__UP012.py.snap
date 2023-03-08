@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 3
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 4
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 5
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 6
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 7
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 8
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 16
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 20
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 24
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 32
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 50
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 52
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 54
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 55
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 56
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 57
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    commit: "Remove unnecessary `encode`"
+    suggestion: "Remove unnecessary `encode`"
     fixable: true
   location:
     row: 58

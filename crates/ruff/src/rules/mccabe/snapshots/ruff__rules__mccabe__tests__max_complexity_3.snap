@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`try_else` is too complex (4)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 73
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`handle` is too complex (9)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 113

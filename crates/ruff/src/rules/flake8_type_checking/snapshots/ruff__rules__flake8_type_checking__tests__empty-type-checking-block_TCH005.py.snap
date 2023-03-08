@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: EmptyTypeCheckingBlock
     body: Found empty type-checking block
-    commit: Delete empty type-checking block
+    suggestion: Delete empty type-checking block
     fixable: true
   location:
     row: 4
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: EmptyTypeCheckingBlock
     body: Found empty type-checking block
-    commit: Delete empty type-checking block
+    suggestion: Delete empty type-checking block
     fixable: true
   location:
     row: 8
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: EmptyTypeCheckingBlock
     body: Found empty type-checking block
-    commit: Delete empty type-checking block
+    suggestion: Delete empty type-checking block
     fixable: true
   location:
     row: 11
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: EmptyTypeCheckingBlock
     body: Found empty type-checking block
-    commit: Delete empty type-checking block
+    suggestion: Delete empty type-checking block
     fixable: true
   location:
     row: 16
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: EmptyTypeCheckingBlock
     body: Found empty type-checking block
-    commit: Delete empty type-checking block
+    suggestion: Delete empty type-checking block
     fixable: true
   location:
     row: 22

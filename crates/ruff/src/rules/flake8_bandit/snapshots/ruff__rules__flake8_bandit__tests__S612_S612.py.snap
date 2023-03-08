@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LoggingConfigInsecureListen
     body: "Use of insecure `logging.config.listen` detected"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3

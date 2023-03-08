@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummaryFirstLine
     body: Multi-line docstring summary should start at the first line
-    commit: Remove whitespace after opening quotes
+    suggestion: Remove whitespace after opening quotes
     fixable: true
   location:
     row: 129
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummaryFirstLine
     body: Multi-line docstring summary should start at the first line
-    commit: Remove whitespace after opening quotes
+    suggestion: Remove whitespace after opening quotes
     fixable: true
   location:
     row: 597
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummaryFirstLine
     body: Multi-line docstring summary should start at the first line
-    commit: Remove whitespace after opening quotes
+    suggestion: Remove whitespace after opening quotes
     fixable: true
   location:
     row: 624

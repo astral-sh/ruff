@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryListCall
     body: "Unnecessary `list` call (remove the outer call to `list()`)"
-    commit: "Remove outer `list` call"
+    suggestion: "Remove outer `list` call"
     fixable: true
   location:
     row: 2

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: OpenFileWithContextHandler
     body: Use context handler for opening files
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: OpenFileWithContextHandler
     body: Use context handler for opening files
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31

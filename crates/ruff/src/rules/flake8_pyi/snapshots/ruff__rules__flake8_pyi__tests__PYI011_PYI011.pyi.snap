@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 36
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 41
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 45
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 49
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 53
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 57
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentSimpleDefaults
     body: Only simple default values allowed for typed arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 61

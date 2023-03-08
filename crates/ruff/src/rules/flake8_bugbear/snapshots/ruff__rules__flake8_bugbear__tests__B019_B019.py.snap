@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CachedInstanceMethod
     body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 78
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: CachedInstanceMethod
     body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 82
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: CachedInstanceMethod
     body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 86
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: CachedInstanceMethod
     body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 90
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: CachedInstanceMethod
     body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 94
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: CachedInstanceMethod
     body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 98
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: CachedInstanceMethod
     body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 102
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: CachedInstanceMethod
     body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 106

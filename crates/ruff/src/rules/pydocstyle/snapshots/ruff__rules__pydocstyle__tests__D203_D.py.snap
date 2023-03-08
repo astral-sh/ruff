@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: OneBlankLineBeforeClass
     body: 1 blank line required before class docstring
-    commit: Insert 1 blank line before class docstring
+    suggestion: Insert 1 blank line before class docstring
     fixable: true
   location:
     row: 161
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: OneBlankLineBeforeClass
     body: 1 blank line required before class docstring
-    commit: Insert 1 blank line before class docstring
+    suggestion: Insert 1 blank line before class docstring
     fixable: true
   location:
     row: 192
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: OneBlankLineBeforeClass
     body: 1 blank line required before class docstring
-    commit: Insert 1 blank line before class docstring
+    suggestion: Insert 1 blank line before class docstring
     fixable: true
   location:
     row: 526

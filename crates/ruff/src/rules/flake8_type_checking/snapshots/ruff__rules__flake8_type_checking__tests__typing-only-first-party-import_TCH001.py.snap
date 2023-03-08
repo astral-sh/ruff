@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypingOnlyFirstPartyImport
     body: "Move application import `.TYP001` into a type-checking block"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20

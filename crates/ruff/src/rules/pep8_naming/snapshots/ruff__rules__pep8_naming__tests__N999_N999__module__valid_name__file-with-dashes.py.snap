@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: InvalidModuleName
     body: "Invalid module name: 'file-with-dashes'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1

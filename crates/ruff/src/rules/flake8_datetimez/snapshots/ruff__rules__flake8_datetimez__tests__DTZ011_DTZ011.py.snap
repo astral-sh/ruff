@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CallDateToday
     body: "The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: CallDateToday
     body: "The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

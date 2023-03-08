@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDictKwargs
     body: "Unnecessary `dict` kwargs"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDictKwargs
     body: "Unnecessary `dict` kwargs"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDictKwargs
     body: "Unnecessary `dict` kwargs"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDictKwargs
     body: "Unnecessary `dict` kwargs"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDictKwargs
     body: "Unnecessary `dict` kwargs"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

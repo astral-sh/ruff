@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UselessYieldFixture
     body: "No teardown in fixture `error`, use `return` instead of `yield`"
-    commit: "Replace `yield` with `return`"
+    suggestion: "Replace `yield` with `return`"
     fixable: true
   location:
     row: 17

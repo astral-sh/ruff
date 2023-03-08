@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PercentFormatExtraNamedArguments
     body: "`%`-format string has unused named argument(s): baz"
-    commit: "Remove extra named arguments: baz"
+    suggestion: "Remove extra named arguments: baz"
     fixable: true
   location:
     row: 8

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TooFewSpacesBeforeInlineComment
     body: Insert at least two spaces before an inline comment
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2

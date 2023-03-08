@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `True` should be `cond is True`"
-    commit: "Replace with `cond is True`"
+    suggestion: "Replace with `cond is True`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `False` should be `cond is not False`"
-    commit: "Replace with `cond is not False`"
+    suggestion: "Replace with `cond is not False`"
     fixable: true
   location:
     row: 5
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `True` should be `cond is not True`"
-    commit: "Replace with `cond is not True`"
+    suggestion: "Replace with `cond is not True`"
     fixable: true
   location:
     row: 8
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `False` should be `cond is False`"
-    commit: "Replace with `cond is False`"
+    suggestion: "Replace with `cond is False`"
     fixable: true
   location:
     row: 11
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `True` should be `cond is True`"
-    commit: "Replace with `cond is True`"
+    suggestion: "Replace with `cond is True`"
     fixable: true
   location:
     row: 14
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `False` should be `cond is not False`"
-    commit: "Replace with `cond is not False`"
+    suggestion: "Replace with `cond is not False`"
     fixable: true
   location:
     row: 17
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `True` should be `cond is True`"
-    commit: "Replace with `cond is True`"
+    suggestion: "Replace with `cond is True`"
     fixable: true
   location:
     row: 20
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `False` should be `cond is False`"
-    commit: "Replace with `cond is False`"
+    suggestion: "Replace with `cond is False`"
     fixable: true
   location:
     row: 20
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `True` should be `cond is True`"
-    commit: "Replace with `cond is True`"
+    suggestion: "Replace with `cond is True`"
     fixable: true
   location:
     row: 22
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `True` should be `cond is True`"
-    commit: "Replace with `cond is True`"
+    suggestion: "Replace with `cond is True`"
     fixable: true
   location:
     row: 25
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: TrueFalseComparison
     body: "Comparison to `False` should be `cond is not False`"
-    commit: "Replace with `cond is not False`"
+    suggestion: "Replace with `cond is not False`"
     fixable: true
   location:
     row: 25

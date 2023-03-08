@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ReraiseNoCause
     body: "Use `raise from` to specify exception cause"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ReraiseNoCause
     body: "Use `raise from` to specify exception cause"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23

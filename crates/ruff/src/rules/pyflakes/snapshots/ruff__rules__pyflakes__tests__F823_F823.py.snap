@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UndefinedLocal
     body: "Local variable `my_var` referenced before assignment"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6

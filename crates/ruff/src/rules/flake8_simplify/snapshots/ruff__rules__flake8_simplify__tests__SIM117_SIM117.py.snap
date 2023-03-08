@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MultipleWithStatements
     body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    commit: "Combine `with` statements"
+    suggestion: "Combine `with` statements"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: MultipleWithStatements
     body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    commit: "Combine `with` statements"
+    suggestion: "Combine `with` statements"
     fixable: true
   location:
     row: 7
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: MultipleWithStatements
     body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -58,7 +58,7 @@ expression: diagnostics
 - kind:
     name: MultipleWithStatements
     body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    commit: "Combine `with` statements"
+    suggestion: "Combine `with` statements"
     fixable: true
   location:
     row: 19
@@ -78,7 +78,7 @@ expression: diagnostics
 - kind:
     name: MultipleWithStatements
     body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    commit: "Combine `with` statements"
+    suggestion: "Combine `with` statements"
     fixable: true
   location:
     row: 53
@@ -98,7 +98,7 @@ expression: diagnostics
 - kind:
     name: MultipleWithStatements
     body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    commit: "Combine `with` statements"
+    suggestion: "Combine `with` statements"
     fixable: true
   location:
     row: 68
@@ -118,7 +118,7 @@ expression: diagnostics
 - kind:
     name: MultipleWithStatements
     body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    commit: "Combine `with` statements"
+    suggestion: "Combine `with` statements"
     fixable: true
   location:
     row: 76
@@ -138,7 +138,7 @@ expression: diagnostics
 - kind:
     name: MultipleWithStatements
     body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    commit: "Combine `with` statements"
+    suggestion: "Combine `with` statements"
     fixable: true
   location:
     row: 84

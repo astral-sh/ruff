@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RuntimeImportInTypeCheckingBlock
     body: "Move import `typing.List` out of type-checking block. Import is used for more than type hinting."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RuntimeImportInTypeCheckingBlock
     body: "Move import `typing.Sequence` out of type-checking block. Import is used for more than type hinting."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: RuntimeImportInTypeCheckingBlock
     body: "Move import `typing.Set` out of type-checking block. Import is used for more than type hinting."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4

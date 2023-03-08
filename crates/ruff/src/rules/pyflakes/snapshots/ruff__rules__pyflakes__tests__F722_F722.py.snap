@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ForwardAnnotationSyntaxError
     body: "Syntax error in forward annotation: `///`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

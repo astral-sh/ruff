@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `md5`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `md4`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `md5`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `MD4`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `sha`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `SHA`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `sha`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `md5`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 25
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: HashlibInsecureHashFunction
     body: "Probable use of insecure hash functions in `hashlib`: `sha1`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 32

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: StripWithMultiCharacters
     body: "Using `.strip()` with multi-character strings is misleading the reader"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: StripWithMultiCharacters
     body: "Using `.strip()` with multi-character strings is misleading the reader"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: StripWithMultiCharacters
     body: "Using `.strip()` with multi-character strings is misleading the reader"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: StripWithMultiCharacters
     body: "Using `.strip()` with multi-character strings is misleading the reader"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: StripWithMultiCharacters
     body: "Using `.strip()` with multi-character strings is misleading the reader"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: StripWithMultiCharacters
     body: "Using `.strip()` with multi-character strings is misleading the reader"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: StripWithMultiCharacters
     body: "Using `.strip()` with multi-character strings is misleading the reader"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: StripWithMultiCharacters
     body: "Using `.strip()` with multi-character strings is misleading the reader"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24

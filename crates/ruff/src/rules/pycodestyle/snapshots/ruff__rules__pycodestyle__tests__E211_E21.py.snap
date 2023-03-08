@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeParameters
     body: "Whitespace before '('"
-    commit: "Removed whitespace before '('"
+    suggestion: "Removed whitespace before '('"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeParameters
     body: "Whitespace before '['"
-    commit: "Removed whitespace before '['"
+    suggestion: "Removed whitespace before '['"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeParameters
     body: "Whitespace before '['"
-    commit: "Removed whitespace before '['"
+    suggestion: "Removed whitespace before '['"
     fixable: true
   location:
     row: 4
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeParameters
     body: "Whitespace before '['"
-    commit: "Removed whitespace before '['"
+    suggestion: "Removed whitespace before '['"
     fixable: true
   location:
     row: 6

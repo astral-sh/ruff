@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseContinue
     body: "Unnecessary `elif` after `continue` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseContinue
     body: "Unnecessary `elif` after `continue` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseContinue
     body: "Unnecessary `else` after `continue` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 36
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseContinue
     body: "Unnecessary `else` after `continue` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 47
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseContinue
     body: "Unnecessary `else` after `continue` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 63
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseContinue
     body: "Unnecessary `else` after `continue` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 74
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseContinue
     body: "Unnecessary `else` after `continue` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 85

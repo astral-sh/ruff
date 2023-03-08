@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SuperCallWithParameters
     body: "Use `super()` instead of `super(__class__, self)`"
-    commit: "Remove `__super__` parameters"
+    suggestion: "Remove `__super__` parameters"
     fixable: true
   location:
     row: 17
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: SuperCallWithParameters
     body: "Use `super()` instead of `super(__class__, self)`"
-    commit: "Remove `__super__` parameters"
+    suggestion: "Remove `__super__` parameters"
     fixable: true
   location:
     row: 18
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: SuperCallWithParameters
     body: "Use `super()` instead of `super(__class__, self)`"
-    commit: "Remove `__super__` parameters"
+    suggestion: "Remove `__super__` parameters"
     fixable: true
   location:
     row: 19
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: SuperCallWithParameters
     body: "Use `super()` instead of `super(__class__, self)`"
-    commit: "Remove `__super__` parameters"
+    suggestion: "Remove `__super__` parameters"
     fixable: true
   location:
     row: 36
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: SuperCallWithParameters
     body: "Use `super()` instead of `super(__class__, self)`"
-    commit: "Remove `__super__` parameters"
+    suggestion: "Remove `__super__` parameters"
     fixable: true
   location:
     row: 50

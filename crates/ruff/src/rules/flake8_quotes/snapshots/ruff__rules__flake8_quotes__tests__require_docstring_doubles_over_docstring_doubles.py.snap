@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesMultilineString
     body: Double quote multiline found but single quotes preferred
-    commit: Replace double multiline quotes with single quotes
+    suggestion: Replace double multiline quotes with single quotes
     fixable: true
   location:
     row: 5
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesMultilineString
     body: Double quote multiline found but single quotes preferred
-    commit: Replace double multiline quotes with single quotes
+    suggestion: Replace double multiline quotes with single quotes
     fixable: true
   location:
     row: 16
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesMultilineString
     body: Double quote multiline found but single quotes preferred
-    commit: Replace double multiline quotes with single quotes
+    suggestion: Replace double multiline quotes with single quotes
     fixable: true
   location:
     row: 21
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesMultilineString
     body: Double quote multiline found but single quotes preferred
-    commit: Replace double multiline quotes with single quotes
+    suggestion: Replace double multiline quotes with single quotes
     fixable: true
   location:
     row: 30
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesMultilineString
     body: Double quote multiline found but single quotes preferred
-    commit: Replace double multiline quotes with single quotes
+    suggestion: Replace double multiline quotes with single quotes
     fixable: true
   location:
     row: 35

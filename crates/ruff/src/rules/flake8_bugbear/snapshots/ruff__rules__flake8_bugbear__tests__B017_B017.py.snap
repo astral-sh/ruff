@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: AssertRaisesException
     body: "`assertRaises(Exception)` should be considered evil"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22

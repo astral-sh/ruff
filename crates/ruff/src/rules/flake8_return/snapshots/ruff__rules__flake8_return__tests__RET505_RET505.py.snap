@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseReturn
     body: "Unnecessary `elif` after `return` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseReturn
     body: "Unnecessary `elif` after `return` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseReturn
     body: "Unnecessary `elif` after `return` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 41
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseReturn
     body: "Unnecessary `else` after `return` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 53
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseReturn
     body: "Unnecessary `else` after `return` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 64
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseReturn
     body: "Unnecessary `else` after `return` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 79
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseReturn
     body: "Unnecessary `else` after `return` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 89
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: SuperfluousElseReturn
     body: "Unnecessary `else` after `return` statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 99

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeCloseBracket
     body: "Whitespace before ')'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeCloseBracket
     body: "Whitespace before ')'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeCloseBracket
     body: "Whitespace before ')'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeCloseBracket
     body: "Whitespace before ')'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 25
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeCloseBracket
     body: "Whitespace before ')'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: WhitespaceBeforeCloseBracket
     body: "Whitespace before ')'"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29

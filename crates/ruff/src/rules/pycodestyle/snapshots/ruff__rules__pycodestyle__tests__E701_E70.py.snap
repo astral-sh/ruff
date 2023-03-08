@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 25
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 32
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 33
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 35
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 37
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 39
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 56
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: MultipleStatementsOnOneLineColon
     body: Multiple statements on one line (colon)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 59

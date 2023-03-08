@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 39
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 40
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 81
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 81
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeValuesWrongType
     body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 81

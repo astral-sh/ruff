@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IfExprWithFalseTrue
     body: "Use `not b` instead of `False if b else True`"
-    commit: "Replace with `bool(b)"
+    suggestion: "Replace with `bool(b)"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: IfExprWithFalseTrue
     body: "Use `not b != c` instead of `False if b != c else True`"
-    commit: "Replace with `bool(b != c)"
+    suggestion: "Replace with `bool(b != c)"
     fixable: true
   location:
     row: 3
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: IfExprWithFalseTrue
     body: "Use `not b + c` instead of `False if b + c else True`"
-    commit: "Replace with `bool(b + c)"
+    suggestion: "Replace with `bool(b + c)"
     fixable: true
   location:
     row: 5

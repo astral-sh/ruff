@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace with builtin `OSError`"
+    suggestion: "Replace with builtin `OSError`"
     fixable: true
   location:
     row: 5
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace with builtin `OSError`"
+    suggestion: "Replace with builtin `OSError`"
     fixable: true
   location:
     row: 7
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: OSErrorAlias
     body: "Replace aliased errors with `OSError`"
-    commit: "Replace with builtin `OSError`"
+    suggestion: "Replace with builtin `OSError`"
     fixable: true
   location:
     row: 12

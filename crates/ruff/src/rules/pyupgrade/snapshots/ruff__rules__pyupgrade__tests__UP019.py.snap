@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypingTextStrAlias
     body: "`typing.Text` is deprecated, use `str`"
-    commit: "Replace with `str`"
+    suggestion: "Replace with `str`"
     fixable: true
   location:
     row: 7
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: TypingTextStrAlias
     body: "`typing.Text` is deprecated, use `str`"
-    commit: "Replace with `str`"
+    suggestion: "Replace with `str`"
     fixable: true
   location:
     row: 11
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: TypingTextStrAlias
     body: "`typing.Text` is deprecated, use `str`"
-    commit: "Replace with `str`"
+    suggestion: "Replace with `str`"
     fixable: true
   location:
     row: 15
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: TypingTextStrAlias
     body: "`typing.Text` is deprecated, use `str`"
-    commit: "Replace with `str`"
+    suggestion: "Replace with `str`"
     fixable: true
   location:
     row: 19

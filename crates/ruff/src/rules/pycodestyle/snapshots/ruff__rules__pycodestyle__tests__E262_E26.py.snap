@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoSpaceAfterInlineComment
     body: "Inline comment should start with `# `"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: NoSpaceAfterInlineComment
     body: "Inline comment should start with `# `"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: NoSpaceAfterInlineComment
     body: "Inline comment should start with `# `"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: NoSpaceAfterInlineComment
     body: "Inline comment should start with `# `"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 63
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: NoSpaceAfterInlineComment
     body: "Inline comment should start with `# `"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 66

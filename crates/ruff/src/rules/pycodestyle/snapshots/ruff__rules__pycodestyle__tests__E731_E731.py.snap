@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LambdaAssignment
     body: "Do not assign a `lambda` expression, use a `def`"
-    commit: "Rewrite `f` as a `def`"
+    suggestion: "Rewrite `f` as a `def`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: LambdaAssignment
     body: "Do not assign a `lambda` expression, use a `def`"
-    commit: "Rewrite `f` as a `def`"
+    suggestion: "Rewrite `f` as a `def`"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: LambdaAssignment
     body: "Do not assign a `lambda` expression, use a `def`"
-    commit: "Rewrite `this` as a `def`"
+    suggestion: "Rewrite `this` as a `def`"
     fixable: true
   location:
     row: 7
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: LambdaAssignment
     body: "Do not assign a `lambda` expression, use a `def`"
-    commit: "Rewrite `f` as a `def`"
+    suggestion: "Rewrite `f` as a `def`"
     fixable: true
   location:
     row: 9
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: LambdaAssignment
     body: "Do not assign a `lambda` expression, use a `def`"
-    commit: "Rewrite `f` as a `def`"
+    suggestion: "Rewrite `f` as a `def`"
     fixable: true
   location:
     row: 11
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: LambdaAssignment
     body: "Do not assign a `lambda` expression, use a `def`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14

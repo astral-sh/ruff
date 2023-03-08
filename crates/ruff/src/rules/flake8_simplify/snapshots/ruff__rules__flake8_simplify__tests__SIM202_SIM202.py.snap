@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NegateNotEqualOp
     body: "Use `a == b` instead of `not a != b`"
-    commit: "Replace with `==` operator"
+    suggestion: "Replace with `==` operator"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NegateNotEqualOp
     body: "Use `a == b + c` instead of `not a != b + c`"
-    commit: "Replace with `==` operator"
+    suggestion: "Replace with `==` operator"
     fixable: true
   location:
     row: 6
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: NegateNotEqualOp
     body: "Use `a + b == c` instead of `not a + b != c`"
-    commit: "Replace with `==` operator"
+    suggestion: "Replace with `==` operator"
     fixable: true
   location:
     row: 10

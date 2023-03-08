@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BooleanDefaultValueInFunctionDefinition
     body: Boolean default value in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BooleanDefaultValueInFunctionDefinition
     body: Boolean default value in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BooleanDefaultValueInFunctionDefinition
     body: Boolean default value in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BooleanDefaultValueInFunctionDefinition
     body: Boolean default value in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15

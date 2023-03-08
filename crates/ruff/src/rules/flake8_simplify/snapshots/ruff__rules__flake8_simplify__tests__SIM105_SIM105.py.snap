@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UseContextlibSuppress
     body: "Use `contextlib.suppress(ValueError)` instead of try-except-pass"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UseContextlibSuppress
     body: "Use `contextlib.suppress(ValueError, OSError)` instead of try-except-pass"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UseContextlibSuppress
     body: "Use `contextlib.suppress(Exception)` instead of try-except-pass"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UseContextlibSuppress
     body: "Use `contextlib.suppress(a.Error, b.Error)` instead of try-except-pass"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RaisesTooBroad
     body: "`pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RaisesTooBroad
     body: "`pytest.raises(socket.error)` is too broad, set the `match` parameter or use a more specific exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: RaisesTooBroad
     body: "`pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 25
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: RaisesTooBroad
     body: "`pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: RaisesTooBroad
     body: "`pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31

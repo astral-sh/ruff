@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DefaultExceptNotLast
     body: "An `except` block as not the last exception handler"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: DefaultExceptNotLast
     body: "An `except` block as not the last exception handler"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: DefaultExceptNotLast
     body: "An `except` block as not the last exception handler"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19

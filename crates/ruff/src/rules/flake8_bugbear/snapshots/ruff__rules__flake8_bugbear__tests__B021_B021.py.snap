@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 38
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 46
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 62
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 70
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: FStringDocstring
     body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 74

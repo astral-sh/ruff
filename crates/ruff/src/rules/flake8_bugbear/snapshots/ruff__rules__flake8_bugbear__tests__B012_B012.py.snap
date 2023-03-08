@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 44
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`break` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 66
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`continue` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 78
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 94
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`continue` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 101
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`break` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 107
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: JumpStatementInFinally
     body: "`break` inside `finally` blocks cause exceptions to be silenced"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 118

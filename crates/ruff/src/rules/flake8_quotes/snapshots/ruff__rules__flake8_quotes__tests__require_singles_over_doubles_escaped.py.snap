@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: AvoidableEscapedQuote
     body: Change outer quotes to avoid escaping inner quotes
-    commit: Change outer quotes to avoid escaping inner quotes
+    suggestion: Change outer quotes to avoid escaping inner quotes
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: AvoidableEscapedQuote
     body: Change outer quotes to avoid escaping inner quotes
-    commit: Change outer quotes to avoid escaping inner quotes
+    suggestion: Change outer quotes to avoid escaping inner quotes
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: AvoidableEscapedQuote
     body: Change outer quotes to avoid escaping inner quotes
-    commit: Change outer quotes to avoid escaping inner quotes
+    suggestion: Change outer quotes to avoid escaping inner quotes
     fixable: true
   location:
     row: 10

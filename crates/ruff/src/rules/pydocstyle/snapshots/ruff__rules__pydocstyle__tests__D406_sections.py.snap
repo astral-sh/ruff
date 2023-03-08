@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NewLineAfterSectionName
     body: "Section name should end with a newline (\"Returns\")"
-    commit: "Add newline after \"Returns\""
+    suggestion: "Add newline after \"Returns\""
     fixable: true
   location:
     row: 30
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NewLineAfterSectionName
     body: "Section name should end with a newline (\"Raises\")"
-    commit: "Add newline after \"Raises\""
+    suggestion: "Add newline after \"Raises\""
     fixable: true
   location:
     row: 207

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RaiseVanillaClass
     body: Create your own exception
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RaiseVanillaClass
     body: Create your own exception
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithoutFromInsideExcept
     body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithoutFromInsideExcept
     body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithoutFromInsideExcept
     body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithoutFromInsideExcept
     body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 62
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithoutFromInsideExcept
     body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 64
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithoutFromInsideExcept
     body: "Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 72

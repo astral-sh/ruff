@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 18
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 18
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 19
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 22
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 26
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 26
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 30
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 32
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 36
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 40
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 44
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 47
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 49
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 51
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 53
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 55
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 57
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 59
@@ -365,7 +365,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 61
@@ -385,7 +385,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 63
@@ -405,7 +405,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 63
@@ -425,7 +425,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 65
@@ -445,7 +445,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 65
@@ -465,7 +465,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 65
@@ -485,7 +485,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 65
@@ -505,7 +505,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 67
@@ -525,7 +525,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 67
@@ -545,7 +545,7 @@ expression: diagnostics
 - kind:
     name: QuotedAnnotation
     body: Remove quotes from type annotation
-    commit: Remove quotes
+    suggestion: Remove quotes
     fixable: true
   location:
     row: 67

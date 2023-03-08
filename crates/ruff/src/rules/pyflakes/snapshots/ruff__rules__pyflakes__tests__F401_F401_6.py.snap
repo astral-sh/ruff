@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`.background.BackgroundTasks` imported but unused"
-    commit: "Remove unused import: `.background.BackgroundTasks`"
+    suggestion: "Remove unused import: `.background.BackgroundTasks`"
     fixable: true
   location:
     row: 7
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`.datastructures.UploadFile` imported but unused"
-    commit: "Remove unused import: `.datastructures.UploadFile`"
+    suggestion: "Remove unused import: `.datastructures.UploadFile`"
     fixable: true
   location:
     row: 10
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`background` imported but unused"
-    commit: "Remove unused import: `background`"
+    suggestion: "Remove unused import: `background`"
     fixable: true
   location:
     row: 16
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`datastructures` imported but unused"
-    commit: "Remove unused import: `datastructures`"
+    suggestion: "Remove unused import: `datastructures`"
     fixable: true
   location:
     row: 19

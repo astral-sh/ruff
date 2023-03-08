@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DuplicateTryBlockException
     body: "try-except block with duplicate exception `ValueError`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: DuplicateTryBlockException
     body: "try-except block with duplicate exception `pickle.PickleError`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: DuplicateTryBlockException
     body: "try-except block with duplicate exception `ValueError`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 35
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: DuplicateTryBlockException
     body: "try-except block with duplicate exception `TypeError`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 37

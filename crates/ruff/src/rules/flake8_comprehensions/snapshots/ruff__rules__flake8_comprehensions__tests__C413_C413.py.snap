@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCallAroundSorted
     body: "Unnecessary `list` call around `sorted()`"
-    commit: "Remove unnecessary `list` call"
+    suggestion: "Remove unnecessary `list` call"
     fixable: true
   location:
     row: 3
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCallAroundSorted
     body: "Unnecessary `reversed` call around `sorted()`"
-    commit: "Remove unnecessary `reversed` call"
+    suggestion: "Remove unnecessary `reversed` call"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCallAroundSorted
     body: "Unnecessary `reversed` call around `sorted()`"
-    commit: "Remove unnecessary `reversed` call"
+    suggestion: "Remove unnecessary `reversed` call"
     fixable: true
   location:
     row: 5
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCallAroundSorted
     body: "Unnecessary `reversed` call around `sorted()`"
-    commit: "Remove unnecessary `reversed` call"
+    suggestion: "Remove unnecessary `reversed` call"
     fixable: true
   location:
     row: 6
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCallAroundSorted
     body: "Unnecessary `reversed` call around `sorted()`"
-    commit: "Remove unnecessary `reversed` call"
+    suggestion: "Remove unnecessary `reversed` call"
     fixable: true
   location:
     row: 7
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCallAroundSorted
     body: "Unnecessary `reversed` call around `sorted()`"
-    commit: "Remove unnecessary `reversed` call"
+    suggestion: "Remove unnecessary `reversed` call"
     fixable: true
   location:
     row: 8
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCallAroundSorted
     body: "Unnecessary `reversed` call around `sorted()`"
-    commit: "Remove unnecessary `reversed` call"
+    suggestion: "Remove unnecessary `reversed` call"
     fixable: true
   location:
     row: 9

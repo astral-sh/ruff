@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`typing.Union` imported but unused"
-    commit: "Remove unused import: `typing.Union`"
+    suggestion: "Remove unused import: `typing.Union`"
     fixable: true
   location:
     row: 37
@@ -27,7 +27,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `F401`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 52
@@ -47,7 +47,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `F401`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 59
@@ -67,7 +67,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (non-enabled: `F501`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 66
@@ -87,7 +87,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (non-enabled: `F501`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 72
@@ -107,7 +107,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`typing.Awaitable` imported but unused"
-    commit: Remove unused import
+    suggestion: Remove unused import
     fixable: true
   location:
     row: 89
@@ -127,7 +127,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`typing.AwaitableGenerator` imported but unused"
-    commit: Remove unused import
+    suggestion: Remove unused import
     fixable: true
   location:
     row: 89
@@ -147,7 +147,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (non-enabled: `F501`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 89

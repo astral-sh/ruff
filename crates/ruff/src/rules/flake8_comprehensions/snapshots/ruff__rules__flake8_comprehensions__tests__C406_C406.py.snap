@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralDict
     body: "Unnecessary `list` literal (rewrite as a `dict` literal)"
-    commit: "Rewrite as a `dict` literal"
+    suggestion: "Rewrite as a `dict` literal"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralDict
     body: "Unnecessary `tuple` literal (rewrite as a `dict` literal)"
-    commit: "Rewrite as a `dict` literal"
+    suggestion: "Rewrite as a `dict` literal"
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralDict
     body: "Unnecessary `list` literal (rewrite as a `dict` literal)"
-    commit: "Rewrite as a `dict` literal"
+    suggestion: "Rewrite as a `dict` literal"
     fixable: true
   location:
     row: 3
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralDict
     body: "Unnecessary `tuple` literal (rewrite as a `dict` literal)"
-    commit: "Rewrite as a `dict` literal"
+    suggestion: "Rewrite as a `dict` literal"
     fixable: true
   location:
     row: 4

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeWithoutTzinfo
     body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeWithoutTzinfo
     body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeWithoutTzinfo
     body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeWithoutTzinfo
     body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeWithoutTzinfo
     body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21

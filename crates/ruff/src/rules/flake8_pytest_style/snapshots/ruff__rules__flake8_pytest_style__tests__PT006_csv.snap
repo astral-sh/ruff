@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    commit: "Use a `csv` for parameter names"
+    suggestion: "Use a `csv` for parameter names"
     fixable: true
   location:
     row: 24
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    commit: "Use a `csv` for parameter names"
+    suggestion: "Use a `csv` for parameter names"
     fixable: true
   location:
     row: 29
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    commit: "Use a `csv` for parameter names"
+    suggestion: "Use a `csv` for parameter names"
     fixable: true
   location:
     row: 34
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    commit: "Use a `csv` for parameter names"
+    suggestion: "Use a `csv` for parameter names"
     fixable: true
   location:
     row: 39
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    commit: "Use a `csv` for parameter names"
+    suggestion: "Use a `csv` for parameter names"
     fixable: true
   location:
     row: 44
@@ -98,7 +98,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    commit: "Use a `csv` for parameter names"
+    suggestion: "Use a `csv` for parameter names"
     fixable: true
   location:
     row: 49

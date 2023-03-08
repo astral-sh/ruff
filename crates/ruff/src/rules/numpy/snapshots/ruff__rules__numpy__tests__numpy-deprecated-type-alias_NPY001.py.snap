@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NumpyDeprecatedTypeAlias
     body: "Type alias `np.bool` is deprecated, replace with builtin type"
-    commit: "Replace `np.bool` with builtin type"
+    suggestion: "Replace `np.bool` with builtin type"
     fixable: true
   location:
     row: 6
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NumpyDeprecatedTypeAlias
     body: "Type alias `np.int` is deprecated, replace with builtin type"
-    commit: "Replace `np.int` with builtin type"
+    suggestion: "Replace `np.int` with builtin type"
     fixable: true
   location:
     row: 7
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: NumpyDeprecatedTypeAlias
     body: "Type alias `np.object` is deprecated, replace with builtin type"
-    commit: "Replace `np.object` with builtin type"
+    suggestion: "Replace `np.object` with builtin type"
     fixable: true
   location:
     row: 9
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: NumpyDeprecatedTypeAlias
     body: "Type alias `np.int` is deprecated, replace with builtin type"
-    commit: "Replace `np.int` with builtin type"
+    suggestion: "Replace `np.int` with builtin type"
     fixable: true
   location:
     row: 12
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: NumpyDeprecatedTypeAlias
     body: "Type alias `np.long` is deprecated, replace with builtin type"
-    commit: "Replace `np.long` with builtin type"
+    suggestion: "Replace `np.long` with builtin type"
     fixable: true
   location:
     row: 12
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: NumpyDeprecatedTypeAlias
     body: "Type alias `np.object` is deprecated, replace with builtin type"
-    commit: "Replace `np.object` with builtin type"
+    suggestion: "Replace `np.object` with builtin type"
     fixable: true
   location:
     row: 17
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: NumpyDeprecatedTypeAlias
     body: "Type alias `np.int` is deprecated, replace with builtin type"
-    commit: "Replace `np.int` with builtin type"
+    suggestion: "Replace `np.int` with builtin type"
     fixable: true
   location:
     row: 20

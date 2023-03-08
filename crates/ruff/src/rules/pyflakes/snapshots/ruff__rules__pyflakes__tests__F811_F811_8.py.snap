@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RedefinedWhileUnused
     body: "Redefinition of unused `os` from line 4"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5

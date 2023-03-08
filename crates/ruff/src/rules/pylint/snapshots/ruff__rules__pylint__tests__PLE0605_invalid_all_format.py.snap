@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: InvalidAllFormat
     body: "Invalid format for `__all__`, must be `tuple` or `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: InvalidAllFormat
     body: "Invalid format for `__all__`, must be `tuple` or `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: InvalidAllFormat
     body: "Invalid format for `__all__`, must be `tuple` or `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: InvalidAllFormat
     body: "Invalid format for `__all__`, must be `tuple` or `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: InvalidAllFormat
     body: "Invalid format for `__all__`, must be `tuple` or `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: InvalidAllFormat
     body: "Invalid format for `__all__`, must be `tuple` or `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: InvalidAllFormat
     body: "Invalid format for `__all__`, must be `tuple` or `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: InvalidAllFormat
     body: "Invalid format for `__all__`, must be `tuple` or `list`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15

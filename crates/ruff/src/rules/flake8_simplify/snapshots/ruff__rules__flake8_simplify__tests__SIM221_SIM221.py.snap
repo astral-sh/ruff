@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ExprOrNotExpr
     body: "Use `True` instead of `a or not a`"
-    commit: "Replace with `True`"
+    suggestion: "Replace with `True`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ExprOrNotExpr
     body: "Use `True` instead of `a or not a`"
-    commit: "Replace with `True`"
+    suggestion: "Replace with `True`"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ExprOrNotExpr
     body: "Use `True` instead of `a or not a`"
-    commit: "Replace with `True`"
+    suggestion: "Replace with `True`"
     fixable: true
   location:
     row: 7

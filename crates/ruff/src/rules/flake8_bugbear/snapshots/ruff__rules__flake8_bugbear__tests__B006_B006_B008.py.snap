@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 60
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 64
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 68
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 72
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 76
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 80
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 85
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 89
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 93
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 97
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 170
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 203
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 204
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: MutableArgumentDefault
     body: Do not use mutable data structures for argument defaults
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 205

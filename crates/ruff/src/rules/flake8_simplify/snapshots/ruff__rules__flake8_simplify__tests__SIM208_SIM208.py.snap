@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DoubleNegation
     body: "Use `a` instead of `not (not a)`"
-    commit: "Replace with `a`"
+    suggestion: "Replace with `a`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: DoubleNegation
     body: "Use `a == b` instead of `not (not a == b)`"
-    commit: "Replace with `a == b`"
+    suggestion: "Replace with `a == b`"
     fixable: true
   location:
     row: 4

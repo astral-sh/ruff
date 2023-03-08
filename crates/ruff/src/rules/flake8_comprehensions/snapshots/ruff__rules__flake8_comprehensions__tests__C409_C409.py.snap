@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralWithinTupleCall
     body: "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)"
-    commit: "Rewrite as a `tuple` literal"
+    suggestion: "Rewrite as a `tuple` literal"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralWithinTupleCall
     body: "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)"
-    commit: "Rewrite as a `tuple` literal"
+    suggestion: "Rewrite as a `tuple` literal"
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralWithinTupleCall
     body: "Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)"
-    commit: "Remove outer `tuple` call"
+    suggestion: "Remove outer `tuple` call"
     fixable: true
   location:
     row: 3
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralWithinTupleCall
     body: "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)"
-    commit: "Rewrite as a `tuple` literal"
+    suggestion: "Rewrite as a `tuple` literal"
     fixable: true
   location:
     row: 4
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryLiteralWithinTupleCall
     body: "Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)"
-    commit: "Remove outer `tuple` call"
+    suggestion: "Remove outer `tuple` call"
     fixable: true
   location:
     row: 8

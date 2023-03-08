@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesBeforeKeyword
     body: Multiple spaces before keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesBeforeKeyword
     body: Multiple spaces before keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesBeforeKeyword
     body: Multiple spaces before keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24

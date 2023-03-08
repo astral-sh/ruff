@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: TypeCommentInStub
     body: "Don't use type comments in stub file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 32

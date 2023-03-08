@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IncorrectFixtureNameUnderscore
     body: "Fixture `_my_fixture` returns a value, remove leading underscore"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 41
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: IncorrectFixtureNameUnderscore
     body: "Fixture `_activate_context` returns a value, remove leading underscore"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 46
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: IncorrectFixtureNameUnderscore
     body: "Fixture `_activate_context` returns a value, remove leading underscore"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 52

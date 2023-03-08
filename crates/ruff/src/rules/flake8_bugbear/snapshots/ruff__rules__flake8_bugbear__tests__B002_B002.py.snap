@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnaryPrefixIncrement
     body: Python does not support the unary prefix increment
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnaryPrefixIncrement
     body: Python does not support the unary prefix increment
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20

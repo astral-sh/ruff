@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 32
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 38
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 44
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 45
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 58
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 61
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 62
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 63
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 64
@@ -200,7 +200,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 65
@@ -213,7 +213,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 66
@@ -226,7 +226,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 73
@@ -239,7 +239,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 78
@@ -252,7 +252,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 83
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 88
@@ -278,7 +278,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 91
@@ -291,7 +291,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 92
@@ -304,7 +304,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 98
@@ -317,7 +317,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 99
@@ -330,7 +330,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 102
@@ -343,7 +343,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 105
@@ -356,7 +356,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 110
@@ -369,7 +369,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 125
@@ -382,7 +382,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 131
@@ -395,7 +395,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 132
@@ -408,7 +408,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 133
@@ -421,7 +421,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 136
@@ -434,7 +434,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 137
@@ -447,7 +447,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 138
@@ -460,7 +460,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 139
@@ -473,7 +473,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 140
@@ -486,7 +486,7 @@ expression: diagnostics
 - kind:
     name: IndentationContainsTabs
     body: Indentation contains tabs
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 143

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CommentedOutCode
     body: Found commented-out code
-    commit: Remove commented-out code
+    suggestion: Remove commented-out code
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: CommentedOutCode
     body: Found commented-out code
-    commit: Remove commented-out code
+    suggestion: Remove commented-out code
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: CommentedOutCode
     body: Found commented-out code
-    commit: Remove commented-out code
+    suggestion: Remove commented-out code
     fixable: true
   location:
     row: 3
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: CommentedOutCode
     body: Found commented-out code
-    commit: Remove commented-out code
+    suggestion: Remove commented-out code
     fixable: true
   location:
     row: 5
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: CommentedOutCode
     body: Found commented-out code
-    commit: Remove commented-out code
+    suggestion: Remove commented-out code
     fixable: true
   location:
     row: 12

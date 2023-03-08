@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: GetAttrWithConstant
     body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `getattr` with attribute access"
+    suggestion: "Replace `getattr` with attribute access"
     fixable: true
   location:
     row: 19
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: GetAttrWithConstant
     body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `getattr` with attribute access"
+    suggestion: "Replace `getattr` with attribute access"
     fixable: true
   location:
     row: 20
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: GetAttrWithConstant
     body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `getattr` with attribute access"
+    suggestion: "Replace `getattr` with attribute access"
     fixable: true
   location:
     row: 21
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: GetAttrWithConstant
     body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `getattr` with attribute access"
+    suggestion: "Replace `getattr` with attribute access"
     fixable: true
   location:
     row: 22
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: GetAttrWithConstant
     body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `getattr` with attribute access"
+    suggestion: "Replace `getattr` with attribute access"
     fixable: true
   location:
     row: 23
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: GetAttrWithConstant
     body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `getattr` with attribute access"
+    suggestion: "Replace `getattr` with attribute access"
     fixable: true
   location:
     row: 24
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: GetAttrWithConstant
     body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    commit: "Replace `getattr` with attribute access"
+    suggestion: "Replace `getattr` with attribute access"
     fixable: true
   location:
     row: 25

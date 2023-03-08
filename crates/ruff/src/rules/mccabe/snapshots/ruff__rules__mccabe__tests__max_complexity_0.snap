@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`trivial` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`expr_as_statement` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`sequential` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`if_elif_else_dead_path` is too complex (3)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`nested_ifs` is too complex (3)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`for_loop` is too complex (2)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 40
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`for_else` is too complex (2)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 46
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`recursive` is too complex (2)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`nested_functions` is too complex (3)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 62
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`a` is too complex (2)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 63
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`b` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 64
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`try_else` is too complex (4)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 73
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`nested_try_finally` is too complex (3)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 85
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`foobar` is too complex (3)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 96
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`annotated_assign` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 107
@@ -200,7 +200,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`handle` is too complex (9)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 113
@@ -213,7 +213,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`a` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 118
@@ -226,7 +226,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`b` is too complex (2)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 121
@@ -239,7 +239,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`c` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 126
@@ -252,7 +252,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`error` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 129
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`info` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 132
@@ -278,7 +278,7 @@ expression: diagnostics
 - kind:
     name: ComplexStructure
     body: "`exception` is too complex (1)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 135

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnreliableCallableCheck
     body: "Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnreliableCallableCheck
     body: "Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5

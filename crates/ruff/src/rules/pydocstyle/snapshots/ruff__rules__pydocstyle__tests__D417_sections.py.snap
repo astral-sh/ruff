@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument description in the docstring: `y`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 283
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument description in the docstring: `y`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 300
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument descriptions in the docstring: `test`, `y`, `z`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 324
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument descriptions in the docstring: `test`, `y`, `z`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 336
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument descriptions in the docstring: `a`, `y`, `z`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 349
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument descriptions in the docstring: `a`, `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 361
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument description in the docstring: `y`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 389
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument descriptions in the docstring: `test`, `y`, `z`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 425
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument descriptions in the docstring: `test`, `y`, `z`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 440
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument descriptions in the docstring: `a`, `z`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 459
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: UndocumentedParam
     body: "Missing argument description in the docstring: `y`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 489

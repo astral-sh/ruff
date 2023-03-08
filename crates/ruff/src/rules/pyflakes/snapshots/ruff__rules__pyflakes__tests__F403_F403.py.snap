@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ImportStar
     body: "`from F634 import *` used; unable to detect undefined names"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ImportStar
     body: "`from F634 import *` used; unable to detect undefined names"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2

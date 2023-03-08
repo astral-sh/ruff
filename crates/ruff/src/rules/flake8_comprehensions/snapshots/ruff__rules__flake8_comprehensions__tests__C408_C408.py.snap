@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCollectionCall
     body: "Unnecessary `tuple` call (rewrite as a literal)"
-    commit: Rewrite as a literal
+    suggestion: Rewrite as a literal
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCollectionCall
     body: "Unnecessary `list` call (rewrite as a literal)"
-    commit: Rewrite as a literal
+    suggestion: Rewrite as a literal
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCollectionCall
     body: "Unnecessary `dict` call (rewrite as a literal)"
-    commit: Rewrite as a literal
+    suggestion: Rewrite as a literal
     fixable: true
   location:
     row: 3
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryCollectionCall
     body: "Unnecessary `dict` call (rewrite as a literal)"
-    commit: Rewrite as a literal
+    suggestion: Rewrite as a literal
     fixable: true
   location:
     row: 4

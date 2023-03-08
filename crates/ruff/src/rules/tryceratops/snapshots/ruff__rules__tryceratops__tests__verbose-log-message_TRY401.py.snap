@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 39
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 46
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: VerboseLogMessage
     body: "Redundant exception object included in `logging.exception` call"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 53
