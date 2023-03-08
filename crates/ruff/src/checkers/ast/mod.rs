@@ -3766,6 +3766,13 @@ where
                 if self.settings.rules.enabled(&Rule::ExceptWithEmptyTuple) {
                     flake8_bugbear::rules::except_with_empty_tuple(self, excepthandler);
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(&Rule::ExceptWithNonExceptionClasses)
+                {
+                    flake8_bugbear::rules::except_with_non_exception_classes(self, excepthandler);
+                }
                 if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }

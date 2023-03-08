@@ -210,6 +210,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
     rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
+    rules::flake8_bugbear::rules::ExceptWithNonExceptionClasses,
     rules::flake8_bugbear::rules::UnintentionalTypeAnnotation,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
