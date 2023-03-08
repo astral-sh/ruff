@@ -3,31 +3,6 @@ use rustpython_parser::ast::Location;
 use crate::core::locator::Locator;
 use crate::core::types::Range;
 
-/// Return the leading quote for a string or byte literal (e.g., `"""`).
-pub fn leading_quote(content: &str) -> Option<&str> {
-    if let Some(first_line) = content.lines().next() {
-        for pattern in ruff_python_stdlib::str::TRIPLE_QUOTE_PREFIXES
-            .iter()
-            .chain(ruff_python_stdlib::bytes::TRIPLE_QUOTE_PREFIXES)
-            .chain(ruff_python_stdlib::str::SINGLE_QUOTE_PREFIXES)
-            .chain(ruff_python_stdlib::bytes::SINGLE_QUOTE_PREFIXES)
-        {
-            if first_line.starts_with(pattern) {
-                return Some(pattern);
-            }
-        }
-    }
-    None
-}
-
-/// Return the trailing quote string for a string or byte literal (e.g., `"""`).
-pub fn trailing_quote(content: &str) -> Option<&&str> {
-    ruff_python_stdlib::str::TRIPLE_QUOTE_SUFFIXES
-        .iter()
-        .chain(ruff_python_stdlib::str::SINGLE_QUOTE_SUFFIXES)
-        .find(|&pattern| content.ends_with(pattern))
-}
-
 /// Return `true` if the given string is a radix literal (e.g., `0b101`).
 pub fn is_radix_literal(content: &str) -> bool {
     content.starts_with("0b")
@@ -154,31 +129,4 @@ pub fn is_elif(orelse: &[rustpython_parser::ast::Stmt], locator: &Locator) -> bo
         }
     }
     false
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_prefixes() {
-        let prefixes = ruff_python_stdlib::str::TRIPLE_QUOTE_PREFIXES
-            .iter()
-            .chain(ruff_python_stdlib::bytes::TRIPLE_QUOTE_PREFIXES)
-            .chain(ruff_python_stdlib::str::SINGLE_QUOTE_PREFIXES)
-            .chain(ruff_python_stdlib::bytes::SINGLE_QUOTE_PREFIXES)
-            .collect::<Vec<_>>();
-        for i in 1..prefixes.len() {
-            for j in 0..i - 1 {
-                if i != j {
-                    if prefixes[i].starts_with(prefixes[j]) {
-                        assert!(
-                            !prefixes[i].starts_with(prefixes[j]),
-                            "Prefixes are not unique: {} starts with {}",
-                            prefixes[i],
-                            prefixes[j]
-                        );
-                    }
-                }
-            }
-        }
-    }
 }

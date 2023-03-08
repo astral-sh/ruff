@@ -10,7 +10,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 use crate::source_code::Locator;
 use ruff_rustpython::vendor;
 
-use crate::strings::leading_quote;
+use crate::str::leading_quote;
 use crate::types::Range;
 
 pub struct Stylist<'a> {

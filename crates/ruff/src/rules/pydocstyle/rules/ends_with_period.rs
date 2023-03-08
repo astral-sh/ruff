@@ -1,7 +1,7 @@
 use strum::IntoEnumIterator;
 
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::strings::leading_quote;
+use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;

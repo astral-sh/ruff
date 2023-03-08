@@ -2154,6 +2154,7 @@ dependencies = [
  "itertools",
  "once_cell",
  "ruff_formatter",
+ "ruff_python_ast",
  "ruff_python_stdlib",
  "ruff_rustpython",
  "ruff_testing_macros",
