@@ -1,13 +1,9 @@
 use itertools::Itertools;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::unparse_constant;
-use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
+use ruff_python_ast::helpers::{unparse_constant, unparse_expr};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located};
 
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use crate::{checkers::ast::Checker, registry::Diagnostic, violation::Violation};
 
 use super::comparison_of_constant::ViolationsCmpop;
 
@@ -55,7 +51,7 @@ pub fn compare_to_empty_string(
                                 op: op.into(),
                                 rhs: unparse_constant(value, checker.stylist),
                             },
-                            Range::from_located(lhs),
+                            lhs.into(),
                         );
                         checker.diagnostics.push(diag);
                     }
