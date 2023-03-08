@@ -31,7 +31,10 @@ pub fn fix_unnecessary_comprehension_any_all(
         rpar: list_comp.rpar.clone(),
     }));
 
-    call.args[0].comma = None;
+    if let Some(comma) = &call.args[0].comma {
+        call.args[0].whitespace_after_arg = comma.whitespace_after.clone();
+        call.args[0].comma = None;
+    }
 
     let mut state = CodegenState {
         default_newline: stylist.line_ending(),

@@ -45,7 +45,7 @@ expression: diagnostics
     row: 12
     column: 23
   fix:
-    content: "any(\n    x.id for x in bar)"
+    content: "any(  # first comment\n    x.id for x in bar  # second comment\n)"
     location:
       row: 11
       column: 0
@@ -62,7 +62,7 @@ expression: diagnostics
     row: 15
     column: 23
   fix:
-    content: "all(\n    x.id for x in bar)"
+    content: "all(  # first comment\n    x.id for x in bar  # second comment\n)"
     location:
       row: 14
       column: 0
