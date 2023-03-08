@@ -2,10 +2,10 @@ use rustpython_parser::{Mode, Tok};
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
+use ruff_python_ast::strings::{leading_quote, trailing_quote};
 use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
-use crate::core::helpers::{leading_quote, trailing_quote};
 use crate::core::types::Range;
 use crate::cst::Expr;
 
