@@ -5,7 +5,7 @@ use ruff::settings::{
 };
 
 #[allow(clippy::print_stdout)]
-pub(super) fn config(key: Option<&str>) -> ExitStatus {
+pub(crate) fn config(key: Option<&str>) -> ExitStatus {
     let Some(entry) = Options::get(key) else {
         println!("Unknown option");
         return ExitStatus::Error;
