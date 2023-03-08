@@ -5,53 +5,81 @@ expression: diagnostics
 - kind:
     name: SingleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
-    suggestion: ~
-    fixable: false
+    suggestion: "Merge `startswith` once with a `tuple`"
+    fixable: true
   location:
     row: 2
-    column: 25
+    column: 0
   end_location:
     row: 2
-    column: 28
-  fix: ~
+    column: 46
+  fix:
+    content: "obj.startswith((\"foo\", \"bar\"))"
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 46
   parent: ~
 - kind:
     name: SingleStartsEndsWith
     body: "Call `endswith` once with a `tuple`"
-    suggestion: ~
-    fixable: false
+    suggestion: "Merge `endswith` once with a `tuple`"
+    fixable: true
   location:
     row: 4
-    column: 23
+    column: 0
   end_location:
     row: 4
-    column: 26
-  fix: ~
+    column: 42
+  fix:
+    content: "obj.endswith((\"foo\", \"bar\"))"
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 42
   parent: ~
 - kind:
     name: SingleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
-    suggestion: ~
-    fixable: false
+    suggestion: "Merge `startswith` once with a `tuple`"
+    fixable: true
   location:
     row: 6
-    column: 23
+    column: 0
   end_location:
     row: 6
-    column: 26
-  fix: ~
+    column: 42
+  fix:
+    content: "obj.startswith((foo, bar))"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 42
   parent: ~
 - kind:
     name: SingleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
-    suggestion: ~
-    fixable: false
+    suggestion: "Merge `startswith` once with a `tuple`"
+    fixable: true
   location:
     row: 8
-    column: 23
+    column: 0
   end_location:
     row: 8
-    column: 26
-  fix: ~
+    column: 44
+  fix:
+    content: "obj.startswith((foo, \"foo\"))"
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 44
   parent: ~
 

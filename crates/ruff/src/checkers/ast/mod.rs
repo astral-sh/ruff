@@ -3430,7 +3430,7 @@ where
                     pylint::rules::merge_isinstance(self, expr, op, values);
                 }
                 if self.settings.rules.enabled(&Rule::SingleStartsEndsWith) {
-                    flake8_pie::rules::single_starts_ends_with(self, values, op);
+                    flake8_pie::rules::single_starts_ends_with(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::DuplicateIsinstanceCall) {
                     flake8_simplify::rules::duplicate_isinstance_call(self, expr);
