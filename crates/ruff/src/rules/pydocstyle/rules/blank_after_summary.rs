@@ -50,22 +50,22 @@ enum Strategy {
 }
 
 fn do_raw_string_line_count(content: &str) -> Strategy {
+    // skip the summary line
     let mut lines = content.trim().lines().skip(1);
 
-    // Count lines in second block after the first block
-    // second_block_lines_count > 0 means we have no blank lines after first line
-    let has_second_block = match lines.next() {
+    // Check if there are content that immediately follow the summary
+    let has_follower = match lines.next() {
         Some(line) => !line.trim().is_empty(),
         None => return Strategy::None,
     };
 
-    // If we have second block, we need to insert a new line
-    // to separate it from the one-line summary
-    if has_second_block {
+    // If we have follower, we need to insert a new line
+    // or add line continuation character to separate it from the one-line summary
+    if has_follower {
         return Strategy::InsertNewLineOrLineContinuation(1);
     }
 
-    // We have one line that separates summary and description
+    // We have one line that separates summary and its follower
     // But we may have redundant blank lines
     let mut blanks_to_remove = 0_usize;
     for line in lines {
@@ -90,23 +90,25 @@ fn do_raw_string_line_count(content: &str) -> Strategy {
 fn do_normal_string_line_count(content: &str) -> Strategy {
     let mut lines = LinesWhenConsiderLineContinuation::new(content.trim());
 
-    let mut first_block_lines_count = 0_usize;
+    // Considering line continuation means that summary can >= 1
+    let mut summary_lines_count = 0_usize;
     match lines.next() {
         Some((_, actual_lines)) => {
-            first_block_lines_count += actual_lines;
+            summary_lines_count += actual_lines;
         }
         None => {
             return Strategy::None;
         }
     };
 
-    let (has_second_block, actual_lines_for_first_blank) = match lines.next() {
-        Some((line, actual_lines_count)) => (!line.trim().is_empty(), actual_lines_count),
+    // We need to cound the actual lines of the follower in order to propose fix
+    let (has_follower, actual_lines_read) = match lines.next() {
+        Some((line, actual_lines_read)) => (!line.trim().is_empty(), actual_lines_read),
         None => return Strategy::None,
     };
 
-    if has_second_block {
-        return Strategy::InsertNewLineOrLineContinuation(first_block_lines_count);
+    if has_follower {
+        return Strategy::InsertNewLineOrLineContinuation(summary_lines_count);
     }
 
     let mut blanks_count = 1;
@@ -124,7 +126,7 @@ fn do_normal_string_line_count(content: &str) -> Strategy {
     }
 
     Strategy::RemoveRedundantLine(
-        first_block_lines_count + actual_lines_for_first_blank,
+        summary_lines_count + actual_lines_read,
         actual_lines_to_remove,
         blanks_count,
     )
