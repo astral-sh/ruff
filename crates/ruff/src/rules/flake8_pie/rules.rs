@@ -346,7 +346,7 @@ pub fn unnecessary_comprehension_any_all(
                     match fixes::fix_unnecessary_comprehension_any_all(
                         checker.locator,
                         checker.stylist,
-                        &args[0],
+                        &expr,
                     ) {
                         Ok(fix) => {
                             diagnostic.amend(fix);
