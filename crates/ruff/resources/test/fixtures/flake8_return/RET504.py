@@ -260,3 +260,23 @@ def nonlocal_assignment():
         nonlocal X
         X = 1
         return X
+
+
+def decorator() -> Flask:
+    app = Flask(__name__)
+
+    @app.route('/hello')
+    def hello() -> str:
+        """Hello endpoint."""
+        return 'Hello, World!'
+
+    return app
+
+
+def default():
+    y = 1
+
+    def f(x = y) -> X:
+        return x
+
+    return y
