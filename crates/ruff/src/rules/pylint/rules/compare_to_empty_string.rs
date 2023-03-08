@@ -55,7 +55,7 @@ pub fn compare_to_empty_string(
                                 op: op.into(),
                                 rhs: unparse_constant(value, checker.stylist),
                             },
-                            Range::from_located(lhs)
+                            Range::from_located(lhs),
                         );
                         checker.diagnostics.push(diag);
                     }
