@@ -8,7 +8,7 @@ pub const REGENERATE_ALL_COMMAND: &str = "cargo dev generate-all";
 
 #[derive(clap::Args)]
 pub struct Args {
-    #[arg(long)]
+    #[arg(long, default_value_t, value_enum)]
     mode: Mode,
 }
 

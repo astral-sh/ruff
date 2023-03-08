@@ -20,7 +20,7 @@ const SUBCOMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated subcommand hel
 
 #[derive(clap::Args)]
 pub struct Args {
-    #[arg(long)]
+    #[arg(long, default_value_t, value_enum)]
     pub(crate) mode: Mode,
 }
 

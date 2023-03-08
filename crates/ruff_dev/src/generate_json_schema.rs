@@ -14,7 +14,7 @@ use crate::ROOT_DIR;
 #[derive(clap::Args)]
 pub struct Args {
     /// Write the generated table to stdout (rather than to `ruff.schema.json`).
-    #[arg(long)]
+    #[arg(long, default_value_t, value_enum)]
     pub(crate) mode: Mode,
 }
 
