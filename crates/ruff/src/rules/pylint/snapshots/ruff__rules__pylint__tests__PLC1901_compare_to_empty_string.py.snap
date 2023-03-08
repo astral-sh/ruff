@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CompareToEmptyString: ~
+    CompareToEmptyString:
+      lhs: x
+      op: Is
+      rhs: "\"\""
   location:
     row: 4
     column: 3
@@ -13,13 +16,42 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CompareToEmptyString: ~
+    CompareToEmptyString:
+      lhs: x
+      op: Eq
+      rhs: "\"\""
+  location:
+    row: 4
+    column: 14
+  end_location:
+    row: 4
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    CompareToEmptyString:
+      lhs: y
+      op: IsNot
+      rhs: "\"\""
   location:
     row: 7
     column: 3
   end_location:
     row: 7
     column: 4
+  fix: ~
+  parent: ~
+- kind:
+    CompareToEmptyString:
+      lhs: y
+      op: NotEq
+      rhs: "\"\""
+  location:
+    row: 7
+    column: 18
+  end_location:
+    row: 7
+    column: 19
   fix: ~
   parent: ~
 
