@@ -101,7 +101,7 @@ fn do_normal_string_line_count(content: &str) -> Strategy {
         }
     };
 
-    // We need to cound the actual lines of the follower in order to propose fix
+    // We need to count the actual lines of the follower in order to propose fix
     let (has_follower, actual_lines_read) = match lines.next() {
         Some((line, actual_lines_read)) => (!line.trim().is_empty(), actual_lines_read),
         None => return Strategy::None,
