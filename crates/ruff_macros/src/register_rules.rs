@@ -61,6 +61,16 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             }
         }
 
+        pub trait AsRule {
+            fn rule(&self) -> &'static Rule;
+        }
+
+        impl AsRule for DiagnosticKind {
+            fn rule(&self) -> &'static Rule {
+                self.into()
+            }
+        }
+
         impl From<&DiagnosticKind> for &'static Rule {
             fn from(diagnostic_kind: &DiagnosticKind) -> Self {
                 match diagnostic_kind.rule.as_str() {

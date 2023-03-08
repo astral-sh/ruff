@@ -8,6 +8,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 use crate::registry::Diagnostic;
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
@@ -304,7 +305,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         },
         location,
     );
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match remove_unused_format_arguments_from_dict(
             &missing,
             right,
