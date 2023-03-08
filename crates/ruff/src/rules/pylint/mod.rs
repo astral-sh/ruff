@@ -25,6 +25,7 @@ mod tests {
     #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"); "PLE0117")]
     #[test_case(Rule::UsedPriorGlobalDeclaration, Path::new("used_prior_global_declaration.py"); "PLE0118")]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"); "PLE1142")]
+    #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"); "PLC1901")]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"); "PLR0133")]
     #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"); "PLR0206")]
     #[test_case(Rule::ConsiderUsingFromImport, Path::new("import_aliasing.py"); "PLR0402")]

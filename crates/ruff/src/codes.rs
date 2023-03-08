@@ -177,6 +177,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "E1142") => Rule::AwaitOutsideAsync,
         (Pylint, "R0206") => Rule::PropertyWithParameters,
         (Pylint, "R0402") => Rule::ConsiderUsingFromImport,
+        (Pylint, "C1901") => Rule::CompareToEmptyString,
         (Pylint, "R0133") => Rule::ComparisonOfConstant,
         (Pylint, "R1701") => Rule::ConsiderMergingIsinstance,
         (Pylint, "R1722") => Rule::ConsiderUsingSysExit,
