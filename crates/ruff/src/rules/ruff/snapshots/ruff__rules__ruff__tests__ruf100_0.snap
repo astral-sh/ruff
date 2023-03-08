@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused blanket `noqa` directive"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 9
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `E501`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 13
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `F841`, `E501`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 16
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `F841`, `W191`; non-enabled: `F821`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 19
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `F841`; unknown: `V101`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 22
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `E501`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 26
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `d` is assigned to but never used"
-    commit: "Remove assignment to unused variable `d`"
+    suggestion: "Remove assignment to unused variable `d`"
     fixable: true
   location:
     row: 29
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `E501`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 29
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `F841`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 55
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `E501`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 63
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused blanket `noqa` directive"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 71
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`shelve` imported but unused"
-    commit: "Remove unused import: `shelve`"
+    suggestion: "Remove unused import: `shelve`"
     fixable: true
   location:
     row: 85
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: LineTooLong
     body: Line too long (103 > 88 characters)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 90
@@ -258,7 +258,7 @@ expression: diagnostics
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `F401`)"
-    commit: "Remove unused `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
     fixable: true
   location:
     row: 90

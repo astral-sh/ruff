@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: AssertFalse
     body: "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
-    commit: "Replace `assert False`"
+    suggestion: "Replace `assert False`"
     fixable: true
   location:
     row: 8
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: AssertFalse
     body: "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
-    commit: "Replace `assert False`"
+    suggestion: "Replace `assert False`"
     fixable: true
   location:
     row: 10

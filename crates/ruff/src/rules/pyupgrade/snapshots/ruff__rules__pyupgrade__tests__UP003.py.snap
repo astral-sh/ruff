@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypeOfPrimitive
     body: "Use `str` instead of `type(...)`"
-    commit: "Replace `type(...)` with `str`"
+    suggestion: "Replace `type(...)` with `str`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: TypeOfPrimitive
     body: "Use `bytes` instead of `type(...)`"
-    commit: "Replace `type(...)` with `bytes`"
+    suggestion: "Replace `type(...)` with `bytes`"
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: TypeOfPrimitive
     body: "Use `int` instead of `type(...)`"
-    commit: "Replace `type(...)` with `int`"
+    suggestion: "Replace `type(...)` with `int`"
     fixable: true
   location:
     row: 3
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: TypeOfPrimitive
     body: "Use `float` instead of `type(...)`"
-    commit: "Replace `type(...)` with `float`"
+    suggestion: "Replace `type(...)` with `float`"
     fixable: true
   location:
     row: 4
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: TypeOfPrimitive
     body: "Use `complex` instead of `type(...)`"
-    commit: "Replace `type(...)` with `complex`"
+    suggestion: "Replace `type(...)` with `complex`"
     fixable: true
   location:
     row: 5

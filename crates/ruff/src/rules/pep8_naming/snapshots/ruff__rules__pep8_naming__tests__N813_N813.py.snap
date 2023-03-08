@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CamelcaseImportedAsLowercase
     body: "Camelcase `Camel` imported as lowercase `camel`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: CamelcaseImportedAsLowercase
     body: "Camelcase `CamelCase` imported as lowercase `camelcase`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: CamelcaseImportedAsLowercase
     body: "Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LateFutureImport
     body: "`from __future__` imports must occur at the beginning of the file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: LateFutureImport
     body: "`from __future__` imports must occur at the beginning of the file"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8

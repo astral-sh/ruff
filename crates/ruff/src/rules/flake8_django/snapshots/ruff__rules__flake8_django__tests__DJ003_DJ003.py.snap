@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LocalsInRenderFunction
     body: "Avoid passing `locals()` as context to a `render` function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: LocalsInRenderFunction
     body: "Avoid passing `locals()` as context to a `render` function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: Jinja2AutoescapeFalse
     body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: Jinja2AutoescapeFalse
     body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: Jinja2AutoescapeFalse
     body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: Jinja2AutoescapeFalse
     body: "By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: Jinja2AutoescapeFalse
     body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29

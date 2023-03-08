@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UndefinedName
     body: "Undefined name `os`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UndefinedName
     body: "Undefined name `Baz`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23

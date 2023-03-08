@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PercentFormatPositionalCountMismatch
     body: "`%`-format string has 2 placeholder(s) but 1 substitution(s)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: PercentFormatPositionalCountMismatch
     body: "`%`-format string has 2 placeholder(s) but 3 substitution(s)"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6

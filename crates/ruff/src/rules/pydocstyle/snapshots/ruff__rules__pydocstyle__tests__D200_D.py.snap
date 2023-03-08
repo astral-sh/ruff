@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FitsOnOneLine
     body: One-line docstring should fit on one line
-    commit: Reformat to one line
+    suggestion: Reformat to one line
     fixable: true
   location:
     row: 129
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: FitsOnOneLine
     body: One-line docstring should fit on one line
-    commit: Reformat to one line
+    suggestion: Reformat to one line
     fixable: true
   location:
     row: 597
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: FitsOnOneLine
     body: One-line docstring should fit on one line
-    commit: Reformat to one line
+    suggestion: Reformat to one line
     fixable: true
   location:
     row: 606
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: FitsOnOneLine
     body: One-line docstring should fit on one line
-    commit: Reformat to one line
+    suggestion: Reformat to one line
     fixable: true
   location:
     row: 615
@@ -78,7 +78,7 @@ expression: diagnostics
 - kind:
     name: FitsOnOneLine
     body: One-line docstring should fit on one line
-    commit: Reformat to one line
+    suggestion: Reformat to one line
     fixable: true
   location:
     row: 624

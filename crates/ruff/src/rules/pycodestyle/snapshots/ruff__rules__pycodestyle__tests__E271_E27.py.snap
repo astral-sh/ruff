@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesAfterKeyword
     body: Multiple spaces after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesAfterKeyword
     body: Multiple spaces after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesAfterKeyword
     body: Multiple spaces after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesAfterKeyword
     body: Multiple spaces after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesAfterKeyword
     body: Multiple spaces after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesAfterKeyword
     body: Multiple spaces after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesAfterKeyword
     body: Multiple spaces after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesAfterKeyword
     body: Multiple spaces after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: MultipleSpacesAfterKeyword
     body: Multiple spaces after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 35

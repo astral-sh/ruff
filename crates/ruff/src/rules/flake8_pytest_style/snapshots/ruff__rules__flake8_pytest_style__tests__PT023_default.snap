@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IncorrectMarkParenthesesStyle
     body: "Use `@pytest.mark.foo()` over `@pytest.mark.foo`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 12
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: IncorrectMarkParenthesesStyle
     body: "Use `@pytest.mark.foo()` over `@pytest.mark.foo`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 17
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: IncorrectMarkParenthesesStyle
     body: "Use `@pytest.mark.foo()` over `@pytest.mark.foo`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 24
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: IncorrectMarkParenthesesStyle
     body: "Use `@pytest.mark.foo()` over `@pytest.mark.foo`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 30
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: IncorrectMarkParenthesesStyle
     body: "Use `@pytest.mark.foo()` over `@pytest.mark.foo`"
-    commit: Add/remove parentheses
+    suggestion: Add/remove parentheses
     fixable: true
   location:
     row: 38

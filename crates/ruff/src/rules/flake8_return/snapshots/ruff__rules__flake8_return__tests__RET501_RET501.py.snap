@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryReturnNone
     body: "Do not explicitly `return None` in function if it is the only possible return value"
-    commit: "Remove explicit `return None`"
+    suggestion: "Remove explicit `return None`"
     fixable: true
   location:
     row: 4

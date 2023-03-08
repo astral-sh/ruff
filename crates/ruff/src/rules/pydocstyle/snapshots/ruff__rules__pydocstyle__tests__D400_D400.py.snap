@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 7
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 12
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 20
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 25
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 32
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 39
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 44
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 49
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 57
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 62
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: EndsInPeriod
     body: First line should end with a period
-    commit: Add period
+    suggestion: Add period
     fixable: true
   location:
     row: 69

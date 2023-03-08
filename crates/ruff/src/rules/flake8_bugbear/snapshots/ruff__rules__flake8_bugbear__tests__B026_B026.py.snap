@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: StarArgUnpackingAfterKeywordArg
     body: Star-arg unpacking after a keyword argument is strongly discouraged
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: StarArgUnpackingAfterKeywordArg
     body: Star-arg unpacking after a keyword argument is strongly discouraged
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: StarArgUnpackingAfterKeywordArg
     body: Star-arg unpacking after a keyword argument is strongly discouraged
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: StarArgUnpackingAfterKeywordArg
     body: Star-arg unpacking after a keyword argument is strongly discouraged
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: StarArgUnpackingAfterKeywordArg
     body: Star-arg unpacking after a keyword argument is strongly discouraged
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: StarArgUnpackingAfterKeywordArg
     body: Star-arg unpacking after a keyword argument is strongly discouraged
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: StarArgUnpackingAfterKeywordArg
     body: Star-arg unpacking after a keyword argument is strongly discouraged
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21

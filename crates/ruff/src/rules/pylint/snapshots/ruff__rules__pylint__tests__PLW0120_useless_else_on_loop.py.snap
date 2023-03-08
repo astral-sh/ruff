@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UselessElseOnLoop
     body: "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UselessElseOnLoop
     body: "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UselessElseOnLoop
     body: "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UselessElseOnLoop
     body: "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 37
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UselessElseOnLoop
     body: "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 42
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: UselessElseOnLoop
     body: "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 88
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: UselessElseOnLoop
     body: "`else` clause on loop without a `break` statement; remove the `else` and de-indent all the code inside it"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 98

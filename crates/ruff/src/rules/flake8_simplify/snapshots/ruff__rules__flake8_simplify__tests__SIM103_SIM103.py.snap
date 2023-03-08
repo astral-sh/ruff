@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NeedlessBool
     body: "Return the condition `a` directly"
-    commit: "Replace with `return a`"
+    suggestion: "Replace with `return a`"
     fixable: true
   location:
     row: 3
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NeedlessBool
     body: "Return the condition `a == b` directly"
-    commit: "Replace with `return a == b`"
+    suggestion: "Replace with `return a == b`"
     fixable: true
   location:
     row: 11
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: NeedlessBool
     body: "Return the condition `b` directly"
-    commit: "Replace with `return b`"
+    suggestion: "Replace with `return b`"
     fixable: true
   location:
     row: 21
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: NeedlessBool
     body: "Return the condition `b` directly"
-    commit: "Replace with `return b`"
+    suggestion: "Replace with `return b`"
     fixable: true
   location:
     row: 32
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: NeedlessBool
     body: "Return the condition `a` directly"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 57
@@ -98,7 +98,7 @@ expression: diagnostics
 - kind:
     name: NeedlessBool
     body: "Return the condition `a` directly"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 83

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LoopVariableOverridesIterator
     body: "Loop control variable `items` overrides iterable it iterates"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: LoopVariableOverridesIterator
     body: "Loop control variable `values` overrides iterable it iterates"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: LoopVariableOverridesIterator
     body: "Loop control variable `vars` overrides iterable it iterates"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 36

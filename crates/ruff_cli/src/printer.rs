@@ -193,7 +193,7 @@ impl Printer {
                                     content: &fix.content,
                                     location: &fix.location,
                                     end_location: &fix.end_location,
-                                    message: message.kind.commit.as_deref(),
+                                    message: message.kind.suggestion.as_deref(),
                                 }),
                                 location: message.location,
                                 end_location: message.end_location,
@@ -597,11 +597,11 @@ fn print_message<T: Write>(
     );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
-        let commit = message.kind.commit.clone();
-        let footer = if commit.is_some() {
+        let suggestion = message.kind.suggestion.clone();
+        let footer = if suggestion.is_some() {
             vec![Annotation {
                 id: None,
-                label: commit.as_deref(),
+                label: suggestion.as_deref(),
                 annotation_type: AnnotationType::Help,
             }]
         } else {
@@ -703,11 +703,11 @@ fn print_grouped_message<T: Write>(
     );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
-        let commit = message.kind.commit.clone();
-        let footer = if commit.is_some() {
+        let suggestion = message.kind.suggestion.clone();
+        let footer = if suggestion.is_some() {
             vec![Annotation {
                 id: None,
-                label: commit.as_deref(),
+                label: suggestion.as_deref(),
                 annotation_type: AnnotationType::Help,
             }]
         } else {

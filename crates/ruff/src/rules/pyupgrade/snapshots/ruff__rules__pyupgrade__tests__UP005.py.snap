@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedUnittestAlias
     body: "`assertEquals` is deprecated, use `assertEqual`"
-    commit: "Replace `assertEqual` with `assertEquals`"
+    suggestion: "Replace `assertEqual` with `assertEquals`"
     fixable: true
   location:
     row: 6
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedUnittestAlias
     body: "`assertEquals` is deprecated, use `assertEqual`"
-    commit: "Replace `assertEqual` with `assertEquals`"
+    suggestion: "Replace `assertEqual` with `assertEquals`"
     fixable: true
   location:
     row: 7
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedUnittestAlias
     body: "`failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`"
-    commit: "Replace `assertAlmostEqual` with `failUnlessAlmostEqual`"
+    suggestion: "Replace `assertAlmostEqual` with `failUnlessAlmostEqual`"
     fixable: true
   location:
     row: 9
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedUnittestAlias
     body: "`assertNotRegexpMatches` is deprecated, use `assertNotRegex`"
-    commit: "Replace `assertNotRegex` with `assertNotRegexpMatches`"
+    suggestion: "Replace `assertNotRegex` with `assertNotRegexpMatches`"
     fixable: true
   location:
     row: 10

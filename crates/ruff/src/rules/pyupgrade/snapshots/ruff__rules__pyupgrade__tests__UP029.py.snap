@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryBuiltinImport
     body: "Unnecessary builtin import: `*`"
-    commit: Remove unnecessary builtin import
+    suggestion: Remove unnecessary builtin import
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryBuiltinImport
     body: "Unnecessary builtin imports: `ascii`, `bytes`"
-    commit: Remove unnecessary builtin import
+    suggestion: Remove unnecessary builtin import
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryBuiltinImport
     body: "Unnecessary builtin imports: `filter`, `zip`"
-    commit: Remove unnecessary builtin import
+    suggestion: Remove unnecessary builtin import
     fixable: true
   location:
     row: 4
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryBuiltinImport
     body: "Unnecessary builtin import: `open`"
-    commit: Remove unnecessary builtin import
+    suggestion: Remove unnecessary builtin import
     fixable: true
   location:
     row: 5

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RedefinedWhileUnused
     body: "Redefinition of unused `bar` from line 6"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10

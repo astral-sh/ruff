@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: VerboseRaise
     body: "Use `raise` without specifying exception name"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: VerboseRaise
     body: "Use `raise` without specifying exception name"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 63
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: VerboseRaise
     body: "Use `raise` without specifying exception name"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 74

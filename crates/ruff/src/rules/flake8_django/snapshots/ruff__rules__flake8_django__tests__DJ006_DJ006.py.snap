@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ExcludeWithModelForm
     body: "Do not use `exclude` with `ModelForm`, use `fields` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6

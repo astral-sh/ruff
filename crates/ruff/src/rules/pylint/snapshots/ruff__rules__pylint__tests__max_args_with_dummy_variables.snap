@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TooManyArguments
     body: Too many arguments to function call (6/5)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

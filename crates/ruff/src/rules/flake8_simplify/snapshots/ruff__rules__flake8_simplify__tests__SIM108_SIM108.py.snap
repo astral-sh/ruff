@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UseTernaryOperator
     body: "Use ternary operator `b = c if a else d` instead of `if`-`else`-block"
-    commit: "Replace `if`-`else`-block with `b = c if a else d`"
+    suggestion: "Replace `if`-`else`-block with `b = c if a else d`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UseTernaryOperator
     body: "Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 58
@@ -38,7 +38,7 @@ expression: diagnostics
 - kind:
     name: UseTernaryOperator
     body: "Use ternary operator `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd` instead of `if`-`else`-block"
-    commit: "Replace `if`-`else`-block with `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd`"
+    suggestion: "Replace `if`-`else`-block with `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd`"
     fixable: true
   location:
     row: 82
@@ -58,7 +58,7 @@ expression: diagnostics
 - kind:
     name: UseTernaryOperator
     body: "Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 97
@@ -71,7 +71,7 @@ expression: diagnostics
 - kind:
     name: UseTernaryOperator
     body: "Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 104
@@ -84,7 +84,7 @@ expression: diagnostics
 - kind:
     name: UseTernaryOperator
     body: "Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 109

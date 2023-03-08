@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
-    commit: "Remove implied `scope` argument"
+    suggestion: "Remove implied `scope` argument"
     fixable: true
   location:
     row: 14
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
-    commit: "Remove implied `scope` argument"
+    suggestion: "Remove implied `scope` argument"
     fixable: true
   location:
     row: 19
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
-    commit: "Remove implied `scope` argument"
+    suggestion: "Remove implied `scope` argument"
     fixable: true
   location:
     row: 24
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
-    commit: "Remove implied `scope` argument"
+    suggestion: "Remove implied `scope` argument"
     fixable: true
   location:
     row: 29
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
-    commit: "Remove implied `scope` argument"
+    suggestion: "Remove implied `scope` argument"
     fixable: true
   location:
     row: 37
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
-    commit: "Remove implied `scope` argument"
+    suggestion: "Remove implied `scope` argument"
     fixable: true
   location:
     row: 43
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
-    commit: "Remove implied `scope` argument"
+    suggestion: "Remove implied `scope` argument"
     fixable: true
   location:
     row: 52
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
-    commit: "Remove implied `scope` argument"
+    suggestion: "Remove implied `scope` argument"
     fixable: true
   location:
     row: 66

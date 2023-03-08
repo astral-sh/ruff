@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: InvalidEscapeSequence
     body: "Invalid escape sequence: `\\.`"
-    commit: Add backslash to escape sequence
+    suggestion: Add backslash to escape sequence
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: InvalidEscapeSequence
     body: "Invalid escape sequence: `\\.`"
-    commit: Add backslash to escape sequence
+    suggestion: Add backslash to escape sequence
     fixable: true
   location:
     row: 6
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: InvalidEscapeSequence
     body: "Invalid escape sequence: `\\_`"
-    commit: Add backslash to escape sequence
+    suggestion: Add backslash to escape sequence
     fixable: true
   location:
     row: 11
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: InvalidEscapeSequence
     body: "Invalid escape sequence: `\\_`"
-    commit: Add backslash to escape sequence
+    suggestion: Add backslash to escape sequence
     fixable: true
   location:
     row: 18

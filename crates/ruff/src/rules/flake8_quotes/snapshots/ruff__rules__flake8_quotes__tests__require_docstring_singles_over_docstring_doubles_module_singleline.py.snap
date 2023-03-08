@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesDocstring
     body: Double quote docstring found but single quotes preferred
-    commit: Replace double quotes docstring with single quotes
+    suggestion: Replace double quotes docstring with single quotes
     fixable: true
   location:
     row: 1

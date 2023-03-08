@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 32
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 35
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 38
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 41
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: ArgumentSimpleDefaults
     body: Only simple default values allowed for arguments
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 44

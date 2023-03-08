@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LoggingTooManyArgs
     body: "Too many arguments for `logging` format string"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: LoggingTooManyArgs
     body: "Too many arguments for `logging` format string"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5

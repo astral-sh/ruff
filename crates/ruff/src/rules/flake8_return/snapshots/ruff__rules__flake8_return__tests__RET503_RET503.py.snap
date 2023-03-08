@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 20
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 27
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 36
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 41
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 52
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 59
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 66
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 82
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 113
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 120
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 130
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 137
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 274
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 291
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 300
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 305
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 310
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 315
@@ -365,7 +365,7 @@ expression: diagnostics
 - kind:
     name: ImplicitReturn
     body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    commit: "Add explicit `return` statement"
+    suggestion: "Add explicit `return` statement"
     fixable: true
   location:
     row: 320

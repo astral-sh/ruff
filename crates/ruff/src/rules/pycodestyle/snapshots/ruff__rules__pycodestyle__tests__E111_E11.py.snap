@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IndentationWithInvalidMultiple
     body: Indentation is not a multiple of 4
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: IndentationWithInvalidMultiple
     body: Indentation is not a multiple of 4
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6

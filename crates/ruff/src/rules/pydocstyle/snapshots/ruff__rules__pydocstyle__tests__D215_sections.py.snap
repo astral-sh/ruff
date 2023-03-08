@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SectionUnderlineNotOverIndented
     body: "Section underline is over-indented (\"Returns\")"
-    commit: "Remove over-indentation from \"Returns\" underline"
+    suggestion: "Remove over-indentation from \"Returns\" underline"
     fixable: true
   location:
     row: 147
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: SectionUnderlineNotOverIndented
     body: "Section underline is over-indented (\"Returns\")"
-    commit: "Remove over-indentation from \"Returns\" underline"
+    suggestion: "Remove over-indentation from \"Returns\" underline"
     fixable: true
   location:
     row: 161

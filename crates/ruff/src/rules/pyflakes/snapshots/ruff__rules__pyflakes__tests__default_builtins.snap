@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UndefinedName
     body: "Undefined name `_`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1

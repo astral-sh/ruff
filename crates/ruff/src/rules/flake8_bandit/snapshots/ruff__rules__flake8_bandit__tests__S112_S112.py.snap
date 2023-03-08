@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TryExceptContinue
     body: "`try`-`except`-`continue` detected, consider logging the exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: TryExceptContinue
     body: "`try`-`except`-`continue` detected, consider logging the exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: TryExceptContinue
     body: "`try`-`except`-`continue` detected, consider logging the exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: TryExceptContinue
     body: "`try`-`except`-`continue` detected, consider logging the exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18

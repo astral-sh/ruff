@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnintentionalTypeAnnotation
     body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnintentionalTypeAnnotation
     body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnintentionalTypeAnnotation
     body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UnintentionalTypeAnnotation
     body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UnintentionalTypeAnnotation
     body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: UnintentionalTypeAnnotation
     body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: UnintentionalTypeAnnotation
     body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: UnintentionalTypeAnnotation
     body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19

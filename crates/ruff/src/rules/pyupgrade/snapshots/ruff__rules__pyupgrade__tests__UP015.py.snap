@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 3
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 4
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 5
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 6
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 7
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"w\"\""
-    commit: "Replace with \"\"w\"\""
+    suggestion: "Replace with \"\"w\"\""
     fixable: true
   location:
     row: 8
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 10
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 12
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 14
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 16
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 18
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 20
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 22
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"w\"\""
-    commit: "Replace with \"\"w\"\""
+    suggestion: "Replace with \"\"w\"\""
     fixable: true
   location:
     row: 24
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 27
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 28
@@ -365,7 +365,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 30
@@ -385,7 +385,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 32
@@ -405,7 +405,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 35
@@ -425,7 +425,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 35
@@ -445,7 +445,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 37
@@ -465,7 +465,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 37
@@ -485,7 +485,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 40
@@ -505,7 +505,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 41
@@ -525,7 +525,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 42
@@ -545,7 +545,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 44
@@ -565,7 +565,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 46
@@ -585,7 +585,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 48
@@ -605,7 +605,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 51
@@ -625,7 +625,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 52
@@ -645,7 +645,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 53
@@ -665,7 +665,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 55
@@ -685,7 +685,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 57
@@ -705,7 +705,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 59
@@ -725,7 +725,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 62
@@ -745,7 +745,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 63
@@ -765,7 +765,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 64
@@ -785,7 +785,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: Unnecessary open mode parameters
-    commit: Remove open mode parameters
+    suggestion: Remove open mode parameters
     fixable: true
   location:
     row: 65
@@ -805,7 +805,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 67
@@ -825,7 +825,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 68
@@ -845,7 +845,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 69
@@ -865,7 +865,7 @@ expression: diagnostics
 - kind:
     name: RedundantOpenModes
     body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    commit: "Replace with \"\"rb\"\""
+    suggestion: "Replace with \"\"rb\"\""
     fixable: true
   location:
     row: 70

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoBlankLineBeforeClass
     body: No blank lines allowed before class docstring
-    commit: Remove blank line(s) before class docstring
+    suggestion: Remove blank line(s) before class docstring
     fixable: true
   location:
     row: 170
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NoBlankLineBeforeClass
     body: No blank lines allowed before class docstring
-    commit: Remove blank line(s) before class docstring
+    suggestion: Remove blank line(s) before class docstring
     fixable: true
   location:
     row: 181

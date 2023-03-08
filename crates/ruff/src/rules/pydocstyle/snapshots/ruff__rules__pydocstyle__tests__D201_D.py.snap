@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoBlankLineBeforeFunction
     body: No blank lines allowed before function docstring (found 1)
-    commit: Remove blank line(s) before function docstring
+    suggestion: Remove blank line(s) before function docstring
     fixable: true
   location:
     row: 137
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NoBlankLineBeforeFunction
     body: No blank lines allowed before function docstring (found 1)
-    commit: Remove blank line(s) before function docstring
+    suggestion: Remove blank line(s) before function docstring
     fixable: true
   location:
     row: 151
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: NoBlankLineBeforeFunction
     body: No blank lines allowed before function docstring (found 1)
-    commit: Remove blank line(s) before function docstring
+    suggestion: Remove blank line(s) before function docstring
     fixable: true
   location:
     row: 546
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: NoBlankLineBeforeFunction
     body: No blank lines allowed before function docstring (found 1)
-    commit: Remove blank line(s) before function docstring
+    suggestion: Remove blank line(s) before function docstring
     fixable: true
   location:
     row: 568

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BuiltinAttributeShadowing
     body: "Class attribute `ImportError` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BuiltinAttributeShadowing
     body: "Class attribute `id` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BuiltinAttributeShadowing
     body: "Class attribute `dir` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BuiltinAttributeShadowing
     body: "Class attribute `str` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

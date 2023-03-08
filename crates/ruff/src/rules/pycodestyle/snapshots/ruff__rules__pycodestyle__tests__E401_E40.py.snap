@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MultipleImportsOnOneLine
     body: Multiple imports on one line
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: BadStringFormatType
     body: Format type does not match argument type
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FunctoolsCache
     body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
-    commit: "Rewrite with `@functools.cache"
+    suggestion: "Rewrite with `@functools.cache"
     fixable: true
   location:
     row: 5
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: FunctoolsCache
     body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
-    commit: "Rewrite with `@functools.cache"
+    suggestion: "Rewrite with `@functools.cache"
     fixable: true
   location:
     row: 10
@@ -38,7 +38,7 @@ expression: diagnostics
 - kind:
     name: FunctoolsCache
     body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
-    commit: "Rewrite with `@functools.cache"
+    suggestion: "Rewrite with `@functools.cache"
     fixable: true
   location:
     row: 16
@@ -58,7 +58,7 @@ expression: diagnostics
 - kind:
     name: FunctoolsCache
     body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
-    commit: "Rewrite with `@functools.cache"
+    suggestion: "Rewrite with `@functools.cache"
     fixable: true
   location:
     row: 21

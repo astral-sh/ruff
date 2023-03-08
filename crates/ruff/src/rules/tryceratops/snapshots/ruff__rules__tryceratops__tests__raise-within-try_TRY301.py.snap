@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithinTry
     body: "Abstract `raise` to an inner function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithinTry
     body: "Abstract `raise` to an inner function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithinTry
     body: "Abstract `raise` to an inner function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithinTry
     body: "Abstract `raise` to an inner function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithinTry
     body: "Abstract `raise` to an inner function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: RaiseWithinTry
     body: "Abstract `raise` to an inner function"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 34

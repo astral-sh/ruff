@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PercentFormatExpectedMapping
     body: "`%`-format string expected mapping but got sequence"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TrailingWhitespace
     body: Trailing whitespace
-    commit: Remove trailing whitespace
+    suggestion: Remove trailing whitespace
     fixable: true
   location:
     row: 4
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: TrailingWhitespace
     body: Trailing whitespace
-    commit: Remove trailing whitespace
+    suggestion: Remove trailing whitespace
     fixable: true
   location:
     row: 11
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: TrailingWhitespace
     body: Trailing whitespace
-    commit: Remove trailing whitespace
+    suggestion: Remove trailing whitespace
     fixable: true
   location:
     row: 13

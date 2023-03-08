@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 7"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 17"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 25"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 35"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 33
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 43"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 41
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 53"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 51
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 61"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 59
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 71"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 69
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 79"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 77
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 89"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 87
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 97"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 95
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 107"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 105
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: UsedPriorGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 114"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 113

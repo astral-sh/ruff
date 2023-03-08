@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `i` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`with` statement variable `i` overwritten by `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `i` overwritten by `with` statement target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `with` statement variable `i` overwritten by inner `with` statement target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `i` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 34
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `i` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 40
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `j` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 41
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `i` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 46
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `i` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 50
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `i` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `i` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 58
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `i` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 63
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `i` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 68
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `i` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 73
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `i` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 78
@@ -200,7 +200,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `j` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 78
@@ -213,7 +213,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `j` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 95
@@ -226,7 +226,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `i` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 112
@@ -239,7 +239,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "Outer `for` loop variable `i` overwritten by inner `for` loop target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 118
@@ -252,7 +252,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `a[0]` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 133
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `a['i']` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 138
@@ -278,7 +278,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `a.i` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 143
@@ -291,7 +291,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `a.i.j` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 148
@@ -304,7 +304,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `a.i` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 153
@@ -317,7 +317,7 @@ expression: diagnostics
 - kind:
     name: RedefinedLoopName
     body: "`for` loop variable `a.i` overwritten by assignment target"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 155

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `sum` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `int` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `print` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `copyright` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `complex` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `float` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `object` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `min` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `max` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `bytes` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `slice` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `ValueError` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `memoryview` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `bytearray` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `str` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -200,7 +200,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `all` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -213,7 +213,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `any` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -226,7 +226,7 @@ expression: diagnostics
 - kind:
     name: BuiltinVariableShadowing
     body: "Variable `sum` is shadowing a python builtin"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30

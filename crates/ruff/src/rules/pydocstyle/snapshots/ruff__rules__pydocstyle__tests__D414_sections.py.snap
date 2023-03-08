@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: EmptyDocstringSection
     body: "Section has no content (\"Returns\")"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: EmptyDocstringSection
     body: "Section has no content (\"Returns\")"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 67
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: EmptyDocstringSection
     body: "Section has no content (\"Yields\")"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 67
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: EmptyDocstringSection
     body: "Section has no content (\"Returns\")"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 161
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: EmptyDocstringSection
     body: "Section has no content (\"Returns\")"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 252

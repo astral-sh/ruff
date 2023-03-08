@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedYieldFixture
     body: "`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: DeprecatedYieldFixture
     body: "`@pytest.yield_fixture` is deprecated, use `@pytest.fixture`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `BaseException`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 25
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `Exception`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `Exception`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 42
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `BaseException`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 45
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `Exception`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `Exception`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 60
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `BaseException`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 62
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `Exception`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 69
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `Exception`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 75
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: BlindExcept
     body: "Do not catch blind exception: `Exception`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 81

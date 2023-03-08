@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryGeneratorList
     body: "Unnecessary generator (rewrite as a `list` comprehension)"
-    commit: "Rewrite as a `list` comprehension"
+    suggestion: "Rewrite as a `list` comprehension"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryGeneratorList
     body: "Unnecessary generator (rewrite as a `list` comprehension)"
-    commit: "Rewrite as a `list` comprehension"
+    suggestion: "Rewrite as a `list` comprehension"
     fixable: true
   location:
     row: 2

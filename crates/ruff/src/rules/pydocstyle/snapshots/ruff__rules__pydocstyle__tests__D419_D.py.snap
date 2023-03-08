@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: EmptyDocstring
     body: Docstring is empty
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: EmptyDocstring
     body: Docstring is empty
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 74
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: EmptyDocstring
     body: Docstring is empty
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 80

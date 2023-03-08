@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is None`"
-    commit: "Replace with `cond is None`"
+    suggestion: "Replace with `cond is None`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is not None`"
-    commit: "Replace with `cond is not None`"
+    suggestion: "Replace with `cond is not None`"
     fixable: true
   location:
     row: 5
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is None`"
-    commit: "Replace with `cond is None`"
+    suggestion: "Replace with `cond is None`"
     fixable: true
   location:
     row: 8
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is not None`"
-    commit: "Replace with `cond is not None`"
+    suggestion: "Replace with `cond is not None`"
     fixable: true
   location:
     row: 11
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is None`"
-    commit: "Replace with `cond is None`"
+    suggestion: "Replace with `cond is None`"
     fixable: true
   location:
     row: 14
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is not None`"
-    commit: "Replace with `cond is not None`"
+    suggestion: "Replace with `cond is not None`"
     fixable: true
   location:
     row: 17
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is not None`"
-    commit: "Replace with `cond is not None`"
+    suggestion: "Replace with `cond is not None`"
     fixable: true
   location:
     row: 20
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is None`"
-    commit: "Replace with `cond is None`"
+    suggestion: "Replace with `cond is None`"
     fixable: true
   location:
     row: 23
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is None`"
-    commit: "Replace with `cond is None`"
+    suggestion: "Replace with `cond is None`"
     fixable: true
   location:
     row: 26
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: NoneComparison
     body: "Comparison to `None` should be `cond is not None`"
-    commit: "Replace with `cond is not None`"
+    suggestion: "Replace with `cond is not None`"
     fixable: true
   location:
     row: 26

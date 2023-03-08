@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CapitalizeSectionName
     body: "Section name should be properly capitalized (\"returns\")"
-    commit: "Capitalize \"returns\""
+    suggestion: "Capitalize \"returns\""
     fixable: true
   location:
     row: 17
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: CapitalizeSectionName
     body: "Section name should be properly capitalized (\"Short summary\")"
-    commit: "Capitalize \"Short summary\""
+    suggestion: "Capitalize \"Short summary\""
     fixable: true
   location:
     row: 207

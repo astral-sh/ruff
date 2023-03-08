@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 9
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 10
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 11
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 12
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 17
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 21
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 22
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 23
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 24
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 25
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 26
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 27
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 28

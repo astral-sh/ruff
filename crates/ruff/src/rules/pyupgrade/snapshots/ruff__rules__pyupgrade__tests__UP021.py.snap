@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ReplaceUniversalNewlines
     body: "`universal_newlines` is deprecated, use `text`"
-    commit: "Replace with `text` keyword argument"
+    suggestion: "Replace with `text` keyword argument"
     fixable: true
   location:
     row: 6
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ReplaceUniversalNewlines
     body: "`universal_newlines` is deprecated, use `text`"
-    commit: "Replace with `text` keyword argument"
+    suggestion: "Replace with `text` keyword argument"
     fixable: true
   location:
     row: 7
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ReplaceUniversalNewlines
     body: "`universal_newlines` is deprecated, use `text`"
-    commit: "Replace with `text` keyword argument"
+    suggestion: "Replace with `text` keyword argument"
     fixable: true
   location:
     row: 9
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ReplaceUniversalNewlines
     body: "`universal_newlines` is deprecated, use `text`"
-    commit: "Replace with `text` keyword argument"
+    suggestion: "Replace with `text` keyword argument"
     fixable: true
   location:
     row: 10

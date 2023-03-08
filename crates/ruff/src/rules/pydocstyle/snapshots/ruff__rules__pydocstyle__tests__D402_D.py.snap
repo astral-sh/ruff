@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoSignature
     body: "First line should not be the function's signature"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 378

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BlankLineAfterSection
     body: "Missing blank line after section (\"Returns\")"
-    commit: "Add blank line after \"Returns\""
+    suggestion: "Add blank line after \"Returns\""
     fixable: true
   location:
     row: 67
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: BlankLineAfterSection
     body: "Missing blank line after section (\"Returns\")"
-    commit: "Add blank line after \"Returns\""
+    suggestion: "Add blank line after \"Returns\""
     fixable: true
   location:
     row: 207

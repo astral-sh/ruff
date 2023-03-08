@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `e` is assigned to but never used"
-    commit: "Remove assignment to unused variable `e`"
+    suggestion: "Remove assignment to unused variable `e`"
     fixable: true
   location:
     row: 3
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `z` is assigned to but never used"
-    commit: "Remove assignment to unused variable `z`"
+    suggestion: "Remove assignment to unused variable `z`"
     fixable: true
   location:
     row: 16
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `foo` is assigned to but never used"
-    commit: "Remove assignment to unused variable `foo`"
+    suggestion: "Remove assignment to unused variable `foo`"
     fixable: true
   location:
     row: 20
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `a` is assigned to but never used"
-    commit: "Remove assignment to unused variable `a`"
+    suggestion: "Remove assignment to unused variable `a`"
     fixable: true
   location:
     row: 21
@@ -78,7 +78,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `b` is assigned to but never used"
-    commit: "Remove assignment to unused variable `b`"
+    suggestion: "Remove assignment to unused variable `b`"
     fixable: true
   location:
     row: 21
@@ -91,7 +91,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `baz` is assigned to but never used"
-    commit: "Remove assignment to unused variable `baz`"
+    suggestion: "Remove assignment to unused variable `baz`"
     fixable: true
   location:
     row: 26
@@ -111,7 +111,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `b` is assigned to but never used"
-    commit: "Remove assignment to unused variable `b`"
+    suggestion: "Remove assignment to unused variable `b`"
     fixable: true
   location:
     row: 51
@@ -131,7 +131,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `my_file` is assigned to but never used"
-    commit: "Remove assignment to unused variable `my_file`"
+    suggestion: "Remove assignment to unused variable `my_file`"
     fixable: true
   location:
     row: 79
@@ -151,7 +151,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `my_file` is assigned to but never used"
-    commit: "Remove assignment to unused variable `my_file`"
+    suggestion: "Remove assignment to unused variable `my_file`"
     fixable: true
   location:
     row: 85
@@ -171,7 +171,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `msg3` is assigned to but never used"
-    commit: "Remove assignment to unused variable `msg3`"
+    suggestion: "Remove assignment to unused variable `msg3`"
     fixable: true
   location:
     row: 102
@@ -191,7 +191,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `Baz` is assigned to but never used"
-    commit: "Remove assignment to unused variable `Baz`"
+    suggestion: "Remove assignment to unused variable `Baz`"
     fixable: true
   location:
     row: 115
@@ -211,7 +211,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `y` is assigned to but never used"
-    commit: "Remove assignment to unused variable `y`"
+    suggestion: "Remove assignment to unused variable `y`"
     fixable: true
   location:
     row: 122

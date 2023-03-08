@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MagicMethod
     body: Missing docstring in magic method
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 64

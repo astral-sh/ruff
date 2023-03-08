@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PercentFormatStarRequiresSequence
     body: "`%`-format string `*` specifier requires sequence"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

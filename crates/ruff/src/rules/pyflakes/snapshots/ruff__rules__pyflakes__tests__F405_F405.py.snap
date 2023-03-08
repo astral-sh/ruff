@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ImportStarUsage
     body: "`name` may be undefined, or defined from star imports: `mymodule`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ImportStarUsage
     body: "`a` may be undefined, or defined from star imports: `mymodule`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

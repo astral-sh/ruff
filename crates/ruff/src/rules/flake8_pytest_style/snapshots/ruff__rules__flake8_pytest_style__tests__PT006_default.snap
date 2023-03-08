@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple`"
-    commit: "Use a `tuple` for parameter names"
+    suggestion: "Use a `tuple` for parameter names"
     fixable: true
   location:
     row: 9
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple`"
-    commit: "Use a `tuple` for parameter names"
+    suggestion: "Use a `tuple` for parameter names"
     fixable: true
   location:
     row: 14
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple`"
-    commit: "Use a `tuple` for parameter names"
+    suggestion: "Use a `tuple` for parameter names"
     fixable: true
   location:
     row: 19
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    commit: "Use a `csv` for parameter names"
+    suggestion: "Use a `csv` for parameter names"
     fixable: true
   location:
     row: 29
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple`"
-    commit: "Use a `tuple` for parameter names"
+    suggestion: "Use a `tuple` for parameter names"
     fixable: true
   location:
     row: 34
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    commit: "Use a `csv` for parameter names"
+    suggestion: "Use a `csv` for parameter names"
     fixable: true
   location:
     row: 39
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple`"
-    commit: "Use a `tuple` for parameter names"
+    suggestion: "Use a `tuple` for parameter names"
     fixable: true
   location:
     row: 44
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: ParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple`"
-    commit: "Use a `tuple` for parameter names"
+    suggestion: "Use a `tuple` for parameter names"
     fixable: true
   location:
     row: 49

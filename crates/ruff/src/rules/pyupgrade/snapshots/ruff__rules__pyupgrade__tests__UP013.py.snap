@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 5
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 8
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 11
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 14
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 17
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 18
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 21
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 24
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 27
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 30
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 40
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: ConvertTypedDictFunctionalToClass
     body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    commit: "Convert `MyType` to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
     fixable: true
   location:
     row: 43

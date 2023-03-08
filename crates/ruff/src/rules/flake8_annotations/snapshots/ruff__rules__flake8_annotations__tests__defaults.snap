@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeFunctionArgument
     body: "Missing type annotation for function argument `a`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeFunctionArgument
     body: "Missing type annotation for function argument `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeFunctionArgument
     body: "Missing type annotation for function argument `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeFunctionArgument
     body: "Missing type annotation for function argument `b`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `a`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 44
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 49
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `*args`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `*args`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 59
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 64
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeSelf
     body: "Missing type annotation for `self` in method"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 74
@@ -200,7 +200,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `a`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 78
@@ -213,7 +213,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 82
@@ -226,7 +226,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `*params`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 86
@@ -239,7 +239,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `**options`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 86
@@ -252,7 +252,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `*params`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 90
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: AnyType
     body: "Dynamically typed expressions (typing.Any) are disallowed in `**options`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 94
@@ -278,7 +278,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeCls
     body: "Missing type annotation for `cls` in classmethod"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 104
@@ -291,7 +291,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeSelf
     body: "Missing type annotation for `self` in method"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 108

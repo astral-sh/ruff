@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: StringDotFormatMixingAutomatic
     body: "`.format` string mixes automatic and manual numbering"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: StringDotFormatMixingAutomatic
     body: "`.format` string mixes automatic and manual numbering"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2

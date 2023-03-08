@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: StringDotFormatInvalidFormat
     body: "`.format` call has invalid format string: Single '{' encountered in format string"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: StringDotFormatInvalidFormat
     body: "`.format` call has invalid format string: Single '}' encountered in format string"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: StringDotFormatInvalidFormat
     body: "`.format` call has invalid format string: Expected '}' before end of string"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: StringDotFormatInvalidFormat
     body: "`.format` call has invalid format string: Max string recursion exceeded"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: StringDotFormatInvalidFormat
     body: "`.format` call has invalid format string: Empty attribute in format string"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: StringDotFormatInvalidFormat
     body: "`.format` call has invalid format string: Empty attribute in format string"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: StringDotFormatInvalidFormat
     body: "`.format` call has invalid format string: Empty attribute in format string"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

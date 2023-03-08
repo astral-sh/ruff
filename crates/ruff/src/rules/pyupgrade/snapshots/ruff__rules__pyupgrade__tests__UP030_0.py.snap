@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 3
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 5
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 9
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 11
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 13
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 15
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 17
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 20
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 22
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 24
@@ -198,7 +198,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 29
@@ -211,7 +211,7 @@ expression: diagnostics
 - kind:
     name: FormatLiterals
     body: Use implicit references for positional format fields
-    commit: Remove explicit positional indexes
+    suggestion: Remove explicit positional indexes
     fixable: true
   location:
     row: 34

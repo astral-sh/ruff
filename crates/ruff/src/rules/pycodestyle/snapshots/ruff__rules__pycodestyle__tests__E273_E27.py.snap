@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TabAfterKeyword
     body: Tab after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: TabAfterKeyword
     body: Tab after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: TabAfterKeyword
     body: Tab after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: TabAfterKeyword
     body: Tab after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: TabAfterKeyword
     body: Tab after keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30

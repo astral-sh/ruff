@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 6
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 8
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 10
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 12
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 15
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 18
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 20
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 23
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 28
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 30
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 33
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`, `Callable`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 37
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Callable`"
-    commit: "Import from `collections.abc`"
+    suggestion: "Import from `collections.abc`"
     fixable: true
   location:
     row: 44
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections` instead: `OrderedDict`"
-    commit: "Import from `collections`"
+    suggestion: "Import from `collections`"
     fixable: true
   location:
     row: 44
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `re` instead: `Match`, `Pattern`"
-    commit: "Import from `re`"
+    suggestion: "Import from `re`"
     fixable: true
   location:
     row: 44
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: ImportReplacements
     body: "Import from `collections.abc` instead: `Mapping`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 46

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TooManyStatements
     body: Too many statements (52/50)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5

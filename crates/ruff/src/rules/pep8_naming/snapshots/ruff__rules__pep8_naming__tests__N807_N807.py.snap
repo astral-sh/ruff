@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DunderFunctionName
     body: "Function name should not start and end with `__`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: DunderFunctionName
     body: "Function name should not start and end with `__`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14

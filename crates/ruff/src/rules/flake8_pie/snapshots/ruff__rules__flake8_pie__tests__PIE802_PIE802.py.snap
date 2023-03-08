@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryComprehensionAnyAll
     body: Unnecessary list comprehension.
-    commit: Remove unnecessary list comprehension
+    suggestion: Remove unnecessary list comprehension
     fixable: true
   location:
     row: 9
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryComprehensionAnyAll
     body: Unnecessary list comprehension.
-    commit: Remove unnecessary list comprehension
+    suggestion: Remove unnecessary list comprehension
     fixable: true
   location:
     row: 10
@@ -43,7 +43,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    UnnecessaryComprehensionAnyAll: ~
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    suggestion: Remove unnecessary list comprehension
+    fixable: true
   location:
     row: 12
     column: 4
@@ -60,7 +63,10 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UnnecessaryComprehensionAnyAll: ~
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    suggestion: Remove unnecessary list comprehension
+    fixable: true
   location:
     row: 15
     column: 4

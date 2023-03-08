@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryComprehension
     body: "Unnecessary `list` comprehension (rewrite using `list()`)"
-    commit: "Rewrite using `list()`"
+    suggestion: "Rewrite using `list()`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryComprehension
     body: "Unnecessary `set` comprehension (rewrite using `set()`)"
-    commit: "Rewrite using `set()`"
+    suggestion: "Rewrite using `set()`"
     fixable: true
   location:
     row: 3

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoNewLineAtEndOfFile
     body: No newline at end of file
-    commit: Add trailing newline
+    suggestion: Add trailing newline
     fixable: true
   location:
     row: 2

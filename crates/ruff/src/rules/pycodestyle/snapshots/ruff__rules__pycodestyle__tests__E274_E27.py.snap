@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TabBeforeKeyword
     body: Tab before keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: TabBeforeKeyword
     body: Tab before keyword
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30

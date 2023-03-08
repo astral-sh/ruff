@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `compare == \"yoda\"` instead"
-    commit: "Replace Yoda condition with `compare == \"yoda\"`"
+    suggestion: "Replace Yoda condition with `compare == \"yoda\"`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `compare == \"yoda\"` instead"
-    commit: "Replace Yoda condition with `compare == \"yoda\"`"
+    suggestion: "Replace Yoda condition with `compare == \"yoda\"`"
     fixable: true
   location:
     row: 3
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `age == 42` instead"
-    commit: "Replace Yoda condition with `age == 42`"
+    suggestion: "Replace Yoda condition with `age == 42`"
     fixable: true
   location:
     row: 4
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `compare == (\"a\", \"b\")` instead"
-    commit: "Replace Yoda condition with `compare == (\"a\", \"b\")`"
+    suggestion: "Replace Yoda condition with `compare == (\"a\", \"b\")`"
     fixable: true
   location:
     row: 5
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `compare >= \"yoda\"` instead"
-    commit: "Replace Yoda condition with `compare >= \"yoda\"`"
+    suggestion: "Replace Yoda condition with `compare >= \"yoda\"`"
     fixable: true
   location:
     row: 6
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `compare > \"yoda\"` instead"
-    commit: "Replace Yoda condition with `compare > \"yoda\"`"
+    suggestion: "Replace Yoda condition with `compare > \"yoda\"`"
     fixable: true
   location:
     row: 7
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `age < 42` instead"
-    commit: "Replace Yoda condition with `age < 42`"
+    suggestion: "Replace Yoda condition with `age < 42`"
     fixable: true
   location:
     row: 8
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `age < -42` instead"
-    commit: "Replace Yoda condition with `age < -42`"
+    suggestion: "Replace Yoda condition with `age < -42`"
     fixable: true
   location:
     row: 9
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `age < +42` instead"
-    commit: "Replace Yoda condition with `age < +42`"
+    suggestion: "Replace Yoda condition with `age < +42`"
     fixable: true
   location:
     row: 10
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `age == YODA` instead"
-    commit: "Replace Yoda condition with `age == YODA`"
+    suggestion: "Replace Yoda condition with `age == YODA`"
     fixable: true
   location:
     row: 11
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `age < YODA` instead"
-    commit: "Replace Yoda condition with `age < YODA`"
+    suggestion: "Replace Yoda condition with `age < YODA`"
     fixable: true
   location:
     row: 12
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `age <= YODA` instead"
-    commit: "Replace Yoda condition with `age <= YODA`"
+    suggestion: "Replace Yoda condition with `age <= YODA`"
     fixable: true
   location:
     row: 13
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `age == JediOrder.YODA` instead"
-    commit: "Replace Yoda condition with `age == JediOrder.YODA`"
+    suggestion: "Replace Yoda condition with `age == JediOrder.YODA`"
     fixable: true
   location:
     row: 14
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `(number - 100) > 0` instead"
-    commit: "Replace Yoda condition with `(number - 100) > 0`"
+    suggestion: "Replace Yoda condition with `(number - 100) > 0`"
     fixable: true
   location:
     row: 15
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: YodaConditions
     body: "Yoda conditions are discouraged, use `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE` instead"
-    commit: "Replace Yoda condition with `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE`"
+    suggestion: "Replace Yoda condition with `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE`"
     fixable: true
   location:
     row: 16

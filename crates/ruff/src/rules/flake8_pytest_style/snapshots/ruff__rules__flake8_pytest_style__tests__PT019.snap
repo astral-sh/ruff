@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FixtureParamWithoutValue
     body: "Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: FixtureParamWithoutValue
     body: "Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 45
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 50
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MissingTypeFunctionArgument
     body: "Missing type annotation for function argument `a`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 59

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 5
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 8
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 11
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 14
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 18
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 23
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 30
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 35
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: ExtraneousParentheses
     body: Avoid extraneous parentheses
-    commit: Remove extraneous parentheses
+    suggestion: Remove extraneous parentheses
     fixable: true
   location:
     row: 39

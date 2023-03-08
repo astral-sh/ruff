@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SnmpInsecureVersion
     body: The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: SnmpInsecureVersion
     body: The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4

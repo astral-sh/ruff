@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: LoggingExcInfo
     body: "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: LoggingExcInfo
     body: "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13

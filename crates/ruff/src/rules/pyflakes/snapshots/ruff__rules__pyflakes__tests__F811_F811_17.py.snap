@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RedefinedWhileUnused
     body: "Redefinition of unused `fu` from line 2"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RedefinedWhileUnused
     body: "Redefinition of unused `fu` from line 6"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 200
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 210
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 220
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 230
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 240
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 250
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 260
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 270
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 281
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 299
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 343
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 383
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 392
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 438
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 450
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 526
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 546
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 555
@@ -365,7 +365,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 568
@@ -385,7 +385,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 588
@@ -405,7 +405,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 606
@@ -425,7 +425,7 @@ expression: diagnostics
 - kind:
     name: MultiLineSummarySecondLine
     body: Multi-line docstring summary should start at the second line
-    commit: Insert line break and indentation after opening quotes
+    suggestion: Insert line break and indentation after opening quotes
     fixable: true
   location:
     row: 615

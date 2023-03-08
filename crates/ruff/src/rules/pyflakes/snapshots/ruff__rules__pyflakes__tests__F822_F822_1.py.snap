@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UndefinedExport
     body: "Undefined name `b` in `__all__`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3

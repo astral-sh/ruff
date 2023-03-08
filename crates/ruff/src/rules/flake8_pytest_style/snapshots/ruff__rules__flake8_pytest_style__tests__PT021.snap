@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FixtureFinalizerCallback
     body: "Use `yield` instead of `request.addfinalizer`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 49
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: FixtureFinalizerCallback
     body: "Use `yield` instead of `request.addfinalizer`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 56

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PublicPackage
     body: Missing docstring in public package
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1

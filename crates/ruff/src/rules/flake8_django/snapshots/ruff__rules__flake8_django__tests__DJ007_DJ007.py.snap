@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: AllWithModelForm
     body: "Do not use `__all__` with `ModelForm`, use `fields` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: AllWithModelForm
     body: "Do not use `__all__` with `ModelForm`, use `fields` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

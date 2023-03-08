@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PreferUniqueEnums
     body: "Enum contains duplicate value: `\"B\"`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: PreferUniqueEnums
     body: "Enum contains duplicate value: `2`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: PreferUniqueEnums
     body: "Enum contains duplicate value: `\"2\"`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: PreferUniqueEnums
     body: "Enum contains duplicate value: `2.5`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: PreferUniqueEnums
     body: "Enum contains duplicate value: `False`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 33
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: PreferUniqueEnums
     body: "Enum contains duplicate value: `None`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 40
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: PreferUniqueEnums
     body: "Enum contains duplicate value: `2`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54

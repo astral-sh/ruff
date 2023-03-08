@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RaisesTooBroad
     body: "`pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter or use a more specific exception"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12

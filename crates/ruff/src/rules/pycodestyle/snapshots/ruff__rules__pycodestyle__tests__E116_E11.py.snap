@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnexpectedIndentationComment
     body: Unexpected indentation (comment)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnexpectedIndentationComment
     body: Unexpected indentation (comment)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnexpectedIndentationComment
     body: Unexpected indentation (comment)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UnexpectedIndentationComment
     body: Unexpected indentation (comment)
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SingleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: SingleStartsEndsWith
     body: "Call `endswith` once with a `tuple`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: SingleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: SingleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8

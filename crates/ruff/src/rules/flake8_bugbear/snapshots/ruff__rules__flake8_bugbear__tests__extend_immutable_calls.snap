@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FunctionCallArgumentDefault
     body: "Do not perform function call `Depends` in argument defaults"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19

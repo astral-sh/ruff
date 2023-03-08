@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypingUnion
     body: "Use `X | Y` for type annotations"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 6
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: TypingUnion
     body: "Use `X | Y` for type annotations"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 10
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: TypingUnion
     body: "Use `X | Y` for type annotations"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 14
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: TypingUnion
     body: "Use `X | Y` for type annotations"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 14
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: TypingUnion
     body: "Use `X | Y` for type annotations"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 18
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: TypingUnion
     body: "Use `X | Y` for type annotations"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 22
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: TypingUnion
     body: "Use `X | Y` for type annotations"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 26
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: TypingUnion
     body: "Use `X | Y` for type annotations"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 47

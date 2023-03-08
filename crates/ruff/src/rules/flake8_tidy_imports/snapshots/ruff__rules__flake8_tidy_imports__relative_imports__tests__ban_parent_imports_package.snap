@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 6
@@ -38,7 +38,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 6
@@ -58,7 +58,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 6
@@ -78,7 +78,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 7
@@ -98,7 +98,7 @@ expression: diagnostics
 - kind:
     name: RelativeImports
     body: Relative imports from parent modules are banned
-    commit: Replace relative imports from parent modules with absolute imports
+    suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
     row: 8

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoSurroundingWhitespace
     body: No whitespaces allowed surrounding docstring text
-    commit: Trim surrounding whitespace
+    suggestion: Trim surrounding whitespace
     fixable: true
   location:
     row: 288
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NoSurroundingWhitespace
     body: No whitespaces allowed surrounding docstring text
-    commit: Trim surrounding whitespace
+    suggestion: Trim surrounding whitespace
     fixable: true
   location:
     row: 293
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: NoSurroundingWhitespace
     body: No whitespaces allowed surrounding docstring text
-    commit: Trim surrounding whitespace
+    suggestion: Trim surrounding whitespace
     fixable: true
   location:
     row: 299
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: NoSurroundingWhitespace
     body: No whitespaces allowed surrounding docstring text
-    commit: Trim surrounding whitespace
+    suggestion: Trim surrounding whitespace
     fixable: true
   location:
     row: 581

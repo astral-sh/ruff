@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RedundantTupleInExceptionHandler
     body: "A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`."
-    commit: "Replace with `except ValueError`"
+    suggestion: "Replace with `except ValueError`"
     fixable: true
   location:
     row: 3

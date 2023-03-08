@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UseFixturesWithoutParameters
     body: "Useless `pytest.mark.usefixtures` without parameters"
-    commit: "Remove `usefixtures` decorator or pass parameters"
+    suggestion: "Remove `usefixtures` decorator or pass parameters"
     fixable: true
   location:
     row: 19
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UseFixturesWithoutParameters
     body: "Useless `pytest.mark.usefixtures` without parameters"
-    commit: "Remove `usefixtures` decorator or pass parameters"
+    suggestion: "Remove `usefixtures` decorator or pass parameters"
     fixable: true
   location:
     row: 24

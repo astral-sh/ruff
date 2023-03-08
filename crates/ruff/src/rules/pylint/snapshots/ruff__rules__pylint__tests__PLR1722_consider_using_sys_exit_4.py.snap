@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ConsiderUsingSysExit
     body: "Use `sys.exit()` instead of `exit`"
-    commit: "Replace `exit` with `sys.exit()`"
+    suggestion: "Replace `exit` with `sys.exit()`"
     fixable: true
   location:
     row: 3
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ConsiderUsingSysExit
     body: "Use `sys.exit()` instead of `quit`"
-    commit: "Replace `quit` with `sys.exit()`"
+    suggestion: "Replace `quit` with `sys.exit()`"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ConsiderUsingSysExit
     body: "Use `sys.exit()` instead of `exit`"
-    commit: "Replace `exit` with `sys.exit()`"
+    suggestion: "Replace `exit` with `sys.exit()`"
     fixable: true
   location:
     row: 8
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ConsiderUsingSysExit
     body: "Use `sys.exit()` instead of `quit`"
-    commit: "Replace `quit` with `sys.exit()`"
+    suggestion: "Replace `quit` with `sys.exit()`"
     fixable: true
   location:
     row: 9

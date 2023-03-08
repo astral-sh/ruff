@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ShebangPython
     body: "Shebang should contain `python`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1

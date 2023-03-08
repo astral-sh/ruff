@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDirectLambdaCall
     body: Lambda expression called directly. Execute the expression inline instead.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDirectLambdaCall
     body: Lambda expression called directly. Execute the expression inline instead.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryDirectLambdaCall
     body: Lambda expression called directly. Execute the expression inline instead.
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5

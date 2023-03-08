@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MissingRequiredImport
     body: "Missing required import: `import os`"
-    commit: "Insert required import: `import os`"
+    suggestion: "Insert required import: `import os`"
     fixable: true
   location:
     row: 1

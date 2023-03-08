@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NewLineAfterLastParagraph
     body: Multi-line docstring closing quotes should be on a separate line
-    commit: Move closing quotes to new line
+    suggestion: Move closing quotes to new line
     fixable: true
   location:
     row: 281
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NewLineAfterLastParagraph
     body: Multi-line docstring closing quotes should be on a separate line
-    commit: Move closing quotes to new line
+    suggestion: Move closing quotes to new line
     fixable: true
   location:
     row: 588

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryParenOnRaiseException
     body: Unnecessary parentheses on raised exception
-    commit: Remove unnecessary parentheses
+    suggestion: Remove unnecessary parentheses
     fixable: true
   location:
     row: 5
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryParenOnRaiseException
     body: Unnecessary parentheses on raised exception
-    commit: Remove unnecessary parentheses
+    suggestion: Remove unnecessary parentheses
     fixable: true
   location:
     row: 13
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryParenOnRaiseException
     body: Unnecessary parentheses on raised exception
-    commit: Remove unnecessary parentheses
+    suggestion: Remove unnecessary parentheses
     fixable: true
   location:
     row: 16
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryParenOnRaiseException
     body: Unnecessary parentheses on raised exception
-    commit: Remove unnecessary parentheses
+    suggestion: Remove unnecessary parentheses
     fixable: true
   location:
     row: 20
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryParenOnRaiseException
     body: Unnecessary parentheses on raised exception
-    commit: Remove unnecessary parentheses
+    suggestion: Remove unnecessary parentheses
     fixable: true
   location:
     row: 23
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryParenOnRaiseException
     body: Unnecessary parentheses on raised exception
-    commit: Remove unnecessary parentheses
+    suggestion: Remove unnecessary parentheses
     fixable: true
   location:
     row: 28

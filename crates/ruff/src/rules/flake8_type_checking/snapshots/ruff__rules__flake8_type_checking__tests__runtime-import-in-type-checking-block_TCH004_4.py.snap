@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RuntimeImportInTypeCheckingBlock
     body: "Move import `typing.Any` out of type-checking block. Import is used for more than type hinting."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4

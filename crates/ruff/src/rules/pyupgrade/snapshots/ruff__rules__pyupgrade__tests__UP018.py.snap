@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NativeLiterals
     body: "Unnecessary call to `str`"
-    commit: "Replace with `str`"
+    suggestion: "Replace with `str`"
     fixable: true
   location:
     row: 20
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NativeLiterals
     body: "Unnecessary call to `str`"
-    commit: "Replace with `str`"
+    suggestion: "Replace with `str`"
     fixable: true
   location:
     row: 21
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: NativeLiterals
     body: "Unnecessary call to `str`"
-    commit: "Replace with `str`"
+    suggestion: "Replace with `str`"
     fixable: true
   location:
     row: 22
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: NativeLiterals
     body: "Unnecessary call to `bytes`"
-    commit: "Replace with `bytes`"
+    suggestion: "Replace with `bytes`"
     fixable: true
   location:
     row: 24
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: NativeLiterals
     body: "Unnecessary call to `bytes`"
-    commit: "Replace with `bytes`"
+    suggestion: "Replace with `bytes`"
     fixable: true
   location:
     row: 25
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: NativeLiterals
     body: "Unnecessary call to `bytes`"
-    commit: "Replace with `bytes`"
+    suggestion: "Replace with `bytes`"
     fixable: true
   location:
     row: 26

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TryConsiderElse
     body: "Consider moving this statement to an `else` block"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20

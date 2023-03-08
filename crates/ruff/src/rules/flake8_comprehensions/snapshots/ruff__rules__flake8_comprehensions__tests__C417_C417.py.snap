@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    commit: "Replace `map` using a generator expression"
+    suggestion: "Replace `map` using a generator expression"
     fixable: true
   location:
     row: 3
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    commit: "Replace `map` using a generator expression"
+    suggestion: "Replace `map` using a generator expression"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a `list` comprehension)"
-    commit: "Replace `map` using a `list` comprehension"
+    suggestion: "Replace `map` using a `list` comprehension"
     fixable: true
   location:
     row: 5
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a `set` comprehension)"
-    commit: "Replace `map` using a `set` comprehension"
+    suggestion: "Replace `map` using a `set` comprehension"
     fixable: true
   location:
     row: 6
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a `dict` comprehension)"
-    commit: "Replace `map` using a `dict` comprehension"
+    suggestion: "Replace `map` using a `dict` comprehension"
     fixable: true
   location:
     row: 7
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    commit: "Replace `map` using a generator expression"
+    suggestion: "Replace `map` using a generator expression"
     fixable: true
   location:
     row: 8
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    commit: "Replace `map` using a generator expression"
+    suggestion: "Replace `map` using a generator expression"
     fixable: true
   location:
     row: 9
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    commit: "Replace `map` using a generator expression"
+    suggestion: "Replace `map` using a generator expression"
     fixable: true
   location:
     row: 10
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    commit: "Replace `map` using a generator expression"
+    suggestion: "Replace `map` using a generator expression"
     fixable: true
   location:
     row: 11
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    commit: "Replace `map` using a generator expression"
+    suggestion: "Replace `map` using a generator expression"
     fixable: true
   location:
     row: 12
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a `set` comprehension)"
-    commit: "Replace `map` using a `set` comprehension"
+    suggestion: "Replace `map` using a `set` comprehension"
     fixable: true
   location:
     row: 15
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a `dict` comprehension)"
-    commit: "Replace `map` using a `dict` comprehension"
+    suggestion: "Replace `map` using a `dict` comprehension"
     fixable: true
   location:
     row: 16
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryMap
     body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    commit: "Replace `map` using a generator expression"
+    suggestion: "Replace `map` using a generator expression"
     fixable: true
   location:
     row: 21

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 6
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 8
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 12
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 12
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 12
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 12
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 16
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 17
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 18
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: RewriteUnicodeLiteral
     body: Remove unicode literals from strings
-    commit: Remove unicode prefix
+    suggestion: Remove unicode prefix
     fixable: true
   location:
     row: 19

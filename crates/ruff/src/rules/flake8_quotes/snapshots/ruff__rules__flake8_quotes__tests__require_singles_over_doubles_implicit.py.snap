@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Double quotes found but single quotes preferred
-    commit: Replace double quotes with single quotes
+    suggestion: Replace double quotes with single quotes
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Double quotes found but single quotes preferred
-    commit: Replace double quotes with single quotes
+    suggestion: Replace double quotes with single quotes
     fixable: true
   location:
     row: 3
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Double quotes found but single quotes preferred
-    commit: Replace double quotes with single quotes
+    suggestion: Replace double quotes with single quotes
     fixable: true
   location:
     row: 4
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Double quotes found but single quotes preferred
-    commit: Replace double quotes with single quotes
+    suggestion: Replace double quotes with single quotes
     fixable: true
   location:
     row: 8
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Double quotes found but single quotes preferred
-    commit: Replace double quotes with single quotes
+    suggestion: Replace double quotes with single quotes
     fixable: true
   location:
     row: 9
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Double quotes found but single quotes preferred
-    commit: Replace double quotes with single quotes
+    suggestion: Replace double quotes with single quotes
     fixable: true
   location:
     row: 10
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Double quotes found but single quotes preferred
-    commit: Replace double quotes with single quotes
+    suggestion: Replace double quotes with single quotes
     fixable: true
   location:
     row: 27

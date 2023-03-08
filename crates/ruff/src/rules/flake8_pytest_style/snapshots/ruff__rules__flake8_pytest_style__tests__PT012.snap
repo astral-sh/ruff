@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RaisesWithMultipleStatements
     body: "`pytest.raises()` block should contain a single simple statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RaisesWithMultipleStatements
     body: "`pytest.raises()` block should contain a single simple statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 34
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: RaisesWithMultipleStatements
     body: "`pytest.raises()` block should contain a single simple statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 38
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: RaisesWithMultipleStatements
     body: "`pytest.raises()` block should contain a single simple statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 42
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: RaisesWithMultipleStatements
     body: "`pytest.raises()` block should contain a single simple statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 46
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: RaisesWithMultipleStatements
     body: "`pytest.raises()` block should contain a single simple statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 50
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: RaisesWithMultipleStatements
     body: "`pytest.raises()` block should contain a single simple statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: RaisesWithMultipleStatements
     body: "`pytest.raises()` block should contain a single simple statement"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 60

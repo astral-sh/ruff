@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NonImperativeMood
     body: "First line of docstring should be in imperative mood: \"Returns foo.\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: NonImperativeMood
     body: "First line of docstring should be in imperative mood: \"Constructor for a foo.\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: NonImperativeMood
     body: "First line of docstring should be in imperative mood: \"Constructor for a boa.\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: NonImperativeMood
     body: "First line of docstring should be in imperative mood: \"Runs something\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: NonImperativeMood
     body: "First line of docstring should be in imperative mood: \"Runs other things, nested\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: NonImperativeMood
     body: "First line of docstring should be in imperative mood: \"Writes a logical line that\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 35
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: NonImperativeMood
     body: "First line of docstring should be in imperative mood: \"This method docstring should be written in imperative mood.\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 74

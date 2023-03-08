@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: AssertInExcept
     body: "Found assertion on exception `e` in `except` block, use `pytest.raises()` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19

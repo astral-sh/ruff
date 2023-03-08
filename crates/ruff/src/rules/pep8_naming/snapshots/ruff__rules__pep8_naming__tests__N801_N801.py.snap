@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: InvalidClassName
     body: "Class name `bad` should use CapWords convention "
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: InvalidClassName
     body: "Class name `_bad` should use CapWords convention "
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: InvalidClassName
     body: "Class name `bad_class` should use CapWords convention "
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: InvalidClassName
     body: "Class name `Bad_Class` should use CapWords convention "
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: InvalidClassName
     body: "Class name `BAD_CLASS` should use CapWords convention "
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17

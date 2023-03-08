@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`a.b.c` imported but unused"
-    commit: "Remove unused import: `a.b.c`"
+    suggestion: "Remove unused import: `a.b.c`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`d.e.f` imported but unused"
-    commit: "Remove unused import: `d.e.f`"
+    suggestion: "Remove unused import: `d.e.f`"
     fixable: true
   location:
     row: 3
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`h.i` imported but unused"
-    commit: "Remove unused import: `h.i`"
+    suggestion: "Remove unused import: `h.i`"
     fixable: true
   location:
     row: 4
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnusedImport
     body: "`j.k` imported but unused"
-    commit: "Remove unused import: `j.k`"
+    suggestion: "Remove unused import: `j.k`"
     fixable: true
   location:
     row: 5

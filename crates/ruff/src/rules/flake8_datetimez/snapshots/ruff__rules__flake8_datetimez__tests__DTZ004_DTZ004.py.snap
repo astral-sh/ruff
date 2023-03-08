@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeUtcfromtimestamp
     body: "The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeUtcfromtimestamp
     body: "The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

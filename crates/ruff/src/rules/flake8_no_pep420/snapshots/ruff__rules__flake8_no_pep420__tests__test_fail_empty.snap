@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ImplicitNamespacePackage
     body: "File `./resources/test/fixtures/flake8_no_pep420/test_fail_empty/example.py` is part of an implicit namespace package. Add an `__init__.py`."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NotInTest
     body: "Test for membership should be `not in`"
-    commit: "Convert to `not in`"
+    suggestion: "Convert to `not in`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NotInTest
     body: "Test for membership should be `not in`"
-    commit: "Convert to `not in`"
+    suggestion: "Convert to `not in`"
     fixable: true
   location:
     row: 5
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: NotInTest
     body: "Test for membership should be `not in`"
-    commit: "Convert to `not in`"
+    suggestion: "Convert to `not in`"
     fixable: true
   location:
     row: 8
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: NotInTest
     body: "Test for membership should be `not in`"
-    commit: "Convert to `not in`"
+    suggestion: "Convert to `not in`"
     fixable: true
   location:
     row: 11
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: NotInTest
     body: "Test for membership should be `not in`"
-    commit: "Convert to `not in`"
+    suggestion: "Convert to `not in`"
     fixable: true
   location:
     row: 14

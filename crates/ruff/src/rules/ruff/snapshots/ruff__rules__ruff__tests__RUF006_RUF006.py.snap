@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: AsyncioDanglingTask
     body: "Store a reference to the return value of `asyncio.create_task`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: AsyncioDanglingTask
     body: "Store a reference to the return value of `asyncio.ensure_future`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

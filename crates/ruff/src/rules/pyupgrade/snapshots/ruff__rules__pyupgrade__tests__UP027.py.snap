@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RewriteListComprehension
     body: Replace unpacked list comprehension with a generator expression
-    commit: Replace with generator expression
+    suggestion: Replace with generator expression
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: RewriteListComprehension
     body: Replace unpacked list comprehension with a generator expression
-    commit: Replace with generator expression
+    suggestion: Replace with generator expression
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: RewriteListComprehension
     body: Replace unpacked list comprehension with a generator expression
-    commit: Replace with generator expression
+    suggestion: Replace with generator expression
     fixable: true
   location:
     row: 6
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: RewriteListComprehension
     body: Replace unpacked list comprehension with a generator expression
-    commit: Replace with generator expression
+    suggestion: Replace with generator expression
     fixable: true
   location:
     row: 8
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: RewriteListComprehension
     body: Replace unpacked list comprehension with a generator expression
-    commit: Replace with generator expression
+    suggestion: Replace with generator expression
     fixable: true
   location:
     row: 10

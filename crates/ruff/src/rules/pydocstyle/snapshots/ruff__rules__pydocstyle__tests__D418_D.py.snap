@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: OverloadWithDocstring
     body: "Function decorated with `@overload` shouldn't contain a docstring"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 34
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: OverloadWithDocstring
     body: "Function decorated with `@overload` shouldn't contain a docstring"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 90
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: OverloadWithDocstring
     body: "Function decorated with `@overload` shouldn't contain a docstring"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 110

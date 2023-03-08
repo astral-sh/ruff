@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ErrorSuffixOnExceptionName
     body: "Exception name `C` should be named with an Error suffix"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ErrorSuffixOnExceptionName
     body: "Exception name `E` should be named with an Error suffix"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17

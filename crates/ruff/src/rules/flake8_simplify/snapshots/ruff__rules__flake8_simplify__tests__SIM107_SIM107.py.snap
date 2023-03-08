@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ReturnInTryExceptFinally
     body: "Don't use `return` in `try`/`except` and `finally`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

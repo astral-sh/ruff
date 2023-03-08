@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ExceptWithEmptyTuple
     body: "Using except (): with an empty tuple does not handle/catch anything. Add exceptions to handle."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ExceptWithEmptyTuple
     body: "Using except (): with an empty tuple does not handle/catch anything. Add exceptions to handle."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13

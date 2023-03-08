@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PublicFunction
     body: Missing docstring in public function
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 400

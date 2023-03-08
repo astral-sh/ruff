@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PublicInit
     body: "Missing docstring in `__init__`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 60
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: PublicInit
     body: "Missing docstring in `__init__`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 534

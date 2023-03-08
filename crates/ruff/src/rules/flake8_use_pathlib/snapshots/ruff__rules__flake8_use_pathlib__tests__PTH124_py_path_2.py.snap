@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PathlibPyPath
     body: "`py.path` is in maintenance mode, use `pathlib` instead"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3

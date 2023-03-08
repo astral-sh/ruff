@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RawStringInException
     body: "Exception must not use a string literal, assign to variable first"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: RawStringInException
     body: "Exception must not use a string literal, assign to variable first"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: FStringInException
     body: "Exception must not use an f-string literal, assign to variable first"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: DotFormatInException
     body: "Exception must not use a `.format()` string directly, assign to variable first"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18

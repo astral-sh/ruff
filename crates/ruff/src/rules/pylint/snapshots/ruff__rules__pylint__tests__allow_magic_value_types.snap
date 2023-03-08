@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MagicValueComparison
     body: "Magic value used in comparison, consider replacing \"Hunter2\" with a constant variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 59
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MagicValueComparison
     body: "Magic value used in comparison, consider replacing 3.141592653589793 with a constant variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 65
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MagicValueComparison
     body: "Magic value used in comparison, consider replacing b\"something\" with a constant variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 74

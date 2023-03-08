@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MagicValueComparison
     body: "Magic value used in comparison, consider replacing 10 with a constant variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MagicValueComparison
     body: "Magic value used in comparison, consider replacing 2 with a constant variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 38
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MagicValueComparison
     body: "Magic value used in comparison, consider replacing -2 with a constant variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 41
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: MagicValueComparison
     body: "Magic value used in comparison, consider replacing +2 with a constant variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 44
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: MagicValueComparison
     body: "Magic value used in comparison, consider replacing 3.141592653589793 with a constant variable"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 65

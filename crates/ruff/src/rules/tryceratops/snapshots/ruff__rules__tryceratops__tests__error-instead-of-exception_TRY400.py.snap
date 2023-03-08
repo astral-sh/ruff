@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ErrorInsteadOfException
     body: "Use `logging.exception` instead of `logging.error`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ErrorInsteadOfException
     body: "Use `logging.exception` instead of `logging.error`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: ErrorInsteadOfException
     body: "Use `logging.exception` instead of `logging.error`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 25
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: ErrorInsteadOfException
     body: "Use `logging.exception` instead of `logging.error`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: ErrorInsteadOfException
     body: "Use `logging.exception` instead of `logging.error`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 35
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: ErrorInsteadOfException
     body: "Use `logging.exception` instead of `logging.error`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 38
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: ErrorInsteadOfException
     body: "Use `logging.exception` instead of `logging.error`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 45
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: ErrorInsteadOfException
     body: "Use `logging.exception` instead of `logging.error`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 48

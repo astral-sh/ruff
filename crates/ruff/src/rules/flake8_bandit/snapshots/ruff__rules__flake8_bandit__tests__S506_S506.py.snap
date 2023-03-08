@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnsafeYAMLLoad
     body: "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnsafeYAMLLoad
     body: "Probable use of unsafe loader `Loader` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24

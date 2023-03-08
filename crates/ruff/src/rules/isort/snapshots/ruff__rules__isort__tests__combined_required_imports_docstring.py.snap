@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MissingRequiredImport
     body: "Missing required import: `from __future__ import annotations`"
-    commit: "Insert required import: `from __future__ import annotations`"
+    suggestion: "Insert required import: `from __future__ import annotations`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: MissingRequiredImport
     body: "Missing required import: `from __future__ import generator_stop`"
-    commit: "Insert required import: `from __future__ import generator_stop`"
+    suggestion: "Insert required import: `from __future__ import generator_stop`"
     fixable: true
   location:
     row: 1

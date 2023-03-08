@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 7
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 12
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 17
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 22
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 27
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 33
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 44
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 49
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 55
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 67
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: RewriteYieldFrom
     body: "Replace `yield` over `for` loop with `yield from`"
-    commit: "Replace with `yield from`"
+    suggestion: "Replace with `yield from`"
     fixable: true
   location:
     row: 72

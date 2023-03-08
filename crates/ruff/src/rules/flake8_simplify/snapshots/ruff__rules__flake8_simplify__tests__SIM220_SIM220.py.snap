@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ExprAndNotExpr
     body: "Use `False` instead of `a and not a`"
-    commit: "Replace with `False`"
+    suggestion: "Replace with `False`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ExprAndNotExpr
     body: "Use `False` instead of `a and not a`"
-    commit: "Replace with `False`"
+    suggestion: "Replace with `False`"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ExprAndNotExpr
     body: "Use `False` instead of `a and not a`"
-    commit: "Replace with `False`"
+    suggestion: "Replace with `False`"
     fixable: true
   location:
     row: 7

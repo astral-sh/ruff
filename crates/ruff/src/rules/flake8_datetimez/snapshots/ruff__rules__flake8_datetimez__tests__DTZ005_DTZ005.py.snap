@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeNowWithoutTzinfo
     body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeNowWithoutTzinfo
     body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeNowWithoutTzinfo
     body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeNowWithoutTzinfo
     body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: CallDatetimeNowWithoutTzinfo
     body: "The use of `datetime.datetime.now()` without `tz` argument is not allowed"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18

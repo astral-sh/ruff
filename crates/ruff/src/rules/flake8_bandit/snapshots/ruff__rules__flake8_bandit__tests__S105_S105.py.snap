@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 20
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 25
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 28
@@ -200,7 +200,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -213,7 +213,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30
@@ -226,7 +226,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 31
@@ -239,7 +239,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 32
@@ -252,7 +252,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 33
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 37
@@ -278,7 +278,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 41
@@ -291,7 +291,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 42
@@ -304,7 +304,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 43
@@ -317,7 +317,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 44
@@ -330,7 +330,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 45
@@ -343,7 +343,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 46
@@ -356,7 +356,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 47
@@ -369,7 +369,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 49
@@ -382,7 +382,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 50
@@ -395,7 +395,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 51
@@ -408,7 +408,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 52
@@ -421,7 +421,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 53
@@ -434,7 +434,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 54
@@ -447,7 +447,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 55
@@ -460,7 +460,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"s3cr3t\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 56
@@ -473,7 +473,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"1\\n2\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 58
@@ -486,7 +486,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"3\\t4\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 61
@@ -499,7 +499,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordString
     body: "Possible hardcoded password: \"5\\r6\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 64

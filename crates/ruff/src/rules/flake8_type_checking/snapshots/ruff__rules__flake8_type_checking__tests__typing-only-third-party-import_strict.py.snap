@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypingOnlyThirdPartyImport
     body: "Move third-party import `pkg.bar.A` into a type-checking block"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 51

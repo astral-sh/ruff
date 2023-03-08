@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
     body: Boolean positional arg in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
     body: Boolean positional arg in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
     body: Boolean positional arg in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
     body: Boolean positional arg in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
     body: Boolean positional arg in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
     body: Boolean positional arg in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
     body: Boolean positional arg in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
     body: Boolean positional arg in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
     body: Boolean positional arg in function definition
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 81

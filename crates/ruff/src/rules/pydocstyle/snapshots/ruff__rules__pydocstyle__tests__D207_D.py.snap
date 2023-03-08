@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoUnderIndentation
     body: Docstring is under-indented
-    commit: Increase indentation
+    suggestion: Increase indentation
     fixable: true
   location:
     row: 232
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: NoUnderIndentation
     body: Docstring is under-indented
-    commit: Increase indentation
+    suggestion: Increase indentation
     fixable: true
   location:
     row: 244
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: NoUnderIndentation
     body: Docstring is under-indented
-    commit: Increase indentation
+    suggestion: Increase indentation
     fixable: true
   location:
     row: 440
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: NoUnderIndentation
     body: Docstring is under-indented
-    commit: Increase indentation
+    suggestion: Increase indentation
     fixable: true
   location:
     row: 441

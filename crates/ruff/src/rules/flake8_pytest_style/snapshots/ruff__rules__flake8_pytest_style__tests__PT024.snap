@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryAsyncioMarkOnFixture
     body: "`pytest.mark.asyncio` is unnecessary for fixtures"
-    commit: "Remove `pytest.mark.asyncio`"
+    suggestion: "Remove `pytest.mark.asyncio`"
     fixable: true
   location:
     row: 14
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryAsyncioMarkOnFixture
     body: "`pytest.mark.asyncio` is unnecessary for fixtures"
-    commit: "Remove `pytest.mark.asyncio`"
+    suggestion: "Remove `pytest.mark.asyncio`"
     fixable: true
   location:
     row: 20
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryAsyncioMarkOnFixture
     body: "`pytest.mark.asyncio` is unnecessary for fixtures"
-    commit: "Remove `pytest.mark.asyncio`"
+    suggestion: "Remove `pytest.mark.asyncio`"
     fixable: true
   location:
     row: 27
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryAsyncioMarkOnFixture
     body: "`pytest.mark.asyncio` is unnecessary for fixtures"
-    commit: "Remove `pytest.mark.asyncio`"
+    suggestion: "Remove `pytest.mark.asyncio`"
     fixable: true
   location:
     row: 33

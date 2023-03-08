@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`cgi` is banned: The cgi module is deprecated."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`cgi` is banned: The cgi module is deprecated."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`cgi` is banned: The cgi module is deprecated."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`cgi` is banned: The cgi module is deprecated."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`cgi` is banned: The cgi module is deprecated."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`cgi` is banned: The cgi module is deprecated."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 22
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 27
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: BannedApi
     body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 33

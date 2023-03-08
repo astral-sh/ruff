@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IsinstanceWithTuple
     body: "Use `X | Y` in `isinstance` call instead of `(X, Y)`"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: IsinstanceWithTuple
     body: "Use `X | Y` in `issubclass` call instead of `(X, Y)`"
-    commit: "Convert to `X | Y`"
+    suggestion: "Convert to `X | Y`"
     fixable: true
   location:
     row: 2

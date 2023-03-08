@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: IfTuple
     body: "If test is a tuple, which is always `True`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: IfTuple
     body: "If test is a tuple, which is always `True`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7

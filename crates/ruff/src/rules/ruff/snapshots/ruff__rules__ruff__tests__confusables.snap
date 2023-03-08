@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: AmbiguousUnicodeCharacterString
     body: "String contains ambiguous unicode character `𝐁` (did you mean `B`?)"
-    commit: "Replace `𝐁` with `B`"
+    suggestion: "Replace `𝐁` with `B`"
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: AmbiguousUnicodeCharacterDocstring
     body: "Docstring contains ambiguous unicode character `）` (did you mean `)`?)"
-    commit: "Replace `）` with `)`"
+    suggestion: "Replace `）` with `)`"
     fixable: true
   location:
     row: 6
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: AmbiguousUnicodeCharacterComment
     body: "Comment contains ambiguous unicode character `᜵` (did you mean `/`?)"
-    commit: "Replace `᜵` with `/`"
+    suggestion: "Replace `᜵` with `/`"
     fixable: true
   location:
     row: 7

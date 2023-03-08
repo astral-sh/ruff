@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: GlobalStatement
     body: "Using the global statement to update `CONSTANT` is discouraged"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 17
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: GlobalStatement
     body: "Using the global statement to update `sys` is discouraged"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 24
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: GlobalStatement
     body: "Using the global statement to update `namedtuple` is discouraged"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: GlobalStatement
     body: "Using the global statement to update `CONSTANT` is discouraged"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 36
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: GlobalStatement
     body: "Using the global statement to update `CONSTANT` is discouraged"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 43
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: GlobalStatement
     body: "Using the global statement to update `CONSTANT` is discouraged"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 50
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: GlobalStatement
     body: "Using the global statement to update `FUNC` is discouraged"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 60
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: GlobalStatement
     body: "Using the global statement to update `CLASS` is discouraged"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 70

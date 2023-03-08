@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NoSpaceAfterBlockComment
     body: "Block comment should start with `# `"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: NoSpaceAfterBlockComment
     body: "Block comment should start with `# `"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: NoSpaceAfterBlockComment
     body: "Block comment should start with `# `"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 25
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: NoSpaceAfterBlockComment
     body: "Block comment should start with `# `"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 32

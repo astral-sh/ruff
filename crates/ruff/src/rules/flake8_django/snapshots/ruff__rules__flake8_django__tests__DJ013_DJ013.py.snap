@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NonLeadingReceiverDecorator
     body: "`@receiver` decorator must be on top of all the other decorators"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: NonLeadingReceiverDecorator
     body: "`@receiver` decorator must be on top of all the other decorators"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 35

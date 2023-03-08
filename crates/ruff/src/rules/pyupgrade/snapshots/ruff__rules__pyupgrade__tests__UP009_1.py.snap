@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UTF8EncodingDeclaration
     body: UTF-8 encoding declaration is unnecessary
-    commit: Remove unnecessary coding comment
+    suggestion: Remove unnecessary coding comment
     fixable: true
   location:
     row: 2

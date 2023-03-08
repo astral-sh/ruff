@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ReplaceStdoutStderr
     body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    commit: "Replace with `capture_output` keyword argument"
+    suggestion: "Replace with `capture_output` keyword argument"
     fixable: true
   location:
     row: 4
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ReplaceStdoutStderr
     body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    commit: "Replace with `capture_output` keyword argument"
+    suggestion: "Replace with `capture_output` keyword argument"
     fixable: true
   location:
     row: 6
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ReplaceStdoutStderr
     body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    commit: "Replace with `capture_output` keyword argument"
+    suggestion: "Replace with `capture_output` keyword argument"
     fixable: true
   location:
     row: 8
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ReplaceStdoutStderr
     body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    commit: "Replace with `capture_output` keyword argument"
+    suggestion: "Replace with `capture_output` keyword argument"
     fixable: true
   location:
     row: 10
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: ReplaceStdoutStderr
     body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    commit: "Replace with `capture_output` keyword argument"
+    suggestion: "Replace with `capture_output` keyword argument"
     fixable: true
   location:
     row: 14
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: ReplaceStdoutStderr
     body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    commit: "Replace with `capture_output` keyword argument"
+    suggestion: "Replace with `capture_output` keyword argument"
     fixable: true
   location:
     row: 18
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: ReplaceStdoutStderr
     body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    commit: "Replace with `capture_output` keyword argument"
+    suggestion: "Replace with `capture_output` keyword argument"
     fixable: true
   location:
     row: 29

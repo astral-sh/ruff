@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Single quotes found but double quotes preferred
-    commit: Replace single quotes with double quotes
+    suggestion: Replace single quotes with double quotes
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Single quotes found but double quotes preferred
-    commit: Replace single quotes with double quotes
+    suggestion: Replace single quotes with double quotes
     fixable: true
   location:
     row: 2
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: BadQuotesInlineString
     body: Single quotes found but double quotes preferred
-    commit: Replace single quotes with double quotes
+    suggestion: Replace single quotes with double quotes
     fixable: true
   location:
     row: 3

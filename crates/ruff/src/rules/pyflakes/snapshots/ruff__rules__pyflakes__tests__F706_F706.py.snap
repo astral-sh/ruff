@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ReturnOutsideFunction
     body: "`return` statement outside of a function/method"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: ReturnOutsideFunction
     body: "`return` statement outside of a function/method"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 92
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 94
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 96
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 98
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 100
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 106
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 106
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 110
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 112
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 114
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 114
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
     body: Missing whitespace around arithmetic operator
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 116

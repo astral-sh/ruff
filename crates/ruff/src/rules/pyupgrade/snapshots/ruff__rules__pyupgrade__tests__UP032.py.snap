@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 5
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 7
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 9
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 11
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 13
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 15
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 17
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 19
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 21
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 23
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 25
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 27
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 29
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 31
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 33
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 35
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 37
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 39
@@ -365,7 +365,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 41
@@ -385,7 +385,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 43
@@ -405,7 +405,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 45
@@ -425,7 +425,7 @@ expression: diagnostics
 - kind:
     name: FString
     body: "Use f-string instead of `format` call"
-    commit: Convert to f-string
+    suggestion: Convert to f-string
     fixable: true
   location:
     row: 47

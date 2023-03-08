@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordDefault
     body: "Possible hardcoded password: \"default\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordDefault
     body: "Possible hardcoded password: \"posonly\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordDefault
     body: "Possible hardcoded password: \"kwonly\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 21
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordDefault
     body: "Possible hardcoded password: \"posonly\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: HardcodedPasswordDefault
     body: "Possible hardcoded password: \"kwonly\""
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29

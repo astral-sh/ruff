@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: NonLowercaseVariableInFunction
     body: "Variable `Camel` in function should be lowercase"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 14
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: NonLowercaseVariableInFunction
     body: "Variable `CONSTANT` in function should be lowercase"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 15

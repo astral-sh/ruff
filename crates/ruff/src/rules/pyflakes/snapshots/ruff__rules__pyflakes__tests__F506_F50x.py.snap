@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PercentFormatMixedPositionalAndNamed
     body: "`%`-format string has mixed positional and named placeholders"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: PercentFormatMixedPositionalAndNamed
     body: "`%`-format string has mixed positional and named placeholders"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: PercentFormatMixedPositionalAndNamed
     body: "`%`-format string has mixed positional and named placeholders"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11

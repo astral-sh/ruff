@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SectionNotOverIndented
     body: "Section is over-indented (\"Returns\")"
-    commit: "Remove over-indentation from \"Returns\""
+    suggestion: "Remove over-indentation from \"Returns\""
     fixable: true
   location:
     row: 135

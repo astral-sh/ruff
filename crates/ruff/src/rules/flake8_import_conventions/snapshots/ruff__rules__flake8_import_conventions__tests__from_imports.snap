@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`xml.dom.minidom` should be imported as `md`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`xml.dom.minidom` should be imported as `md`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 4
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`xml.dom.minidom` should be imported as `md`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`xml.dom.minidom` should be imported as `md`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 8
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: UnconventionalImportAlias
     body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 10

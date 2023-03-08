@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: MissingReturnTypePublicFunction
     body: "Missing return type annotation for public function `bar`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 29

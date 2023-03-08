@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: BlankLineContainsWhitespace
     body: Blank line contains whitespace
-    commit: Remove whitespace from blank line
+    suggestion: Remove whitespace from blank line
     fixable: true
   location:
     row: 7

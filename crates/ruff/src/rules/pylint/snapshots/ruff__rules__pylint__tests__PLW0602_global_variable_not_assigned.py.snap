@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: GlobalVariableNotAssigned
     body: "Using global for `X` but no assignment is done"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: GlobalVariableNotAssigned
     body: "Using global for `X` but no assignment is done"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9

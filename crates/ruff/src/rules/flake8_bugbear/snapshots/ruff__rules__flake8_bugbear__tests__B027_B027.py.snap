@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: EmptyMethodWithoutAbstractDecorator
     body: "`AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: EmptyMethodWithoutAbstractDecorator
     body: "`AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 16
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: EmptyMethodWithoutAbstractDecorator
     body: "`AbstractClass.empty_3` is an empty method in an abstract base class, but has no abstract decorator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: EmptyMethodWithoutAbstractDecorator
     body: "`AbstractClass.empty_4` is an empty method in an abstract base class, but has no abstract decorator"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 23

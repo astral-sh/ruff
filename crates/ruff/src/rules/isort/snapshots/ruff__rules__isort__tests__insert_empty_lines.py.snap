@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnsortedImports
     body: Import block is un-sorted or un-formatted
-    commit: Organize imports
+    suggestion: Organize imports
     fixable: true
   location:
     row: 1
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: UnsortedImports
     body: Import block is un-sorted or un-formatted
-    commit: Organize imports
+    suggestion: Organize imports
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: UnsortedImports
     body: Import block is un-sorted or un-formatted
-    commit: Organize imports
+    suggestion: Organize imports
     fixable: true
   location:
     row: 14
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: UnsortedImports
     body: Import block is un-sorted or un-formatted
-    commit: Organize imports
+    suggestion: Organize imports
     fixable: true
   location:
     row: 52

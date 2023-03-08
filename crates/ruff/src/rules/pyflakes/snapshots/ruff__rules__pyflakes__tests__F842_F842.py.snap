@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedAnnotation
     body: "Local variable `name` is annotated but never used"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 2
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnusedAnnotation
     body: "Local variable `age` is annotated but never used"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3

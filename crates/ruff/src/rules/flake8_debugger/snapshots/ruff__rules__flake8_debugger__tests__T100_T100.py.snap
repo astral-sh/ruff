@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: Debugger
     body: "Trace found: `breakpoint` used"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 1
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: Debugger
     body: "Import for `pdb` found"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: Debugger
     body: "Import for `builtins.breakpoint` found"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 5
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: Debugger
     body: "Import for `pdb.set_trace` found"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 6
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: Debugger
     body: "Import for `celery.contrib.rdb.set_trace` found"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 7
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: Debugger
     body: "Import for `celery.contrib.rdb` found"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 9
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: Debugger
     body: "Trace found: `builtins.breakpoint` used"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 11
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: Debugger
     body: "Trace found: `pdb.set_trace` used"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: Debugger
     body: "Trace found: `celery.contrib.rdb.set_trace` used"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 13

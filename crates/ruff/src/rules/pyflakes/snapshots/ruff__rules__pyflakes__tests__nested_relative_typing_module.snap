@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UndefinedName
     body: "Undefined name `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 26
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UndefinedName
     body: "Undefined name `foo`"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 33

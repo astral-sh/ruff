@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SyntaxError
     body: "SyntaxError: unindent does not match any outer indentation level"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 3

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: AbstractBaseClassWithoutAbstractMethod
     body: "`Base_1` is an abstract base class, but it has no abstract methods"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 18
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: AbstractBaseClassWithoutAbstractMethod
     body: "`MetaBase_1` is an abstract base class, but it has no abstract methods"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 71
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: AbstractBaseClassWithoutAbstractMethod
     body: "`abc_Base_1` is an abstract base class, but it has no abstract methods"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 82
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: AbstractBaseClassWithoutAbstractMethod
     body: "`abc_Base_2` is an abstract base class, but it has no abstract methods"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 87
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: AbstractBaseClassWithoutAbstractMethod
     body: "`notabc_Base_1` is an abstract base class, but it has no abstract methods"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 92
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: AbstractBaseClassWithoutAbstractMethod
     body: "`abc_set_class_variable_4` is an abstract base class, but it has no abstract methods"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 141

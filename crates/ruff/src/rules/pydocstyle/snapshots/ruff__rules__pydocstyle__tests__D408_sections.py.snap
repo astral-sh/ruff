@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SectionUnderlineAfterName
     body: "Section underline should be in the line following the section's name (\"Returns\")"
-    commit: "Add underline to \"Returns\""
+    suggestion: "Add underline to \"Returns\""
     fixable: true
   location:
     row: 85

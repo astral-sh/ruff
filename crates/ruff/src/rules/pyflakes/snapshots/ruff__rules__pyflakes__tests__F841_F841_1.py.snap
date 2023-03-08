@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `x` is assigned to but never used"
-    commit: "Remove assignment to unused variable `x`"
+    suggestion: "Remove assignment to unused variable `x`"
     fixable: true
   location:
     row: 6
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `y` is assigned to but never used"
-    commit: "Remove assignment to unused variable `y`"
+    suggestion: "Remove assignment to unused variable `y`"
     fixable: true
   location:
     row: 6
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `coords` is assigned to but never used"
-    commit: "Remove assignment to unused variable `coords`"
+    suggestion: "Remove assignment to unused variable `coords`"
     fixable: true
   location:
     row: 16
@@ -51,7 +51,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `coords` is assigned to but never used"
-    commit: "Remove assignment to unused variable `coords`"
+    suggestion: "Remove assignment to unused variable `coords`"
     fixable: true
   location:
     row: 20
@@ -71,7 +71,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `a` is assigned to but never used"
-    commit: "Remove assignment to unused variable `a`"
+    suggestion: "Remove assignment to unused variable `a`"
     fixable: true
   location:
     row: 24
@@ -84,7 +84,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `b` is assigned to but never used"
-    commit: "Remove assignment to unused variable `b`"
+    suggestion: "Remove assignment to unused variable `b`"
     fixable: true
   location:
     row: 24
@@ -97,7 +97,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `x` is assigned to but never used"
-    commit: "Remove assignment to unused variable `x`"
+    suggestion: "Remove assignment to unused variable `x`"
     fixable: true
   location:
     row: 24
@@ -110,7 +110,7 @@ expression: diagnostics
 - kind:
     name: UnusedVariable
     body: "Local variable `y` is assigned to but never used"
-    commit: "Remove assignment to unused variable `y`"
+    suggestion: "Remove assignment to unused variable `y`"
     fixable: true
   location:
     row: 24

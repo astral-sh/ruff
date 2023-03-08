@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Returns\")"
-    commit: "Add dashed line under \"Returns\""
+    suggestion: "Add dashed line under \"Returns\""
     fixable: true
   location:
     row: 42
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Returns\")"
-    commit: "Add dashed line under \"Returns\""
+    suggestion: "Add dashed line under \"Returns\""
     fixable: true
   location:
     row: 54
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Raises\")"
-    commit: "Add dashed line under \"Raises\""
+    suggestion: "Add dashed line under \"Raises\""
     fixable: true
   location:
     row: 207
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 252
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Returns\")"
-    commit: "Add dashed line under \"Returns\""
+    suggestion: "Add dashed line under \"Returns\""
     fixable: true
   location:
     row: 252
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Raises\")"
-    commit: "Add dashed line under \"Raises\""
+    suggestion: "Add dashed line under \"Raises\""
     fixable: true
   location:
     row: 252
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 269
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 284
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 301
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 313
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 325
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 337
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 350
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 362
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 371
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: DashedUnderlineAfterSection
     body: "Missing dashed underline after section (\"Args\")"
-    commit: "Add dashed line under \"Args\""
+    suggestion: "Add dashed line under \"Args\""
     fixable: true
   location:
     row: 490

@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 12
@@ -18,7 +18,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 19
@@ -31,7 +31,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 30
@@ -44,7 +44,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 37
@@ -57,7 +57,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 44
@@ -70,7 +70,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 51
@@ -83,7 +83,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 58
@@ -96,7 +96,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 65
@@ -109,7 +109,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 72
@@ -122,7 +122,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 79
@@ -135,7 +135,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 86
@@ -148,7 +148,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 95
@@ -161,7 +161,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 104
@@ -174,7 +174,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 111
@@ -187,7 +187,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 118
@@ -200,7 +200,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 125
@@ -213,7 +213,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 132
@@ -226,7 +226,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 139
@@ -239,7 +239,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 146
@@ -252,7 +252,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 153
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 160
@@ -278,7 +278,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 167
@@ -291,7 +291,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 174
@@ -304,7 +304,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 181
@@ -317,7 +317,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 188
@@ -330,7 +330,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 195
@@ -343,7 +343,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 202
@@ -356,7 +356,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 209
@@ -369,7 +369,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 216
@@ -382,7 +382,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 223
@@ -395,7 +395,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 230
@@ -408,7 +408,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 267
@@ -421,7 +421,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 277
@@ -434,7 +434,7 @@ expression: diagnostics
 - kind:
     name: PreferTypeError
     body: "Prefer `TypeError` exception for invalid type"
-    commit: ~
+    suggestion: ~
     fixable: false
   location:
     row: 288

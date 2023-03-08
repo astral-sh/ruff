@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: DictGetWithDefault
     body: "Use `var = a_dict.get(key, \"default1\")` instead of an `if` block"
-    commit: "Replace with `var = a_dict.get(key, \"default1\")`"
+    suggestion: "Replace with `var = a_dict.get(key, \"default1\")`"
     fixable: true
   location:
     row: 6
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: DictGetWithDefault
     body: "Use `var = a_dict.get(key, \"default2\")` instead of an `if` block"
-    commit: "Replace with `var = a_dict.get(key, \"default2\")`"
+    suggestion: "Replace with `var = a_dict.get(key, \"default2\")`"
     fixable: true
   location:
     row: 12
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: DictGetWithDefault
     body: "Use `var = a_dict.get(key, val1 + val2)` instead of an `if` block"
-    commit: "Replace with `var = a_dict.get(key, val1 + val2)`"
+    suggestion: "Replace with `var = a_dict.get(key, val1 + val2)`"
     fixable: true
   location:
     row: 18
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: DictGetWithDefault
     body: "Use `var = a_dict.get(keys[idx], \"default\")` instead of an `if` block"
-    commit: "Replace with `var = a_dict.get(keys[idx], \"default\")`"
+    suggestion: "Replace with `var = a_dict.get(keys[idx], \"default\")`"
     fixable: true
   location:
     row: 24
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: DictGetWithDefault
     body: "Use `var = dicts[idx].get(key, \"default\")` instead of an `if` block"
-    commit: "Replace with `var = dicts[idx].get(key, \"default\")`"
+    suggestion: "Replace with `var = dicts[idx].get(key, \"default\")`"
     fixable: true
   location:
     row: 30
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: DictGetWithDefault
     body: "Use `vars[idx] = a_dict.get(key, \"default\")` instead of an `if` block"
-    commit: "Replace with `vars[idx] = a_dict.get(key, \"default\")`"
+    suggestion: "Replace with `vars[idx] = a_dict.get(key, \"default\")`"
     fixable: true
   location:
     row: 36
