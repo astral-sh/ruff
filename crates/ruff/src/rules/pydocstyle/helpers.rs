@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::str::Lines;
 
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::{map_callable, to_call_path};
@@ -7,63 +8,47 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 
 pub struct LinesWhenConsiderLineContinuation<'a> {
-    underlying: &'a str,
-    new_line_start: usize,
+    underlying: Lines<'a>,
 }
 
 impl<'a> Iterator for LinesWhenConsiderLineContinuation<'a> {
     type Item = (String, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.new_line_start >= self.underlying.len() {
-            return None;
-        }
-
-        let bytes = self.underlying.as_bytes();
-
         let mut ret = String::new();
         let mut actual_lines = 0_usize;
-        let mut prev_line_start = self.new_line_start;
 
         // given a valid utf-8 string
         // new_line_start always starts at a valid code point
-        while let Some(line_end) = self.underlying[self.new_line_start..].find('\n') {
-            let abs_pos = prev_line_start + line_end;
-
+        for line in self.underlying.by_ref() {
             actual_lines += 1;
-            self.new_line_start = abs_pos + 1;
 
             // 0x5c is \ in ASCII
             // for utf-8 encoding str, only \'s last byte is equal to 0x0a
-            if abs_pos == 0 || bytes[abs_pos - 1] != 0x5c {
-                ret.push_str(&self.underlying[prev_line_start..=abs_pos]);
+            if !line.as_bytes().ends_with(&[0x5c]) {
+                ret.push_str(line);
                 break;
             }
 
             // we know line_end - 1 is \
             // so, it is a valid code point
             // we ignore "\\\n" here because we want to correctly reflect the number of blank lines
-            ret.push_str(&self.underlying[prev_line_start..abs_pos - 1]);
+            ret.push_str(&line[..line.len() - 1]);
+        }
 
-            prev_line_start = self.new_line_start;
+        if actual_lines == 0 {
+            return None;
         }
 
         // no more new line => consume entire string
-        if prev_line_start == self.new_line_start {
-            actual_lines += 1;
-            self.new_line_start = self.underlying.len();
-            ret.push_str(&self.underlying[prev_line_start..self.new_line_start]);
-        }
-
         Some((ret, actual_lines))
     }
 }
 
 impl<'a> LinesWhenConsiderLineContinuation<'a> {
-    pub fn new(underlying: &'a str) -> LinesWhenConsiderLineContinuation<'a> {
+    pub fn from(input: &'a str) -> LinesWhenConsiderLineContinuation<'a> {
         LinesWhenConsiderLineContinuation {
-            underlying,
-            new_line_start: 0,
+            underlying: input.lines(),
         }
     }
 }

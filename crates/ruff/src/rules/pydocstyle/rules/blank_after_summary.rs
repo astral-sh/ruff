@@ -88,7 +88,7 @@ fn do_raw_string_line_count(content: &str) -> Strategy {
 
 // Behaviors are similar to above
 fn do_normal_string_line_count(content: &str) -> Strategy {
-    let mut lines = LinesWhenConsiderLineContinuation::new(content.trim());
+    let mut lines = LinesWhenConsiderLineContinuation::from(content.trim());
 
     // Considering line continuation means that summary can >= 1
     let mut summary_lines_count = 0_usize;
