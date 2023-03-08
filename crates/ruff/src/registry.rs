@@ -891,7 +891,7 @@ pub struct DiagnosticKind {
     /// The message body to display to the user, to explain the diagnostic.
     pub body: String,
     /// The message to display to the user, to explain the suggested fix.
-    pub commit: Option<String>,
+    pub suggestion: Option<String>,
     /// Whether the diagnostic is automatically fixable.
     pub fixable: bool,
 }
