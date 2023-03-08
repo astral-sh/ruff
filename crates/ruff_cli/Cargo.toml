@@ -14,8 +14,6 @@ license = "MIT"
 
 [[bin]]
 name = "ruff"
-path = "src/main.rs"
-doctest = false
 
 # Since the name of the binary is the same as the name of the `ruff` crate
 # running `cargo doc --no-deps --all` results in an `output filename collision`
