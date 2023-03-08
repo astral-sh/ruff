@@ -11,7 +11,9 @@ pub use duplicate_exceptions::{
     duplicate_exceptions, DuplicateHandlerException, DuplicateTryBlockException,
 };
 pub use except_with_empty_tuple::{except_with_empty_tuple, ExceptWithEmptyTuple};
-pub use except_with_non_exception_classes::{except_with_non_exception_classes, ExceptWithNonExceptionClasses};
+pub use except_with_non_exception_classes::{
+    except_with_non_exception_classes, ExceptWithNonExceptionClasses,
+};
 pub use f_string_docstring::{f_string_docstring, FStringDocstring};
 pub use function_call_argument_default::{
     function_call_argument_default, FunctionCallArgumentDefault,
