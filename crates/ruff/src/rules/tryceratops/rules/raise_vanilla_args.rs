@@ -48,7 +48,7 @@ pub fn raise_vanilla_args(checker: &mut Checker, expr: &Expr) {
             {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(RaiseVanillaArgs, Range::from_located(expr)));
+                    .push(Diagnostic::new(RaiseVanillaArgs, Range::from(expr)));
             }
         }
     }

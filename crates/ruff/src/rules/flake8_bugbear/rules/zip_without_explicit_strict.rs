@@ -35,10 +35,9 @@ pub fn zip_without_explicit_strict(
                     .map_or(false, |name| name == "strict")
             })
         {
-            checker.diagnostics.push(Diagnostic::new(
-                ZipWithoutExplicitStrict,
-                Range::from_located(expr),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(ZipWithoutExplicitStrict, Range::from(expr)));
         }
     }
 }

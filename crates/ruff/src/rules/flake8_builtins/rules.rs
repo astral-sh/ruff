@@ -192,7 +192,7 @@ pub fn builtin_shadowing<T>(
                 }
                 .into(),
             },
-            Range::from_located(located),
+            Range::from(located),
         ))
     } else {
         None

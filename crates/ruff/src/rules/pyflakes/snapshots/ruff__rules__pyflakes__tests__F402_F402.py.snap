@@ -1,11 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImportShadowedByLoopVar:
-      name: os
-      line: 1
+    name: ImportShadowedByLoopVar
+    body: "Import `os` from line 1 shadowed by loop variable"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 4
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportShadowedByLoopVar:
-      name: path
-      line: 2
+    name: ImportShadowedByLoopVar
+    body: "Import `path` from line 2 shadowed by loop variable"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 4

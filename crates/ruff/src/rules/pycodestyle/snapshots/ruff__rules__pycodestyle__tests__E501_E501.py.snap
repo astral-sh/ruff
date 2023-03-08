@@ -1,11 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LineTooLong:
-      - 123
-      - 88
+    name: LineTooLong
+    body: Line too long (123 > 88 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 88
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    LineTooLong:
-      - 127
-      - 88
+    name: LineTooLong
+    body: Line too long (127 > 88 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 25
     column: 88
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    LineTooLong:
-      - 132
-      - 88
+    name: LineTooLong
+    body: Line too long (132 > 88 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 40
     column: 88
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    LineTooLong:
-      - 105
-      - 88
+    name: LineTooLong
+    body: Line too long (105 > 88 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 43
     column: 88
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    LineTooLong:
-      - 129
-      - 88
+    name: LineTooLong
+    body: Line too long (129 > 88 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 61
     column: 88

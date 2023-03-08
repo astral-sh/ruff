@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CapitalizeSectionName:
-      name: returns
+    name: CapitalizeSectionName
+    body: "Section name should be properly capitalized (\"returns\")"
+    suggestion: "Capitalize \"returns\""
+    fixable: true
   location:
     row: 17
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    CapitalizeSectionName:
-      name: Short summary
+    name: CapitalizeSectionName
+    body: "Section name should be properly capitalized (\"Short summary\")"
+    suggestion: "Capitalize \"Short summary\""
+    fixable: true
   location:
     row: 207
     column: 4

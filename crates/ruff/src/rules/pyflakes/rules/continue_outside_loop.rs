@@ -46,9 +46,6 @@ pub fn continue_outside_loop<'a>(
     if allowed {
         None
     } else {
-        Some(Diagnostic::new(
-            ContinueOutsideLoop,
-            Range::from_located(stmt),
-        ))
+        Some(Diagnostic::new(ContinueOutsideLoop, Range::from(stmt)))
     }
 }

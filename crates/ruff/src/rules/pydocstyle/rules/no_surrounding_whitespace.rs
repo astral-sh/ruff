@@ -1,5 +1,5 @@
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::strings::leading_quote;
+use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 
@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -40,8 +40,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     if line == trimmed {
         return;
     }
-    let mut diagnostic =
-        Diagnostic::new(NoSurroundingWhitespace, Range::from_located(docstring.expr));
+    let mut diagnostic = Diagnostic::new(NoSurroundingWhitespace, Range::from(docstring.expr));
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(pattern) = leading_quote(contents) {
             // If removing whitespace would lead to an invalid string of quote

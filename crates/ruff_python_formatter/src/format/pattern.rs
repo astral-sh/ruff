@@ -1,7 +1,8 @@
+use rustpython_parser::ast::Constant;
+
 use ruff_formatter::prelude::*;
 use ruff_formatter::write;
 use ruff_text_size::TextSize;
-use rustpython_parser::ast::Constant;
 
 use crate::context::ASTFormatContext;
 use crate::cst::{Pattern, PatternKind};

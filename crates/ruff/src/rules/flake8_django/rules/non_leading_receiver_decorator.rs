@@ -69,7 +69,7 @@ where
         if i > 0 && is_receiver && !seen_receiver {
             diagnostics.push(Diagnostic::new(
                 NonLeadingReceiverDecorator,
-                Range::from_located(decorator),
+                Range::from(decorator),
             ));
         }
         if !is_receiver && seen_receiver {

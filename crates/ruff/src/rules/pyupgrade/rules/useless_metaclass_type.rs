@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -45,7 +45,7 @@ fn rule(targets: &[Expr], value: &Expr, location: Range) -> Option<Diagnostic> {
 /// UP001
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
     let Some(mut diagnostic) =
-        rule(targets, value, Range::from_located(stmt)) else {
+        rule(targets, value, Range::from(stmt)) else {
             return;
         };
     if checker.patch(diagnostic.kind.rule()) {

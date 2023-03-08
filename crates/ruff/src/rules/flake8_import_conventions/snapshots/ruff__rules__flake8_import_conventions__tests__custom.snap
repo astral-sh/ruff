@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnconventionalImportAlias:
-      - altair
-      - alt
+    name: UnconventionalImportAlias
+    body: "`altair` should be imported as `alt`"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - dask.array
-      - da
+    name: UnconventionalImportAlias
+    body: "`dask.array` should be imported as `da`"
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - dask.dataframe
-      - dd
+    name: UnconventionalImportAlias
+    body: "`dask.dataframe` should be imported as `dd`"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 0
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - matplotlib.pyplot
-      - plt
+    name: UnconventionalImportAlias
+    body: "`matplotlib.pyplot` should be imported as `plt`"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - numpy
-      - np
+    name: UnconventionalImportAlias
+    body: "`numpy` should be imported as `np`"
+    suggestion: ~
+    fixable: false
   location:
     row: 7
     column: 0
@@ -63,9 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - pandas
-      - pd
+    name: UnconventionalImportAlias
+    body: "`pandas` should be imported as `pd`"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 0
@@ -75,9 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - seaborn
-      - sns
+    name: UnconventionalImportAlias
+    body: "`seaborn` should be imported as `sns`"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -87,9 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - tensorflow
-      - tf
+    name: UnconventionalImportAlias
+    body: "`tensorflow` should be imported as `tf`"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 0
@@ -99,9 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - holoviews
-      - hv
+    name: UnconventionalImportAlias
+    body: "`holoviews` should be imported as `hv`"
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 0
@@ -111,9 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - panel
-      - pn
+    name: UnconventionalImportAlias
+    body: "`panel` should be imported as `pn`"
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 0
@@ -123,9 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - plotly.express
-      - px
+    name: UnconventionalImportAlias
+    body: "`plotly.express` should be imported as `px`"
+    suggestion: ~
+    fixable: false
   location:
     row: 13
     column: 0
@@ -135,9 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - matplotlib
-      - mpl
+    name: UnconventionalImportAlias
+    body: "`matplotlib` should be imported as `mpl`"
+    suggestion: ~
+    fixable: false
   location:
     row: 14
     column: 0
@@ -147,9 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - polars
-      - pl
+    name: UnconventionalImportAlias
+    body: "`polars` should be imported as `pl`"
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 0
@@ -159,9 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - pyarrow
-      - pa
+    name: UnconventionalImportAlias
+    body: "`pyarrow` should be imported as `pa`"
+    suggestion: ~
+    fixable: false
   location:
     row: 16
     column: 0
@@ -171,9 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - altair
-      - alt
+    name: UnconventionalImportAlias
+    body: "`altair` should be imported as `alt`"
+    suggestion: ~
+    fixable: false
   location:
     row: 18
     column: 0
@@ -183,9 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - matplotlib.pyplot
-      - plt
+    name: UnconventionalImportAlias
+    body: "`matplotlib.pyplot` should be imported as `plt`"
+    suggestion: ~
+    fixable: false
   location:
     row: 19
     column: 0
@@ -195,9 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - dask.array
-      - da
+    name: UnconventionalImportAlias
+    body: "`dask.array` should be imported as `da`"
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 0
@@ -207,9 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - dask.dataframe
-      - dd
+    name: UnconventionalImportAlias
+    body: "`dask.dataframe` should be imported as `dd`"
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 0
@@ -219,9 +237,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - numpy
-      - np
+    name: UnconventionalImportAlias
+    body: "`numpy` should be imported as `np`"
+    suggestion: ~
+    fixable: false
   location:
     row: 22
     column: 0
@@ -231,9 +250,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - pandas
-      - pd
+    name: UnconventionalImportAlias
+    body: "`pandas` should be imported as `pd`"
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 0
@@ -243,9 +263,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - seaborn
-      - sns
+    name: UnconventionalImportAlias
+    body: "`seaborn` should be imported as `sns`"
+    suggestion: ~
+    fixable: false
   location:
     row: 24
     column: 0
@@ -255,9 +276,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - tensorflow
-      - tf
+    name: UnconventionalImportAlias
+    body: "`tensorflow` should be imported as `tf`"
+    suggestion: ~
+    fixable: false
   location:
     row: 25
     column: 0
@@ -267,9 +289,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - holoviews
-      - hv
+    name: UnconventionalImportAlias
+    body: "`holoviews` should be imported as `hv`"
+    suggestion: ~
+    fixable: false
   location:
     row: 26
     column: 0
@@ -279,9 +302,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - panel
-      - pn
+    name: UnconventionalImportAlias
+    body: "`panel` should be imported as `pn`"
+    suggestion: ~
+    fixable: false
   location:
     row: 27
     column: 0
@@ -291,9 +315,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - plotly.express
-      - px
+    name: UnconventionalImportAlias
+    body: "`plotly.express` should be imported as `px`"
+    suggestion: ~
+    fixable: false
   location:
     row: 28
     column: 0
@@ -303,9 +328,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - matplotlib
-      - mpl
+    name: UnconventionalImportAlias
+    body: "`matplotlib` should be imported as `mpl`"
+    suggestion: ~
+    fixable: false
   location:
     row: 29
     column: 0
@@ -315,9 +341,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - polars
-      - pl
+    name: UnconventionalImportAlias
+    body: "`polars` should be imported as `pl`"
+    suggestion: ~
+    fixable: false
   location:
     row: 30
     column: 0
@@ -327,9 +354,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnconventionalImportAlias:
-      - pyarrow
-      - pa
+    name: UnconventionalImportAlias
+    body: "`pyarrow` should be imported as `pa`"
+    suggestion: ~
+    fixable: false
   location:
     row: 31
     column: 0

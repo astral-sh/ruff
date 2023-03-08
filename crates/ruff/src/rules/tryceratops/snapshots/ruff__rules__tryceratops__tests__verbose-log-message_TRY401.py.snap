@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 expression: diagnostics
 ---
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 44
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 19
     column: 52
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 44
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 50
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 44
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 24
     column: 44
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 27
     column: 48
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 39
     column: 46
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 46
     column: 52
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    VerboseLogMessage: ~
+    name: VerboseLogMessage
+    body: "Redundant exception object included in `logging.exception` call"
+    suggestion: ~
+    fixable: false
   location:
     row: 53
     column: 46

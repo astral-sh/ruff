@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_return/mod.rs
+source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SuperfluousElseReturn:
-      branch: Elif
+    name: SuperfluousElseReturn
+    body: "Unnecessary `elif` after `return` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn:
-      branch: Elif
+    name: SuperfluousElseReturn
+    body: "Unnecessary `elif` after `return` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 4
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn:
-      branch: Elif
+    name: SuperfluousElseReturn
+    body: "Unnecessary `elif` after `return` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 41
     column: 4
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn:
-      branch: Else
+    name: SuperfluousElseReturn
+    body: "Unnecessary `else` after `return` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 53
     column: 4
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn:
-      branch: Else
+    name: SuperfluousElseReturn
+    body: "Unnecessary `else` after `return` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 64
     column: 8
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn:
-      branch: Else
+    name: SuperfluousElseReturn
+    body: "Unnecessary `else` after `return` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 79
     column: 4
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn:
-      branch: Else
+    name: SuperfluousElseReturn
+    body: "Unnecessary `else` after `return` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 89
     column: 8
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseReturn:
-      branch: Else
+    name: SuperfluousElseReturn
+    body: "Unnecessary `else` after `return` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 99
     column: 4

@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedImport:
-      name: foo.baz
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo.baz` imported but unused"
+    suggestion: "Remove unused import: `foo.baz`"
+    fixable: true
   location:
     row: 4
     column: 21

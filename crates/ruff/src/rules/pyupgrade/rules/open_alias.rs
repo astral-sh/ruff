@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -29,7 +29,7 @@ pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["io", "open"])
     {
-        let mut diagnostic = Diagnostic::new(OpenAlias, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(OpenAlias, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "open".to_string(),

@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -112,7 +112,7 @@ pub fn unnecessary_double_cast_or_process(
         || (outer == "set" && inner == "set")
         || ((outer == "list" || outer == "tuple") && (inner == "list" || inner == "tuple"))
     {
-        let mut diagnostic = create_diagnostic(inner, outer, Range::from_located(expr));
+        let mut diagnostic = create_diagnostic(inner, outer, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
             if let Ok(fix) = fixes::fix_unnecessary_double_cast_or_process(
                 checker.locator,

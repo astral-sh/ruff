@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TripleSingleQuotes: ~
+    name: TripleSingleQuotes
+    body: "Use triple double quotes `\"\"\"`"
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 0

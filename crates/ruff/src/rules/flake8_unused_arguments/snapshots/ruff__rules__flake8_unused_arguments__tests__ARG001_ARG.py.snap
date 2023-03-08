@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_unused_arguments/mod.rs
+source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedFunctionArgument:
-      name: self
+    name: UnusedFunctionArgument
+    body: "Unused function argument: `self`"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 6
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument:
-      name: x
+    name: UnusedFunctionArgument
+    body: "Unused function argument: `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 12
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument:
-      name: cls
+    name: UnusedFunctionArgument
+    body: "Unused function argument: `cls`"
+    suggestion: ~
+    fixable: false
   location:
     row: 13
     column: 6
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument:
-      name: x
+    name: UnusedFunctionArgument
+    body: "Unused function argument: `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 13
     column: 11
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument:
-      name: self
+    name: UnusedFunctionArgument
+    body: "Unused function argument: `self`"
+    suggestion: ~
+    fixable: false
   location:
     row: 17
     column: 6
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument:
-      name: x
+    name: UnusedFunctionArgument
+    body: "Unused function argument: `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 17
     column: 12
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument:
-      name: cls
+    name: UnusedFunctionArgument
+    body: "Unused function argument: `cls`"
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 6
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedFunctionArgument:
-      name: x
+    name: UnusedFunctionArgument
+    body: "Unused function argument: `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 11

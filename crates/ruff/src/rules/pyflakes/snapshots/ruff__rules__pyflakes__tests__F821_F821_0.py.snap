@@ -1,10 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UndefinedName:
-      name: self
+    name: UndefinedName
+    body: "Undefined name `self`"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 11
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: self
+    name: UndefinedName
+    body: "Undefined name `self`"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 12
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: self
+    name: UndefinedName
+    body: "Undefined name `self`"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 8
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: numeric_string
+    name: UndefinedName
+    body: "Undefined name `numeric_string`"
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 11
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: Bar
+    name: UndefinedName
+    body: "Undefined name `Bar`"
+    suggestion: ~
+    fixable: false
   location:
     row: 58
     column: 3
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: TOMATO
+    name: UndefinedName
+    body: "Undefined name `TOMATO`"
+    suggestion: ~
+    fixable: false
   location:
     row: 83
     column: 10
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: B
+    name: UndefinedName
+    body: "Undefined name `B`"
+    suggestion: ~
+    fixable: false
   location:
     row: 87
     column: 7
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: B
+    name: UndefinedName
+    body: "Undefined name `B`"
+    suggestion: ~
+    fixable: false
   location:
     row: 90
     column: 7
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: B
+    name: UndefinedName
+    body: "Undefined name `B`"
+    suggestion: ~
+    fixable: false
   location:
     row: 92
     column: 10
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: B
+    name: UndefinedName
+    body: "Undefined name `B`"
+    suggestion: ~
+    fixable: false
   location:
     row: 93
     column: 13
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: PEP593Test123
+    name: UndefinedName
+    body: "Undefined name `PEP593Test123`"
+    suggestion: ~
+    fixable: false
   location:
     row: 115
     column: 8
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: foo
+    name: UndefinedName
+    body: "Undefined name `foo`"
+    suggestion: ~
+    fixable: false
   location:
     row: 123
     column: 13
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: bar
+    name: UndefinedName
+    body: "Undefined name `bar`"
+    suggestion: ~
+    fixable: false
   location:
     row: 123
     column: 20

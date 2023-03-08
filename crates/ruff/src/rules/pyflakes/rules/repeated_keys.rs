@@ -10,7 +10,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
@@ -107,7 +107,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                                     name: unparse_expr(key, checker.stylist),
                                     repeated_value: is_duplicate_value,
                                 },
-                                Range::from_located(key),
+                                Range::from(key),
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
@@ -135,7 +135,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                                     name: dict_key.to_string(),
                                     repeated_value: is_duplicate_value,
                                 },
-                                Range::from_located(key),
+                                Range::from(key),
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {

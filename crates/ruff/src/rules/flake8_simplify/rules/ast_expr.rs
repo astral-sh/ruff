@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -67,7 +67,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
             expected: capital_env_var.clone(),
             original: env_var.clone(),
         },
-        Range::from_located(arg),
+        Range::from(arg),
     );
     if checker.patch(diagnostic.kind.rule()) {
         let new_env_var = create_expr(ExprKind::Constant {
@@ -109,7 +109,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             expected: capital_env_var.clone(),
             original: env_var.clone(),
         },
-        Range::from_located(slice),
+        Range::from(slice),
     );
     if checker.patch(diagnostic.kind.rule()) {
         let new_env_var = create_expr(ExprKind::Constant {

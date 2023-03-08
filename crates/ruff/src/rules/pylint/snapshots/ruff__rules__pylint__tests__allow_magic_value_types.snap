@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MagicValueComparison:
-      value: "\"Hunter2\""
+    name: MagicValueComparison
+    body: "Magic value used in comparison, consider replacing \"Hunter2\" with a constant variable"
+    suggestion: ~
+    fixable: false
   location:
     row: 59
     column: 21
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MagicValueComparison:
-      value: "3.141592653589793"
+    name: MagicValueComparison
+    body: "Magic value used in comparison, consider replacing 3.141592653589793 with a constant variable"
+    suggestion: ~
+    fixable: false
   location:
     row: 65
     column: 20
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MagicValueComparison:
-      value: "b\"something\""
+    name: MagicValueComparison
+    body: "Magic value used in comparison, consider replacing b\"something\" with a constant variable"
+    suggestion: ~
+    fixable: false
   location:
     row: 74
     column: 17

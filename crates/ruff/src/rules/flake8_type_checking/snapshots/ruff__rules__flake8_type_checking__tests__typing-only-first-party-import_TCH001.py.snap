@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_type_checking/mod.rs
+source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypingOnlyFirstPartyImport:
-      full_name: ".TYP001"
+    name: TypingOnlyFirstPartyImport
+    body: "Move application import `.TYP001` into a type-checking block"
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 18

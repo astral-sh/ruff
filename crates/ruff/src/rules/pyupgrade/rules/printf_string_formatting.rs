@@ -7,7 +7,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::strings::{leading_quote, trailing_quote};
+use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -15,7 +15,7 @@ use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -140,10 +140,7 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple(checker: &mut Checker, right: &Expr) -> String {
-    let mut contents = checker
-        .locator
-        .slice(Range::from_located(right))
-        .to_string();
+    let mut contents = checker.locator.slice(right).to_string();
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
             if right.location.row() == right.end_location.unwrap().row() {
@@ -196,7 +193,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                             }
                         }
 
-                        let value_string = checker.locator.slice(Range::from_located(value));
+                        let value_string = checker.locator.slice(value);
                         arguments.push(format!("{key_string}={value_string}"));
                     } else {
                         // If there are any non-string keys, abort.
@@ -204,7 +201,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                     }
                 }
                 None => {
-                    let value_string = checker.locator.slice(Range::from_located(value));
+                    let value_string = checker.locator.slice(value);
                     arguments.push(format!("**{value_string}"));
                 }
             }
@@ -319,12 +316,8 @@ pub(crate) fn printf_string_formatting(
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<(Location, Location)> = vec![];
     let mut extension = None;
-    for (start, tok, end) in lexer::lex_located(
-        checker.locator.slice(Range::from_located(expr)),
-        Mode::Module,
-        expr.location,
-    )
-    .flatten()
+    for (start, tok, end) in
+        lexer::lex_located(checker.locator.slice(expr), Mode::Module, expr.location).flatten()
     {
         if matches!(tok, Tok::String { .. }) {
             strings.push((start, end));
@@ -401,7 +394,7 @@ pub(crate) fn printf_string_formatting(
     // Add the `.format` call.
     contents.push_str(&format!(".format{params_string}"));
 
-    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,

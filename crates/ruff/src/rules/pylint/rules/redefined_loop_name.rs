@@ -346,7 +346,7 @@ pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,
                     },
-                    Range::from_located(inner_assignment_target.expr),
+                    Range::from(inner_assignment_target.expr),
                 ));
             }
         }

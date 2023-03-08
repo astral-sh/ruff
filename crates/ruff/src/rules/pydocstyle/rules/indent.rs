@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 #[violation]
@@ -123,7 +123,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         if has_seen_tab {
             checker.diagnostics.push(Diagnostic::new(
                 IndentWithSpaces,
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             ));
         }
     }

@@ -1,32 +1,7 @@
 use rustpython_parser::ast::Location;
 
-use crate::core::locator::Locator;
-use crate::core::types::Range;
-
-/// Return the leading quote for a string or byte literal (e.g., `"""`).
-pub fn leading_quote(content: &str) -> Option<&str> {
-    if let Some(first_line) = content.lines().next() {
-        for pattern in ruff_python_stdlib::str::TRIPLE_QUOTE_PREFIXES
-            .iter()
-            .chain(ruff_python_stdlib::bytes::TRIPLE_QUOTE_PREFIXES)
-            .chain(ruff_python_stdlib::str::SINGLE_QUOTE_PREFIXES)
-            .chain(ruff_python_stdlib::bytes::SINGLE_QUOTE_PREFIXES)
-        {
-            if first_line.starts_with(pattern) {
-                return Some(pattern);
-            }
-        }
-    }
-    None
-}
-
-/// Return the trailing quote string for a string or byte literal (e.g., `"""`).
-pub fn trailing_quote(content: &str) -> Option<&&str> {
-    ruff_python_stdlib::str::TRIPLE_QUOTE_SUFFIXES
-        .iter()
-        .chain(ruff_python_stdlib::str::SINGLE_QUOTE_SUFFIXES)
-        .find(|&pattern| content.ends_with(pattern))
-}
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
 /// Return `true` if the given string is a radix literal (e.g., `0b101`).
 pub fn is_radix_literal(content: &str) -> bool {
@@ -45,9 +20,8 @@ pub fn find_tok(
     locator: &Locator,
     f: impl Fn(rustpython_parser::Tok) -> bool,
 ) -> (Location, Location) {
-    let (source, start_index, end_index) = locator.slice(Range::new(location, end_location));
     for (start, tok, end) in rustpython_parser::lexer::lex_located(
-        &source[start_index..end_index],
+        locator.slice(Range::new(location, end_location)),
         rustpython_parser::Mode::Module,
         location,
     )
@@ -73,8 +47,8 @@ pub fn expand_indented_block(
     locator: &Locator,
 ) -> (Location, Location) {
     let contents = locator.contents();
-    let start_index = locator.index(location);
-    let end_index = locator.index(end_location);
+    let start_index = locator.offset(location);
+    let end_index = locator.offset(end_location);
 
     // Find the colon, which indicates the end of the header.
     let mut nesting = 0;
@@ -101,7 +75,7 @@ pub fn expand_indented_block(
         }
     }
     let colon_location = colon.unwrap();
-    let colon_index = locator.index(colon_location);
+    let colon_index = locator.offset(colon_location);
 
     // From here, we have two options: simple statement or compound statement.
     let indent = rustpython_parser::lexer::lex_located(
@@ -145,40 +119,10 @@ pub fn expand_indented_block(
 /// Return true if the `orelse` block of an `if` statement is an `elif` statement.
 pub fn is_elif(orelse: &[rustpython_parser::ast::Stmt], locator: &Locator) -> bool {
     if orelse.len() == 1 && matches!(orelse[0].node, rustpython_parser::ast::StmtKind::If { .. }) {
-        let (source, start, end) = locator.slice(Range::new(
-            orelse[0].location,
-            orelse[0].end_location.unwrap(),
-        ));
-        if source[start..end].starts_with("elif") {
+        let contents = locator.skip(orelse[0].location);
+        if contents.starts_with("elif") {
             return true;
         }
     }
     false
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_prefixes() {
-        let prefixes = ruff_python_stdlib::str::TRIPLE_QUOTE_PREFIXES
-            .iter()
-            .chain(ruff_python_stdlib::bytes::TRIPLE_QUOTE_PREFIXES)
-            .chain(ruff_python_stdlib::str::SINGLE_QUOTE_PREFIXES)
-            .chain(ruff_python_stdlib::bytes::SINGLE_QUOTE_PREFIXES)
-            .collect::<Vec<_>>();
-        for i in 1..prefixes.len() {
-            for j in 0..i - 1 {
-                if i != j {
-                    if prefixes[i].starts_with(prefixes[j]) {
-                        assert!(
-                            !prefixes[i].starts_with(prefixes[j]),
-                            "Prefixes are not unique: {} starts with {}",
-                            prefixes[i],
-                            prefixes[j]
-                        );
-                    }
-                }
-            }
-        }
-    }
 }

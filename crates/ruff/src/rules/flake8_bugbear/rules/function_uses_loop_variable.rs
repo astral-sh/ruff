@@ -40,8 +40,8 @@ where
     fn visit_expr(&mut self, expr: &'b Expr) {
         match &expr.node {
             ExprKind::Name { id, ctx } => match ctx {
-                ExprContext::Load => self.loaded.push((id, expr, Range::from_located(expr))),
-                ExprContext::Store => self.stored.push((id, expr, Range::from_located(expr))),
+                ExprContext::Load => self.loaded.push((id, expr, Range::from(expr))),
+                ExprContext::Store => self.stored.push((id, expr, Range::from(expr))),
                 ExprContext::Del => {}
             },
             _ => visitor::walk_expr(self, expr),

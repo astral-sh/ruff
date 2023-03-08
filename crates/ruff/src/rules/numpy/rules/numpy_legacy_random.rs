@@ -123,7 +123,7 @@ pub fn numpy_legacy_random(checker: &mut Checker, expr: &Expr) {
             NumpyLegacyRandom {
                 method_name: method_name.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TabBeforeKeyword: ~
+    name: TabBeforeKeyword
+    body: Tab before keyword
+    suggestion: ~
+    fixable: false
   location:
     row: 28
     column: 1
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TabBeforeKeyword: ~
+    name: TabBeforeKeyword
+    body: Tab before keyword
+    suggestion: ~
+    fixable: false
   location:
     row: 30
     column: 4

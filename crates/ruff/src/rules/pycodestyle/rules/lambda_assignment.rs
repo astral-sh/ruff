@@ -8,7 +8,7 @@ use ruff_python_ast::whitespace::leading_space;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
@@ -48,7 +48,7 @@ pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stm
                     name: id.to_string(),
                     fixable,
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             );
 
             if checker.patch(diagnostic.kind.rule())

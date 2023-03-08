@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LoggingConfigInsecureListen: ~
+    name: LoggingConfigInsecureListen
+    body: "Use of insecure `logging.config.listen` detected"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 4

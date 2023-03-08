@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 3
     column: 0
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 8
     column: 0
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 16
     column: 0
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 20
     column: 4
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 25
     column: 0
@@ -88,7 +103,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 29
     column: 0
@@ -105,7 +123,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 37
     column: 0
@@ -122,7 +143,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 45
     column: 0
@@ -139,7 +163,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 53
     column: 0
@@ -156,7 +183,10 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 56
     column: 0
@@ -173,7 +203,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 62
     column: 4
@@ -190,7 +223,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 67
     column: 0
@@ -207,7 +243,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 73
     column: 4
@@ -224,7 +263,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 86
     column: 4
@@ -241,7 +283,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 97
     column: 4
@@ -258,7 +303,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 104
     column: 0
@@ -275,7 +323,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 116
     column: 4
@@ -292,7 +343,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 122
     column: 4
@@ -309,7 +363,10 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 125
     column: 4
@@ -326,7 +383,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 130
     column: 4
@@ -343,7 +403,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 140
     column: 0
@@ -360,7 +423,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 150
     column: 0
@@ -377,7 +443,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 163
     column: 0
@@ -394,7 +463,10 @@ expression: diagnostics
       column: 6
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 166
     column: 0
@@ -411,7 +483,10 @@ expression: diagnostics
       column: 49
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 168
     column: 0
@@ -428,7 +503,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 172
     column: 4
@@ -445,7 +523,10 @@ expression: diagnostics
       column: 6
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 176
     column: 4
@@ -462,7 +543,10 @@ expression: diagnostics
       column: 53
   parent: ~
 - kind:
-    OutdatedVersionBlock: ~
+    name: OutdatedVersionBlock
+    body: Version block is outdated for minimum Python version
+    suggestion: Remove outdated version block
+    fixable: true
   location:
     row: 179
     column: 4

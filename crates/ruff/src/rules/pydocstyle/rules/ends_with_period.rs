@@ -1,7 +1,7 @@
 use strum::IntoEnumIterator;
 
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::strings::leading_quote;
+use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -9,7 +9,7 @@ use crate::docstrings::definition::Docstring;
 use crate::docstrings::sections::SectionKind;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pydocstyle::helpers::logical_line;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -60,7 +60,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
         let trimmed = line.trim_end();
 
         if !trimmed.ends_with('.') {
-            let mut diagnostic = Diagnostic::new(EndsInPeriod, Range::from_located(docstring.expr));
+            let mut diagnostic = Diagnostic::new(EndsInPeriod, Range::from(docstring.expr));
             // Best-effort autofix: avoid adding a period after other punctuation marks.
             if checker.patch(diagnostic.kind.rule())
                 && !trimmed.ends_with(':')

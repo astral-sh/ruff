@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_use_pathlib/mod.rs
+source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PathlibPyPath: ~
+    name: PathlibPyPath
+    body: "`py.path` is in maintenance mode, use `pathlib` instead"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 4

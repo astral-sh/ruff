@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BooleanPositionalArgInFunctionDefinition: ~
+    name: BooleanPositionalArgInFunctionDefinition
+    body: Boolean positional arg in function definition
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalArgInFunctionDefinition: ~
+    name: BooleanPositionalArgInFunctionDefinition
+    body: Boolean positional arg in function definition
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalArgInFunctionDefinition: ~
+    name: BooleanPositionalArgInFunctionDefinition
+    body: Boolean positional arg in function definition
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 4
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalArgInFunctionDefinition: ~
+    name: BooleanPositionalArgInFunctionDefinition
+    body: Boolean positional arg in function definition
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 4
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalArgInFunctionDefinition: ~
+    name: BooleanPositionalArgInFunctionDefinition
+    body: Boolean positional arg in function definition
+    suggestion: ~
+    fixable: false
   location:
     row: 14
     column: 4
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalArgInFunctionDefinition: ~
+    name: BooleanPositionalArgInFunctionDefinition
+    body: Boolean positional arg in function definition
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 4
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalArgInFunctionDefinition: ~
+    name: BooleanPositionalArgInFunctionDefinition
+    body: Boolean positional arg in function definition
+    suggestion: ~
+    fixable: false
   location:
     row: 18
     column: 4
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalArgInFunctionDefinition: ~
+    name: BooleanPositionalArgInFunctionDefinition
+    body: Boolean positional arg in function definition
+    suggestion: ~
+    fixable: false
   location:
     row: 19
     column: 4
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BooleanPositionalArgInFunctionDefinition: ~
+    name: BooleanPositionalArgInFunctionDefinition
+    body: Boolean positional arg in function definition
+    suggestion: ~
+    fixable: false
   location:
     row: 81
     column: 18

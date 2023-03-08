@@ -7,7 +7,7 @@ use ruff_python_ast::types::Range;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -81,7 +81,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
                 .sorted()
                 .collect(),
         },
-        Range::from_located(stmt),
+        Range::from(stmt),
     );
 
     if checker.patch(diagnostic.kind.rule()) {

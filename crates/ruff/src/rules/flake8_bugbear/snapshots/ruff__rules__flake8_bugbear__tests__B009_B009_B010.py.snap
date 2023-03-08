@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    GetAttrWithConstant: ~
+    name: GetAttrWithConstant
+    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+    suggestion: "Replace `getattr` with attribute access"
+    fixable: true
   location:
     row: 19
     column: 0
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    GetAttrWithConstant: ~
+    name: GetAttrWithConstant
+    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+    suggestion: "Replace `getattr` with attribute access"
+    fixable: true
   location:
     row: 20
     column: 0
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    GetAttrWithConstant: ~
+    name: GetAttrWithConstant
+    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+    suggestion: "Replace `getattr` with attribute access"
+    fixable: true
   location:
     row: 21
     column: 0
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    GetAttrWithConstant: ~
+    name: GetAttrWithConstant
+    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+    suggestion: "Replace `getattr` with attribute access"
+    fixable: true
   location:
     row: 22
     column: 0
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    GetAttrWithConstant: ~
+    name: GetAttrWithConstant
+    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+    suggestion: "Replace `getattr` with attribute access"
+    fixable: true
   location:
     row: 23
     column: 0
@@ -88,7 +103,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    GetAttrWithConstant: ~
+    name: GetAttrWithConstant
+    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+    suggestion: "Replace `getattr` with attribute access"
+    fixable: true
   location:
     row: 24
     column: 14
@@ -105,7 +123,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    GetAttrWithConstant: ~
+    name: GetAttrWithConstant
+    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+    suggestion: "Replace `getattr` with attribute access"
+    fixable: true
   location:
     row: 25
     column: 3

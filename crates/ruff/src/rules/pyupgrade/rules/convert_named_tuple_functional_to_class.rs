@@ -11,7 +11,7 @@ use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{Availability, Violation};
 use crate::AutofixKind;
 
@@ -203,7 +203,7 @@ pub fn convert_named_tuple_functional_to_class(
             name: typename.to_string(),
             fixable,
         },
-        Range::from_located(stmt),
+        Range::from(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(convert_to_class(

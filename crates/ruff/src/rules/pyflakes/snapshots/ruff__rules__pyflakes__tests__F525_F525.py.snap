@@ -1,9 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    StringDotFormatMixingAutomatic: ~
+    name: StringDotFormatMixingAutomatic
+    body: "`.format` string mixes automatic and manual numbering"
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatMixingAutomatic: ~
+    name: StringDotFormatMixingAutomatic
+    body: "`.format` string mixes automatic and manual numbering"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 0

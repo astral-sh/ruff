@@ -3,37 +3,83 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryComprehensionAnyAll: ~
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    suggestion: Remove unnecessary list comprehension
+    fixable: true
   location:
     row: 9
-    column: 0
+    column: 4
   end_location:
     row: 9
-    column: 24
+    column: 23
   fix:
-    content: x.id for x in bar
+    content: any(x.id for x in bar)
     location:
       row: 9
-      column: 4
+      column: 0
     end_location:
       row: 9
-      column: 23
+      column: 24
   parent: ~
 - kind:
-    UnnecessaryComprehensionAnyAll: ~
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    suggestion: Remove unnecessary list comprehension
+    fixable: true
   location:
     row: 10
-    column: 0
+    column: 4
   end_location:
     row: 10
-    column: 24
+    column: 23
   fix:
-    content: x.id for x in bar
+    content: all(x.id for x in bar)
     location:
       row: 10
-      column: 4
+      column: 0
     end_location:
       row: 10
-      column: 23
+      column: 24
+  parent: ~
+- kind:
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    suggestion: Remove unnecessary list comprehension
+    fixable: true
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 23
+  fix:
+    content: "any(  # first comment\n    x.id for x in bar  # second comment\n)"
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 13
+      column: 1
+  parent: ~
+- kind:
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    suggestion: Remove unnecessary list comprehension
+    fixable: true
+  location:
+    row: 15
+    column: 4
+  end_location:
+    row: 15
+    column: 23
+  fix:
+    content: "all(  # first comment\n    x.id for x in bar  # second comment\n)"
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 16
+      column: 1
   parent: ~
 

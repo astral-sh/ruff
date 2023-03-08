@@ -29,8 +29,7 @@ pub fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
             }
         }
     }
-    checker.diagnostics.push(Diagnostic::new(
-        NonEmptyStubBody,
-        Range::from_located(&body[0]),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(NonEmptyStubBody, Range::from(&body[0])));
 }

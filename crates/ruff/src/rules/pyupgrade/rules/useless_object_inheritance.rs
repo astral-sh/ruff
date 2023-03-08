@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Binding, BindingKind, Range, Scope};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 use super::super::fixes;
@@ -50,7 +50,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
             UselessObjectInheritance {
                 name: name.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 

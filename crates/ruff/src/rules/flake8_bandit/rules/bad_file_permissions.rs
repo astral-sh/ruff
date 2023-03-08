@@ -114,7 +114,7 @@ pub fn bad_file_permissions(
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(
                         BadFilePermissions { mask: int_value },
-                        Range::from_located(mode_arg),
+                        Range::from(mode_arg),
                     ));
                 }
             }

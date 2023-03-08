@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -48,8 +48,8 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
     }
 
     // Slice exact content to preserve formatting.
-    let left_content = checker.locator.slice(Range::from_located(left));
-    let value_content = checker.locator.slice(Range::from_located(value));
+    let left_content = checker.locator.slice(left);
+    let value_content = checker.locator.slice(value);
 
     let mut diagnostic = Diagnostic::new(
         KeyInDict {
@@ -95,5 +95,5 @@ pub fn key_in_dict_compare(
     }
     let right = comparators.first().unwrap();
 
-    key_in_dict(checker, left, right, Range::from_located(expr));
+    key_in_dict(checker, left, right, Range::from(expr));
 }

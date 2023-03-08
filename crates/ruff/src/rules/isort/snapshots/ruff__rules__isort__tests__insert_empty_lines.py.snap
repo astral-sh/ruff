@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnsortedImports: ~
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    suggestion: Organize imports
+    fixable: true
   location:
     row: 1
     column: 0
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnsortedImports: ~
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    suggestion: Organize imports
+    fixable: true
   location:
     row: 4
     column: 0
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnsortedImports: ~
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    suggestion: Organize imports
+    fixable: true
   location:
     row: 14
     column: 0
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnsortedImports: ~
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    suggestion: Organize imports
+    fixable: true
   location:
     row: 52
     column: 0

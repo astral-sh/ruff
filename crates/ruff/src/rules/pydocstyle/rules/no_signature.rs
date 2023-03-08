@@ -39,8 +39,7 @@ pub fn no_signature(checker: &mut Checker, docstring: &Docstring) {
     if !first_line.contains(&format!("{name}(")) {
         return;
     };
-    checker.diagnostics.push(Diagnostic::new(
-        NoSignature,
-        Range::from_located(docstring.expr),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(NoSignature, Range::from(docstring.expr)));
 }

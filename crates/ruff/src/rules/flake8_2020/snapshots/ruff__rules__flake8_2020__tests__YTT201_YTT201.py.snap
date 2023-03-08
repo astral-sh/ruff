@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_2020/mod.rs
+source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SysVersionInfo0Eq3Referenced: ~
+    name: SysVersionInfo0Eq3Referenced
+    body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
+    suggestion: ~
+    fixable: false
   location:
     row: 7
     column: 6
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SysVersionInfo0Eq3Referenced: ~
+    name: SysVersionInfo0Eq3Referenced
+    body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 6
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SysVersionInfo0Eq3Referenced: ~
+    name: SysVersionInfo0Eq3Referenced
+    body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 6
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SysVersionInfo0Eq3Referenced: ~
+    name: SysVersionInfo0Eq3Referenced
+    body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 6

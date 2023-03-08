@@ -3,11 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 2
     column: 0
@@ -24,11 +23,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 4
     column: 0
@@ -45,12 +43,10 @@ expression: diagnostics
       column: 38
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-        - Sequence
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 6
     column: 0
@@ -67,11 +63,10 @@ expression: diagnostics
       column: 41
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 8
     column: 0
@@ -88,11 +83,10 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 10
     column: 0
@@ -109,11 +103,10 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 12
     column: 0
@@ -130,11 +123,10 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 15
     column: 0
@@ -151,12 +143,10 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-        - Sequence
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 18
     column: 0
@@ -173,11 +163,10 @@ expression: diagnostics
       column: 50
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 20
     column: 0
@@ -194,11 +183,10 @@ expression: diagnostics
       column: 51
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 23
     column: 4
@@ -215,11 +203,10 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 28
     column: 4
@@ -236,11 +223,10 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 30
     column: 9
@@ -257,11 +243,10 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 33
     column: 0
@@ -278,12 +263,10 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-        - Callable
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`, `Callable`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 37
     column: 4
@@ -300,11 +283,10 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Callable
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Callable`"
+    suggestion: "Import from `collections.abc`"
+    fixable: true
   location:
     row: 44
     column: 0
@@ -321,11 +303,10 @@ expression: diagnostics
       column: 62
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections
-      members:
-        - OrderedDict
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `collections` instead: `OrderedDict`"
+    suggestion: "Import from `collections`"
+    fixable: true
   location:
     row: 44
     column: 0
@@ -342,12 +323,10 @@ expression: diagnostics
       column: 62
   parent: ~
 - kind:
-    ImportReplacements:
-      module: re
-      members:
-        - Match
-        - Pattern
-      fixable: true
+    name: ImportReplacements
+    body: "Import from `re` instead: `Match`, `Pattern`"
+    suggestion: "Import from `re`"
+    fixable: true
   location:
     row: 44
     column: 0
@@ -364,11 +343,10 @@ expression: diagnostics
       column: 62
   parent: ~
 - kind:
-    ImportReplacements:
-      module: collections.abc
-      members:
-        - Mapping
-      fixable: false
+    name: ImportReplacements
+    body: "Import from `collections.abc` instead: `Mapping`"
+    suggestion: ~
+    fixable: false
   location:
     row: 46
     column: 9

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IndentationWithInvalidMultiple:
-      indent_size: 4
+    name: IndentationWithInvalidMultiple
+    body: Indentation is not a multiple of 4
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 2
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IndentationWithInvalidMultiple:
-      indent_size: 4
+    name: IndentationWithInvalidMultiple
+    body: Indentation is not a multiple of 4
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 5

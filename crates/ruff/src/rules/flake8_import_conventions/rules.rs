@@ -60,7 +60,7 @@ pub fn check_conventional_import(
         if !is_valid_import {
             return Some(Diagnostic::new(
                 UnconventionalImportAlias(name.to_string(), expected_alias.to_string()),
-                Range::from_located(import_from),
+                Range::from(import_from),
             ));
         }
     }

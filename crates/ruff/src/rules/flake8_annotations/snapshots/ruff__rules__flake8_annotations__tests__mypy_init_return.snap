@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingReturnTypeSpecialMethod:
-      name: __init__
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__init__`"
+    suggestion: "Add `None` return type"
+    fixable: true
   location:
     row: 5
     column: 8
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    MissingReturnTypeSpecialMethod:
-      name: __init__
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__init__`"
+    suggestion: "Add `None` return type"
+    fixable: true
   location:
     row: 11
     column: 8
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    MissingReturnTypePrivateFunction:
-      name: __init__
+    name: MissingReturnTypePrivateFunction
+    body: "Missing return type annotation for private function `__init__`"
+    suggestion: ~
+    fixable: false
   location:
     row: 40
     column: 4
@@ -50,8 +56,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingReturnTypeSpecialMethod:
-      name: __init__
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__init__`"
+    suggestion: "Add `None` return type"
+    fixable: true
   location:
     row: 47
     column: 8

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    OSErrorAlias:
-      name: EnvironmentError
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace `EnvironmentError` with builtin `OSError`"
+    fixable: true
   location:
     row: 6
     column: 7
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: IOError
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace `IOError` with builtin `OSError`"
+    fixable: true
   location:
     row: 11
     column: 7
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: WindowsError
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace `WindowsError` with builtin `OSError`"
+    fixable: true
   location:
     row: 16
     column: 7
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: mmap.error
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace `mmap.error` with builtin `OSError`"
+    fixable: true
   location:
     row: 21
     column: 7
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: select.error
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace `select.error` with builtin `OSError`"
+    fixable: true
   location:
     row: 26
     column: 7
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: socket.error
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace `socket.error` with builtin `OSError`"
+    fixable: true
   location:
     row: 31
     column: 7
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: error
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace `error` with builtin `OSError`"
+    fixable: true
   location:
     row: 36
     column: 7
@@ -129,8 +143,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: ~
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace with builtin `OSError`"
+    fixable: true
   location:
     row: 43
     column: 7
@@ -147,8 +163,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: ~
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace with builtin `OSError`"
+    fixable: true
   location:
     row: 47
     column: 7
@@ -165,8 +183,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: ~
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace with builtin `OSError`"
+    fixable: true
   location:
     row: 51
     column: 7
@@ -183,8 +203,10 @@ expression: diagnostics
       column: 57
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: ~
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace with builtin `OSError`"
+    fixable: true
   location:
     row: 58
     column: 7
@@ -201,8 +223,10 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: ~
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace with builtin `OSError`"
+    fixable: true
   location:
     row: 65
     column: 7
@@ -219,8 +243,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    OSErrorAlias:
-      name: mmap.error
+    name: OSErrorAlias
+    body: "Replace aliased errors with `OSError`"
+    suggestion: "Replace `mmap.error` with builtin `OSError`"
+    fixable: true
   location:
     row: 87
     column: 7

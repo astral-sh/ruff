@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DocstringInStub: ~
+    name: DocstringInStub
+    body: Docstrings should not be included in stubs
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocstringInStub: ~
+    name: DocstringInStub
+    body: Docstrings should not be included in stubs
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocstringInStub: ~
+    name: DocstringInStub
+    body: Docstrings should not be included in stubs
+    suggestion: ~
+    fixable: false
   location:
     row: 7
     column: 4

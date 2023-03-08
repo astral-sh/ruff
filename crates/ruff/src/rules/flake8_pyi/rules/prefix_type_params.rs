@@ -88,7 +88,7 @@ pub fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr])
         };
         checker.diagnostics.push(Diagnostic::new(
             PrefixTypeParams { kind },
-            Range::from_located(value),
+            Range::from(value),
         ));
     }
 }

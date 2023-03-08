@@ -50,7 +50,7 @@ pub fn unintentional_type_annotation(
             if matches!(&value.node, ExprKind::Name { .. }) {
                 checker.diagnostics.push(Diagnostic::new(
                     UnintentionalTypeAnnotation,
-                    Range::from_located(stmt),
+                    Range::from(stmt),
                 ));
             }
         }
@@ -59,7 +59,7 @@ pub fn unintentional_type_annotation(
                 if id != "self" {
                     checker.diagnostics.push(Diagnostic::new(
                         UnintentionalTypeAnnotation,
-                        Range::from_located(stmt),
+                        Range::from(stmt),
                     ));
                 }
             }

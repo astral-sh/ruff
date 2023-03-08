@@ -10,7 +10,7 @@ use ruff_python_stdlib::identifiers::is_module_name;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 pub type Settings = Strictness;
@@ -169,7 +169,7 @@ pub fn banned_relative_import(
             RelativeImports {
                 strictness: strictness.clone(),
             },
-            Range::from_located(stmt),
+            Range::from(stmt),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) =

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypingUnion: ~
+    name: TypingUnion
+    body: "Use `X | Y` for type annotations"
+    suggestion: "Convert to `X | Y`"
+    fixable: true
   location:
     row: 40
     column: 3

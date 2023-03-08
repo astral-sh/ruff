@@ -23,10 +23,9 @@ pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
     }
 
     if checker.settings.rules.enabled(&Rule::EmptyDocstring) {
-        checker.diagnostics.push(Diagnostic::new(
-            EmptyDocstring,
-            Range::from_located(docstring.expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(EmptyDocstring, Range::from(docstring.expr)));
     }
     false
 }

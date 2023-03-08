@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_simplify/mod.rs
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ReturnInTryExceptFinally: ~
+    name: ReturnInTryExceptFinally
+    body: "Don't use `return` in `try`/`except` and `finally`"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 8

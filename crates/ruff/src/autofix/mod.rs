@@ -4,11 +4,12 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 
-use crate::fix::Fix;
-use crate::linter::FixTable;
-use crate::registry::Diagnostic;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
+
+use crate::fix::Fix;
+use crate::linter::FixTable;
+use crate::registry::{AsRule, Diagnostic};
 
 pub mod helpers;
 
@@ -95,12 +96,12 @@ pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
 mod tests {
     use rustpython_parser::ast::Location;
 
+    use ruff_python_ast::source_code::Locator;
+
     use crate::autofix::{apply_fix, apply_fixes};
     use crate::fix::Fix;
     use crate::registry::Diagnostic;
     use crate::rules::pycodestyle::rules::NoNewLineAtEndOfFile;
-
-    use ruff_python_ast::source_code::Locator;
 
     #[test]
     fn empty_file() {

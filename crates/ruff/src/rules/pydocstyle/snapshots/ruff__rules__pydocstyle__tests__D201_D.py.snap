@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoBlankLineBeforeFunction:
-      num_lines: 1
+    name: NoBlankLineBeforeFunction
+    body: No blank lines allowed before function docstring (found 1)
+    suggestion: Remove blank line(s) before function docstring
+    fixable: true
   location:
     row: 137
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoBlankLineBeforeFunction:
-      num_lines: 1
+    name: NoBlankLineBeforeFunction
+    body: No blank lines allowed before function docstring (found 1)
+    suggestion: Remove blank line(s) before function docstring
+    fixable: true
   location:
     row: 151
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoBlankLineBeforeFunction:
-      num_lines: 1
+    name: NoBlankLineBeforeFunction
+    body: No blank lines allowed before function docstring (found 1)
+    suggestion: Remove blank line(s) before function docstring
+    fixable: true
   location:
     row: 546
     column: 4
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    NoBlankLineBeforeFunction:
-      num_lines: 1
+    name: NoBlankLineBeforeFunction
+    body: No blank lines allowed before function docstring (found 1)
+    suggestion: Remove blank line(s) before function docstring
+    fixable: true
   location:
     row: 568
     column: 4

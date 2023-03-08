@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BadQuotesMultilineString:
-      quote: double
+    name: BadQuotesMultilineString
+    body: Single quote multiline found but double quotes preferred
+    suggestion: Replace single multiline quotes with double quotes
+    fixable: true
   location:
     row: 5
     column: 0
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 3
   parent: ~
 - kind:
-    BadQuotesMultilineString:
-      quote: double
+    name: BadQuotesMultilineString
+    body: Single quote multiline found but double quotes preferred
+    suggestion: Replace single multiline quotes with double quotes
+    fixable: true
   location:
     row: 11
     column: 20
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 3
   parent: ~
 - kind:
-    BadQuotesMultilineString:
-      quote: double
+    name: BadQuotesMultilineString
+    body: Single quote multiline found but double quotes preferred
+    suggestion: Replace single multiline quotes with double quotes
+    fixable: true
   location:
     row: 18
     column: 4
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    BadQuotesMultilineString:
-      quote: double
+    name: BadQuotesMultilineString
+    body: Single quote multiline found but double quotes preferred
+    suggestion: Replace single multiline quotes with double quotes
+    fixable: true
   location:
     row: 23
     column: 20
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    BadQuotesMultilineString:
-      quote: double
+    name: BadQuotesMultilineString
+    body: Single quote multiline found but double quotes preferred
+    suggestion: Replace single multiline quotes with double quotes
+    fixable: true
   location:
     row: 32
     column: 8
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    BadQuotesMultilineString:
-      quote: double
+    name: BadQuotesMultilineString
+    body: Single quote multiline found but double quotes preferred
+    suggestion: Replace single multiline quotes with double quotes
+    fixable: true
   location:
     row: 37
     column: 12

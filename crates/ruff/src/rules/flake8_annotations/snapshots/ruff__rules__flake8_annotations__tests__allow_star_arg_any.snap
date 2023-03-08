@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AnyType:
-      name: a
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `a`"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 11
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: foo
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `foo`"
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 46
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: a
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `a`"
+    suggestion: ~
+    fixable: false
   location:
     row: 40
     column: 28
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AnyType:
-      name: foo_method
+    name: AnyType
+    body: "Dynamically typed expressions (typing.Any) are disallowed in `foo_method`"
+    suggestion: ~
+    fixable: false
   location:
     row: 44
     column: 66

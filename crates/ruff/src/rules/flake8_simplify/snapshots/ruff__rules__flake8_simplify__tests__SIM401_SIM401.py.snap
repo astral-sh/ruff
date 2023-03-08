@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DictGetWithDefault:
-      contents: "var = a_dict.get(key, \"default1\")"
-      fixable: true
+    name: DictGetWithDefault
+    body: "Use `var = a_dict.get(key, \"default1\")` instead of an `if` block"
+    suggestion: "Replace with `var = a_dict.get(key, \"default1\")`"
+    fixable: true
   location:
     row: 6
     column: 0
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    DictGetWithDefault:
-      contents: "var = a_dict.get(key, \"default2\")"
-      fixable: true
+    name: DictGetWithDefault
+    body: "Use `var = a_dict.get(key, \"default2\")` instead of an `if` block"
+    suggestion: "Replace with `var = a_dict.get(key, \"default2\")`"
+    fixable: true
   location:
     row: 12
     column: 0
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    DictGetWithDefault:
-      contents: "var = a_dict.get(key, val1 + val2)"
-      fixable: true
+    name: DictGetWithDefault
+    body: "Use `var = a_dict.get(key, val1 + val2)` instead of an `if` block"
+    suggestion: "Replace with `var = a_dict.get(key, val1 + val2)`"
+    fixable: true
   location:
     row: 18
     column: 0
@@ -60,9 +63,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    DictGetWithDefault:
-      contents: "var = a_dict.get(keys[idx], \"default\")"
-      fixable: true
+    name: DictGetWithDefault
+    body: "Use `var = a_dict.get(keys[idx], \"default\")` instead of an `if` block"
+    suggestion: "Replace with `var = a_dict.get(keys[idx], \"default\")`"
+    fixable: true
   location:
     row: 24
     column: 0
@@ -79,9 +83,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    DictGetWithDefault:
-      contents: "var = dicts[idx].get(key, \"default\")"
-      fixable: true
+    name: DictGetWithDefault
+    body: "Use `var = dicts[idx].get(key, \"default\")` instead of an `if` block"
+    suggestion: "Replace with `var = dicts[idx].get(key, \"default\")`"
+    fixable: true
   location:
     row: 30
     column: 0
@@ -98,9 +103,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    DictGetWithDefault:
-      contents: "vars[idx] = a_dict.get(key, \"default\")"
-      fixable: true
+    name: DictGetWithDefault
+    body: "Use `vars[idx] = a_dict.get(key, \"default\")` instead of an `if` block"
+    suggestion: "Replace with `vars[idx] = a_dict.get(key, \"default\")`"
+    fixable: true
   location:
     row: 36
     column: 0

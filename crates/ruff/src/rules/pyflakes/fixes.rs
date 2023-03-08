@@ -4,7 +4,7 @@ use rustpython_parser::ast::{Excepthandler, Expr};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::strings::raw_contents;
+use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::types::Range;
 
 use crate::cst::matchers::{match_expr, match_module};
@@ -17,7 +17,7 @@ pub fn remove_unused_format_arguments_from_dict(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(stmt));
+    let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
 
@@ -115,7 +115,7 @@ pub fn remove_exception_handler_assignment(
     excepthandler: &Excepthandler,
     locator: &Locator,
 ) -> Result<Fix> {
-    let contents = locator.slice(Range::from_located(excepthandler));
+    let contents = locator.slice(excepthandler);
     let mut fix_start = None;
     let mut fix_end = None;
 

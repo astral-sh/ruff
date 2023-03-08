@@ -8,7 +8,7 @@ use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -63,7 +63,7 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(GetAttrWithConstant, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(GetAttrWithConstant, Range::from(expr));
 
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(

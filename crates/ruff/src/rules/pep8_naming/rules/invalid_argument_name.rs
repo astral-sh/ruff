@@ -29,7 +29,7 @@ pub fn invalid_argument_name(name: &str, arg: &Arg, ignore_names: &[String]) -> 
             InvalidArgumentName {
                 name: name.to_string(),
             },
-            Range::from_located(arg),
+            Range::from(arg),
         ));
     }
     None

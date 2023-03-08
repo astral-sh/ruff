@@ -75,7 +75,7 @@ pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, it
                 LoopVariableOverridesIterator {
                     name: name.to_string(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             ));
         }
     }

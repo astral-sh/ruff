@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    suggestion: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 2
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    suggestion: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 3
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    suggestion: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 4
     column: 4
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    suggestion: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 8
     column: 4
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    suggestion: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 9
     column: 4
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    suggestion: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 10
     column: 4
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    BadQuotesInlineString:
-      quote: single
+    name: BadQuotesInlineString
+    body: Double quotes found but single quotes preferred
+    suggestion: Replace double quotes with single quotes
+    fixable: true
   location:
     row: 27
     column: 0

@@ -5,7 +5,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
@@ -59,7 +59,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
             BlankLineAfterSummary {
                 num_lines: blanks_count,
             },
-            Range::from_located(docstring.expr),
+            Range::from(docstring.expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if blanks_count > 1 {

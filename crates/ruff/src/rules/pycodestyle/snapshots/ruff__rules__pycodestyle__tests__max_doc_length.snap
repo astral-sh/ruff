@@ -1,11 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DocLineTooLong:
-      - 57
-      - 50
+    name: DocLineTooLong
+    body: Doc line too long (57 > 50 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 50
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocLineTooLong:
-      - 56
-      - 50
+    name: DocLineTooLong
+    body: Doc line too long (56 > 50 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 50
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocLineTooLong:
-      - 56
-      - 50
+    name: DocLineTooLong
+    body: Doc line too long (56 > 50 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 50
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocLineTooLong:
-      - 61
-      - 50
+    name: DocLineTooLong
+    body: Doc line too long (61 > 50 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 50

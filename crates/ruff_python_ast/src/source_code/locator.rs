@@ -125,11 +125,23 @@ impl<'a> Locator<'a> {
     }
 
     /// Take the source code between the given [`Range`].
-    pub fn slice(&self, range: Range) -> &'a str {
+    pub fn slice<R: Into<Range>>(&self, range: R) -> &'a str {
         let index = self.get_or_init_index();
+        let range = range.into();
         let start = truncate(range.location, index, self.contents);
         let end = truncate(range.end_location, index, self.contents);
         &self.contents[start..end]
+    }
+
+    /// Return the byte offset of the given [`Location`].
+    pub fn offset(&self, location: Location) -> usize {
+        let index = self.get_or_init_index();
+        truncate(location, index, self.contents)
+    }
+
+    /// Return the underlying source code.
+    pub fn contents(&self) -> &'a str {
+        self.contents
     }
 
     pub const fn len(&self) -> usize {

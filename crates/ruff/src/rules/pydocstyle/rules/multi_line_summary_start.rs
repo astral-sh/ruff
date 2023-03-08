@@ -1,14 +1,13 @@
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::strings::leading_quote;
+use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::LinesWithTrailingNewline;
-use ruff_python_stdlib::str::TRIPLE_QUOTE_PREFIXES;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -54,16 +53,14 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     {
         return;
     };
-    if TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
+    if is_triple_quote(first_line) {
         if checker
             .settings
             .rules
             .enabled(&Rule::MultiLineSummaryFirstLine)
         {
-            let mut diagnostic = Diagnostic::new(
-                MultiLineSummaryFirstLine,
-                Range::from_located(docstring.expr),
-            );
+            let mut diagnostic =
+                Diagnostic::new(MultiLineSummaryFirstLine, Range::from(docstring.expr));
             if checker.patch(diagnostic.kind.rule()) {
                 let location = docstring.expr.location;
                 let mut end_row = location.row() + 1;
@@ -87,10 +84,8 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
             .rules
             .enabled(&Rule::MultiLineSummarySecondLine)
         {
-            let mut diagnostic = Diagnostic::new(
-                MultiLineSummarySecondLine,
-                Range::from_located(docstring.expr),
-            );
+            let mut diagnostic =
+                Diagnostic::new(MultiLineSummarySecondLine, Range::from(docstring.expr));
             if checker.patch(diagnostic.kind.rule()) {
                 let mut indentation = String::from(docstring.indentation);
                 let mut fixable = true;

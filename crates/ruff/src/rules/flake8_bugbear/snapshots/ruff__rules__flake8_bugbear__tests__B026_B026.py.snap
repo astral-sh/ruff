@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    StarArgUnpackingAfterKeywordArg: ~
+    name: StarArgUnpackingAfterKeywordArg
+    body: Star-arg unpacking after a keyword argument is strongly discouraged
+    suggestion: ~
+    fixable: false
   location:
     row: 16
     column: 15
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StarArgUnpackingAfterKeywordArg: ~
+    name: StarArgUnpackingAfterKeywordArg
+    body: Star-arg unpacking after a keyword argument is strongly discouraged
+    suggestion: ~
+    fixable: false
   location:
     row: 17
     column: 15
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StarArgUnpackingAfterKeywordArg: ~
+    name: StarArgUnpackingAfterKeywordArg
+    body: Star-arg unpacking after a keyword argument is strongly discouraged
+    suggestion: ~
+    fixable: false
   location:
     row: 18
     column: 26
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StarArgUnpackingAfterKeywordArg: ~
+    name: StarArgUnpackingAfterKeywordArg
+    body: Star-arg unpacking after a keyword argument is strongly discouraged
+    suggestion: ~
+    fixable: false
   location:
     row: 19
     column: 37
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StarArgUnpackingAfterKeywordArg: ~
+    name: StarArgUnpackingAfterKeywordArg
+    body: Star-arg unpacking after a keyword argument is strongly discouraged
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 15
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StarArgUnpackingAfterKeywordArg: ~
+    name: StarArgUnpackingAfterKeywordArg
+    body: Star-arg unpacking after a keyword argument is strongly discouraged
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 25
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StarArgUnpackingAfterKeywordArg: ~
+    name: StarArgUnpackingAfterKeywordArg
+    body: Star-arg unpacking after a keyword argument is strongly discouraged
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 25

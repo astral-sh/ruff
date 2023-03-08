@@ -2,14 +2,14 @@
 
 use std::iter;
 
+use itertools::Itertools;
 use rustpython_parser::ast::{Constant, Location};
 use rustpython_parser::Mode;
 
-use itertools::Itertools;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
 use crate::core::helpers::{expand_indented_block, find_tok, is_elif};
-use crate::core::locator::Locator;
-use crate::core::types::Range;
 use crate::trivia::{Parenthesize, Trivia};
 
 type Ident = String;
@@ -40,6 +40,18 @@ impl<T> Located<T> {
 
     pub fn id(&self) -> usize {
         self as *const _ as usize
+    }
+}
+
+impl<T> From<&Located<T>> for Range {
+    fn from(located: &Located<T>) -> Self {
+        Self::new(located.location, located.end_location.unwrap())
+    }
+}
+
+impl<T> From<&Box<Located<T>>> for Range {
+    fn from(located: &Box<Located<T>>) -> Self {
+        Self::new(located.location, located.end_location.unwrap())
     }
 }
 
@@ -2146,10 +2158,8 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
             },
             rustpython_parser::ast::ExprKind::Slice { lower, upper, step } => {
                 // Locate the colon tokens, which indicate the number of index segments.
-                let (source, start, end) =
-                    locator.slice(Range::new(expr.location, expr.end_location.unwrap()));
                 let tokens = rustpython_parser::lexer::lex_located(
-                    &source[start..end],
+                    locator.slice(Range::new(expr.location, expr.end_location.unwrap())),
                     Mode::Module,
                     expr.location,
                 );

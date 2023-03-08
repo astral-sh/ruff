@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DeprecatedCollectionType:
-      name: List
+    name: DeprecatedCollectionType
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
   location:
     row: 34
     column: 17
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    DeprecatedCollectionType:
-      name: List
+    name: DeprecatedCollectionType
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
   location:
     row: 35
     column: 8
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    DeprecatedCollectionType:
-      name: List
+    name: DeprecatedCollectionType
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
   location:
     row: 42
     column: 26
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    DeprecatedCollectionType:
-      name: List
+    name: DeprecatedCollectionType
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
   location:
     row: 42
     column: 37

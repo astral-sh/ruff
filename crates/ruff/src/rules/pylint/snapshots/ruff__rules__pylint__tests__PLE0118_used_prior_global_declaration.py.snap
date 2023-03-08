@@ -1,11 +1,12 @@
 ---
-source: src/rules/pylint/mod.rs
+source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 7
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 7"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 10
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 17
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 17"
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 10
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 25
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 25"
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 10
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 35
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 35"
+    suggestion: ~
+    fixable: false
   location:
     row: 33
     column: 10
@@ -51,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 43
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 43"
+    suggestion: ~
+    fixable: false
   location:
     row: 41
     column: 4
@@ -63,9 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 53
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 53"
+    suggestion: ~
+    fixable: false
   location:
     row: 51
     column: 4
@@ -75,9 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 61
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 61"
+    suggestion: ~
+    fixable: false
   location:
     row: 59
     column: 8
@@ -87,9 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 71
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 71"
+    suggestion: ~
+    fixable: false
   location:
     row: 69
     column: 8
@@ -99,9 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 79
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 79"
+    suggestion: ~
+    fixable: false
   location:
     row: 77
     column: 8
@@ -111,9 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 89
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 89"
+    suggestion: ~
+    fixable: false
   location:
     row: 87
     column: 8
@@ -123,9 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 97
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 97"
+    suggestion: ~
+    fixable: false
   location:
     row: 95
     column: 8
@@ -135,9 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 107
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 107"
+    suggestion: ~
+    fixable: false
   location:
     row: 105
     column: 8
@@ -147,9 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UsedPriorGlobalDeclaration:
-      name: x
-      line: 114
+    name: UsedPriorGlobalDeclaration
+    body: "Name `x` is used prior to global declaration on line 114"
+    suggestion: ~
+    fixable: false
   location:
     row: 113
     column: 13

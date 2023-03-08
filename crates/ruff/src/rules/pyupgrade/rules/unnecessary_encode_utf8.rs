@@ -77,13 +77,13 @@ fn delete_default_encode_arg_or_kwarg(
     patch: bool,
 ) -> Option<Diagnostic> {
     if let Some(arg) = args.get(0) {
-        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
         if patch {
             diagnostic.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
         }
         Some(diagnostic)
     } else if let Some(kwarg) = kwargs.get(0) {
-        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
         if patch {
             diagnostic.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
         }
@@ -100,7 +100,7 @@ fn replace_with_bytes_literal(
     locator: &Locator,
     patch: bool,
 ) -> Diagnostic {
-    let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
     if patch {
         // Build up a replacement string by prefixing all string tokens with `b`.
         let contents = locator.slice(Range::new(

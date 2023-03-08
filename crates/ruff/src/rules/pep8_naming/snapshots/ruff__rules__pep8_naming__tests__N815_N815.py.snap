@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MixedCaseVariableInClassScope:
-      name: mixedCase
+    name: MixedCaseVariableInClassScope
+    body: "Variable `mixedCase` in class scope should not be mixedCase"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MixedCaseVariableInClassScope:
-      name: _mixedCase
+    name: MixedCaseVariableInClassScope
+    body: "Variable `_mixedCase` in class scope should not be mixedCase"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 4
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MixedCaseVariableInClassScope:
-      name: mixed_Case
+    name: MixedCaseVariableInClassScope
+    body: "Variable `mixed_Case` in class scope should not be mixedCase"
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 4

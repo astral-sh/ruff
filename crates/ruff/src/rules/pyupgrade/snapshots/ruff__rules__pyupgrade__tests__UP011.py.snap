@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LRUCacheWithoutParameters: ~
+    name: LRUCacheWithoutParameters
+    body: "Unnecessary parameters to `functools.lru_cache`"
+    suggestion: Remove unnecessary parameters
+    fixable: true
   location:
     row: 5
     column: 20
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    LRUCacheWithoutParameters: ~
+    name: LRUCacheWithoutParameters
+    body: "Unnecessary parameters to `functools.lru_cache`"
+    suggestion: Remove unnecessary parameters
+    fixable: true
   location:
     row: 10
     column: 10
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    LRUCacheWithoutParameters: ~
+    name: LRUCacheWithoutParameters
+    body: "Unnecessary parameters to `functools.lru_cache`"
+    suggestion: Remove unnecessary parameters
+    fixable: true
   location:
     row: 16
     column: 20
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    LRUCacheWithoutParameters: ~
+    name: LRUCacheWithoutParameters
+    body: "Unnecessary parameters to `functools.lru_cache`"
+    suggestion: Remove unnecessary parameters
+    fixable: true
   location:
     row: 21
     column: 20

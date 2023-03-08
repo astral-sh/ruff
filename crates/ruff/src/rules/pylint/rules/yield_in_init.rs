@@ -42,6 +42,6 @@ pub fn yield_in_init(checker: &mut Checker, expr: &Expr) {
     if in_dunder_init(checker) {
         checker
             .diagnostics
-            .push(Diagnostic::new(YieldInInit, Range::from_located(expr)));
+            .push(Diagnostic::new(YieldInInit, Range::from(expr)));
     }
 }

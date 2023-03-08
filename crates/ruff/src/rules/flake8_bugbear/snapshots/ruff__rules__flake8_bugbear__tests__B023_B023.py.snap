@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 29
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: y
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `y`"
+    suggestion: ~
+    fixable: false
   location:
     row: 13
     column: 29
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 16
     column: 15
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 28
     column: 18
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 29
     column: 18
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 30
     column: 18
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 31
     column: 21
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 40
     column: 33
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 42
     column: 13
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: a
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `a`"
+    suggestion: ~
+    fixable: false
   location:
     row: 50
     column: 29
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: a_
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `a_`"
+    suggestion: ~
+    fixable: false
   location:
     row: 51
     column: 29
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: b
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `b`"
+    suggestion: ~
+    fixable: false
   location:
     row: 52
     column: 29
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: c
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `c`"
+    suggestion: ~
+    fixable: false
   location:
     row: 53
     column: 29
@@ -146,8 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: j
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `j`"
+    suggestion: ~
+    fixable: false
   location:
     row: 61
     column: 16
@@ -157,8 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: k
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `k`"
+    suggestion: ~
+    fixable: false
   location:
     row: 61
     column: 20
@@ -168,8 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: l
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 68
     column: 9
@@ -179,8 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: i
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `i`"
+    suggestion: ~
+    fixable: false
   location:
     row: 82
     column: 15
@@ -190,8 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 117
     column: 23
@@ -201,8 +237,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 118
     column: 26
@@ -212,8 +250,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 119
     column: 36
@@ -223,8 +263,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 120
     column: 37
@@ -234,8 +276,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: x
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `x`"
+    suggestion: ~
+    fixable: false
   location:
     row: 121
     column: 36
@@ -245,8 +289,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: name
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `name`"
+    suggestion: ~
+    fixable: false
   location:
     row: 171
     column: 28
@@ -256,8 +302,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FunctionUsesLoopVariable:
-      name: i
+    name: FunctionUsesLoopVariable
+    body: "Function definition does not bind loop variable `i`"
+    suggestion: ~
+    fixable: false
   location:
     row: 174
     column: 28

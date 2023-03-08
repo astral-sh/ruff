@@ -47,8 +47,7 @@ pub fn unary_prefix_increment(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     if !matches!(op, Unaryop::UAdd) {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
-        UnaryPrefixIncrement,
-        Range::from_located(expr),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(UnaryPrefixIncrement, Range::from(expr)));
 }

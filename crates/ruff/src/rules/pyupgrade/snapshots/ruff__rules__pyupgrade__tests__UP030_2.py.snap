@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 6
     column: 0
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 8
     column: 0
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 10
     column: 0
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 12
     column: 0
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 14
     column: 0
@@ -81,7 +96,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 16
     column: 0
@@ -98,7 +116,10 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 18
     column: 0
@@ -115,7 +136,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 20
     column: 0
@@ -132,7 +156,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 22
     column: 0
@@ -149,7 +176,10 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 24
     column: 0
@@ -166,7 +196,10 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 26
     column: 0
@@ -183,7 +216,10 @@ expression: diagnostics
       column: 39
   parent: ~
 - kind:
-    FormatLiterals: ~
+    name: FormatLiterals
+    body: Use implicit references for positional format fields
+    suggestion: Remove explicit positional indexes
+    fixable: true
   location:
     row: 28
     column: 0

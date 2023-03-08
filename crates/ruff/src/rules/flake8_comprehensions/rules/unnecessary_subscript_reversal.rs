@@ -73,6 +73,6 @@ pub fn unnecessary_subscript_reversal(
         UnnecessarySubscriptReversal {
             func: id.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     ));
 }

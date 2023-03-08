@@ -1,9 +1,12 @@
 ---
-source: src/rules/pygrep_hooks/mod.rs
+source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BlanketTypeIgnore: ~
+    name: BlanketTypeIgnore
+    body: Use specific rule codes when ignoring type issues
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 7
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BlanketTypeIgnore: ~
+    name: BlanketTypeIgnore
+    body: Use specific rule codes when ignoring type issues
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 7
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BlanketTypeIgnore: ~
+    name: BlanketTypeIgnore
+    body: Use specific rule codes when ignoring type issues
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 7

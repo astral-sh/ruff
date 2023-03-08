@@ -18,7 +18,7 @@ mod tests {
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
     use crate::linter::{check_path, LinterResult};
-    use crate::registry::{Linter, Rule};
+    use crate::registry::{AsRule, Linter, Rule};
     use crate::settings::flags;
     use crate::test::test_path;
     use crate::{directives, settings};

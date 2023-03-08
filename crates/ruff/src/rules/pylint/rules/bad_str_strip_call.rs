@@ -134,7 +134,7 @@ pub fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
                             };
                             checker.diagnostics.push(Diagnostic::new(
                                 BadStrStripCall { strip, removal },
-                                Range::from_located(arg),
+                                Range::from(arg),
                             ));
                         }
                     }

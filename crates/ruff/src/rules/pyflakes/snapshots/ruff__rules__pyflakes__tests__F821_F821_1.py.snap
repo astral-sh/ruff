@@ -1,10 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UndefinedName:
-      name: Model
+    name: UndefinedName
+    body: "Undefined name `Model`"
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 9
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: Model
+    name: UndefinedName
+    body: "Undefined name `Model`"
+    suggestion: ~
+    fixable: false
   location:
     row: 18
     column: 16
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: Model
+    name: UndefinedName
+    body: "Undefined name `Model`"
+    suggestion: ~
+    fixable: false
   location:
     row: 24
     column: 12
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UndefinedName:
-      name: Model
+    name: UndefinedName
+    body: "Undefined name `Model`"
+    suggestion: ~
+    fixable: false
   location:
     row: 30
     column: 10

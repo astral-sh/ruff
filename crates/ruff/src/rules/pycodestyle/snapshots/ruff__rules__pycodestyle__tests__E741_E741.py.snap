@@ -1,9 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: I
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `I`"
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: O
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `O`"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 0
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 3
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 4
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 4
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 4
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 16
     column: 4
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 7
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 25
     column: 11
@@ -113,7 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 26
     column: 4
@@ -123,7 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 30
     column: 4
@@ -133,7 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 33
     column: 17
@@ -143,7 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 34
     column: 8
@@ -153,7 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 40
     column: 7
@@ -163,7 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: I
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `I`"
+    suggestion: ~
+    fixable: false
   location:
     row: 40
     column: 13
@@ -173,7 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 44
     column: 7
@@ -183,7 +237,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: I
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `I`"
+    suggestion: ~
+    fixable: false
   location:
     row: 44
     column: 15
@@ -193,7 +250,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 48
     column: 8
@@ -203,7 +263,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: I
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `I`"
+    suggestion: ~
+    fixable: false
   location:
     row: 48
     column: 13
@@ -213,7 +276,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 57
     column: 15
@@ -223,7 +289,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 66
     column: 19
@@ -233,7 +302,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 71
     column: 21
@@ -243,7 +315,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousVariableName: l
+    name: AmbiguousVariableName
+    body: "Ambiguous variable name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 74
     column: 4

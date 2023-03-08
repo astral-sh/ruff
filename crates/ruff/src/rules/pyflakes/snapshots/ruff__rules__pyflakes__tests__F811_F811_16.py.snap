@@ -1,11 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RedefinedWhileUnused:
-      name: fu
-      line: 3
+    name: RedefinedWhileUnused
+    body: "Redefinition of unused `fu` from line 3"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 12

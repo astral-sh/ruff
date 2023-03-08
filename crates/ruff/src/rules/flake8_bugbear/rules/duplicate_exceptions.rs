@@ -11,7 +11,7 @@ use ruff_python_ast::types::{CallPath, Range};
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 #[violation]
@@ -95,7 +95,7 @@ fn duplicate_handler_exceptions<'a>(
                         .sorted()
                         .collect::<Vec<String>>(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
@@ -157,7 +157,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
                     DuplicateTryBlockException {
                         name: name.join("."),
                     },
-                    Range::from_located(expr),
+                    Range::from(expr),
                 ));
             }
         }

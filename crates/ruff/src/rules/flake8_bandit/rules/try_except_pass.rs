@@ -31,9 +31,8 @@ pub fn try_except_pass(
         && body[0].node == StmtKind::Pass
         && (check_typed_exception || is_untyped_exception(type_, checker))
     {
-        checker.diagnostics.push(Diagnostic::new(
-            TryExceptPass,
-            Range::from_located(excepthandler),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(TryExceptPass, Range::from(excepthandler)));
     }
 }

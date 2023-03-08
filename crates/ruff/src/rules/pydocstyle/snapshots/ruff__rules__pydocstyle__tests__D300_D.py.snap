@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TripleSingleQuotes: ~
+    name: TripleSingleQuotes
+    body: "Use triple double quotes `\"\"\"`"
+    suggestion: ~
+    fixable: false
   location:
     row: 307
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TripleSingleQuotes: ~
+    name: TripleSingleQuotes
+    body: "Use triple double quotes `\"\"\"`"
+    suggestion: ~
+    fixable: false
   location:
     row: 312
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TripleSingleQuotes: ~
+    name: TripleSingleQuotes
+    body: "Use triple double quotes `\"\"\"`"
+    suggestion: ~
+    fixable: false
   location:
     row: 317
     column: 4
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TripleSingleQuotes: ~
+    name: TripleSingleQuotes
+    body: "Use triple double quotes `\"\"\"`"
+    suggestion: ~
+    fixable: false
   location:
     row: 322
     column: 4
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TripleSingleQuotes: ~
+    name: TripleSingleQuotes
+    body: "Use triple double quotes `\"\"\"`"
+    suggestion: ~
+    fixable: false
   location:
     row: 328
     column: 4

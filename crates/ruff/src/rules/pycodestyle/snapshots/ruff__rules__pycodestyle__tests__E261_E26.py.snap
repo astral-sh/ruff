@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TooFewSpacesBeforeInlineComment: ~
+    name: TooFewSpacesBeforeInlineComment
+    body: Insert at least two spaces before an inline comment
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 4

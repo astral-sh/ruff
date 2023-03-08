@@ -6,7 +6,7 @@ use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::fix_with;
@@ -101,7 +101,7 @@ pub fn multiple_with_statements(
         let mut diagnostic = Diagnostic::new(
             MultipleWithStatements { fixable },
             colon.map_or_else(
-                || Range::from_located(with_stmt),
+                || Range::from(with_stmt),
                 |colon| Range::new(with_stmt.location, colon.end_location),
             ),
         );

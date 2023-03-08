@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -34,7 +34,7 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessImportAlias, Range::from_located(alias));
+    let mut diagnostic = Diagnostic::new(UselessImportAlias, Range::from(alias));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             asname.to_string(),

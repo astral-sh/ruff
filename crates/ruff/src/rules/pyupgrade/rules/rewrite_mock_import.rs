@@ -16,7 +16,7 @@ use ruff_python_ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -144,7 +144,7 @@ fn format_import(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(Range::from_located(stmt));
+    let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text)?;
     let mut import = match_import(&mut tree)?;
 
@@ -178,7 +178,7 @@ fn format_import_from(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(Range::from_located(stmt));
+    let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text).unwrap();
     let mut import = match_import_from(&mut tree)?;
 
@@ -240,7 +240,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 RewriteMockImport {
                     reference_type: MockReference::Attribute,
                 },
-                Range::from_located(value),
+                Range::from(value),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
@@ -287,7 +287,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             RewriteMockImport {
                                 reference_type: MockReference::Import,
                             },
-                            Range::from_located(name),
+                            Range::from(name),
                         );
                         if let Some(content) = content.as_ref() {
                             diagnostic.amend(Fix::replacement(
@@ -315,7 +315,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     RewriteMockImport {
                         reference_type: MockReference::Import,
                     },
-                    Range::from_located(stmt),
+                    Range::from(stmt),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {

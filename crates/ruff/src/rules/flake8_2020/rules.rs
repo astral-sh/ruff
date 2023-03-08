@@ -144,7 +144,7 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SysVersionSlice1Referenced,
-                            Range::from_located(value),
+                            Range::from(value),
                         ));
                     } else if *i == BigInt::from(3)
                         && checker
@@ -154,7 +154,7 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SysVersionSlice3Referenced,
-                            Range::from_located(value),
+                            Range::from(value),
                         ));
                     }
                 }
@@ -167,17 +167,15 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 if *i == BigInt::from(2)
                     && checker.settings.rules.enabled(&Rule::SysVersion2Referenced)
                 {
-                    checker.diagnostics.push(Diagnostic::new(
-                        SysVersion2Referenced,
-                        Range::from_located(value),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(SysVersion2Referenced, Range::from(value)));
                 } else if *i == BigInt::from(0)
                     && checker.settings.rules.enabled(&Rule::SysVersion0Referenced)
                 {
-                    checker.diagnostics.push(Diagnostic::new(
-                        SysVersion0Referenced,
-                        Range::from_located(value),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(SysVersion0Referenced, Range::from(value)));
                 }
             }
 
@@ -216,7 +214,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                         {
                             checker.diagnostics.push(Diagnostic::new(
                                 SysVersionInfo0Eq3Referenced,
-                                Range::from_located(left),
+                                Range::from(left),
                             ));
                         }
                     }
@@ -234,10 +232,9 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     ) = (ops, comparators)
                     {
                         if checker.settings.rules.enabled(&Rule::SysVersionInfo1CmpInt) {
-                            checker.diagnostics.push(Diagnostic::new(
-                                SysVersionInfo1CmpInt,
-                                Range::from_located(left),
-                            ));
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(SysVersionInfo1CmpInt, Range::from(left)));
                         }
                     }
                 }
@@ -266,7 +263,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         SysVersionInfoMinorCmpInt,
-                        Range::from_located(left),
+                        Range::from(left),
                     ));
                 }
             }
@@ -290,16 +287,14 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
         {
             if s.len() == 1 {
                 if checker.settings.rules.enabled(&Rule::SysVersionCmpStr10) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        SysVersionCmpStr10,
-                        Range::from_located(left),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(SysVersionCmpStr10, Range::from(left)));
                 }
             } else if checker.settings.rules.enabled(&Rule::SysVersionCmpStr3) {
-                checker.diagnostics.push(Diagnostic::new(
-                    SysVersionCmpStr3,
-                    Range::from_located(left),
-                ));
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(SysVersionCmpStr3, Range::from(left)));
             }
         }
     }
@@ -314,6 +309,6 @@ pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(SixPY3Referenced, Range::from_located(expr)));
+            .push(Diagnostic::new(SixPY3Referenced, Range::from(expr)));
     }
 }

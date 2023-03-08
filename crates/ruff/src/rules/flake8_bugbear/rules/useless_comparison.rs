@@ -22,9 +22,8 @@ impl Violation for UselessComparison {
 
 pub fn useless_comparison(checker: &mut Checker, expr: &Expr) {
     if matches!(expr.node, ExprKind::Compare { .. }) {
-        checker.diagnostics.push(Diagnostic::new(
-            UselessComparison,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(UselessComparison, Range::from(expr)));
     }
 }

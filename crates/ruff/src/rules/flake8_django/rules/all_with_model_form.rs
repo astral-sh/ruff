@@ -76,18 +76,12 @@ pub fn all_with_model_form(checker: &Checker, bases: &[Expr], body: &[Stmt]) -> 
                 match &value {
                     Constant::Str(s) => {
                         if s == "__all__" {
-                            return Some(Diagnostic::new(
-                                AllWithModelForm,
-                                Range::from_located(element),
-                            ));
+                            return Some(Diagnostic::new(AllWithModelForm, Range::from(element)));
                         }
                     }
                     Constant::Bytes(b) => {
                         if b == "__all__".as_bytes() {
-                            return Some(Diagnostic::new(
-                                AllWithModelForm,
-                                Range::from_located(element),
-                            ));
+                            return Some(Diagnostic::new(AllWithModelForm, Range::from(element)));
                         }
                     }
                     _ => (),

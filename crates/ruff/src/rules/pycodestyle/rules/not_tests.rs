@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pycodestyle::helpers::compare;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -59,8 +59,7 @@ pub fn not_tests(
                 match op {
                     Cmpop::In => {
                         if check_not_in {
-                            let mut diagnostic =
-                                Diagnostic::new(NotInTest, Range::from_located(operand));
+                            let mut diagnostic = Diagnostic::new(NotInTest, Range::from(operand));
                             if checker.patch(diagnostic.kind.rule()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
@@ -73,8 +72,7 @@ pub fn not_tests(
                     }
                     Cmpop::Is => {
                         if check_not_is {
-                            let mut diagnostic =
-                                Diagnostic::new(NotIsTest, Range::from_located(operand));
+                            let mut diagnostic = Diagnostic::new(NotIsTest, Range::from(operand));
                             if checker.patch(diagnostic.kind.rule()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.stylist),

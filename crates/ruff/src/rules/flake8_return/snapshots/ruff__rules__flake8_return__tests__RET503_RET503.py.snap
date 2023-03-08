@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 20
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 27
     column: 8
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 36
     column: 4
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 41
     column: 4
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 52
     column: 8
@@ -88,7 +103,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 59
     column: 4
@@ -105,7 +123,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 66
     column: 4
@@ -122,7 +143,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 82
     column: 4
@@ -139,7 +163,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 113
     column: 4
@@ -156,7 +183,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 120
     column: 4
@@ -173,7 +203,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 130
     column: 4
@@ -190,7 +223,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 137
     column: 4
@@ -207,7 +243,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 274
     column: 4
@@ -224,7 +263,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 291
     column: 12
@@ -241,7 +283,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 300
     column: 8
@@ -258,7 +303,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 305
     column: 8
@@ -275,7 +323,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 310
     column: 8
@@ -292,7 +343,10 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 315
     column: 8
@@ -309,7 +363,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    ImplicitReturn: ~
+    name: ImplicitReturn
+    body: "Missing explicit `return` at the end of function able to return non-`None` value"
+    suggestion: "Add explicit `return` statement"
+    fixable: true
   location:
     row: 320
     column: 8

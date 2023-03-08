@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BareExcept: ~
+    name: BareExcept
+    body: "Do not use bare `except`"
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BareExcept: ~
+    name: BareExcept
+    body: "Do not use bare `except`"
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BareExcept: ~
+    name: BareExcept
+    body: "Do not use bare `except`"
+    suggestion: ~
+    fixable: false
   location:
     row: 16
     column: 0

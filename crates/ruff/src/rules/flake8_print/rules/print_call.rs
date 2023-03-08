@@ -5,7 +5,7 @@ use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::Violation;
 
 #[violation]
@@ -54,11 +54,11 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                     }
                 }
             }
-            Diagnostic::new(PrintFound, Range::from_located(func))
+            Diagnostic::new(PrintFound, Range::from(func))
         } else if call_path.as_ref().map_or(false, |call_path| {
             *call_path.as_slice() == ["pprint", "pprint"]
         }) {
-            Diagnostic::new(PPrintFound, Range::from_located(func))
+            Diagnostic::new(PPrintFound, Range::from(func))
         } else {
             return;
         }

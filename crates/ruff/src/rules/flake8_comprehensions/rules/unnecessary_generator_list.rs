@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::flake8_comprehensions::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -58,7 +58,7 @@ pub fn unnecessary_generator_list(
         return;
     }
     if let ExprKind::GeneratorExp { .. } = argument {
-        let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorList, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorList, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
             match fixes::fix_unnecessary_generator_list(checker.locator, checker.stylist, expr) {
                 Ok(fix) => {

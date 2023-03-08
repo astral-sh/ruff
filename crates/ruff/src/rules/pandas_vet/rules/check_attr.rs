@@ -92,5 +92,5 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
 
     checker
         .diagnostics
-        .push(Diagnostic::new(violation, Range::from_located(attr_expr)));
+        .push(Diagnostic::new(violation, Range::from(attr_expr)));
 }

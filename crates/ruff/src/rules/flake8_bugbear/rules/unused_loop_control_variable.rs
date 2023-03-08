@@ -29,7 +29,7 @@ use ruff_python_ast::{helpers, visitor};
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, result_like::BoolLike)]
@@ -159,7 +159,7 @@ pub fn unused_loop_control_variable(
                 rename: rename.clone(),
                 certainty,
             },
-            Range::from_located(expr),
+            Range::from(expr),
         );
         if let Some(rename) = rename {
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {

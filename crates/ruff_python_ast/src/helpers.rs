@@ -799,7 +799,7 @@ where
         match &stmt.node {
             StmtKind::Raise { exc, cause } => {
                 self.raises
-                    .push((Range::from_located(stmt), exc.as_deref(), cause.as_deref()));
+                    .push((Range::from(stmt), exc.as_deref(), cause.as_deref()));
             }
             StmtKind::ClassDef { .. }
             | StmtKind::FunctionDef { .. }
@@ -940,7 +940,7 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> Range {
             | StmtKind::FunctionDef { .. }
             | StmtKind::AsyncFunctionDef { .. }
     ) {
-        let contents = locator.slice(Range::from_located(stmt));
+        let contents = locator.slice(stmt);
         for (start, tok, end) in lexer::lex_located(contents, Mode::Module, stmt.location).flatten()
         {
             if matches!(tok, Tok::Name { .. }) {
@@ -949,7 +949,7 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> Range {
         }
         error!("Failed to find identifier for {:?}", stmt);
     }
-    Range::from_located(stmt)
+    Range::from(stmt)
 }
 
 /// Like `identifier_range`, but accepts a `Binding`.
@@ -967,12 +967,12 @@ pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
     }
 }
 
-// Return the ranges of `Name` tokens within a specified node.
-pub fn find_names<'a, T, U>(
-    located: &'a Located<T, U>,
+/// Return the ranges of [`Tok::Name`] tokens within a specified node.
+pub fn find_names<'a, T>(
+    located: &'a Located<T>,
     locator: &'a Locator,
 ) -> impl Iterator<Item = Range> + 'a {
-    let contents = locator.slice(Range::from_located(located));
+    let contents = locator.slice(located);
     lexer::lex_located(contents, Mode::Module, located.location)
         .flatten()
         .filter(|(_, tok, _)| matches!(tok, Tok::Name { .. }))
@@ -1031,7 +1031,7 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
 
 /// Find f-strings that don't contain any formatted values in a `JoinedStr`.
 pub fn find_useless_f_strings(expr: &Expr, locator: &Locator) -> Vec<(Range, Range)> {
-    let contents = locator.slice(Range::from_located(expr));
+    let contents = locator.slice(expr);
     lexer::lex_located(contents, Mode::Module, expr.location)
         .flatten()
         .filter_map(|(location, tok, end_location)| match tok {

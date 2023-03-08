@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_executable/mod.rs
+source: crates/ruff/src/rules/flake8_executable/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ShebangNewline: ~
+    name: ShebangNewline
+    body: Shebang should be at the beginning of the file
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 2

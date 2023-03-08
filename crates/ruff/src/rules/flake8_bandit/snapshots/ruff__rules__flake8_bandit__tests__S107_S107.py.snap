@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HardcodedPasswordDefault:
-      string: default
+    name: HardcodedPasswordDefault
+    body: "Possible hardcoded password: \"default\""
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 28
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordDefault:
-      string: posonly
+    name: HardcodedPasswordDefault
+    body: "Possible hardcoded password: \"posonly\""
+    suggestion: ~
+    fixable: false
   location:
     row: 13
     column: 44
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordDefault:
-      string: kwonly
+    name: HardcodedPasswordDefault
+    body: "Possible hardcoded password: \"kwonly\""
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 38
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordDefault:
-      string: posonly
+    name: HardcodedPasswordDefault
+    body: "Possible hardcoded password: \"posonly\""
+    suggestion: ~
+    fixable: false
   location:
     row: 29
     column: 38
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedPasswordDefault:
-      string: kwonly
+    name: HardcodedPasswordDefault
+    body: "Possible hardcoded password: \"kwonly\""
+    suggestion: ~
+    fixable: false
   location:
     row: 29
     column: 61

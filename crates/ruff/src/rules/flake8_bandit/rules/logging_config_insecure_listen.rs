@@ -37,7 +37,7 @@ pub fn logging_config_insecure_listen(
         if call_args.get_argument("verify", None).is_none() {
             checker.diagnostics.push(Diagnostic::new(
                 LoggingConfigInsecureListen,
-                Range::from_located(func),
+                Range::from(func),
             ));
         }
     }

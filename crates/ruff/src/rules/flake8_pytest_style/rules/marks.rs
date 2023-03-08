@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
 use super::helpers::{get_mark_decorators, get_mark_name};
@@ -63,7 +63,7 @@ fn pytest_mark_parentheses(
             expected_parens: preferred.to_string(),
             actual_parens: actual.to_string(),
         },
-        Range::from_located(decorator),
+        Range::from(decorator),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(fix);
@@ -111,8 +111,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
     }
 
     if !has_parameters {
-        let mut diagnostic =
-            Diagnostic::new(UseFixturesWithoutParameters, Range::from_located(decorator));
+        let mut diagnostic = Diagnostic::new(UseFixturesWithoutParameters, Range::from(decorator));
         if checker.patch(diagnostic.kind.rule()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
             diagnostic.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));

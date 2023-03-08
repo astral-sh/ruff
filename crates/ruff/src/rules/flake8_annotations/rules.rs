@@ -11,7 +11,7 @@ use ruff_python_ast::{cast, helpers};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 use super::fixes;
@@ -446,7 +446,7 @@ fn check_dynamically_typed<F>(
     if checker.ctx.match_typing_expr(annotation, "Any") {
         diagnostics.push(Diagnostic::new(
             AnyType { name: func() },
-            Range::from_located(annotation),
+            Range::from(annotation),
         ));
     };
 }
@@ -513,7 +513,7 @@ pub fn definition(
                             MissingTypeFunctionArgument {
                                 name: arg.node.arg.to_string(),
                             },
-                            Range::from_located(arg),
+                            Range::from(arg),
                         ));
                     }
                 }
@@ -544,7 +544,7 @@ pub fn definition(
                             MissingTypeArgs {
                                 name: arg.node.arg.to_string(),
                             },
-                            Range::from_located(arg),
+                            Range::from(arg),
                         ));
                     }
                 }
@@ -575,7 +575,7 @@ pub fn definition(
                             MissingTypeKwargs {
                                 name: arg.node.arg.to_string(),
                             },
-                            Range::from_located(arg),
+                            Range::from(arg),
                         ));
                     }
                 }
@@ -592,7 +592,7 @@ pub fn definition(
                                 MissingTypeCls {
                                     name: arg.node.arg.to_string(),
                                 },
-                                Range::from_located(arg),
+                                Range::from(arg),
                             ));
                         }
                     } else {
@@ -601,7 +601,7 @@ pub fn definition(
                                 MissingTypeSelf {
                                     name: arg.node.arg.to_string(),
                                 },
-                                Range::from_located(arg),
+                                Range::from(arg),
                             ));
                         }
                     }

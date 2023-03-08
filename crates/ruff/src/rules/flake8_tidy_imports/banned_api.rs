@@ -63,7 +63,7 @@ pub fn name_is_banned(
                 name: full_name,
                 message: ban.msg.to_string(),
             },
-            Range::from_located(name),
+            Range::from(name),
         ));
     }
     None
@@ -83,7 +83,7 @@ pub fn name_or_parent_is_banned<T>(
                     name: name.to_string(),
                     message: ban.msg.to_string(),
                 },
-                Range::from_located(located),
+                Range::from(located),
             ));
         }
         match name.rfind('.') {
@@ -110,7 +110,7 @@ pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
                 name: banned_path.to_string(),
                 message: ban.msg.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }

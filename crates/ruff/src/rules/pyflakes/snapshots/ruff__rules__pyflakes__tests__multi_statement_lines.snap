@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedImport:
-      name: foo1
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo1` imported but unused"
+    suggestion: "Remove unused import: `foo1`"
+    fixable: true
   location:
     row: 3
     column: 11
@@ -23,10 +23,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo2
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo2` imported but unused"
+    suggestion: "Remove unused import: `foo2`"
+    fixable: true
   location:
     row: 4
     column: 11
@@ -43,10 +43,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo3
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo3` imported but unused"
+    suggestion: "Remove unused import: `foo3`"
+    fixable: true
   location:
     row: 7
     column: 11
@@ -63,10 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo4
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo4` imported but unused"
+    suggestion: "Remove unused import: `foo4`"
+    fixable: true
   location:
     row: 11
     column: 11
@@ -83,10 +83,10 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo5
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo5` imported but unused"
+    suggestion: "Remove unused import: `foo5`"
+    fixable: true
   location:
     row: 16
     column: 18
@@ -103,10 +103,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo6
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo6` imported but unused"
+    suggestion: "Remove unused import: `foo6`"
+    fixable: true
   location:
     row: 21
     column: 16
@@ -123,10 +123,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo7
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo7` imported but unused"
+    suggestion: "Remove unused import: `foo7`"
+    fixable: true
   location:
     row: 26
     column: 17
@@ -143,10 +143,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo8
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo8` imported but unused"
+    suggestion: "Remove unused import: `foo8`"
+    fixable: true
   location:
     row: 30
     column: 18
@@ -163,10 +163,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo9
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo9` imported but unused"
+    suggestion: "Remove unused import: `foo9`"
+    fixable: true
   location:
     row: 31
     column: 22
@@ -183,10 +183,10 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo10
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo10` imported but unused"
+    suggestion: "Remove unused import: `foo10`"
+    fixable: true
   location:
     row: 35
     column: 15
@@ -203,10 +203,10 @@ expression: diagnostics
       column: 4
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo11
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo11` imported but unused"
+    suggestion: "Remove unused import: `foo11`"
+    fixable: true
   location:
     row: 40
     column: 16
@@ -223,10 +223,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo12
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo12` imported but unused"
+    suggestion: "Remove unused import: `foo12`"
+    fixable: true
   location:
     row: 46
     column: 7
@@ -243,10 +243,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    UnusedImport:
-      name: foo13
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`foo13` imported but unused"
+    suggestion: "Remove unused import: `foo13`"
+    fixable: true
   location:
     row: 51
     column: 7

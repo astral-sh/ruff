@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -23,9 +23,9 @@ impl AlwaysAutofixableViolation for RewriteCElementTree {
 }
 
 fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
-    let mut diagnostic = Diagnostic::new(RewriteCElementTree, Range::from_located(node));
+    let mut diagnostic = Diagnostic::new(RewriteCElementTree, Range::from(node));
     if checker.patch(diagnostic.kind.rule()) {
-        let contents = checker.locator.slice(Range::from_located(node));
+        let contents = checker.locator.slice(node);
         diagnostic.amend(Fix::replacement(
             contents.replacen("cElementTree", "ElementTree", 1),
             node.location,

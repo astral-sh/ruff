@@ -164,20 +164,18 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                 } => {
                     if checker.settings.rules.enabled(&Rule::RawStringInException) {
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
-                            checker.diagnostics.push(Diagnostic::new(
-                                RawStringInException,
-                                Range::from_located(first),
-                            ));
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(RawStringInException, Range::from(first)));
                         }
                     }
                 }
                 // Check for f-strings
                 ExprKind::JoinedStr { .. } => {
                     if checker.settings.rules.enabled(&Rule::FStringInException) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            FStringInException,
-                            Range::from_located(first),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(FStringInException, Range::from(first)));
                     }
                 }
                 // Check for .format() calls
@@ -187,7 +185,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                             if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
                                 checker.diagnostics.push(Diagnostic::new(
                                     DotFormatInException,
-                                    Range::from_located(first),
+                                    Range::from(first),
                                 ));
                             }
                         }

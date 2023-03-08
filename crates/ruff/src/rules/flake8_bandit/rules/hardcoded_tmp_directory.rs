@@ -33,7 +33,7 @@ pub fn hardcoded_tmp_directory(
             HardcodedTempFile {
                 string: value.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ))
     } else {
         None

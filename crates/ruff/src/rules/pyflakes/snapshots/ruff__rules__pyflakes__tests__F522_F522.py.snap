@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    StringDotFormatExtraNamedArguments:
-      missing:
-        - bar
+    name: StringDotFormatExtraNamedArguments
+    body: "`.format` call has unused named argument(s): bar"
+    suggestion: "Remove extra named arguments: bar"
+    fixable: true
   location:
     row: 1
     column: 0
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    StringDotFormatExtraNamedArguments:
-      missing:
-        - spam
+    name: StringDotFormatExtraNamedArguments
+    body: "`.format` call has unused named argument(s): spam"
+    suggestion: "Remove extra named arguments: spam"
+    fixable: true
   location:
     row: 2
     column: 0
@@ -41,10 +43,10 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    StringDotFormatExtraNamedArguments:
-      missing:
-        - eggs
-        - ham
+    name: StringDotFormatExtraNamedArguments
+    body: "`.format` call has unused named argument(s): eggs, ham"
+    suggestion: "Remove extra named arguments: eggs, ham"
+    fixable: true
   location:
     row: 4
     column: 0

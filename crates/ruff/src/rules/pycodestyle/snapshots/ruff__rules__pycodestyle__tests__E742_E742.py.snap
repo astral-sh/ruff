@@ -1,9 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AmbiguousClassName: l
+    name: AmbiguousClassName
+    body: "Ambiguous class name: `l`"
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 6
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousClassName: I
+    name: AmbiguousClassName
+    body: "Ambiguous class name: `I`"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 6
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AmbiguousClassName: O
+    name: AmbiguousClassName
+    body: "Ambiguous class name: `O`"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 6

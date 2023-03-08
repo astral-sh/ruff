@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_logging_format/mod.rs
+source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LoggingRedundantExcInfo: ~
+    name: LoggingRedundantExcInfo
+    body: "Logging statement has redundant `exc_info`"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 37
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    LoggingRedundantExcInfo: ~
+    name: LoggingRedundantExcInfo
+    body: "Logging statement has redundant `exc_info`"
+    suggestion: ~
+    fixable: false
   location:
     row: 13
     column: 37

@@ -1,9 +1,12 @@
 ---
-source: src/rules/tryceratops/mod.rs
+source: crates/ruff/src/rules/tryceratops/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TryConsiderElse: ~
+    name: TryConsiderElse
+    body: "Consider moving this statement to an `else` block"
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 8

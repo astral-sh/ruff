@@ -53,7 +53,7 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
         ) {
             checker.diagnostics.push(Diagnostic::new(
                 CachedInstanceMethod,
-                Range::from_located(decorator),
+                Range::from(decorator),
             ));
         }
     }

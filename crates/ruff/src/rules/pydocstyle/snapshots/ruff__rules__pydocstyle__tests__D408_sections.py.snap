@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SectionUnderlineAfterName:
-      name: Returns
+    name: SectionUnderlineAfterName
+    body: "Section underline should be in the line following the section's name (\"Returns\")"
+    suggestion: "Add underline to \"Returns\""
+    fixable: true
   location:
     row: 85
     column: 4

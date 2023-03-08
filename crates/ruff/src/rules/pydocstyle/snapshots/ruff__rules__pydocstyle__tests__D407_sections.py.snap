@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DashedUnderlineAfterSection:
-      name: Returns
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Returns\")"
+    suggestion: "Add dashed line under \"Returns\""
+    fixable: true
   location:
     row: 42
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Returns
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Returns\")"
+    suggestion: "Add dashed line under \"Returns\""
+    fixable: true
   location:
     row: 54
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Raises
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Raises\")"
+    suggestion: "Add dashed line under \"Raises\""
+    fixable: true
   location:
     row: 207
     column: 4
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 252
     column: 4
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Returns
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Returns\")"
+    suggestion: "Add dashed line under \"Returns\""
+    fixable: true
   location:
     row: 252
     column: 4
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Raises
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Raises\")"
+    suggestion: "Add dashed line under \"Raises\""
+    fixable: true
   location:
     row: 252
     column: 4
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 269
     column: 4
@@ -129,8 +143,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 284
     column: 8
@@ -147,8 +163,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 301
     column: 4
@@ -165,8 +183,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 313
     column: 8
@@ -183,8 +203,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 325
     column: 8
@@ -201,8 +223,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 337
     column: 8
@@ -219,8 +243,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 350
     column: 8
@@ -237,8 +263,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 362
     column: 8
@@ -255,8 +283,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 371
     column: 8
@@ -273,8 +303,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DashedUnderlineAfterSection:
-      name: Args
+    name: DashedUnderlineAfterSection
+    body: "Missing dashed underline after section (\"Args\")"
+    suggestion: "Add dashed line under \"Args\""
+    fixable: true
   location:
     row: 490
     column: 8
