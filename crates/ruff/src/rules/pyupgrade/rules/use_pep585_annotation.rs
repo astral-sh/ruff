@@ -42,7 +42,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
             DeprecatedCollectionType {
                 name: binding.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
             let binding = binding.to_lowercase();

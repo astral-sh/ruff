@@ -28,8 +28,7 @@ pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     if !checker.ctx.is_builtin("print") {
         return;
     };
-    checker.diagnostics.push(Diagnostic::new(
-        InvalidPrintSyntax,
-        Range::from_located(left),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(InvalidPrintSyntax, Range::from(left)));
 }

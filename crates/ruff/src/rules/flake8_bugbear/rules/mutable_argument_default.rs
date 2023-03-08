@@ -171,7 +171,7 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
         {
             checker.diagnostics.push(Diagnostic::new(
                 MutableArgumentDefault,
-                Range::from_located(default),
+                Range::from(default),
             ));
         }
     }

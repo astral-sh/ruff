@@ -73,9 +73,8 @@ pub fn raise_vanilla_class(checker: &mut Checker, expr: &Expr) {
         })
         .map_or(false, |call_path| call_path.as_slice() == ["", "Exception"])
     {
-        checker.diagnostics.push(Diagnostic::new(
-            RaiseVanillaClass,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(RaiseVanillaClass, Range::from(expr)));
     }
 }

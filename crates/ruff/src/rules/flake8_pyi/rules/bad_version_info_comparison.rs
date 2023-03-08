@@ -81,7 +81,7 @@ pub fn bad_version_info_comparison(
     }
 
     if !matches!(op, Cmpop::Lt | Cmpop::GtE) {
-        let diagnostic = Diagnostic::new(BadVersionInfoComparison, Range::from_located(expr));
+        let diagnostic = Diagnostic::new(BadVersionInfoComparison, Range::from(expr));
         checker.diagnostics.push(diagnostic);
     }
 }

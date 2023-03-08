@@ -77,10 +77,9 @@ pub fn locals_in_render_function(
         return;
     };
 
-    checker.diagnostics.push(Diagnostic::new(
-        LocalsInRenderFunction,
-        Range::from_located(locals),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(LocalsInRenderFunction, Range::from(locals)));
 }
 
 fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {

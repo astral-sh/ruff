@@ -58,7 +58,7 @@ pub fn unnecessary_literal_dict(
         UnnecessaryLiteralDict {
             obj_type: kind.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_literal_dict(checker.locator, checker.stylist, expr) {

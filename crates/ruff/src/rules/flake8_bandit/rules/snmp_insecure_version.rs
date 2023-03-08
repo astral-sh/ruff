@@ -43,7 +43,7 @@ pub fn snmp_insecure_version(
                 if value.is_zero() || value.is_one() {
                     checker.diagnostics.push(Diagnostic::new(
                         SnmpInsecureVersion,
-                        Range::from_located(mp_model_arg),
+                        Range::from(mp_model_arg),
                     ));
                 }
             }

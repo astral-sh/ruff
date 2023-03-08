@@ -64,7 +64,7 @@ pub fn model_without_dunder_str(
     if !has_dunder_method(body) {
         return Some(Diagnostic::new(
             ModelWithoutDunderStr,
-            Range::from_located(class_location),
+            Range::from(class_location),
         ));
     }
     None

@@ -82,7 +82,7 @@ pub fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &
                     MagicValueComparison {
                         value: unparse_expr(comparison_expr, checker.stylist),
                     },
-                    Range::from_located(comparison_expr),
+                    Range::from(comparison_expr),
                 ));
             }
         }

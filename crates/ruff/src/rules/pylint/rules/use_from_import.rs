@@ -52,7 +52,7 @@ pub fn use_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, names:
             name: name.to_string(),
             fixable,
         },
-        Range::from_located(alias),
+        Range::from(alias),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(

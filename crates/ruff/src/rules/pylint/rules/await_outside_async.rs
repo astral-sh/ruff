@@ -31,9 +31,8 @@ pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
         })
         .unwrap_or(true)
     {
-        checker.diagnostics.push(Diagnostic::new(
-            AwaitOutsideAsync,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(AwaitOutsideAsync, Range::from(expr)));
     }
 }

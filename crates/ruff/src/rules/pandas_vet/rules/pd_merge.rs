@@ -24,7 +24,7 @@ pub fn use_of_pd_merge(func: &Expr) -> Option<Diagnostic> {
     if let ExprKind::Attribute { attr, value, .. } = &func.node {
         if let ExprKind::Name { id, .. } = &value.node {
             if id == "pd" && attr == "merge" {
-                return Some(Diagnostic::new(UseOfPdMerge, Range::from_located(func)));
+                return Some(Diagnostic::new(UseOfPdMerge, Range::from(func)));
             }
         }
     }

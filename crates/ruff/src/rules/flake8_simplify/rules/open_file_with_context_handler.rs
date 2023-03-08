@@ -115,7 +115,7 @@ pub fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
 
             checker.diagnostics.push(Diagnostic::new(
                 OpenFileWithContextHandler,
-                Range::from_located(func),
+                Range::from(func),
             ));
         }
     }

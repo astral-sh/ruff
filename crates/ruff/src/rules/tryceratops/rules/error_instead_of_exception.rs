@@ -31,10 +31,9 @@ pub fn error_instead_of_exception(checker: &mut Checker, handlers: &[Excepthandl
         for (expr, func) in calls {
             if let ExprKind::Attribute { attr, .. } = &func.node {
                 if attr == "error" {
-                    checker.diagnostics.push(Diagnostic::new(
-                        ErrorInsteadOfException,
-                        Range::from_located(expr),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(ErrorInsteadOfException, Range::from(expr)));
                 }
             }
         }

@@ -84,7 +84,7 @@ fn check_patch_call(
             visitor.visit_expr(body);
 
             if !visitor.uses_args {
-                return Some(Diagnostic::new(PatchWithLambda, Range::from_located(call)));
+                return Some(Diagnostic::new(PatchWithLambda, Range::from(call)));
             }
         }
     }

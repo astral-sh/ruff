@@ -113,7 +113,7 @@ pub fn comparison_of_constant(
                     op: op.into(),
                     right_constant: unparse_constant(right_constant, checker.stylist),
                 },
-                Range::from_located(left),
+                Range::from(left),
             );
 
             checker.diagnostics.push(diagnostic);

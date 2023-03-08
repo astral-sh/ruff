@@ -97,10 +97,9 @@ pub fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
                     };
                     for (id, expr) in names {
                         if id == target {
-                            checker.diagnostics.push(Diagnostic::new(
-                                VerboseLogMessage,
-                                Range::from_located(expr),
-                            ));
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(VerboseLogMessage, Range::from(expr)));
                         }
                     }
                 }

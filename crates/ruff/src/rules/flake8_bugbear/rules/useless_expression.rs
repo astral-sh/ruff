@@ -23,18 +23,16 @@ pub fn useless_expression(checker: &mut Checker, body: &[Stmt]) {
         if let StmtKind::Expr { value } = &stmt.node {
             match &value.node {
                 ExprKind::List { .. } | ExprKind::Dict { .. } | ExprKind::Set { .. } => {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UselessExpression,
-                        Range::from_located(value),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(UselessExpression, Range::from(value)));
                 }
                 ExprKind::Constant { value: val, .. } => match &val {
                     Constant::Str { .. } | Constant::Ellipsis => {}
                     _ => {
-                        checker.diagnostics.push(Diagnostic::new(
-                            UselessExpression,
-                            Range::from_located(value),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(UselessExpression, Range::from(value)));
                     }
                 },
                 _ => {}

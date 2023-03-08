@@ -35,7 +35,7 @@ pub fn hardcoded_password_func_arg(keywords: &[Keyword]) -> Vec<Diagnostic> {
                 HardcodedPasswordFuncArg {
                     string: string.to_string(),
                 },
-                Range::from_located(keyword),
+                Range::from(keyword),
             ))
         })
         .collect()

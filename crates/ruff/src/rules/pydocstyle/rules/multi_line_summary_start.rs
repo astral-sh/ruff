@@ -59,10 +59,8 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
             .rules
             .enabled(&Rule::MultiLineSummaryFirstLine)
         {
-            let mut diagnostic = Diagnostic::new(
-                MultiLineSummaryFirstLine,
-                Range::from_located(docstring.expr),
-            );
+            let mut diagnostic =
+                Diagnostic::new(MultiLineSummaryFirstLine, Range::from(docstring.expr));
             if checker.patch(diagnostic.kind.rule()) {
                 let location = docstring.expr.location;
                 let mut end_row = location.row() + 1;
@@ -86,10 +84,8 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
             .rules
             .enabled(&Rule::MultiLineSummarySecondLine)
         {
-            let mut diagnostic = Diagnostic::new(
-                MultiLineSummarySecondLine,
-                Range::from_located(docstring.expr),
-            );
+            let mut diagnostic =
+                Diagnostic::new(MultiLineSummarySecondLine, Range::from(docstring.expr));
             if checker.patch(diagnostic.kind.rule()) {
                 let mut indentation = String::from(docstring.indentation);
                 let mut fixable = true;

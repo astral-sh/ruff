@@ -62,8 +62,7 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        AssertRaisesException,
-        Range::from_located(stmt),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(AssertRaisesException, Range::from(stmt)));
 }

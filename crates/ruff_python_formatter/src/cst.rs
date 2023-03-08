@@ -43,6 +43,18 @@ impl<T> Located<T> {
     }
 }
 
+impl<T> From<&Located<T>> for Range {
+    fn from(located: &Located<T>) -> Self {
+        Range::new(located.location, located.end_location.unwrap())
+    }
+}
+
+impl<T> From<&Box<Located<T>>> for Range {
+    fn from(located: &Box<Located<T>>) -> Self {
+        Range::new(located.location, located.end_location.unwrap())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprContext {
     Load,

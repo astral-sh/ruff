@@ -115,7 +115,7 @@ pub fn consider_using_sys_exit(checker: &mut Checker, func: &Expr) {
             ConsiderUsingSysExit {
                 name: name.to_string(),
             },
-            Range::from_located(func),
+            Range::from(func),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {

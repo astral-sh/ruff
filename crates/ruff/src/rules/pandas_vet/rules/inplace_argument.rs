@@ -65,8 +65,7 @@ pub fn inplace_argument(
                 _ => false,
             };
             if is_true_literal {
-                let mut diagnostic =
-                    Diagnostic::new(UseOfInplaceArgument, Range::from_located(keyword));
+                let mut diagnostic = Diagnostic::new(UseOfInplaceArgument, Range::from(keyword));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(fix) = fix_inplace_argument(
                         checker.locator,

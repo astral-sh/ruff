@@ -24,7 +24,7 @@ pub fn try_consider_else(checker: &mut Checker, body: &[Stmt], orelse: &[Stmt]) 
             if let StmtKind::Return { .. } = &stmt.node {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(TryConsiderElse, Range::from_located(stmt)));
+                    .push(Diagnostic::new(TryConsiderElse, Range::from(stmt)));
             }
         }
     }

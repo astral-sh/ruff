@@ -244,7 +244,7 @@ fn is_valid_dict(
 /// PLE1307
 pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let content = checker.locator.slice(Range::from_located(expr));
+    let content = checker.locator.slice(expr);
     let mut strings: Vec<(Location, Location)> = vec![];
     for (start, tok, end) in lexer::lex_located(content, Mode::Module, expr.location).flatten() {
         if matches!(tok, Tok::String { .. }) {
@@ -283,9 +283,8 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) 
         _ => true,
     };
     if !is_valid {
-        checker.diagnostics.push(Diagnostic::new(
-            BadStringFormatType,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(BadStringFormatType, Range::from(expr)));
     }
 }

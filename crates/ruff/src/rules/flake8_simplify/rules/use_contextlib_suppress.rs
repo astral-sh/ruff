@@ -65,7 +65,7 @@ pub fn use_contextlib_suppress(
             };
             checker.diagnostics.push(Diagnostic::new(
                 UseContextlibSuppress { exception },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }

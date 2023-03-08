@@ -12,7 +12,7 @@ use crate::fix::Fix;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::to_absolute;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::types::Range;
+
 use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 
 /// Determine if a body contains only a single statement, taking into account
@@ -227,7 +227,7 @@ pub fn remove_unused_imports<'a>(
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(stmt));
+    let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {

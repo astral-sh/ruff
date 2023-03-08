@@ -65,7 +65,7 @@ pub fn unnecessary_comprehension(
         UnnecessaryComprehension {
             obj_type: id.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr) {

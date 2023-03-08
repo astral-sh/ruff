@@ -28,8 +28,5 @@ pub fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
     if id != "df" {
         return None;
     }
-    Some(Diagnostic::new(
-        DfIsABadVariableName,
-        Range::from_located(target),
-    ))
+    Some(Diagnostic::new(DfIsABadVariableName, Range::from(target)))
 }

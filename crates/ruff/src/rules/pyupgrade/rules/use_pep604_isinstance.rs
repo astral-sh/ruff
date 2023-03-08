@@ -81,7 +81,7 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         if let Some(types) = args.get(1) {
             if let ExprKind::Tuple { elts, .. } = &types.node {
                 let mut diagnostic =
-                    Diagnostic::new(IsinstanceWithTuple { kind }, Range::from_located(expr));
+                    Diagnostic::new(IsinstanceWithTuple { kind }, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         unparse_expr(&union(elts), checker.stylist),

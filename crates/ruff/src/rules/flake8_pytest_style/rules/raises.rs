@@ -73,10 +73,9 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: 
             .enabled(&Rule::RaisesWithoutException)
         {
             if args.is_empty() && keywords.is_empty() {
-                checker.diagnostics.push(Diagnostic::new(
-                    RaisesWithoutException,
-                    Range::from_located(func),
-                ));
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(RaisesWithoutException, Range::from(func)));
             }
         }
 
@@ -133,7 +132,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
         if is_too_complex {
             checker.diagnostics.push(Diagnostic::new(
                 RaisesWithMultipleStatements,
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }
@@ -168,7 +167,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
             RaisesTooBroad {
                 exception: call_path,
             },
-            Range::from_located(exception),
+            Range::from(exception),
         ));
     }
 }

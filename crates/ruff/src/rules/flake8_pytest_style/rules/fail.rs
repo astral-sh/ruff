@@ -27,16 +27,14 @@ pub fn fail_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[
 
         if let Some(msg) = msg {
             if is_empty_or_null_string(msg) {
-                checker.diagnostics.push(Diagnostic::new(
-                    FailWithoutMessage,
-                    Range::from_located(func),
-                ));
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(FailWithoutMessage, Range::from(func)));
             }
         } else {
-            checker.diagnostics.push(Diagnostic::new(
-                FailWithoutMessage,
-                Range::from_located(func),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(FailWithoutMessage, Range::from(func)));
         }
     }
 }

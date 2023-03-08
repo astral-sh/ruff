@@ -84,7 +84,7 @@ pub fn unnecessary_call_around_sorted(
         UnnecessaryCallAroundSorted {
             func: outer.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_call_around_sorted(checker.locator, checker.stylist, expr) {

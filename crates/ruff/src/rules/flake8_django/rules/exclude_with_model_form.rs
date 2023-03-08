@@ -68,10 +68,7 @@ pub fn exclude_with_model_form(
                     continue;
                 };
                 if id == "exclude" {
-                    return Some(Diagnostic::new(
-                        ExcludeWithModelForm,
-                        Range::from_located(target),
-                    ));
+                    return Some(Diagnostic::new(ExcludeWithModelForm, Range::from(target)));
                 }
             }
         }

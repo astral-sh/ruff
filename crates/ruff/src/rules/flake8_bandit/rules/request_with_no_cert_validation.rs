@@ -67,7 +67,7 @@ pub fn request_with_no_cert_validation(
                     RequestWithNoCertValidation {
                         string: target.to_string(),
                     },
-                    Range::from_located(verify_arg),
+                    Range::from(verify_arg),
                 ));
             }
         }

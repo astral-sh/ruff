@@ -126,7 +126,7 @@ impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
 
         // TODO(charlie): This tokenization needs to happen earlier, so that we can attach
         // comments to individual string literals.
-        let (source, start, end) = f.context().locator().slice(Range::from_located(expr));
+        let (source, start, end) = f.context().locator().slice(Range::from(expr));
         let elts =
             rustpython_parser::lexer::lex_located(&source[start..end], Mode::Module, expr.location)
                 .flatten()

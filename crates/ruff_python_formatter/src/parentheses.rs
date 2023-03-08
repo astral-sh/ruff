@@ -154,7 +154,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
                         ..
                     },
                 ) {
-                    let (source, start, end) = self.locator.slice(Range::from_located(value));
+                    let (source, start, end) = self.locator.slice(Range::from(&*value));
                     // TODO(charlie): Encode this in the AST via separate node types.
                     if !is_radix_literal(&source[start..end]) {
                         value.parentheses = Parenthesize::Always;

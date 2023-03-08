@@ -138,7 +138,7 @@ pub fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
             FutureFeatureNotDefined {
                 name: alias.node.name.to_string(),
             },
-            Range::from_located(alias),
+            Range::from(alias),
         ));
     }
 }

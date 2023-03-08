@@ -87,7 +87,7 @@ fn generate_call(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut expression = match_expression(module_text)?;
     let mut call = match_call(&mut expression)?;
 
@@ -140,7 +140,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(FormatLiterals, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(FormatLiterals, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846

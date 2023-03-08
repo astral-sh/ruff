@@ -78,7 +78,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // (i.e., it's directly within an `StmtKind::Expr`).
     if let StmtKind::Expr { value: child } = &checker.ctx.current_stmt().node {
         if expr == child.as_ref() {
-            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, Range::from(expr));
 
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(

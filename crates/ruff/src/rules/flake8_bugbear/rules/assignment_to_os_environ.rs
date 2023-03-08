@@ -34,8 +34,7 @@ pub fn assignment_to_os_environ(checker: &mut Checker, targets: &[Expr]) {
     if id != "os" {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
-        AssignmentToOsEnviron,
-        Range::from_located(target),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(AssignmentToOsEnviron, Range::from(target)));
 }

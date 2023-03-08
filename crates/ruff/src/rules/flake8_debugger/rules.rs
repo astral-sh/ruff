@@ -57,7 +57,7 @@ pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
             Debugger {
                 using_type: DebuggerUsingType::Call(format_call_path(target)),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }
@@ -78,7 +78,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
                 Debugger {
                     using_type: DebuggerUsingType::Import(format_call_path(&call_path)),
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     } else {
@@ -91,7 +91,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }

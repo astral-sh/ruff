@@ -67,6 +67,6 @@ pub fn return_in_init(checker: &mut Checker, stmt: &Stmt) {
     if in_dunder_init(checker) {
         checker
             .diagnostics
-            .push(Diagnostic::new(ReturnInInit, Range::from_located(stmt)));
+            .push(Diagnostic::new(ReturnInInit, Range::from(stmt)));
     }
 }

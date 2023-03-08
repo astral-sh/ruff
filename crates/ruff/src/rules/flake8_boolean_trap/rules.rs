@@ -92,7 +92,7 @@ fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
     if is_boolean_arg(arg) {
         checker
             .diagnostics
-            .push(Diagnostic::new(kind, Range::from_located(arg)));
+            .push(Diagnostic::new(kind, Range::from(arg)));
     }
 }
 
@@ -135,7 +135,7 @@ pub fn check_positional_boolean_in_def(
         }
         checker.diagnostics.push(Diagnostic::new(
             BooleanPositionalArgInFunctionDefinition,
-            Range::from_located(arg),
+            Range::from(arg),
         ));
     }
 }

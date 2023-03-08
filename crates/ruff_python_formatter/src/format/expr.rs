@@ -39,7 +39,7 @@ fn format_name(
     expr: &Expr,
     _id: &str,
 ) -> FormatResult<()> {
-    write!(f, [literal(Range::from_located(expr))])?;
+    write!(f, [literal(Range::from(expr))])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
@@ -577,7 +577,7 @@ fn format_joined_str(
     expr: &Expr,
     _values: &[Expr],
 ) -> FormatResult<()> {
-    write!(f, [literal(Range::from_located(expr))])?;
+    write!(f, [literal(Range::from(expr))])?;
     write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
@@ -598,11 +598,11 @@ fn format_constant(
                 write!(f, [text("False")])?;
             }
         }
-        Constant::Int(_) => write!(f, [int_literal(Range::from_located(expr))])?,
-        Constant::Float(_) => write!(f, [float_literal(Range::from_located(expr))])?,
+        Constant::Int(_) => write!(f, [int_literal(Range::from(expr))])?,
+        Constant::Float(_) => write!(f, [float_literal(Range::from(expr))])?,
         Constant::Str(_) => write!(f, [string_literal(expr)])?,
         Constant::Bytes(_) => write!(f, [string_literal(expr)])?,
-        Constant::Complex { .. } => write!(f, [complex_literal(Range::from_located(expr))])?,
+        Constant::Complex { .. } => write!(f, [complex_literal(Range::from(expr))])?,
         Constant::Tuple(_) => unreachable!("Constant::Tuple should be handled by format_tuple"),
     }
     write!(f, [end_of_line_comments(expr)])?;

@@ -32,7 +32,7 @@ pub fn useless_contextlib_suppress(checker: &mut Checker, expr: &Expr, func: &Ex
     {
         checker.diagnostics.push(Diagnostic::new(
             UselessContextlibSuppress,
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }

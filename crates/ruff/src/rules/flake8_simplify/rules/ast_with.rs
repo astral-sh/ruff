@@ -101,7 +101,7 @@ pub fn multiple_with_statements(
         let mut diagnostic = Diagnostic::new(
             MultipleWithStatements { fixable },
             colon.map_or_else(
-                || Range::from_located(with_stmt),
+                || Range::from(with_stmt),
                 |colon| Range::new(with_stmt.location, colon.end_location),
             ),
         );

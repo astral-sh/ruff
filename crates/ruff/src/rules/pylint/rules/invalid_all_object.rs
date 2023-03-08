@@ -18,5 +18,5 @@ impl Violation for InvalidAllObject {
 
 /// PLE0604
 pub fn invalid_all_object(expr: &Expr) -> Diagnostic {
-    Diagnostic::new(InvalidAllObject, Range::from_located(expr))
+    Diagnostic::new(InvalidAllObject, Range::from(expr))
 }

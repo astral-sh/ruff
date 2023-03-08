@@ -30,10 +30,7 @@ pub fn collapsible_else_if(orelse: &[Stmt], locator: &Locator) -> Option<Diagnos
                 })
                 .starts_with("if")
             {
-                return Some(Diagnostic::new(
-                    CollapsibleElseIf,
-                    Range::from_located(first),
-                ));
+                return Some(Diagnostic::new(CollapsibleElseIf, Range::from(first)));
             }
         }
     }

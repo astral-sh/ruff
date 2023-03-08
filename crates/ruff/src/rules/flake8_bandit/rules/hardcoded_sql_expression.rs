@@ -97,10 +97,9 @@ fn unparse_string_format_expression(checker: &mut Checker, expr: &Expr) -> Optio
 pub fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
     match unparse_string_format_expression(checker, expr) {
         Some(string) if matches_sql_statement(&string) => {
-            checker.diagnostics.push(Diagnostic::new(
-                HardcodedSQLExpression,
-                Range::from_located(expr),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(HardcodedSQLExpression, Range::from(expr)));
         }
         _ => (),
     }
