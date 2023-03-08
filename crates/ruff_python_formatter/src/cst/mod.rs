@@ -9,8 +9,11 @@ use rustpython_parser::Mode;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
-use crate::core::helpers::{expand_indented_block, find_tok, is_elif};
+use crate::cst::helpers::{expand_indented_block, find_tok, is_elif};
 use crate::trivia::{Parenthesize, Trivia};
+
+pub mod helpers;
+pub mod visitor;
 
 type Ident = String;
 
