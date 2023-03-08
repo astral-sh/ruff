@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
@@ -45,7 +45,7 @@ pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
             DatetimeTimezoneUTC { straight_import },
             Range::from_located(expr),
         );
-        if checker.patch((&diagnostic.kind).into()) {
+        if checker.patch(diagnostic.kind.rule()) {
             if straight_import {
                 diagnostic.amend(Fix::replacement(
                     "datetime.UTC".to_string(),

@@ -11,11 +11,12 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::Location;
 
-use crate::codes::NoqaCode;
-use crate::registry::{Diagnostic, Rule};
-use crate::rule_redirects::get_redirect_target;
 use ruff_python_ast::source_code::{LineEnding, Locator};
 use ruff_python_ast::types::Range;
+
+use crate::codes::NoqaCode;
+use crate::registry::{AsRule, Diagnostic, Rule};
+use crate::rule_redirects::get_redirect_target;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -201,8 +202,7 @@ fn add_noqa_inner(
 
         // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
         if !file_exemptions.is_empty() {
-            let rule: &Rule = (&diagnostic.kind).into();
-            if file_exemptions.contains(&rule.noqa_code()) {
+            if file_exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
                 continue;
             }
         }
@@ -216,7 +216,7 @@ fn add_noqa_inner(
                         continue;
                     }
                     Directive::Codes(.., codes) => {
-                        if includes((&diagnostic.kind).into(), &codes) {
+                        if includes(diagnostic.kind.rule(), &codes) {
                             continue;
                         }
                     }
@@ -236,7 +236,7 @@ fn add_noqa_inner(
                     continue;
                 }
                 Directive::Codes(.., codes) => {
-                    if includes((&diagnostic.kind).into(), &codes) {
+                    if includes(diagnostic.kind.rule(), &codes) {
                         continue;
                     }
                 }
@@ -250,7 +250,7 @@ fn add_noqa_inner(
         matches_by_line
             .entry(noqa_lineno)
             .or_default()
-            .insert((&diagnostic.kind).into());
+            .insert(diagnostic.kind.rule());
     }
 
     let mut count: usize = 0;
@@ -333,12 +333,13 @@ mod tests {
     use nohash_hasher::IntMap;
     use rustpython_parser::ast::Location;
 
+    use ruff_python_ast::source_code::LineEnding;
+    use ruff_python_ast::types::Range;
+
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
     use crate::registry::Diagnostic;
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
     use crate::rules::pyflakes;
-    use ruff_python_ast::source_code::LineEnding;
-    use ruff_python_ast::types::Range;
 
     #[test]
     fn regex() {

@@ -8,8 +8,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::AsRule;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 use super::super::cformat::CFormatSummary;
@@ -471,7 +470,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         },
         location,
     );
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         match remove_unused_keyword_arguments_from_format_call(
             &missing,
             location,

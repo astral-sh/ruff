@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -80,7 +80,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
                 },
                 Range::from_located(docstring.expr),
             );
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line before the docstring.
                 diagnostic.amend(Fix::deletion(
                     Location::new(docstring.expr.location.row() - blank_lines_before, 0),
@@ -135,7 +135,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
                 },
                 Range::from_located(docstring.expr),
             );
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line after the docstring.
                 diagnostic.amend(Fix::deletion(
                     Location::new(docstring.expr.end_location.unwrap().row() + 1, 0),

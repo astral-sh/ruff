@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -41,7 +41,7 @@ pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[
             ),
         );
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
-        if checker.patch((&diagnostic.kind).into()) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "text".to_string(),
                 range.location,

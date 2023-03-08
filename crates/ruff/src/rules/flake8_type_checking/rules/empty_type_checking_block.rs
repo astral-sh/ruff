@@ -6,7 +6,7 @@ use ruff_python_ast::types::{Range, RefEquality};
 
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -35,7 +35,7 @@ pub fn empty_type_checking_block<'a, 'b>(
         let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, Range::from_located(&body[0]));
 
         // Delete the entire type-checking block.
-        if checker.patch((&diagnostic.kind).into()) {
+        if checker.patch(diagnostic.kind.rule()) {
             let parent = checker
                 .ctx
                 .child_to_parent

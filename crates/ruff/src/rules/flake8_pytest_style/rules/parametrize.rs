@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 use super::super::types;
@@ -99,7 +99,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             },
                             Range::from_located(expr),
                         );
-                        if checker.patch((&diagnostic.kind).into()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
                                 format!(
                                     "({})",
@@ -132,7 +132,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             },
                             Range::from_located(expr),
                         );
-                        if checker.patch((&diagnostic.kind).into()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
@@ -174,7 +174,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             },
                             Range::from_located(expr),
                         );
-                        if checker.patch((&diagnostic.kind).into()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
@@ -196,7 +196,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             },
                             Range::from_located(expr),
                         );
-                        if checker.patch((&diagnostic.kind).into()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
                                 diagnostic.amend(Fix::replacement(
                                     content,
@@ -225,7 +225,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             },
                             Range::from_located(expr),
                         );
-                        if checker.patch((&diagnostic.kind).into()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
                                 format!(
                                     "({})",
@@ -250,7 +250,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             },
                             Range::from_located(expr),
                         );
-                        if checker.patch((&diagnostic.kind).into()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
                                 diagnostic.amend(Fix::replacement(
                                     content,
@@ -328,7 +328,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
         Range::from_located(expr),
     );
 
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_expr(&create_expr(value.node.clone()), checker.stylist),
             expr.location,

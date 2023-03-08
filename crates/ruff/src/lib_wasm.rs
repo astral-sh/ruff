@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::directives;
 use crate::linter::{check_path, LinterResult};
-use crate::registry::Rule;
+use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
@@ -208,7 +208,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
         .map(|message| ExpandedMessage {
-            code: Into::<&Rule>::into(&message.kind).into(),
+            code: message.kind.rule().into(),
             message: message.kind.body.clone(),
             location: message.location,
             end_location: message.end_location,

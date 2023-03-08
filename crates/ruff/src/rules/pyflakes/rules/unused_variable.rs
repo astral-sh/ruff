@@ -11,7 +11,7 @@ use ruff_python_ast::types::{Range, RefEquality, ScopeKind};
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 /// ## What it does
@@ -337,7 +337,7 @@ pub fn unused_variable(checker: &mut Checker, scope: usize) {
                 },
                 binding.range,
             );
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 if let Some(stmt) = binding.source.as_ref().map(Into::into) {
                     if let Some((kind, fix)) = remove_unused_variable(stmt, &binding.range, checker)
                     {

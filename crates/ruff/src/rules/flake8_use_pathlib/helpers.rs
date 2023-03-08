@@ -3,7 +3,7 @@ use rustpython_parser::ast::Expr;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticKind};
+use crate::registry::{AsRule, Diagnostic, DiagnosticKind};
 use crate::rules::flake8_use_pathlib::violations::{
     PathlibAbspath, PathlibBasename, PathlibChmod, PathlibDirname, PathlibExists,
     PathlibExpanduser, PathlibGetcwd, PathlibIsAbs, PathlibIsDir, PathlibIsFile, PathlibIsLink,
@@ -54,7 +54,7 @@ pub fn replaceable_by_pathlib(checker: &mut Checker, expr: &Expr) {
         let diagnostic =
             Diagnostic::new::<DiagnosticKind>(diagnostic_kind, Range::from_located(expr));
 
-        if checker.settings.rules.enabled((&diagnostic.kind).into()) {
+        if checker.settings.rules.enabled(diagnostic.kind.rule()) {
             checker.diagnostics.push(diagnostic);
         }
     }

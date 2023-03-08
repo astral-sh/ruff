@@ -16,7 +16,7 @@ use ruff_python_ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -242,7 +242,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 },
                 Range::from_located(value),
             );
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "mock".to_string(),
                     value.location,
@@ -317,7 +317,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     },
                     Range::from_located(stmt),
                 );
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         match format_import_from(stmt, indent, checker.locator, checker.stylist) {
                             Ok(content) => {

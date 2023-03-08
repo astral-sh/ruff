@@ -8,7 +8,7 @@ use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -174,7 +174,7 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
             }
 
             let mut diagnostic = Diagnostic::new(RewriteYieldFrom, Range::from_located(item.stmt));
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 let contents = checker.locator.slice(Range::from_located(item.iter));
                 let contents = format!("yield from {contents}");
                 diagnostic.amend(Fix::replacement(

@@ -9,7 +9,7 @@ use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 use super::branch::Branch;
@@ -138,7 +138,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from_located(stmt));
-        if checker.patch((&diagnostic.kind).into()) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "return".to_string(),
                 stmt.location,
@@ -156,7 +156,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from_located(stmt));
-        if checker.patch((&diagnostic.kind).into()) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "return None".to_string(),
                 stmt.location,
@@ -213,7 +213,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 implicit_return(checker, last_stmt);
             } else {
                 let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
                         content.push_str(checker.stylist.line_ending().as_str());
@@ -253,7 +253,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                 implicit_return(checker, last_stmt);
             } else {
                 let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
                         content.push_str(checker.stylist.line_ending().as_str());
@@ -292,7 +292,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 if let Some(indent) = indentation(checker.locator, stmt) {
                     let mut content = String::new();
                     content.push_str(checker.stylist.line_ending().as_str());
@@ -418,7 +418,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 SuperfluousElseReturn { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
             );
-            if checker.settings.rules.enabled((&diagnostic.kind).into()) {
+            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -428,7 +428,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 SuperfluousElseBreak { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
             );
-            if checker.settings.rules.enabled((&diagnostic.kind).into()) {
+            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -438,7 +438,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 SuperfluousElseRaise { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
             );
-            if checker.settings.rules.enabled((&diagnostic.kind).into()) {
+            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
             }
             return true;
@@ -448,7 +448,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
                 SuperfluousElseContinue { branch },
                 elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
             );
-            if checker.settings.rules.enabled((&diagnostic.kind).into()) {
+            if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
             }
             return true;

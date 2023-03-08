@@ -5,7 +5,7 @@ use ruff_python_ast::helpers::match_parens;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -34,7 +34,7 @@ pub fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) 
             let range = match_parens(func.end_location.unwrap(), checker.locator)
                 .expect("Expected call to include parentheses");
             let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::deletion(
                     func.end_location.unwrap(),
                     range.end_location,

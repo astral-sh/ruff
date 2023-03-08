@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -42,7 +42,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     }
     let mut diagnostic =
         Diagnostic::new(NoSurroundingWhitespace, Range::from_located(docstring.expr));
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         if let Some(pattern) = leading_quote(contents) {
             // If removing whitespace would lead to an invalid string of quote
             // characters, avoid applying the fix.

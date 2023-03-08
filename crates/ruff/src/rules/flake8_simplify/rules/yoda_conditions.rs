@@ -10,7 +10,7 @@ use ruff_python_stdlib::str::{self};
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
@@ -162,7 +162,7 @@ pub fn yoda_conditions(
             },
             Range::from_located(expr),
         );
-        if checker.patch((&diagnostic.kind).into()) {
+        if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 suggestion,
                 expr.location,

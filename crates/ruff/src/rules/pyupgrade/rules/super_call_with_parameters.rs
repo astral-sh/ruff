@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Range, ScopeKind};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pyupgrade::fixes;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -96,7 +96,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     }
 
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, Range::from_located(expr));
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         if let Some(fix) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
             diagnostic.amend(fix);
         }

@@ -11,7 +11,7 @@ use ruff_python_ast::{cast, helpers};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 use super::fixes;
@@ -666,7 +666,7 @@ pub fn definition(
                             },
                             helpers::identifier_range(stmt, checker.locator),
                         );
-                        if checker.patch((&diagnostic.kind).into()) {
+                        if checker.patch(diagnostic.kind.rule()) {
                             match fixes::add_return_none_annotation(checker.locator, stmt) {
                                 Ok(fix) => {
                                     diagnostic.amend(fix);

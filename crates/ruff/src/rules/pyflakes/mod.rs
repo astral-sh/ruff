@@ -18,7 +18,7 @@ mod tests {
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
     use crate::linter::{check_path, LinterResult};
-    use crate::registry::{Linter, Rule};
+    use crate::registry::{AsRule, Linter, Rule};
     use crate::settings::flags;
     use crate::test::test_path;
     use crate::{directives, settings};
@@ -270,10 +270,10 @@ mod tests {
             flags::Autofix::Enabled,
         );
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        let actual: Vec<Rule> = diagnostics
-            .into_iter()
-            .map(|diagnostic| (Into::<&Rule>::into(&diagnostic.kind)).clone())
-            .collect();
+        let actual = diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.kind.rule().clone())
+            .collect::<Vec<_>>();
         assert_eq!(actual, expected);
     }
 

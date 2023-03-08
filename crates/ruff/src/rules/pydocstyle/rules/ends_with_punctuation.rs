@@ -9,7 +9,7 @@ use crate::docstrings::definition::Docstring;
 use crate::docstrings::sections::SectionKind;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pydocstyle::helpers::logical_line;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -62,7 +62,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
             let mut diagnostic =
                 Diagnostic::new(EndsInPunctuation, Range::from_located(docstring.expr));
             // Best-effort autofix: avoid adding a period after other punctuation marks.
-            if checker.patch((&diagnostic.kind).into())
+            if checker.patch(diagnostic.kind.rule())
                 && !trimmed.ends_with(':')
                 && !trimmed.ends_with(';')
             {

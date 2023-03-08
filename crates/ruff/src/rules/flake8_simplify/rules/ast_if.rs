@@ -12,7 +12,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::flake8_simplify::rules::fix_if;
 use crate::violation::{AutofixKind, Availability, Violation};
 
@@ -279,7 +279,7 @@ pub fn nested_if_statements(
             |colon| Range::new(stmt.location, colon.end_location),
         ),
     );
-    if fixable && checker.patch((&diagnostic.kind).into()) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
             Ok(fix) => {
                 if fix
@@ -353,7 +353,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         NeedlessBool { condition, fixable },
         Range::from_located(stmt),
     );
-    if fixable && checker.patch((&diagnostic.kind).into()) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
             diagnostic.amend(Fix::replacement(
@@ -503,7 +503,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         },
         Range::from_located(stmt),
     );
-    if fixable && checker.patch((&diagnostic.kind).into()) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,
@@ -851,7 +851,7 @@ pub fn use_dict_get_with_default(
         },
         Range::from_located(stmt),
     );
-    if fixable && checker.patch((&diagnostic.kind).into()) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             stmt.location,

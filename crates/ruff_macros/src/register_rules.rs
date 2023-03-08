@@ -67,15 +67,9 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
 
         impl AsRule for DiagnosticKind {
             fn rule(&self) -> &'static Rule {
-                self.into()
-            }
-        }
-
-        impl From<&DiagnosticKind> for &'static Rule {
-            fn from(diagnostic_kind: &DiagnosticKind) -> Self {
-                match diagnostic_kind.rule.as_str() {
+                match self.name.as_str() {
                     #from_impls_for_diagnostic_kind
-                    _ => unreachable!("invalid rule name: {}", diagnostic_kind.rule),
+                    _ => unreachable!("invalid rule name: {}", self.name),
                 }
             }
         }

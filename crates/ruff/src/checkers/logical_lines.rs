@@ -5,7 +5,7 @@ use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
 use crate::rules::pycodestyle::rules::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
@@ -68,7 +68,7 @@ pub fn check_logical_lines(
             for (index, kind) in space_around_operator(&line.text) {
                 let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
                 let location = Location::new(pos.row(), pos.column() + index - token_offset);
-                if settings.rules.enabled((&kind).into()) {
+                if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -86,7 +86,7 @@ pub fn check_logical_lines(
             for (index, kind) in extraneous_whitespace(&line.text) {
                 let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
                 let location = Location::new(pos.row(), pos.column() + index - token_offset);
-                if settings.rules.enabled((&kind).into()) {
+                if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -101,7 +101,7 @@ pub fn check_logical_lines(
             for (index, kind) in whitespace_around_keywords(&line.text) {
                 let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
                 let location = Location::new(pos.row(), pos.column() + index - token_offset);
-                if settings.rules.enabled((&kind).into()) {
+                if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -113,7 +113,7 @@ pub fn check_logical_lines(
             }
 
             for (location, kind) in missing_whitespace_after_keyword(&line.tokens) {
-                if settings.rules.enabled((&kind).into()) {
+                if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -126,7 +126,7 @@ pub fn check_logical_lines(
         }
         if line.flags.contains(TokenFlags::COMMENT) {
             for (range, kind) in whitespace_before_comment(&line.tokens, locator) {
-                if settings.rules.enabled((&kind).into()) {
+                if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location: range.location,
@@ -141,7 +141,7 @@ pub fn check_logical_lines(
             for (location, kind) in
                 whitespace_around_named_parameter_equals(&line.tokens, &line.text)
             {
-                if settings.rules.enabled((&kind).into()) {
+                if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -152,7 +152,7 @@ pub fn check_logical_lines(
                 }
             }
             for (location, kind) in missing_whitespace_around_operator(&line.tokens) {
-                if settings.rules.enabled((&kind).into()) {
+                if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -170,7 +170,7 @@ pub fn check_logical_lines(
             let should_fix = false;
 
             for diagnostic in missing_whitespace(&line.text, start_loc.row(), should_fix) {
-                if settings.rules.enabled((&diagnostic.kind).into()) {
+                if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
             }
@@ -185,7 +185,7 @@ pub fn check_logical_lines(
             let should_fix = false;
 
             for diagnostic in whitespace_before_parameters(&line.tokens, should_fix) {
-                if settings.rules.enabled((&diagnostic.kind).into()) {
+                if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
             }
@@ -201,7 +201,7 @@ pub fn check_logical_lines(
         ) {
             let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
             let location = Location::new(pos.row(), pos.column() + index - token_offset);
-            if settings.rules.enabled((&kind).into()) {
+            if settings.rules.enabled(kind.rule()) {
                 diagnostics.push(Diagnostic {
                     kind,
                     location,

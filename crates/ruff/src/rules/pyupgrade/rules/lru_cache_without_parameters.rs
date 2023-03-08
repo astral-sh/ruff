@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -48,7 +48,7 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
                 LRUCacheWithoutParameters,
                 Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
             );
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     unparse_expr(func, checker.stylist),
                     expr.location,

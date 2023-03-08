@@ -11,7 +11,7 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_call, match_expression};
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pyflakes::format::FormatSummary;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -141,7 +141,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
     }
 
     let mut diagnostic = Diagnostic::new(FormatLiterals, Range::from_located(expr));
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846
         if let Ok(contents) =

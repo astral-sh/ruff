@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 /// ## What it does
@@ -76,7 +76,7 @@ pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut
     {
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(fix_f_string_missing_placeholders(
                     &prefix_range,
                     &tok_range,

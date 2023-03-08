@@ -7,7 +7,7 @@ use ruff_python_ast::types::Range;
 
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, DiagnosticKind};
+use crate::registry::{AsRule, Diagnostic, DiagnosticKind};
 use crate::rules::ruff::rules::Context;
 use crate::settings::{flags, Settings};
 use crate::violation::AlwaysAutofixableViolation;
@@ -1729,8 +1729,8 @@ pub fn ambiguous_unicode_character(
                     },
                     Range::new(location, end_location),
                 );
-                if settings.rules.enabled((&diagnostic.kind).into()) {
-                    if autofix.into() && settings.rules.should_fix((&diagnostic.kind).into()) {
+                if settings.rules.enabled(diagnostic.kind.rule()) {
+                    if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                         diagnostic.amend(Fix::replacement(
                             (*representant as char).to_string(),
                             location,

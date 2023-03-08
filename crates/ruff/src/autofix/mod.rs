@@ -9,7 +9,7 @@ use ruff_python_ast::types::Range;
 
 use crate::fix::Fix;
 use crate::linter::FixTable;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic};
 
 pub mod helpers;
 
@@ -37,7 +37,7 @@ fn apply_fixes<'a>(
             diagnostic
                 .fix
                 .as_ref()
-                .map(|fix| (Into::<&Rule>::into(&diagnostic.kind), fix))
+                .map(|fix| (diagnostic.kind.rule(), fix))
         })
         .sorted_by_key(|(.., fix)| fix.location)
     {

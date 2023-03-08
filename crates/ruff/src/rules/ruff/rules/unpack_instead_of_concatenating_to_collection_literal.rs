@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
@@ -112,7 +112,7 @@ pub fn unpack_instead_of_concatenating_to_collection_literal(checker: &mut Check
         },
         Range::from_located(expr),
     );
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         if fixable {
             diagnostic.amend(Fix::replacement(
                 contents,

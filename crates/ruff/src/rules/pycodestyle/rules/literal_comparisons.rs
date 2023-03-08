@@ -9,7 +9,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pycodestyle::helpers::compare;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -117,7 +117,7 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 let diagnostic =
                     Diagnostic::new(NoneComparison(op.into()), Range::from_located(comparator));
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(0, Cmpop::Is);
                 }
                 diagnostics.push(diagnostic);
@@ -125,7 +125,7 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::NotEq) {
                 let diagnostic =
                     Diagnostic::new(NoneComparison(op.into()), Range::from_located(comparator));
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(0, Cmpop::IsNot);
                 }
                 diagnostics.push(diagnostic);
@@ -143,7 +143,7 @@ pub fn literal_comparisons(
                         TrueFalseComparison(value, op.into()),
                         Range::from_located(comparator),
                     );
-                    if checker.patch((&diagnostic.kind).into()) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(0, Cmpop::Is);
                     }
                     diagnostics.push(diagnostic);
@@ -153,7 +153,7 @@ pub fn literal_comparisons(
                         TrueFalseComparison(value, op.into()),
                         Range::from_located(comparator),
                     );
-                    if checker.patch((&diagnostic.kind).into()) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(0, Cmpop::IsNot);
                     }
                     diagnostics.push(diagnostic);
@@ -181,7 +181,7 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::Eq) {
                 let diagnostic =
                     Diagnostic::new(NoneComparison(op.into()), Range::from_located(next));
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(idx, Cmpop::Is);
                 }
                 diagnostics.push(diagnostic);
@@ -189,7 +189,7 @@ pub fn literal_comparisons(
             if matches!(op, Cmpop::NotEq) {
                 let diagnostic =
                     Diagnostic::new(NoneComparison(op.into()), Range::from_located(next));
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     bad_ops.insert(idx, Cmpop::IsNot);
                 }
                 diagnostics.push(diagnostic);
@@ -207,7 +207,7 @@ pub fn literal_comparisons(
                         TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch((&diagnostic.kind).into()) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(idx, Cmpop::Is);
                     }
                     diagnostics.push(diagnostic);
@@ -217,7 +217,7 @@ pub fn literal_comparisons(
                         TrueFalseComparison(value, op.into()),
                         Range::from_located(next),
                     );
-                    if checker.patch((&diagnostic.kind).into()) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         bad_ops.insert(idx, Cmpop::IsNot);
                     }
                     diagnostics.push(diagnostic);

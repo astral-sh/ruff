@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -41,7 +41,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                         NewLineAfterLastParagraph,
                         Range::from_located(docstring.expr),
                     );
-                    if checker.patch((&diagnostic.kind).into()) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         // Insert a newline just before the end-quote(s).
                         let num_trailing_quotes = "'''".len();
                         let num_trailing_spaces = last_line

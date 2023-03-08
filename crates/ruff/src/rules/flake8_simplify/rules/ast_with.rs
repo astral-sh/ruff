@@ -6,7 +6,7 @@ use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::fix_with;
@@ -105,7 +105,7 @@ pub fn multiple_with_statements(
                 |colon| Range::new(with_stmt.location, colon.end_location),
             ),
         );
-        if fixable && checker.patch((&diagnostic.kind).into()) {
+        if fixable && checker.patch(diagnostic.kind.rule()) {
             match fix_with::fix_multiple_with_statements(
                 checker.locator,
                 checker.stylist,

@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 use super::super::types::Primitive;
@@ -47,7 +47,7 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
         return;
     };
     let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, Range::from_located(expr));
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             primitive.builtin(),
             expr.location,

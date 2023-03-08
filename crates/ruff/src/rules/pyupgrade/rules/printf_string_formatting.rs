@@ -15,7 +15,7 @@ use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pyupgrade::helpers::curly_escape;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -402,7 +402,7 @@ pub(crate) fn printf_string_formatting(
     contents.push_str(&format!(".format{params_string}"));
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, Range::from_located(expr));
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
             expr.location,

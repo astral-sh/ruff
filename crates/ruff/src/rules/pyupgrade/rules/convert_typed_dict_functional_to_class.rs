@@ -11,7 +11,7 @@ use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{Availability, Violation};
 use crate::AutofixKind;
 
@@ -253,7 +253,7 @@ pub fn convert_typed_dict_functional_to_class(
         },
         Range::from_located(stmt),
     );
-    if fixable && checker.patch((&diagnostic.kind).into()) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(convert_to_class(
             stmt,
             class_name,

@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 #[violation]
@@ -93,7 +93,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row() + i, 0),
                     ),
                 );
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),
@@ -143,7 +143,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                             Location::new(docstring.expr.location.row() + i, 0),
                         ),
                     );
-                    if checker.patch((&diagnostic.kind).into()) {
+                    if checker.patch(diagnostic.kind.rule()) {
                         diagnostic.amend(Fix::replacement(
                             whitespace::clean(docstring.indentation),
                             Location::new(docstring.expr.location.row() + i, 0),
@@ -167,7 +167,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                         Location::new(docstring.expr.location.row() + i, 0),
                     ),
                 );
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),

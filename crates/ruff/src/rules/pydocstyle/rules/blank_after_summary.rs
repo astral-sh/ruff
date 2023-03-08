@@ -5,7 +5,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
@@ -61,7 +61,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
             },
             Range::from_located(docstring.expr),
         );
-        if checker.patch((&diagnostic.kind).into()) {
+        if checker.patch(diagnostic.kind.rule()) {
             if blanks_count > 1 {
                 // Find the "summary" line (defined as the first non-blank line).
                 let mut summary_line = 0;

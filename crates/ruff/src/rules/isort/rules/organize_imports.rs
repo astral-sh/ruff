@@ -13,7 +13,7 @@ use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::leading_space;
 
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::settings::{flags, Settings};
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -155,7 +155,7 @@ pub fn organize_imports(
         None
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
-        if autofix.into() && settings.rules.should_fix((&diagnostic.kind).into()) {
+        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 indent(&expected, indentation),
                 range.location,

@@ -20,7 +20,7 @@ use ruff::fs::relativize_path;
 use ruff::linter::FixTable;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
-use ruff::registry::Rule;
+use ruff::registry::{AsRule, Rule};
 use ruff::settings::types::SerializationFormat;
 use ruff::{fix, notify_user};
 
@@ -187,7 +187,7 @@ impl Printer {
                             .messages
                             .iter()
                             .map(|message| ExpandedMessage {
-                                code: Into::<&Rule>::into(&message.kind).into(),
+                                code: message.kind.rule().into(),
                                 message: message.kind.body.clone(),
                                 fix: message.fix.as_ref().map(|fix| ExpandedFix {
                                     content: &fix.content,
@@ -223,10 +223,7 @@ impl Printer {
                             message.kind.body
                         ));
                         let mut case = TestCase::new(
-                            format!(
-                                "org.ruff.{}",
-                                Into::<&Rule>::into(&message.kind).noqa_code()
-                            ),
+                            format!("org.ruff.{}", message.kind.rule().noqa_code()),
                             status,
                         );
                         let file_path = Path::new(filename);
@@ -318,14 +315,14 @@ impl Printer {
                         ":",
                         message.location.column(),
                         ":",
-                        Into::<&Rule>::into(&message.kind).noqa_code(),
+                        message.kind.rule().noqa_code(),
                         message.kind.body,
                     );
                     writeln!(
                         stdout,
                         "::error title=Ruff \
                          ({}),file={},line={},col={},endLine={},endColumn={}::{}",
-                        Into::<&Rule>::into(&message.kind).noqa_code(),
+                        message.kind.rule().noqa_code(),
                         message.filename,
                         message.location.row(),
                         message.location.column(),
@@ -346,9 +343,9 @@ impl Printer {
                             .iter()
                             .map(|message| {
                                 json!({
-                                    "description": format!("({}) {}", Into::<&Rule>::into(&message.kind).noqa_code(), message.kind.body),
+                                    "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body),
                                     "severity": "major",
-                                    "fingerprint": Into::<&Rule>::into(&message.kind).noqa_code().to_string(),
+                                    "fingerprint": message.kind.rule().noqa_code().to_string(),
                                     "location": {
                                         "path": message.filename,
                                         "lines": {
@@ -371,7 +368,7 @@ impl Printer {
                         "{}:{}: [{}] {}",
                         relativize_path(Path::new(&message.filename)),
                         message.location.row(),
-                        Into::<&Rule>::into(&message.kind).noqa_code(),
+                        message.kind.rule().noqa_code(),
                         message.kind.body,
                     );
                     writeln!(stdout, "{label}")?;
@@ -388,7 +385,7 @@ impl Printer {
                         message.filename,
                         message.location.row(),
                         message.location.column(),
-                        Into::<&Rule>::into(&message.kind).noqa_code(),
+                        message.kind.rule().noqa_code(),
                         message.kind.body,
                     )?;
                 }
@@ -404,7 +401,7 @@ impl Printer {
         let violations: Vec<&Rule> = diagnostics
             .messages
             .iter()
-            .map(|message| (&message.kind).into())
+            .map(|message| message.kind.rule())
             .sorted()
             .dedup()
             .collect::<Vec<_>>();
@@ -419,18 +416,18 @@ impl Printer {
                 count: diagnostics
                     .messages
                     .iter()
-                    .filter(|message| Into::<&Rule>::into(&message.kind) == *rule)
+                    .filter(|message| message.kind.rule() == *rule)
                     .count(),
                 message: diagnostics
                     .messages
                     .iter()
-                    .find(|message| Into::<&Rule>::into(&message.kind) == *rule)
+                    .find(|message| message.kind.rule() == *rule)
                     .map(|message| message.kind.body.clone())
                     .unwrap(),
                 fixable: diagnostics
                     .messages
                     .iter()
-                    .find(|message| Into::<&Rule>::into(&message.kind) == *rule)
+                    .find(|message| message.kind.rule() == *rule)
                     .iter()
                     .any(|message| message.kind.fixable),
             })
@@ -559,11 +556,7 @@ impl Display for CodeAndBody<'_> {
             write!(
                 f,
                 "{code} {autofix}{body}",
-                code = Into::<&Rule>::into(&self.0.kind)
-                    .noqa_code()
-                    .to_string()
-                    .red()
-                    .bold(),
+                code = self.0.kind.rule().noqa_code().to_string().red().bold(),
                 autofix = format_args!("[{}] ", "*".cyan()),
                 body = self.0.kind.body,
             )
@@ -571,11 +564,7 @@ impl Display for CodeAndBody<'_> {
             write!(
                 f,
                 "{code} {body}",
-                code = Into::<&Rule>::into(&self.0.kind)
-                    .noqa_code()
-                    .to_string()
-                    .red()
-                    .bold(),
+                code = self.0.kind.rule().noqa_code().to_string().red().bold(),
                 body = self.0.kind.body,
             )
         }
@@ -618,7 +607,7 @@ fn print_message<T: Write>(
         } else {
             vec![]
         };
-        let label = Into::<&Rule>::into(&message.kind).noqa_code().to_string();
+        let label = message.kind.rule().noqa_code().to_string();
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,
@@ -724,7 +713,7 @@ fn print_grouped_message<T: Write>(
         } else {
             vec![]
         };
-        let label = Into::<&Rule>::into(&message.kind).noqa_code().to_string();
+        let label = message.kind.rule().noqa_code().to_string();
         let snippet = Snippet {
             title: Some(Annotation {
                 label: None,

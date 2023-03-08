@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::rules::flake8_logging_format::violations::{
     LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
@@ -158,7 +158,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                 && matches!(logging_level, LoggingLevel::Warn)
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         "warning".to_string(),
                         level_call_range.location,

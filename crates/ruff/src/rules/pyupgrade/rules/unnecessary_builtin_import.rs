@@ -7,7 +7,7 @@ use ruff_python_ast::types::Range;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -104,7 +104,7 @@ pub fn unnecessary_builtin_import(
         Range::from_located(stmt),
     );
 
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
         let defined_by = checker.ctx.current_stmt();
         let defined_in = checker.ctx.current_stmt_parent();

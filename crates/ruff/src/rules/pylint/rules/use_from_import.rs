@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
@@ -54,7 +54,7 @@ pub fn use_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, names:
         },
         Range::from_located(alias),
     );
-    if fixable && checker.patch((&diagnostic.kind).into()) {
+    if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_stmt(
                 &create_stmt(StmtKind::ImportFrom {

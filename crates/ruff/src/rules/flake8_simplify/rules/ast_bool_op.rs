@@ -10,7 +10,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 /// ## What it does
@@ -196,7 +196,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 },
                 Range::from_located(expr),
             );
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 // Grab the types used in each duplicate `isinstance` call.
                 let types: Vec<&Expr> = indices
                     .iter()
@@ -342,7 +342,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             },
             Range::from_located(expr),
         );
-        if checker.patch((&diagnostic.kind).into()) {
+        if checker.patch(diagnostic.kind.rule()) {
             let unmatched: Vec<Expr> = values
                 .iter()
                 .enumerate()
@@ -409,7 +409,7 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     },
                     Range::from_located(expr),
                 );
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         "False".to_string(),
                         expr.location,
@@ -463,7 +463,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     },
                     Range::from_located(expr),
                 );
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         "True".to_string(),
                         expr.location,
@@ -491,7 +491,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
         } = &value.node
         {
             let mut diagnostic = Diagnostic::new(ExprOrTrue, Range::from_located(value));
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "True".to_string(),
                     expr.location,
@@ -518,7 +518,7 @@ pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
         } = &value.node
         {
             let mut diagnostic = Diagnostic::new(ExprAndFalse, Range::from_located(value));
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "False".to_string(),
                     expr.location,

@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 // TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
@@ -98,7 +98,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
     match typing_member {
         TypingMember::Optional => {
             let mut diagnostic = Diagnostic::new(TypingUnion, Range::from_located(expr));
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
                     expr.location,
@@ -109,7 +109,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         }
         TypingMember::Union => {
             let mut diagnostic = Diagnostic::new(TypingUnion, Range::from_located(expr));
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
                     ExprKind::Slice { .. } => {
                         // Invalid type annotation.

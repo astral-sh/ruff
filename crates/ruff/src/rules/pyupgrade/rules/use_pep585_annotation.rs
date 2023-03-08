@@ -5,7 +5,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 // TODO: document referencing [PEP 585]: https://peps.python.org/pep-0585/
@@ -44,7 +44,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
             },
             Range::from_located(expr),
         );
-        if checker.patch((&diagnostic.kind).into()) {
+        if checker.patch(diagnostic.kind.rule()) {
             let binding = binding.to_lowercase();
             if checker.ctx.is_builtin(&binding) {
                 diagnostic.amend(Fix::replacement(

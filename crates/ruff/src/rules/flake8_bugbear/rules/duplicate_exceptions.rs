@@ -11,7 +11,7 @@ use ruff_python_ast::types::{CallPath, Range};
 
 use crate::checkers::ast::Checker;
 use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 #[violation]
@@ -97,7 +97,7 @@ fn duplicate_handler_exceptions<'a>(
                 },
                 Range::from_located(expr),
             );
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     if unique_elts.len() == 1 {
                         unparse_expr(unique_elts[0], checker.stylist)

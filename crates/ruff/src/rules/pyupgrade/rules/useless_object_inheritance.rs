@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Binding, BindingKind, Range, Scope};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::violation::AlwaysAutofixableViolation;
 
 use super::super::fixes;
@@ -68,7 +68,7 @@ pub fn useless_object_inheritance(
     let Some(mut diagnostic) = rule(name, bases, checker.ctx.current_scope(), &checker.ctx.bindings) else {
         return;
     };
-    if checker.patch((&diagnostic.kind).into()) {
+    if checker.patch(diagnostic.kind.rule()) {
         if let Some(fix) = fixes::remove_class_def_base(
             checker.locator,
             stmt.location,

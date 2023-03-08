@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::{AsRule, Diagnostic};
 use crate::rules::pandas_vet::fixes::fix_inplace_argument;
 use crate::violation::AlwaysAutofixableViolation;
 
@@ -67,7 +67,7 @@ pub fn inplace_argument(
             if is_true_literal {
                 let mut diagnostic =
                     Diagnostic::new(UseOfInplaceArgument, Range::from_located(keyword));
-                if checker.patch((&diagnostic.kind).into()) {
+                if checker.patch(diagnostic.kind.rule()) {
                     if let Some(fix) = fix_inplace_argument(
                         checker.locator,
                         expr,

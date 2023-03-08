@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Diagnostic, Rule};
 use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
@@ -64,7 +64,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 MultiLineSummaryFirstLine,
                 Range::from_located(docstring.expr),
             );
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 let location = docstring.expr.location;
                 let mut end_row = location.row() + 1;
                 // Delete until first non-whitespace char.
@@ -91,7 +91,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 MultiLineSummarySecondLine,
                 Range::from_located(docstring.expr),
             );
-            if checker.patch((&diagnostic.kind).into()) {
+            if checker.patch(diagnostic.kind.rule()) {
                 let mut indentation = String::from(docstring.indentation);
                 let mut fixable = true;
                 if !indentation.chars().all(char::is_whitespace) {

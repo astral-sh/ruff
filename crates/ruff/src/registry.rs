@@ -887,7 +887,7 @@ impl Rule {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiagnosticKind {
     /// The identifier of the corresponding [`Rule`].
-    pub rule: String,
+    pub name: String,
     /// The message body to display to the user, to explain the diagnostic.
     pub body: String,
     /// The message to display to the user, to explain the suggested fix.

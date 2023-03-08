@@ -16,7 +16,7 @@ mod tests {
     use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
     use crate::linter::{check_path, LinterResult};
-    use crate::registry::{Linter, Rule};
+    use crate::registry::{AsRule, Linter, Rule};
     use crate::settings::flags;
     use crate::test::test_path;
     use crate::{directives, settings};
@@ -47,7 +47,7 @@ mod tests {
         );
         let actual: Vec<Rule> = diagnostics
             .into_iter()
-            .map(|diagnostic| (Into::<&Rule>::into(&diagnostic.kind)).clone())
+            .map(|diagnostic| diagnostic.kind.rule().clone())
             .collect();
         assert_eq!(actual, expected);
     }
