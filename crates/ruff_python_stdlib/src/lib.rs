@@ -1,5 +1,4 @@
 pub mod builtins;
-pub mod bytes;
 pub mod future;
 pub mod identifiers;
 pub mod keyword;

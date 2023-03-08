@@ -9,7 +9,7 @@ pub mod logging;
 pub mod operations;
 pub mod relocate;
 pub mod source_code;
-pub mod strings;
+pub mod str;
 pub mod types;
 pub mod typing;
 pub mod visibility;

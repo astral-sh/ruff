@@ -27,7 +27,7 @@ use ruff_python_ast::types::{
 use ruff_python_ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{
-    branch_detection, cast, helpers, operations, strings, typing, visibility, visitor,
+    branch_detection, cast, helpers, operations, str, typing, visibility, visitor,
 };
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -5292,7 +5292,7 @@ impl<'a> Checker<'a> {
                     Location::new(expr.location.row(), expr.location.column()),
                 ));
 
-                let body = strings::raw_contents(contents);
+                let body = str::raw_contents(contents);
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,

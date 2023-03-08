@@ -1,8 +1,7 @@
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::strings::leading_quote;
+use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::LinesWithTrailingNewline;
-use ruff_python_stdlib::str::TRIPLE_QUOTE_PREFIXES;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
@@ -54,7 +53,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     {
         return;
     };
-    if TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
+    if is_triple_quote(first_line) {
         if checker
             .settings
             .rules
