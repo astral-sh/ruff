@@ -1983,6 +1983,7 @@ dependencies = [
  "result-like",
  "ruff_cache",
  "ruff_diagnostics",
+ "ruff_linter_eradicate",
  "ruff_macros",
  "ruff_python_ast",
  "ruff_python_stdlib",
@@ -2100,6 +2101,18 @@ dependencies = [
  "serde",
  "tracing",
  "unicode-width",
+]
+
+[[package]]
+name = "ruff_linter_eradicate"
+version = "0.0.0"
+dependencies = [
+ "once_cell",
+ "regex",
+ "ruff_diagnostics",
+ "ruff_macros",
+ "ruff_python_ast",
+ "rustpython-parser",
 ]
 
 [[package]]

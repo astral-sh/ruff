@@ -1,6 +1,6 @@
 //! Rules from [eradicate](https://pypi.org/project/eradicate/).
-pub(crate) mod detection;
-pub(crate) mod rules;
+
+pub use ruff_linter_eradicate::rules;
 
 #[cfg(test)]
 mod tests {

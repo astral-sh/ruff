@@ -5,9 +5,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
-use crate::registry::Rule;
-use crate::settings::{flags, Settings};
-
 use super::detection::comment_contains_code;
 
 /// ## What it does
@@ -51,17 +48,17 @@ pub fn commented_out_code(
     locator: &Locator,
     start: Location,
     end: Location,
-    settings: &Settings,
-    autofix: flags::Autofix,
+    task_tags: &[String],
+    fix: bool,
 ) -> Option<Diagnostic> {
     let location = Location::new(start.row(), 0);
     let end_location = Location::new(end.row() + 1, 0);
     let line = locator.slice(Range::new(location, end_location));
 
     // Verify that the comment is on its own line, and that it contains code.
-    if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
+    if is_standalone_comment(line) && comment_contains_code(line, task_tags) {
         let mut diagnostic = Diagnostic::new(CommentedOutCode, Range::new(start, end));
-        if autofix.into() && settings.rules.should_fix(&Rule::CommentedOutCode) {
+        if fix {
             diagnostic.amend(Fix::deletion(location, end_location));
         }
         Some(diagnostic)

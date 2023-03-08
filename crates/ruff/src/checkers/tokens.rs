@@ -94,9 +94,13 @@ pub fn check_tokens(
     if enforce_commented_out_code {
         for (start, tok, end) in tokens.iter().flatten() {
             if matches!(tok, Tok::Comment(_)) {
-                if let Some(diagnostic) =
-                    eradicate::rules::commented_out_code(locator, *start, *end, settings, autofix)
-                {
+                if let Some(diagnostic) = eradicate::rules::commented_out_code(
+                    locator,
+                    *start,
+                    *end,
+                    &settings.task_tags,
+                    autofix.into() && settings.rules.should_fix(&Rule::CommentedOutCode),
+                ) {
                     diagnostics.push(diagnostic);
                 }
             }

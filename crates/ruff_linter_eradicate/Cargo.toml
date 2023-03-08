@@ -1,0 +1,17 @@
+[package]
+name = "ruff_linter_eradicate"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[lib]
+
+[dependencies]
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_macros = { path = "../ruff_macros" }
+ruff_diagnostics = { path = "../ruff_diagnostics" }
+
+once_cell = { workspace = true }
+regex = { workspace = true }
+rustpython-parser = { workspace = true }
