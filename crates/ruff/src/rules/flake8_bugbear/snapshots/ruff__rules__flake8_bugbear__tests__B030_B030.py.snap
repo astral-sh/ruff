@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ExceptWithNonExceptionClasses: ~
+    name: ExceptWithNonExceptionClasses
+    body: "`except` handlers should only be exception classes or tuples of exception classes"
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 7
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ExceptWithNonExceptionClasses: ~
+    name: ExceptWithNonExceptionClasses
+    body: "`except` handlers should only be exception classes or tuples of exception classes"
+    suggestion: ~
+    fixable: false
   location:
     row: 17
     column: 8
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ExceptWithNonExceptionClasses: ~
+    name: ExceptWithNonExceptionClasses
+    body: "`except` handlers should only be exception classes or tuples of exception classes"
+    suggestion: ~
+    fixable: false
   location:
     row: 22
     column: 20
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ExceptWithNonExceptionClasses: ~
+    name: ExceptWithNonExceptionClasses
+    body: "`except` handlers should only be exception classes or tuples of exception classes"
+    suggestion: ~
+    fixable: false
   location:
     row: 27
     column: 36
