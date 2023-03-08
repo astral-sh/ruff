@@ -36,11 +36,11 @@ impl<'a> Iterator for LinesWhenConsiderLineContinuation<'a> {
             ret.push_str(&line[..line.len() - 1]);
         }
 
+        // no more lines to consume
         if actual_lines == 0 {
             return None;
         }
 
-        // no more new line => consume entire string
         Some((ret, actual_lines))
     }
 }
