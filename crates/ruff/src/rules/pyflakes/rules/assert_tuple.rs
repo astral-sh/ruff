@@ -23,7 +23,7 @@ pub fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
         if !elts.is_empty() {
             checker
                 .diagnostics
-                .push(Diagnostic::new(AssertTuple, Range::from_located(stmt)));
+                .push(Diagnostic::new(AssertTuple, Range::from(stmt)));
         }
     }
 }

@@ -49,6 +49,6 @@ pub fn raise_within_try(checker: &mut Checker, body: &[Stmt]) {
     for stmt in raises {
         checker
             .diagnostics
-            .push(Diagnostic::new(RaiseWithinTry, Range::from_located(stmt)));
+            .push(Diagnostic::new(RaiseWithinTry, Range::from(stmt)));
     }
 }

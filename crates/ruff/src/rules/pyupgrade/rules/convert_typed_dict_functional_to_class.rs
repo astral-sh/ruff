@@ -251,7 +251,7 @@ pub fn convert_typed_dict_functional_to_class(
             name: class_name.to_string(),
             fixable,
         },
-        Range::from_located(stmt),
+        Range::from(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(convert_to_class(

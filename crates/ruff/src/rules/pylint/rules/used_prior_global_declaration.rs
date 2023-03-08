@@ -34,7 +34,7 @@ pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &E
                     name: name.to_string(),
                     line: stmt.location.row(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             ));
         }
     }

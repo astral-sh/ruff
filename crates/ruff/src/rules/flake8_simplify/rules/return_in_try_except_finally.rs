@@ -40,7 +40,7 @@ pub fn return_in_try_except_finally(
         if try_has_return || except_has_return {
             checker.diagnostics.push(Diagnostic::new(
                 ReturnInTryExceptFinally,
-                Range::from_located(finally_return),
+                Range::from(finally_return),
             ));
         }
     }

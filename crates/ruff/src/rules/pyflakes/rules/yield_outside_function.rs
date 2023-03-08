@@ -53,7 +53,7 @@ pub fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
         };
         checker.diagnostics.push(Diagnostic::new(
             YieldOutsideFunction { keyword },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }

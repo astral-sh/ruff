@@ -69,7 +69,7 @@ pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values:
                         .sorted()
                         .collect(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             ));
         }
     }

@@ -24,5 +24,5 @@ pub fn exec_used(expr: &Expr, func: &Expr) -> Option<Diagnostic> {
     if id != "exec" {
         return None;
     }
-    Some(Diagnostic::new(ExecBuiltin, Range::from_located(expr)))
+    Some(Diagnostic::new(ExecBuiltin, Range::from(expr)))
 }

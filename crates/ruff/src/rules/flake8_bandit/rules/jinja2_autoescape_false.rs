@@ -58,20 +58,20 @@ pub fn jinja2_autoescape_false(
                         if id.as_str() != "select_autoescape" {
                             checker.diagnostics.push(Diagnostic::new(
                                 Jinja2AutoescapeFalse { value: true },
-                                Range::from_located(autoescape_arg),
+                                Range::from(autoescape_arg),
                             ));
                         }
                     }
                 }
                 _ => checker.diagnostics.push(Diagnostic::new(
                     Jinja2AutoescapeFalse { value: true },
-                    Range::from_located(autoescape_arg),
+                    Range::from(autoescape_arg),
                 )),
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 Jinja2AutoescapeFalse { value: false },
-                Range::from_located(func),
+                Range::from(func),
             ));
         }
     }

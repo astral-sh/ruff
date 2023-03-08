@@ -68,7 +68,7 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
             alias: attr.to_string(),
             target: target.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(

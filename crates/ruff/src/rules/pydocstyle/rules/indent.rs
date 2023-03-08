@@ -123,7 +123,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         if has_seen_tab {
             checker.diagnostics.push(Diagnostic::new(
                 IndentWithSpaces,
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             ));
         }
     }

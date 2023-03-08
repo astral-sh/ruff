@@ -33,7 +33,7 @@ pub fn try_except_continue(
     {
         checker.diagnostics.push(Diagnostic::new(
             TryExceptContinue,
-            Range::from_located(excepthandler),
+            Range::from(excepthandler),
         ));
     }
 }

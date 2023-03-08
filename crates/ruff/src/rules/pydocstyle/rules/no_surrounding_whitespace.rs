@@ -40,8 +40,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     if line == trimmed {
         return;
     }
-    let mut diagnostic =
-        Diagnostic::new(NoSurroundingWhitespace, Range::from_located(docstring.expr));
+    let mut diagnostic = Diagnostic::new(NoSurroundingWhitespace, Range::from(docstring.expr));
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(pattern) = leading_quote(contents) {
             // If removing whitespace would lead to an invalid string of quote

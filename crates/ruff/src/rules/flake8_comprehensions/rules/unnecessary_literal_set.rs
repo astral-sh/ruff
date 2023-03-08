@@ -51,7 +51,7 @@ pub fn unnecessary_literal_set(
         UnnecessaryLiteralSet {
             obj_type: kind.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_literal_set(checker.locator, checker.stylist, expr) {

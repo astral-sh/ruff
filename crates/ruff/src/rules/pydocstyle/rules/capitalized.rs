@@ -46,6 +46,6 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     };
     checker.diagnostics.push(Diagnostic::new(
         FirstLineCapitalized,
-        Range::from_located(docstring.expr),
+        Range::from(docstring.expr),
     ));
 }

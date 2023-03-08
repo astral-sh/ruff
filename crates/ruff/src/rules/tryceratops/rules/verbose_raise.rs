@@ -73,7 +73,7 @@ pub fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
                         if id == exception_name {
                             checker
                                 .diagnostics
-                                .push(Diagnostic::new(VerboseRaise, Range::from_located(exc)));
+                                .push(Diagnostic::new(VerboseRaise, Range::from(exc)));
                         }
                     }
                 }

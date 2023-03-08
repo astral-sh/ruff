@@ -125,10 +125,9 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
 
                         if checker.settings.rules.enabled(&Rule::LoggingTooManyArgs) {
                             if summary.num_positional < message_args {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    LoggingTooManyArgs,
-                                    Range::from_located(func),
-                                ));
+                                checker
+                                    .diagnostics
+                                    .push(Diagnostic::new(LoggingTooManyArgs, Range::from(func)));
                             }
                         }
 
@@ -137,10 +136,9 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                                 && call_args.kwargs.is_empty()
                                 && summary.num_positional > message_args
                             {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    LoggingTooFewArgs,
-                                    Range::from_located(func),
-                                ));
+                                checker
+                                    .diagnostics
+                                    .push(Diagnostic::new(LoggingTooFewArgs, Range::from(func)));
                             }
                         }
                     }

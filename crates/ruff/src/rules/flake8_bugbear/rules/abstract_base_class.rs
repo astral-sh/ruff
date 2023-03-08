@@ -128,7 +128,7 @@ pub fn abstract_base_class(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }
@@ -142,7 +142,7 @@ pub fn abstract_base_class(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }

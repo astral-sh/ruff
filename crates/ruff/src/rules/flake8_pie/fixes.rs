@@ -2,7 +2,6 @@ use anyhow::{bail, Result};
 use libcst_native::{Codegen, CodegenState, Expression, GeneratorExp};
 
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 
 use crate::cst::matchers::{match_call, match_expression};
 use crate::fix::Fix;
@@ -14,7 +13,7 @@ pub fn fix_unnecessary_comprehension_any_all(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(ListComp) -> Expr(GeneratorExp)
-    let expression_text = locator.slice(Range::from_located(expr));
+    let expression_text = locator.slice(expr);
     let mut tree = match_expression(expression_text)?;
     let call = match_call(&mut tree)?;
 

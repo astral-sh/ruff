@@ -32,7 +32,7 @@ pub fn empty_type_checking_block<'a, 'b>(
     'b: 'a,
 {
     if body.len() == 1 && matches!(body[0].node, StmtKind::Pass) {
-        let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, Range::from_located(&body[0]));
+        let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, Range::from(&body[0]));
 
         // Delete the entire type-checking block.
         if checker.patch(diagnostic.kind.rule()) {

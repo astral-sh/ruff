@@ -1,5 +1,6 @@
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use rustpython_parser::ast::Stmt;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Diagnostic;
@@ -55,18 +56,18 @@ pub fn global_statement(checker: &mut Checker, name: &str) {
     if let Some(index) = scope.bindings.get(name) {
         let binding = &checker.ctx.bindings[*index];
         if binding.kind.is_global() {
+            let source: &Stmt = binding
+                .source
+                .as_ref()
+                .expect("`global` bindings should always have a `source`")
+                .into();
             let diagnostic = Diagnostic::new(
                 GlobalStatement {
                     name: name.to_string(),
                 },
                 // Match Pylint's behavior by reporting on the `global` statement`, rather
                 // than the variable usage.
-                Range::from_located(
-                    binding
-                        .source
-                        .as_ref()
-                        .expect("`global` bindings should always have a `source`"),
-                ),
+                Range::from(source),
             );
             checker.diagnostics.push(diagnostic);
         }

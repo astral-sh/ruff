@@ -22,8 +22,7 @@ pub fn cannot_raise_literal(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Constant { .. } = &expr.node else {
         return;
     };
-    checker.diagnostics.push(Diagnostic::new(
-        CannotRaiseLiteral,
-        Range::from_located(expr),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(CannotRaiseLiteral, Range::from(expr)));
 }

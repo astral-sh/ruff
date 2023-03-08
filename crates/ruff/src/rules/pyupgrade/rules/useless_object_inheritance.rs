@@ -50,7 +50,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
             UselessObjectInheritance {
                 name: name.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 

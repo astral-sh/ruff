@@ -48,8 +48,7 @@ pub fn unnecessary_list_comprehension_dict(
     if elts.len() != 2 {
         return;
     }
-    let mut diagnostic =
-        Diagnostic::new(UnnecessaryListComprehensionDict, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_list_comprehension_dict(checker.locator, checker.stylist, expr)
         {

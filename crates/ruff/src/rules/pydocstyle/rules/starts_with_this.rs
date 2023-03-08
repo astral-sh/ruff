@@ -34,6 +34,6 @@ pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     }
     checker.diagnostics.push(Diagnostic::new(
         DocstringStartsWithThis,
-        Range::from_located(docstring.expr),
+        Range::from(docstring.expr),
     ));
 }

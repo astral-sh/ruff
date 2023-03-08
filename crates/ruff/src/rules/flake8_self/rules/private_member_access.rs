@@ -120,7 +120,7 @@ pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
                 PrivateMemberAccess {
                     access: attr.to_string(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             ));
         }
     }

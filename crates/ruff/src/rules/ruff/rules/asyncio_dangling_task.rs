@@ -91,13 +91,13 @@ where
                 AsyncioDanglingTask {
                     method: Method::CreateTask,
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             )),
             Some(["asyncio", "ensure_future"]) => Some(Diagnostic::new(
                 AsyncioDanglingTask {
                     method: Method::EnsureFuture,
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             )),
             _ => None,
         }

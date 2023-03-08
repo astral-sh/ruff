@@ -8,7 +8,6 @@ use libcst_native::{
 };
 
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 
 use crate::cst::matchers::{match_expr, match_module};
 use crate::fix::Fix;
@@ -36,7 +35,7 @@ pub fn fix_unnecessary_generator_list(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -83,7 +82,7 @@ pub fn fix_unnecessary_generator_set(
     parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Fix> {
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -140,7 +139,7 @@ pub fn fix_unnecessary_generator_dict(
     expr: &rustpython_parser::ast::Expr,
     parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -214,7 +213,7 @@ pub fn fix_unnecessary_list_comprehension_set(
 ) -> Result<Fix> {
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -258,7 +257,7 @@ pub fn fix_unnecessary_list_comprehension_dict(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -357,7 +356,7 @@ pub fn fix_unnecessary_literal_set(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let mut call = match_call(body)?;
@@ -408,7 +407,7 @@ pub fn fix_unnecessary_literal_dict(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -481,7 +480,7 @@ pub fn fix_unnecessary_collection_call(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -596,7 +595,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -655,7 +654,7 @@ pub fn fix_unnecessary_literal_within_list_call(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -717,7 +716,7 @@ pub fn fix_unnecessary_list_call(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
     // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -747,7 +746,7 @@ pub fn fix_unnecessary_call_around_sorted(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let outer_call = match_call(body)?;
@@ -874,7 +873,7 @@ pub fn fix_unnecessary_double_cast_or_process(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let body = match_expr(&mut tree)?;
     let mut outer_call = match_call(body)?;
@@ -913,7 +912,7 @@ pub fn fix_unnecessary_comprehension(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
 
@@ -989,7 +988,7 @@ pub fn fix_unnecessary_map(
     parent: Option<&rustpython_parser::ast::Expr>,
     kind: &str,
 ) -> Result<Fix> {
-    let module_text = locator.slice(Range::from_located(expr));
+    let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;

@@ -28,13 +28,17 @@ impl Range {
             end_location,
         }
     }
+}
 
-    pub fn from_located<T, U>(located: &Located<T, U>) -> Self {
+impl<T> From<&Located<T>> for Range {
+    fn from(located: &Located<T>) -> Self {
         Range::new(located.location, located.end_location.unwrap())
     }
+}
 
-    pub fn contains(&self, other: &Range) -> bool {
-        self.location <= other.location && self.end_location >= other.end_location
+impl<T> From<&Box<Located<T>>> for Range {
+    fn from(located: &Box<Located<T>>) -> Self {
+        Range::new(located.location, located.end_location.unwrap())
     }
 }
 

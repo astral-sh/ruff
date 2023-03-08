@@ -169,7 +169,7 @@ pub fn banned_relative_import(
             RelativeImports {
                 strictness: strictness.clone(),
             },
-            Range::from_located(stmt),
+            Range::from(stmt),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) =

@@ -66,7 +66,7 @@ pub fn unnecessary_literal_within_list_call(
         UnnecessaryLiteralWithinListCall {
             literal: argument_kind.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_literal_within_list_call(

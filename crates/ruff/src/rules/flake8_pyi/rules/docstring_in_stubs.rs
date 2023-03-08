@@ -20,9 +20,8 @@ impl Violation for DocstringInStub {
 /// PYI021
 pub fn docstring_in_stubs(checker: &mut Checker, docstring: Option<&Expr>) {
     if let Some(docstr) = &docstring {
-        checker.diagnostics.push(Diagnostic::new(
-            DocstringInStub,
-            Range::from_located(docstr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(DocstringInStub, Range::from(*docstr)));
     }
 }

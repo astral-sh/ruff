@@ -42,7 +42,7 @@ pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     if !starts_with_triple {
         checker.diagnostics.push(Diagnostic::new(
             TripleSingleQuotes,
-            Range::from_located(docstring.expr),
+            Range::from(docstring.expr),
         ));
     }
 }

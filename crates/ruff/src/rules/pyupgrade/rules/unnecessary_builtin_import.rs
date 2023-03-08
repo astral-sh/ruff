@@ -101,7 +101,7 @@ pub fn unnecessary_builtin_import(
                 .sorted()
                 .collect(),
         },
-        Range::from_located(stmt),
+        Range::from(stmt),
     );
 
     if checker.patch(diagnostic.kind.rule()) {

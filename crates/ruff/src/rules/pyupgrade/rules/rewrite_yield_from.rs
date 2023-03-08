@@ -173,9 +173,9 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(RewriteYieldFrom, Range::from_located(item.stmt));
+            let mut diagnostic = Diagnostic::new(RewriteYieldFrom, Range::from(item.stmt));
             if checker.patch(diagnostic.kind.rule()) {
-                let contents = checker.locator.slice(Range::from_located(item.iter));
+                let contents = checker.locator.slice(item.iter);
                 let contents = format!("yield from {contents}");
                 diagnostic.amend(Fix::replacement(
                     contents,

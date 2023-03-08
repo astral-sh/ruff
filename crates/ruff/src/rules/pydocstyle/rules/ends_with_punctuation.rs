@@ -59,8 +59,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
         let line = body.lines().nth(index).unwrap();
         let trimmed = line.trim_end();
         if !(trimmed.ends_with('.') || trimmed.ends_with('!') || trimmed.ends_with('?')) {
-            let mut diagnostic =
-                Diagnostic::new(EndsInPunctuation, Range::from_located(docstring.expr));
+            let mut diagnostic = Diagnostic::new(EndsInPunctuation, Range::from(docstring.expr));
             // Best-effort autofix: avoid adding a period after other punctuation marks.
             if checker.patch(diagnostic.kind.rule())
                 && !trimmed.ends_with(':')

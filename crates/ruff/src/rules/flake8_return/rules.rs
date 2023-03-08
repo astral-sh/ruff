@@ -137,7 +137,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         ) {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from_located(stmt));
+        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "return".to_string(),
@@ -155,7 +155,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         if expr.is_some() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from_located(stmt));
+        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "return None".to_string(),
@@ -212,7 +212,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
@@ -252,7 +252,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
@@ -291,7 +291,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     if is_noreturn_func(checker, func)
             ) => {}
         _ => {
-            let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
+            let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(indent) = indentation(checker.locator, stmt) {
                     let mut content = String::new();
@@ -383,10 +383,9 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         }
 
         if !stack.refs.contains_key(id.as_str()) {
-            checker.diagnostics.push(Diagnostic::new(
-                UnnecessaryAssign,
-                Range::from_located(expr),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(UnnecessaryAssign, Range::from(expr)));
             return;
         }
 
@@ -400,10 +399,9 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
-            UnnecessaryAssign,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(UnnecessaryAssign, Range::from(expr)));
     }
 }
 
@@ -416,7 +414,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Return { .. }) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -426,7 +424,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Break) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -436,7 +434,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Raise { .. }) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -446,7 +444,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Continue) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);

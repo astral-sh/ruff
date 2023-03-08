@@ -64,7 +64,7 @@ pub fn non_imperative_mood(
     if let Some(false) = MOOD.is_imperative(&first_word_norm) {
         let diagnostic = Diagnostic::new(
             NonImperativeMood(line.to_string()),
-            Range::from_located(docstring.expr),
+            Range::from(docstring.expr),
         );
         checker.diagnostics.push(diagnostic);
     }

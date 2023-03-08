@@ -68,7 +68,7 @@ pub fn remove_class_def_base(
 
 /// Generate a fix to remove arguments from a `super` call.
 pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr) -> Option<Fix> {
-    let range = Range::from_located(expr);
+    let range = Range::from(expr);
     let contents = locator.slice(range);
 
     let mut tree = libcst_native::parse_module(contents, None).ok()?;

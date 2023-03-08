@@ -9,7 +9,7 @@ use crate::fix::Fix;
 
 /// ANN204
 pub fn add_return_none_annotation(locator: &Locator, stmt: &Stmt) -> Result<Fix> {
-    let range = Range::from_located(stmt);
+    let range = Range::from(stmt);
     let contents = locator.slice(range);
 
     // Find the colon (following the `def` keyword).

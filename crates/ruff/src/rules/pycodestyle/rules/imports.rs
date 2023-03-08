@@ -29,10 +29,9 @@ impl Violation for ModuleImportNotAtTopOfFile {
 
 pub fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &[Alias]) {
     if names.len() > 1 {
-        checker.diagnostics.push(Diagnostic::new(
-            MultipleImportsOnOneLine,
-            Range::from_located(stmt),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(MultipleImportsOnOneLine, Range::from(stmt)));
     }
 }
 
@@ -40,7 +39,7 @@ pub fn module_import_not_at_top_of_file(checker: &mut Checker, stmt: &Stmt) {
     if checker.ctx.seen_import_boundary && stmt.location.column() == 0 {
         checker.diagnostics.push(Diagnostic::new(
             ModuleImportNotAtTopOfFile,
-            Range::from_located(stmt),
+            Range::from(stmt),
         ));
     }
 }

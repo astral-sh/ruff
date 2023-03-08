@@ -97,7 +97,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
 
     match typing_member {
         TypingMember::Optional => {
-            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
@@ -108,7 +108,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             checker.diagnostics.push(diagnostic);
         }
         TypingMember::Union => {
-            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
                     ExprKind::Slice { .. } => {

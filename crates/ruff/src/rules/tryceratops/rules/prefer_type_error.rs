@@ -135,7 +135,7 @@ fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
     if check_raise_type(checker, exc) {
         checker
             .diagnostics
-            .push(Diagnostic::new(PreferTypeError, Range::from_located(item)));
+            .push(Diagnostic::new(PreferTypeError, Range::from(item)));
     }
 }
 

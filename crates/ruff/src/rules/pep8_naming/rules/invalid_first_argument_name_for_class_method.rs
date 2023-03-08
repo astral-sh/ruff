@@ -89,7 +89,7 @@ pub fn invalid_first_argument_name_for_class_method(
             }
             return Some(Diagnostic::new(
                 InvalidFirstArgumentNameForClassMethod,
-                Range::from_located(arg),
+                Range::from(arg),
             ));
         }
     }

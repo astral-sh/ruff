@@ -22,7 +22,7 @@ pub fn unnecessary_direct_lambda_call(checker: &mut Checker, expr: &Expr, func: 
     if let ExprKind::Lambda { .. } = &func.node {
         checker.diagnostics.push(Diagnostic::new(
             UnnecessaryDirectLambdaCall,
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }

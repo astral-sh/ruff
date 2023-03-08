@@ -30,7 +30,7 @@ pub fn except_with_empty_tuple(checker: &mut Checker, excepthandler: &Excepthand
     if elts.is_empty() {
         checker.diagnostics.push(Diagnostic::new(
             ExceptWithEmptyTuple,
-            Range::from_located(excepthandler),
+            Range::from(excepthandler),
         ));
     }
 }

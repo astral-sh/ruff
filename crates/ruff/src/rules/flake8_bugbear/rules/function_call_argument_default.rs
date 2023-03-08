@@ -75,7 +75,7 @@ where
                             name: compose_call_path(func),
                         }
                         .into(),
-                        Range::from_located(expr),
+                        Range::from(expr),
                     ));
                 }
                 visitor::walk_expr(self, expr);

@@ -34,7 +34,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
                         ),
                     },
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
         match &stmt.node {

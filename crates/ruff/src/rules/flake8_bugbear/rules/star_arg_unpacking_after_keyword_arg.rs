@@ -44,7 +44,7 @@ pub fn star_arg_unpacking_after_keyword_arg(
         }
         checker.diagnostics.push(Diagnostic::new(
             StarArgUnpackingAfterKeywordArg,
-            Range::from_located(arg),
+            Range::from(arg),
         ));
     }
 }

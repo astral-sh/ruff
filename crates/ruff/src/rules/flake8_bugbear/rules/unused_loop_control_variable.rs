@@ -159,7 +159,7 @@ pub fn unused_loop_control_variable(
                 rename: rename.clone(),
                 certainty,
             },
-            Range::from_located(expr),
+            Range::from(expr),
         );
         if let Some(rename) = rename {
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {

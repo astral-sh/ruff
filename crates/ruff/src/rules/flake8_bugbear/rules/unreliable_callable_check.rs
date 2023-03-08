@@ -41,8 +41,7 @@ pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr
     if s != "__call__" {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
-        UnreliableCallableCheck,
-        Range::from_located(expr),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(UnreliableCallableCheck, Range::from(expr)));
 }

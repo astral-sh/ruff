@@ -42,7 +42,7 @@ pub fn mixed_case_variable_in_class_scope(
             MixedCaseVariableInClassScope {
                 name: name.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }

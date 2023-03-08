@@ -39,9 +39,8 @@ pub fn strip_with_multi_characters(checker: &mut Checker, expr: &Expr, func: &Ex
 
     let num_chars = value.chars().count();
     if num_chars > 1 && num_chars != value.chars().unique().count() {
-        checker.diagnostics.push(Diagnostic::new(
-            StripWithMultiCharacters,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(StripWithMultiCharacters, Range::from(expr)));
     }
 }

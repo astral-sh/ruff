@@ -57,13 +57,13 @@ pub fn request_without_timeout(
                     RequestWithoutTimeout {
                         timeout: Some(timeout),
                     },
-                    Range::from_located(timeout_arg),
+                    Range::from(timeout_arg),
                 ));
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 RequestWithoutTimeout { timeout: None },
-                Range::from_located(func),
+                Range::from(func),
             ));
         }
     }

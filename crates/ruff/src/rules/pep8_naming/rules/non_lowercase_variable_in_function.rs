@@ -76,7 +76,7 @@ pub fn non_lowercase_variable_in_function(
             NonLowercaseVariableInFunction {
                 name: name.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }

@@ -113,7 +113,7 @@ fn create_check(
         RedundantOpenModes {
             replacement: replacement_value.clone(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if patch {
         if let Some(content) = replacement_value {
