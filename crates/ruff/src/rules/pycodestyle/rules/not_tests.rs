@@ -8,6 +8,26 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::helpers::compare;
 
+/// ## What it does
+/// Checks for negative comparison using `not {foo} in {bar}`.
+///
+/// ## Why is this bad?
+/// Negative comparison should be done using `not in`.
+///
+/// ## Example
+/// ```python
+/// Z = not X in Y
+/// if not X.B in Y:\n    pass
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if x not in y:\n    pass
+/// assert (X in Y or X is Z)
+///
+/// ```
+/// """
 #[violation]
 pub struct NotInTest;
 
@@ -22,6 +42,26 @@ impl AlwaysAutofixableViolation for NotInTest {
     }
 }
 
+/// ## What it does
+/// Checks for negative comparison using `not {foo} is {bar}`.
+///
+/// ## Why is this bad?
+/// Negative comparison should be done using `is not`.
+///
+/// ## Example
+/// ```python
+/// if not X is Y:
+///     pass
+/// Z = not X.B is Y
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if not (X in Y):
+///     pass
+/// zz = x is not y
+/// ```
+/// """
 #[violation]
 pub struct NotIsTest;
 

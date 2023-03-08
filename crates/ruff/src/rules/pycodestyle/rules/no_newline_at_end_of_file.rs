@@ -5,6 +5,23 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
 
+/// ## What it does
+/// Checks for files missing a new line at the end of the file.
+///
+/// ## Why is this bad?
+/// Trailing blank lines are superfluous.
+/// However the last line should end with a new line.
+///
+/// ## Example
+/// ```python
+/// spam(1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(1)\n
+/// ```
+/// """
 #[violation]
 pub struct NoNewLineAtEndOfFile;
 

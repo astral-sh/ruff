@@ -10,6 +10,26 @@ use ruff_python_ast::whitespace::leading_space;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for lambda expressions which are assigned to a variable.
+///
+/// ## Why is this bad?
+/// Compound statements (on the same line) are generally discouraged.
+/// Always use a def statement instead of an assignment statement that
+/// binds a lambda expression directly to a name.
+///
+///
+/// ## Example
+/// ```python
+/// f = lambda x: 2*x
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def f(x):
+///    return 2 * x
+/// ```
+/// """
 #[violation]
 pub struct LambdaAssignment {
     pub name: String,

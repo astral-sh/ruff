@@ -28,6 +28,31 @@ impl From<&Cmpop> for EqCmpop {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons to `None` which are not using the `is` operator.
+///
+/// ## Why is this bad?
+/// Comparison to singletons should use `is` or `is not`.
+///
+/// Comparisons to singletons like None should always be done
+/// with `is` or `is not`, never the equality operators.
+///
+/// Also, beware of writing `if x` when you really mean `if x is not None`
+/// -- e.g. when testing whether a variable or argument that defaults to
+/// None was set to some other value.  The other value might have a type
+/// (such as a container) that could be false in a boolean context!
+///
+/// ## Example
+/// ```python
+/// if arg != None:
+/// if None == arg:
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if arg is not None:
+/// ```
+/// """
 #[violation]
 pub struct NoneComparison(pub EqCmpop);
 
@@ -50,6 +75,27 @@ impl AlwaysAutofixableViolation for NoneComparison {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons to booleans which are not using the `is` operator.
+///
+/// ## Why is this bad?
+/// Comparison to singletons should use `is` or `is not`.
+///
+/// Comparisons to singletons like `True` or `False` should always be done
+/// with `is` or `is not`, never the equality operators.
+///
+/// ## Example
+/// ```python
+/// if arg == True:
+/// if False == arg:
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if arg:
+/// if not arg:
+/// ```
+/// """
 #[violation]
 pub struct TrueFalseComparison(pub bool, pub EqCmpop);
 

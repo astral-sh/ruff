@@ -6,6 +6,26 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::pycodestyle::logical_lines::LogicalLine;
 
+/// ## What it does
+/// Checks for indentation with invalid multiple of 4 spaces.
+///
+/// ## Why is this bad?
+/// Use indent_size (PEP8 says 4) spaces per indentation level.
+/// For really old code that you don't want to mess up, you can continue
+/// to use 8-space tabs.
+///
+/// ## Example
+/// ```python
+/// if True:
+///    a = 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if True:
+///     a = 1
+/// ```
+/// """
 #[violation]
 pub struct IndentationWithInvalidMultiple {
     pub indent_size: usize,
@@ -19,6 +39,26 @@ impl Violation for IndentationWithInvalidMultiple {
     }
 }
 
+/// ## What it does
+/// Checks for indentation of comments with invalid multiple of 4 spaces.
+///
+/// ## Why is this bad?
+/// Use indent_size (PEP8 says 4) spaces per indentation level.
+/// For really old code that you don't want to mess up, you can continue
+/// to use 8-space tabs.
+///
+/// ## Example
+/// ```python
+/// if True:
+///    # a = 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if True:
+///     # a = 1
+/// ```
+/// """
 #[violation]
 pub struct IndentationWithInvalidMultipleComment {
     pub indent_size: usize,
@@ -32,6 +72,27 @@ impl Violation for IndentationWithInvalidMultipleComment {
     }
 }
 
+/// ## What it does
+/// Checks for missing indented block.
+///
+/// ## Why is this bad?
+/// Use indent_size (PEP8 says 4) spaces per indentation level.
+/// For really old code that you don't want to mess up, you can continue
+/// to use 8-space tabs.
+///
+/// ## Example
+/// ```python
+/// for item in items:
+/// pass
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// for item in items:
+///     pass
+/// ```
+/// """
 #[violation]
 pub struct NoIndentedBlock;
 
@@ -42,6 +103,28 @@ impl Violation for NoIndentedBlock {
     }
 }
 
+/// ## What it does
+/// Checks for missing indented comment in a block.
+///
+/// ## Why is this bad?
+/// Use indent_size (PEP8 says 4) spaces per indentation level.
+/// For really old code that you don't want to mess up, you can continue
+/// to use 8-space tabs.
+///
+/// ## Example
+/// ```python
+/// for item in items:
+/// # Hi
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// for item in items:
+///     # Hi
+///     pass
+/// ```
+/// """
 #[violation]
 pub struct NoIndentedBlockComment;
 
@@ -52,6 +135,26 @@ impl Violation for NoIndentedBlockComment {
     }
 }
 
+/// ## What it does
+/// Checks for unexpected indentation.
+///
+/// ## Why is this bad?
+/// Use indent_size (PEP8 says 4) spaces per indentation level.
+/// For really old code that you don't want to mess up, you can continue
+/// to use 8-space tabs.
+///
+/// ## Example
+/// ```python
+/// a = 1
+///     b = 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 1
+/// b = 2
+/// ```
+/// """
 #[violation]
 pub struct UnexpectedIndentation;
 
@@ -62,6 +165,26 @@ impl Violation for UnexpectedIndentation {
     }
 }
 
+/// ## What it does
+/// Checks for unexpected indentation of comment.
+///
+/// ## Why is this bad?
+/// Use indent_size (PEP8 says 4) spaces per indentation level.
+/// For really old code that you don't want to mess up, you can continue
+/// to use 8-space tabs.
+///
+/// ## Example
+/// ```python
+/// a = 1
+///     # b = 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 1
+/// # b = 2
+/// ```
+/// """
 #[violation]
 pub struct UnexpectedIndentationComment;
 
@@ -72,6 +195,26 @@ impl Violation for UnexpectedIndentationComment {
     }
 }
 
+/// ## What it does
+/// Checks for over indented code.
+///
+/// ## Why is this bad?
+/// Use indent_size (PEP8 says 4) spaces per indentation level.
+/// For really old code that you don't want to mess up, you can continue
+/// to use 8-space tabs.
+///
+/// ## Example
+/// ```python
+/// for item in items:
+///       pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// for item in items:
+///     pass
+/// ```
+/// """
 #[violation]
 pub struct OverIndented;
 
@@ -82,7 +225,7 @@ impl Violation for OverIndented {
     }
 }
 
-/// E111
+/// E111, E114, E112, E113, E115, E116, E117
 #[cfg(feature = "logical_lines")]
 pub fn indentation(
     logical_line: &LogicalLine,

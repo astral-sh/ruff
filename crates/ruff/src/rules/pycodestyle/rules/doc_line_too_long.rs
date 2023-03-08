@@ -7,6 +7,27 @@ use ruff_python_ast::types::Range;
 use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
 
+/// ## What it does
+/// Checks for all doc lines to a maximum of e.g. 72 characters.
+///
+/// ## Why is this bad?
+/// For flowing long blocks of text (docstrings or comments), limiting
+/// the length to 72 characters is recommended.
+///
+/// ## Example
+/// ```python
+/// def function(x):
+///     """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis auctor purus ut ex fermentum, at maximus est hendrerit."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def function(x):
+///     """
+///     Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+///     Duis auctor purus ut ex fermentum, at maximus est hendrerit.
+///     """
+/// ```
 #[violation]
 pub struct DocLineTooLong(pub usize, pub usize);
 

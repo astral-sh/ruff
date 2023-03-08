@@ -7,6 +7,23 @@ use ruff_python_ast::types::Range;
 use crate::registry::Rule;
 use crate::settings::{flags, Settings};
 
+/// ## What it does
+/// Checks for superfluous trailing whitespace.
+/// The warning returned varies on whether the line itself is blank,
+/// for easier filtering for those who want to indent their blank lines.
+///
+/// ## Why is this bad?
+///
+/// ## Example
+/// ```python
+/// spam(1) \n#
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(1)\n#
+/// ```
+/// """
 #[violation]
 pub struct TrailingWhitespace;
 
@@ -21,6 +38,25 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
     }
 }
 
+/// ## What it does
+/// Checks for superfluous whitespace in blank lines.
+/// The warning returned varies on whether the line itself is blank,
+/// for easier filtering for those who want to indent their blank lines.
+///
+/// ## Why is this bad?
+///
+///
+/// ## Example
+/// ```python
+/// class Foo(object):\n    \n    bang = 12
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo(object):\n\n    bang = 12
+/// ```
+/// """
 #[violation]
 pub struct BlankLineContainsWhitespace;
 

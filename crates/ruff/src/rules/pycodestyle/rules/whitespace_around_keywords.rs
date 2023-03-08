@@ -7,6 +7,22 @@ use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for extraneous whitespace after keywords.
+///
+/// ## Why is this bad?
+///
+///
+/// ## Example
+/// ```python
+/// True and  False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// True and False
+/// ```
+/// """
 #[violation]
 pub struct MultipleSpacesAfterKeyword;
 
@@ -17,6 +33,23 @@ impl Violation for MultipleSpacesAfterKeyword {
     }
 }
 
+/// ## What it does
+/// Checks for extraneous whitespace before keywords.
+///
+/// ## Why is this bad?
+///
+///
+/// ## Example
+/// ```python
+/// True  and False
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// True and False
+/// ```
+/// """
 #[violation]
 pub struct MultipleSpacesBeforeKeyword;
 
@@ -27,6 +60,23 @@ impl Violation for MultipleSpacesBeforeKeyword {
     }
 }
 
+/// ## What it does
+/// Checks for extraneous tabs after keywords.
+///
+/// ## Why is this bad?
+///
+///
+/// ## Example
+/// ```python
+/// True and\tFalse
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// True and False
+/// ```
+/// """
 #[violation]
 pub struct TabAfterKeyword;
 
@@ -37,6 +87,23 @@ impl Violation for TabAfterKeyword {
     }
 }
 
+/// ## What it does
+/// Checks for extraneous tabs before keywords.
+///
+/// ## Why is this bad?
+///
+///
+/// ## Example
+/// ```python
+/// True\tand False
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// True and False
+/// ```
+/// """
 #[violation]
 pub struct TabBeforeKeyword;
 
