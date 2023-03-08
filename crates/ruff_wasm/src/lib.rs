@@ -2,21 +2,20 @@ use std::path::Path;
 
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use crate::directives;
-use crate::linter::{check_path, LinterResult};
-use crate::registry::{AsRule, Rule};
-use crate::rules::{
+use ruff::directives;
+use ruff::linter::{check_path, LinterResult};
+use ruff::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
     flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
     isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
-use crate::settings::configuration::Configuration;
-use crate::settings::options::Options;
-use crate::settings::{defaults, flags, Settings};
+use ruff::settings::configuration::Configuration;
+use ruff::settings::options::Options;
+use ruff::settings::{defaults, flags, Settings};
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -49,34 +48,17 @@ export interface Diagnostic {
 };
 "#;
 
-#[derive(Serialize)]
-struct ExpandedMessage<'a> {
-    code: SerializeRuleAsCode<'a>,
-    message: String,
-    location: Location,
-    end_location: Location,
-    fix: Option<ExpandedFix>,
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedMessage {
+    pub code: String,
+    pub message: String,
+    pub location: Location,
+    pub end_location: Location,
+    pub fix: Option<ExpandedFix>,
 }
 
-struct SerializeRuleAsCode<'a>(&'a Rule);
-
-impl Serialize for SerializeRuleAsCode<'_> {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.0.noqa_code().to_string())
-    }
-}
-
-impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
-    fn from(rule: &'a Rule) -> Self {
-        Self(rule)
-    }
-}
-
-#[derive(Serialize)]
-struct ExpandedFix {
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedFix {
     content: String,
     message: Option<String>,
     location: Location,
@@ -86,7 +68,16 @@ struct ExpandedFix {
 #[wasm_bindgen(start)]
 pub fn run() {
     use log::Level;
+
+    // When the `console_error_panic_hook` feature is enabled, we can call the
+    // `set_panic_hook` function at least once during initialization, and then
+    // we will get better error messages if our code ever panics.
+    //
+    // For more details see
+    // https://github.com/rustwasm/console_error_panic_hook#readme
+    #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+
     console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
 }
 
@@ -208,8 +199,8 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
         .map(|message| ExpandedMessage {
-            code: message.kind.rule().into(),
-            message: message.kind.body.clone(),
+            code: message.kind.name,
+            message: message.kind.body,
             location: message.location,
             end_location: message.end_location,
             fix: message.fix.map(|fix| ExpandedFix {
@@ -222,56 +213,4 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         .collect();
 
     Ok(serde_wasm_bindgen::to_value(&messages)?)
-}
-
-#[cfg(test)]
-mod test {
-    use js_sys;
-    use wasm_bindgen_test::*;
-
-    use super::*;
-
-    macro_rules! check {
-        ($source:expr, $config:expr, $expected:expr) => {{
-            let foo = js_sys::JSON::parse($config).unwrap();
-            match check($source, foo) {
-                Ok(output) => {
-                    let result: Vec<Message> = serde_wasm_bindgen::from_value(output).unwrap();
-                    assert_eq!(result, $expected);
-                }
-                Err(e) => assert!(false, "{:#?}", e),
-            }
-        }};
-    }
-
-    #[wasm_bindgen_test]
-    fn empty_config() {
-        check!(
-            "if (1, 2): pass",
-            r#"{}"#,
-            [ExpandedMessage {
-                code: Rule::IfTuple.into(),
-                message: "If test is a tuple, which is always `True`".to_string(),
-                location: Location::new(1, 0),
-                end_location: Location::new(1, 15),
-                fix: None,
-            }]
-        );
-    }
-
-    #[wasm_bindgen_test]
-    fn partial_config() {
-        check!("if (1, 2): pass", r#"{"ignore": ["F"]}"#, []);
-    }
-
-    #[wasm_bindgen_test]
-    fn partial_nested_config() {
-        let config = r#"{
-          "select": ["Q"],
-          "flake8-quotes": {
-            "inline-quotes": "single"
-          }
-        }"#;
-        check!(r#"print('hello world')"#, config, []);
-    }
 }
