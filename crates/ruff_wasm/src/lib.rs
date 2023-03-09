@@ -7,6 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use ruff::directives;
 use ruff::linter::{check_path, LinterResult};
+use ruff::registry::AsRule;
 use ruff::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
@@ -199,7 +200,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
         .map(|message| ExpandedMessage {
-            code: message.kind.name,
+            code: message.kind.rule().noqa_code().to_string(),
             message: message.kind.body,
             location: message.location,
             end_location: message.end_location,
