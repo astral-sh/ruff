@@ -309,6 +309,15 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
     }
 }
 
+fn has_multiple_assigns(id: &str, stack: &Stack) -> bool {
+    if let Some(assigns) = stack.assigns.get(&id) {
+        if assigns.len() > 1 {
+            return true;
+        }
+    }
+    false
+}
+
 fn has_refs_before_next_assign(id: &str, return_location: Location, stack: &Stack) -> bool {
     let mut before_assign: &Location = &Location::default();
     let mut after_assign: Option<&Location> = None;
@@ -389,7 +398,8 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
             return;
         }
 
-        if has_refs_before_next_assign(id, expr.location, stack)
+        if has_multiple_assigns(id, stack)
+            || has_refs_before_next_assign(id, expr.location, stack)
             || has_refs_or_assigns_within_try_or_loop(id, stack)
         {
             return;

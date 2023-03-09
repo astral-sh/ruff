@@ -6,22 +6,6 @@ def x():
     return a  # error
 
 
-def x():
-    a = 1
-    print(a)
-    a = 2
-    return a  # error
-
-
-def x():
-    a = 1
-    if True:
-        return a  # error
-    a = 2
-    print(a)
-    return a
-
-
 # Can be refactored false positives
 # https://github.com/afonasev/flake8-return/issues/47#issuecomment-1122571066
 def get_bar_if_exists(obj):
@@ -165,44 +149,6 @@ def my_func():
     return foo
 
 
-# Refactored incorrect false positives
-# See test cases above marked: "Can be refactored false positives"
-# https://github.com/afonasev/flake8-return/issues/47#issuecomment-1122571066
-def get_bar_if_exists(obj):
-    if hasattr(obj, "bar"):
-        return str(obj.bar)
-    return ""
-
-
-# https://github.com/afonasev/flake8-return/issues/47#issue-641117366
-def x():
-    formatted = _USER_AGENT_FORMATTER.format(format_string, **values)
-    # clean up after any blank components
-    return formatted.replace("()", "").replace("  ", " ").strip()
-
-
-# https://github.com/afonasev/flake8-return/issues/47#issue-641117366
-def user_agent_username(username=None):
-
-    if not username:
-        return ""
-
-    username = username.replace(" ", "_")  # Avoid spaces or %20.
-    try:
-        username.encode("ascii")  # just test,
-        # but not actually use it
-    except UnicodeEncodeError:
-        username = quote(username.encode("utf-8"))
-    else:
-        # % is legal in the default $wgLegalTitleChars
-        # This is so that ops know the real pywikibot will not
-        # allow a useragent in the username to allow through a
-        # hand-coded percent-encoded value.
-        if "%" in username:
-            username = quote(username)
-    return username
-
-
 # https://github.com/afonasev/flake8-return/issues/116#issue-1367575481
 def no_exception_loop():
     success = False
@@ -280,3 +226,24 @@ def default():
         return x
 
     return y
+
+
+def get_queryset(option_1, option_2):
+    queryset: Any = None
+    queryset = queryset.filter(a=1)
+    if option_1:
+        queryset = queryset.annotate(b=Value(2))
+    if option_2:
+        queryset = queryset.filter(c=3)
+    return queryset
+
+
+def get_queryset():
+    queryset = Model.filter(a=1)
+    queryset = queryset.filter(c=3)
+    return queryset
+
+
+def get_queryset():
+    queryset = Model.filter(a=1)
+    return queryset  # error
