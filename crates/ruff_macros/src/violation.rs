@@ -44,12 +44,12 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
     let explanation = get_docs(&violation.attrs)?;
     let violation = if explanation.trim().is_empty() {
         quote! {
-            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            #[derive(Debug, PartialEq, Eq)]
             #violation
 
-            impl From<#ident> for crate::registry::DiagnosticKind {
+            impl From<#ident> for ruff_diagnostics::DiagnosticKind {
                 fn from(value: #ident) -> Self {
-                    use crate::violation::Violation;
+                    use ruff_diagnostics::Violation;
 
                     Self {
                         body: Violation::message(&value),
@@ -62,7 +62,7 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
         }
     } else {
         quote! {
-            #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+            #[derive(Debug, PartialEq, Eq)]
             #violation
 
             impl #ident {
@@ -71,9 +71,9 @@ pub fn violation(violation: &ItemStruct) -> Result<TokenStream> {
                 }
             }
 
-            impl From<#ident> for crate::registry::DiagnosticKind {
+            impl From<#ident> for ruff_diagnostics::DiagnosticKind {
                 fn from(value: #ident) -> Self {
-                    use crate::violation::Violation;
+                    use ruff_diagnostics::Violation;
 
                     Self {
                         body: Violation::message(&value),

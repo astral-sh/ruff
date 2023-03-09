@@ -3,15 +3,14 @@ use std::hash::{BuildHasherDefault, Hash};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Expr, ExprKind};
 
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic, Rule};
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct MultiValueRepeatedKeyLiteral {

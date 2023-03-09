@@ -17,9 +17,10 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
         });
         // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
         rule_message_formats_match_arms
-            .extend(quote! {#(#attr)* Self::#name => <#path as Violation>::message_formats(),});
-        rule_autofixable_match_arms
-            .extend(quote! {#(#attr)* Self::#name => <#path as Violation>::AUTOFIX,});
+            .extend(quote! {#(#attr)* Self::#name => <#path as ruff_diagnostics::Violation>::message_formats(),});
+        rule_autofixable_match_arms.extend(
+            quote! {#(#attr)* Self::#name => <#path as ruff_diagnostics::Violation>::AUTOFIX,},
+        );
         rule_explanation_match_arms.extend(quote! {#(#attr)* Self::#name => #path::explanation(),});
 
         // Enable conversion from `DiagnosticKind` to `Rule`.
@@ -56,7 +57,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             }
 
             /// Returns the autofix status of this rule.
-            pub fn autofixable(&self) -> Option<crate::violation::AutofixKind> {
+            pub fn autofixable(&self) -> Option<ruff_diagnostics::AutofixKind> {
                 match self { #rule_autofixable_match_arms }
             }
         }
@@ -65,7 +66,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             fn rule(&self) -> &'static Rule;
         }
 
-        impl AsRule for DiagnosticKind {
+        impl AsRule for ruff_diagnostics::DiagnosticKind {
             fn rule(&self) -> &'static Rule {
                 match self.name.as_str() {
                     #from_impls_for_diagnostic_kind

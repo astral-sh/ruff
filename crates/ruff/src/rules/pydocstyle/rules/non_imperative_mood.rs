@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use imperative::Mood;
 use once_cell::sync::Lazy;
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::to_call_path;
@@ -11,9 +12,7 @@ use ruff_python_ast::visibility::{is_property, is_test};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
-use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;
-use crate::violation::Violation;
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 

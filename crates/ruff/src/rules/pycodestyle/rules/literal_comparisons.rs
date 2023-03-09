@@ -3,15 +3,14 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 use serde::{Deserialize, Serialize};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::pycodestyle::helpers::compare;
-use crate::violation::AlwaysAutofixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EqCmpop {

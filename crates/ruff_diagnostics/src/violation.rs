@@ -1,9 +1,21 @@
 use std::fmt::Debug;
 
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+pub enum Availability {
+    Sometimes,
+    Always,
+}
 
-pub trait Violation: Debug + PartialEq + Eq + Serialize + DeserializeOwned {
+pub struct AutofixKind {
+    pub available: Availability,
+}
+
+impl AutofixKind {
+    pub const fn new(available: Availability) -> Self {
+        Self { available }
+    }
+}
+
+pub trait Violation: Debug + PartialEq + Eq {
     /// `None` in the case an autofix is never available or otherwise Some
     /// [`AutofixKind`] describing the available autofix.
     const AUTOFIX: Option<AutofixKind> = None;
@@ -27,26 +39,9 @@ pub trait Violation: Debug + PartialEq + Eq + Serialize + DeserializeOwned {
     fn message_formats() -> &'static [&'static str];
 }
 
-pub struct AutofixKind {
-    pub available: Availability,
-}
-
-pub enum Availability {
-    Sometimes,
-    Always,
-}
-
-impl AutofixKind {
-    pub const fn new(available: Availability) -> Self {
-        Self { available }
-    }
-}
-
 /// This trait exists just to make implementing the [`Violation`] trait more
 /// convenient for violations that can always be autofixed.
-pub trait AlwaysAutofixableViolation:
-    Debug + PartialEq + Eq + Serialize + DeserializeOwned
-{
+pub trait AlwaysAutofixableViolation: Debug + PartialEq + Eq {
     /// The message used to describe the violation.
     fn message(&self) -> String;
 

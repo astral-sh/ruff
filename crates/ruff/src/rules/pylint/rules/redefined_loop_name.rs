@@ -4,6 +4,7 @@ use regex::Regex;
 use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind, Withitem};
 use serde::{Deserialize, Serialize};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::unparse_expr;
@@ -12,8 +13,6 @@ use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
 pub enum OuterBindingKind {

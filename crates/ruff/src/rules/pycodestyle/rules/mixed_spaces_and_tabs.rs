@@ -1,11 +1,9 @@
 use rustpython_parser::ast::Location;
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::leading_space;
-
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[violation]
 pub struct MixedSpacesAndTabs;

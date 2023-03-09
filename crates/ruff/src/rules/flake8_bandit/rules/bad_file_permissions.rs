@@ -3,13 +3,12 @@ use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{compose_call_path, SimpleCallArgs};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[violation]
 pub struct BadFilePermissions {

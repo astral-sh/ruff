@@ -1,3 +1,4 @@
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
@@ -5,10 +6,8 @@ use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct NoSurroundingWhitespace;

@@ -2,13 +2,13 @@ use itertools::Itertools;
 use log::error;
 use rustpython_parser::ast::{Alias, AliasData, Located, Stmt};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct UnnecessaryBuiltinImport {

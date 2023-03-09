@@ -10,6 +10,7 @@ use rustpython_parser::ast::{
     Unaryop,
 };
 
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments_in, unparse_stmt};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -19,9 +20,7 @@ use ruff_python_ast::{visitor, whitespace};
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::match_module;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
 use super::helpers::is_falsy_constant;
 use super::unittest_assert::UnittestAssert;

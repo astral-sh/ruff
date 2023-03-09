@@ -2,13 +2,12 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{Expr, ExprKind, Operator};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{any_over_expr, unparse_expr};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 use super::super::helpers::string_literal;
 

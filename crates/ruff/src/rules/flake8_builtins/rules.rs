@@ -1,11 +1,10 @@
 use rustpython_parser::ast::Located;
 
+use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 use ruff_python_stdlib::builtins::BUILTINS;
-
-use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::violation::Violation;
 
 use super::types::ShadowingType;
 

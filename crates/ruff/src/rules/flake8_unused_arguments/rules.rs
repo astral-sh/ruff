@@ -4,6 +4,7 @@ use regex::Regex;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arg, Arguments};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::function_type;
 use ruff_python_ast::function_type::FunctionType;
@@ -11,8 +12,6 @@ use ruff_python_ast::types::{Binding, FunctionDef, Lambda, Scope, ScopeKind};
 use ruff_python_ast::visibility;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 use super::helpers;
 use super::types::Argumentable;

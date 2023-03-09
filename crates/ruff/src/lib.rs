@@ -9,7 +9,6 @@ pub use ruff_python_ast::source_code::round_trip;
 pub use ruff_python_ast::types::Range;
 pub use rule_selector::RuleSelector;
 pub use rules::pycodestyle::rules::IOError;
-pub use violation::{AutofixKind, Availability as AutofixAvailability};
 
 mod autofix;
 mod checkers;
@@ -33,7 +32,6 @@ mod rule_redirects;
 mod rule_selector;
 pub mod rules;
 pub mod settings;
-mod violation;
 
 #[cfg(test)]
 mod test;

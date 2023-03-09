@@ -2,6 +2,8 @@ use anyhow::Result;
 use log::error;
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt, StmtKind};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{collect_arg_names, collect_call_path};
 use ruff_python_ast::source_code::Locator;
@@ -11,9 +13,7 @@ use ruff_python_ast::visitor::Visitor;
 
 use crate::autofix::helpers::remove_argument;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic, Rule};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::{AsRule, Rule};
 
 use super::helpers::{
     get_mark_decorators, get_mark_name, is_abstractmethod_decorator, is_pytest_fixture,
