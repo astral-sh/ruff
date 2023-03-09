@@ -1505,7 +1505,7 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
                     if let Some(item) = exc {
-                        pyupgrade::rules::os_error_alias(self, &item);
+                        pyupgrade::rules::os_error_alias_raise(self, item);
                     }
                 }
                 if self.settings.rules.enabled(&Rule::RaiseVanillaClass) {
@@ -1757,7 +1757,7 @@ where
                     flake8_bugbear::rules::redundant_tuple_in_exception_handler(self, handlers);
                 }
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
-                    pyupgrade::rules::os_error_alias(self, &handlers);
+                    pyupgrade::rules::os_error_alias_handlers(self, handlers);
                 }
                 if self.settings.rules.enabled(&Rule::AssertInExcept) {
                     self.diagnostics.extend(
@@ -2484,7 +2484,7 @@ where
                     pyupgrade::rules::replace_stdout_stderr(self, expr, func, keywords);
                 }
                 if self.settings.rules.enabled(&Rule::OSErrorAlias) {
-                    pyupgrade::rules::os_error_alias(self, &expr);
+                    pyupgrade::rules::os_error_alias_call(self, func);
                 }
                 if self.settings.rules.enabled(&Rule::IsinstanceWithTuple)
                     && self.settings.target_version >= PythonVersion::Py310
