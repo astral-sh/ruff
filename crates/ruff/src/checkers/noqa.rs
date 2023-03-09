@@ -150,10 +150,17 @@ pub fn check_noqa(
                             Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic.amend(Fix::deletion(
-                                Location::new(row + 1, start - spaces),
-                                Location::new(row + 1, lines[row].chars().count()),
-                            ));
+                            if start - spaces == 0 {
+                                diagnostic.amend(Fix::deletion(
+                                    Location::new(row + 1, 0),
+                                    Location::new(row + 2, 0),
+                                ));
+                            } else {
+                                diagnostic.amend(Fix::deletion(
+                                    Location::new(row + 1, start - spaces),
+                                    Location::new(row + 1, lines[row].chars().count()),
+                                ));
+                            }
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -218,10 +225,17 @@ pub fn check_noqa(
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
-                                diagnostic.amend(Fix::deletion(
-                                    Location::new(row + 1, start - spaces),
-                                    Location::new(row + 1, lines[row].chars().count()),
-                                ));
+                                if start - spaces == 0 {
+                                    diagnostic.amend(Fix::deletion(
+                                        Location::new(row + 1, 0),
+                                        Location::new(row + 2, 0),
+                                    ));
+                                } else {
+                                    diagnostic.amend(Fix::deletion(
+                                        Location::new(row + 1, start - spaces),
+                                        Location::new(row + 1, lines[row].chars().count()),
+                                    ));
+                                }
                             } else {
                                 diagnostic.amend(Fix::replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),

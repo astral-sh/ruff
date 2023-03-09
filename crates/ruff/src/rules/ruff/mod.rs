@@ -90,6 +90,19 @@ mod tests {
     }
 
     #[test]
+    fn ruf100_3() -> Result<()> {
+        let settings = settings::Settings::for_rules(vec![
+            Rule::UnusedNOQA,
+            Rule::LineTooLong,
+            Rule::UnusedVariable,
+        ]);
+
+        let diagnostics = test_path(Path::new("ruff/RUF100_3.py"), &settings)?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn flake8_noqa() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/flake8_noqa.py"),
