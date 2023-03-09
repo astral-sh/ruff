@@ -89,7 +89,7 @@ pub fn unspecified_encoding(
                 .diagnostics
                 .push(Diagnostic::new(UnspecifiedEncoding, Range::from(func)));
         }
-    } else if encoding_arg.is_none() {
+    } else {
         // Encoding not found
         checker
             .diagnostics
