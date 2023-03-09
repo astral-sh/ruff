@@ -70,7 +70,7 @@ pub fn unspecified_encoding(
             ..
         } = &mode.node
         {
-            if mode_param_value.as_str().contains("b") {
+            if mode_param_value.as_str().contains('b') {
                 return;
             }
         }
