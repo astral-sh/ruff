@@ -18,25 +18,21 @@ impl<'a> Iterator for LinesWhenConsiderLineContinuation<'a> {
         let mut ret = String::new();
         let mut actual_lines = 0_usize;
 
-        // given a valid utf-8 string
-        // new_line_start always starts at a valid code point
-        for line in self.underlying.by_ref() {
-            actual_lines += 1;
+        // 0x5c is \ in ASCII
+        // for utf-8 encoding str, only \'s last byte is equal to 0x5c
+        let lines = self.underlying.by_ref().map(|line| {
+            return (line, line.as_bytes().ends_with(&[0x5c]));
+        });
 
-            // 0x5c is \ in ASCII
-            // for utf-8 encoding str, only \'s last byte is equal to 0x0a
-            if !line.as_bytes().ends_with(&[0x5c]) {
-                ret.push_str(line);
+        for (line, ends_with_backslash) in lines {
+            actual_lines += 1;
+            ret.push_str(&line[..line.len() - (ends_with_backslash as usize)]);
+
+            if !ends_with_backslash {
                 break;
             }
-
-            // we know line_end - 1 is \
-            // so, it is a valid code point
-            // we ignore "\\\n" here because we want to correctly reflect the number of blank lines
-            ret.push_str(&line[..line.len() - 1]);
         }
 
-        // no more lines to consume
         if actual_lines == 0 {
             return None;
         }
