@@ -8,11 +8,11 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 5
-    column: 7
+    row: 7
+    column: 12
   end_location:
-    row: 5
-    column: 8
+    row: 7
+    column: 14
   fix: ~
   parent: ~
 - kind:
@@ -21,11 +21,11 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 5
-    column: 18
+    row: 7
+    column: 23
   end_location:
-    row: 5
-    column: 19
+    row: 7
+    column: 25
   fix: ~
   parent: ~
 - kind:
@@ -34,11 +34,11 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 8
-    column: 7
+    row: 10
+    column: 16
   end_location:
-    row: 8
-    column: 8
+    row: 10
+    column: 18
   fix: ~
   parent: ~
 - kind:
@@ -47,11 +47,24 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 8
-    column: 22
+    row: 10
+    column: 27
   end_location:
-    row: 8
-    column: 23
+    row: 10
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    name: CompareToEmptyString
+    body: "`\"\" != z` can be simplified to `not z` as an empty string is falsey"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 13
+    column: 7
+  end_location:
+    row: 13
+    column: 9
   fix: ~
   parent: ~
 

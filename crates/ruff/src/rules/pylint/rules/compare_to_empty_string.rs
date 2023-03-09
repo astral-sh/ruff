@@ -1,20 +1,23 @@
-use anyhow::anyhow;
+use anyhow::bail;
 use itertools::Itertools;
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
+
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{unparse_constant, unparse_expr};
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located};
+use ruff_python_ast::types::Range;
 
-use crate::{checkers::ast::Checker, registry::Diagnostic, violation::Violation};
+use crate::checkers::ast::Checker;
 
-#[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum EmptyStringViolationsCmpop {
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum EmptyStringCmpop {
     Is,
     IsNot,
     Eq,
     NotEq,
 }
 
-impl TryFrom<&Cmpop> for EmptyStringViolationsCmpop {
+impl TryFrom<&Cmpop> for EmptyStringCmpop {
     type Error = anyhow::Error;
 
     fn try_from(value: &Cmpop) -> Result<Self, Self::Error> {
@@ -23,14 +26,21 @@ impl TryFrom<&Cmpop> for EmptyStringViolationsCmpop {
             Cmpop::IsNot => Ok(Self::IsNot),
             Cmpop::Eq => Ok(Self::Eq),
             Cmpop::NotEq => Ok(Self::NotEq),
-            _ => Err(anyhow!(
-                "{value:?} cannot be converted to EmptyStringViolationsCmpop"
-            )),
+            _ => bail!("{value:?} cannot be converted to EmptyStringCmpop"),
         }
     }
 }
 
-impl std::fmt::Display for EmptyStringViolationsCmpop {
+impl EmptyStringCmpop {
+    pub fn into_unary(self) -> &'static str {
+        match self {
+            Self::Is | Self::Eq => "",
+            Self::IsNot | Self::NotEq => "not ",
+        }
+    }
+}
+
+impl std::fmt::Display for EmptyStringCmpop {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let repr = match self {
             Self::Is => "is",
@@ -44,21 +54,16 @@ impl std::fmt::Display for EmptyStringViolationsCmpop {
 
 #[violation]
 pub struct CompareToEmptyString {
-    pub lhs: String,
-    pub op: EmptyStringViolationsCmpop,
-    pub rhs: String,
+    pub existing: String,
+    pub replacement: String,
 }
 
 impl Violation for CompareToEmptyString {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let prefix = match self.op {
-            EmptyStringViolationsCmpop::Is | EmptyStringViolationsCmpop::Eq => "",
-            EmptyStringViolationsCmpop::IsNot | EmptyStringViolationsCmpop::NotEq => "not ",
-        };
         format!(
-            "`{} {} {}` can be simplified to `{}{}` as an empty string is falsey",
-            self.lhs, self.op, self.rhs, prefix, self.lhs
+            "`{}` can be simplified to `{}` as an empty string is falsey",
+            self.existing, self.replacement,
         )
     }
 }
@@ -69,27 +74,49 @@ pub fn compare_to_empty_string(
     ops: &[Cmpop],
     comparators: &[Expr],
 ) {
+    let mut first = true;
     for ((lhs, rhs), op) in std::iter::once(left)
         .chain(comparators.iter())
-        .tuple_windows::<(&Located<_>, &Located<_>)>()
+        .tuple_windows::<(&Expr<_>, &Expr<_>)>()
         .zip(ops)
     {
-        if matches!(op, Cmpop::Eq | Cmpop::NotEq | Cmpop::Is | Cmpop::IsNot) {
+        if let Ok(op) = EmptyStringCmpop::try_from(op) {
+            if std::mem::take(&mut first) {
+                // Check the left-most expression.
+                if let ExprKind::Constant { value, .. } = &lhs.node {
+                    if let Constant::Str(s) = value {
+                        if s.is_empty() {
+                            let constant = unparse_constant(value, checker.stylist);
+                            let expr = unparse_expr(rhs, checker.stylist);
+                            let existing = format!("{constant} {op} {expr}");
+                            let replacement = format!("{}{expr}", op.into_unary());
+                            checker.diagnostics.push(Diagnostic::new(
+                                CompareToEmptyString {
+                                    existing,
+                                    replacement,
+                                },
+                                Range::from(lhs),
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // Check all right-hand expressions.
             if let ExprKind::Constant { value, .. } = &rhs.node {
                 if let Constant::Str(s) = value {
                     if s.is_empty() {
-                        let diag = Diagnostic::new(
+                        let expr = unparse_expr(lhs, checker.stylist);
+                        let constant = unparse_constant(value, checker.stylist);
+                        let existing = format!("{expr} {op} {constant}");
+                        let replacement = format!("{}{expr}", op.into_unary());
+                        checker.diagnostics.push(Diagnostic::new(
                             CompareToEmptyString {
-                                lhs: unparse_expr(lhs, checker.stylist),
-                                // we know `op` can be safely converted into a
-                                // EmptyStringViolationCmpop due to the first if statement being
-                                // true in this branch
-                                op: op.try_into().unwrap(),
-                                rhs: unparse_constant(value, checker.stylist),
+                                existing,
+                                replacement,
                             },
-                            lhs.into(),
-                        );
-                        checker.diagnostics.push(diag);
+                            Range::from(rhs),
+                        ));
                     }
                 }
             }
