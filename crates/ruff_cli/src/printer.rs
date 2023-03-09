@@ -171,6 +171,13 @@ impl Printer {
                 self.format,
                 SerializationFormat::Text | SerializationFormat::Grouped
             ) {
+                if self.flags.contains(Flags::SHOW_FIXES) {
+                    if !diagnostics.fixed.is_empty() {
+                        writeln!(stdout)?;
+                        print_fixed(&mut stdout, &diagnostics.fixed)?;
+                        writeln!(stdout)?;
+                    }
+                }
                 self.post_text(&mut stdout, diagnostics)?;
             }
             return Ok(());
@@ -292,7 +299,6 @@ impl Printer {
                     }
                     writeln!(stdout)?;
                 }
-
                 if self.flags.contains(Flags::SHOW_FIXES) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(stdout)?;
@@ -300,7 +306,6 @@ impl Printer {
                         writeln!(stdout)?;
                     }
                 }
-
                 self.post_text(&mut stdout, diagnostics)?;
             }
             SerializationFormat::Github => {
