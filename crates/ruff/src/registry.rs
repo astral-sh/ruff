@@ -611,6 +611,20 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
 
+impl Rule {
+    pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
+        let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
+        let prefix: RuleCodePrefix = RuleCodePrefix::parse(&linter, code)?;
+        Ok(prefix.into_iter().next().unwrap())
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum FromCodeError {
+    #[error("unknown rule code")]
+    Unknown,
+}
+
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
 pub enum Linter {
     /// [Pyflakes](https://pypi.org/project/pyflakes/)

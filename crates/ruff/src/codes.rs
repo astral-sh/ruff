@@ -1,5 +1,23 @@
 use crate::registry::{Linter, Rule};
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub struct NoqaCode(&'static str, &'static str);
+
+impl std::fmt::Display for NoqaCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}{}", self.0, self.1)
+    }
+}
+
+impl PartialEq<&str> for NoqaCode {
+    fn eq(&self, other: &&str) -> bool {
+        match other.strip_prefix(self.0) {
+            Some(suffix) => suffix == self.1,
+            None => false,
+        }
+    }
+}
+
 #[ruff_macros::map_codes]
 pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
     #[allow(clippy::enum_glob_use)]

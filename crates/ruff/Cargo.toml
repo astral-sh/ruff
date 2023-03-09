@@ -25,11 +25,9 @@ ruff_rustpython = { path = "../ruff_rustpython" }
 anyhow = { workspace = true }
 bisection = { version = "0.1.0" }
 bitflags = { workspace = true }
-cfg-if = { version = "1.0.0" }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "env", "string"] }
 colored = { workspace = true }
-derivative = { version = "2.2.0" }
 dirs = { version = "4.0.0" }
 fern = { version = "0.6.1" }
 glob = { workspace = true }
@@ -65,22 +63,11 @@ textwrap = { workspace = true }
 thiserror = { version = "1.0.38" }
 toml = { workspace = true }
 
-# https://docs.rs/getrandom/0.2.7/getrandom/#webassembly-support
-[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
-getrandom = { version = "0.2.8", features = ["js"] }
-console_error_panic_hook = { version = "0.1.7" }
-console_log = { version = "0.2.1" }
-serde-wasm-bindgen = { version = "0.4.5" }
-js-sys = { version = "0.3.61" }
-wasm-bindgen = { version = "0.2.84" }
-
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "redactions"] }
 test-case = { workspace = true }
-wasm-bindgen-test = { version = "0.3.34" }
-
-[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 criterion = { version = "0.4.0" }
+
 
 [features]
 default = []
