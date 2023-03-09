@@ -3299,6 +3299,10 @@ where
                     pylint::rules::comparison_of_constant(self, left, ops, comparators);
                 }
 
+                if self.settings.rules.enabled(&Rule::CompareToEmptyString) {
+                    pylint::rules::compare_to_empty_string(self, left, ops, comparators);
+                }
+
                 if self.settings.rules.enabled(&Rule::MagicValueComparison) {
                     pylint::rules::magic_value_comparison(self, left, comparators);
                 }
