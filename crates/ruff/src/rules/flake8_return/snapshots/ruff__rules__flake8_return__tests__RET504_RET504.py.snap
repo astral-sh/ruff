@@ -21,50 +21,11 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 13
+    row: 249
     column: 11
   end_location:
-    row: 13
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: UnnecessaryAssign
-    body: "Unnecessary variable assignment before `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 15
-  end_location:
-    row: 19
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: UnnecessaryAssign
-    body: "Unnecessary variable assignment before `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 31
-    column: 11
-  end_location:
-    row: 31
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: UnnecessaryAssign
-    body: "Unnecessary variable assignment before `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 39
-    column: 11
-  end_location:
-    row: 39
-    column: 20
+    row: 249
+    column: 19
   fix: ~
   parent: ~
 
