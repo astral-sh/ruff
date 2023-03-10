@@ -11,11 +11,12 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::Location;
 
+use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{LineEnding, Locator};
 use ruff_python_ast::types::Range;
 
 use crate::codes::NoqaCode;
-use crate::registry::{AsRule, Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rule_redirects::get_redirect_target;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -340,11 +341,11 @@ mod tests {
     use nohash_hasher::IntMap;
     use rustpython_parser::ast::Location;
 
+    use ruff_diagnostics::Diagnostic;
     use ruff_python_ast::source_code::LineEnding;
     use ruff_python_ast::types::Range;
 
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
-    use crate::registry::Diagnostic;
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
     use crate::rules::pyflakes;
 

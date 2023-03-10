@@ -24,6 +24,7 @@ doc = false
 [dependencies]
 ruff = { path = "../ruff" }
 ruff_cache = { path = "../ruff_cache" }
+ruff_diagnostics = { path = "../ruff_diagnostics" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }

@@ -3,12 +3,12 @@ use libcst_native::{Call, Codegen, CodegenState, Dict, DictElement, Expression};
 use rustpython_parser::ast::{Excepthandler, Expr};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::types::Range;
 
 use crate::cst::matchers::{match_expr, match_module};
-use crate::fix::Fix;
 
 /// Generate a [`Fix`] to remove unused keys from format dict.
 pub fn remove_unused_format_arguments_from_dict(

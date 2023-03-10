@@ -3,11 +3,32 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
-use crate::registry::DiagnosticKind;
-use crate::violation::Violation;
-
+/// ## What it does
+/// Checks for the use of extraneous whitespace after "(".
+///
+/// ## Why is this bad?
+/// PEP 8 recommends the omission of whitespace in the following cases:
+/// - "Immediately inside parentheses, brackets or braces."
+/// - "Immediately before a comma, semicolon, or colon."
+///
+/// ## Example
+/// ```python
+/// spam( ham[1], {eggs: 2})
+/// spam(ham[ 1], {eggs: 2})
+/// spam(ham[1], { eggs: 2})
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(ham[1], {eggs: 2})
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#pet-peeves)
 #[violation]
 pub struct WhitespaceAfterOpenBracket;
 
@@ -18,6 +39,28 @@ impl Violation for WhitespaceAfterOpenBracket {
     }
 }
 
+/// ## What it does
+/// Checks for the use of extraneous whitespace before ")".
+///
+/// ## Why is this bad?
+/// PEP 8 recommends the omission of whitespace in the following cases:
+/// - "Immediately inside parentheses, brackets or braces."
+/// - "Immediately before a comma, semicolon, or colon."
+///
+/// ## Example
+/// ```python
+/// spam(ham[1], {eggs: 2} )
+/// spam(ham[1 ], {eggs: 2})
+/// spam(ham[1], {eggs: 2 })
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(ham[1], {eggs: 2})
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#pet-peeves)
 #[violation]
 pub struct WhitespaceBeforeCloseBracket;
 
@@ -28,6 +71,26 @@ impl Violation for WhitespaceBeforeCloseBracket {
     }
 }
 
+/// ## What it does
+/// Checks for the use of extraneous whitespace before ",", ";" or ":".
+///
+/// ## Why is this bad?
+/// PEP 8 recommends the omission of whitespace in the following cases:
+/// - "Immediately inside parentheses, brackets or braces."
+/// - "Immediately before a comma, semicolon, or colon."
+///
+/// ## Example
+/// ```python
+/// if x == 4: print(x, y); x, y = y , x
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if x == 4: print(x, y); x, y = y, x
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#pet-peeves)
 #[violation]
 pub struct WhitespaceBeforePunctuation;
 

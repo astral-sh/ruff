@@ -1,13 +1,33 @@
 use rustpython_parser::ast::Location;
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
-use crate::violation::Violation;
 
+/// ## What it does
+/// Checks for doc lines that exceed the specified maximum character length.
+///
+/// ## Why is this bad?
+/// For flowing long blocks of text (docstrings or comments), overlong lines
+/// can hurt readability.
+///
+/// ## Example
+/// ```python
+/// def function(x):
+///     """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Duis auctor purus ut ex fermentum, at maximus est hendrerit."""
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def function(x):
+///     """
+///     Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+///     Duis auctor purus ut ex fermentum, at maximus est hendrerit.
+///     """
+/// ```
 #[violation]
 pub struct DocLineTooLong(pub usize, pub usize);
 

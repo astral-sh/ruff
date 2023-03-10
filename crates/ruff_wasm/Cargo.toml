@@ -1,0 +1,30 @@
+[package]
+name = "ruff_wasm"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+description = "WebAssembly bindings for Ruff"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+console_log = { version = "0.2.1" }
+getrandom = { version = "0.2.8", features = ["js"] }
+log = { workspace = true }
+ruff = { path = "../ruff" }
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_rustpython = { path = "../ruff_rustpython" }
+rustpython-parser = { workspace = true }
+serde = { workspace = true }
+serde-wasm-bindgen = { version = "0.5.0" }
+wasm-bindgen = { version = "0.2.84" }
+console_error_panic_hook = { version = "0.1.7", optional = true }
+
+[dev-dependencies]
+js-sys = { version = "0.3.61" }
+wasm-bindgen-test = { version = "0.3.34" }

@@ -1,12 +1,12 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::pandas_vet::fixes::fix_inplace_argument;
-use crate::violation::AlwaysAutofixableViolation;
 
 /// ## What it does
 /// Checks for `inplace=True` usages in `pandas` function and method

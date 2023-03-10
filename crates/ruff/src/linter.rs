@@ -4,10 +4,13 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::error;
-use ruff_python_stdlib::path::is_python_stub_file;
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::ParseError;
+
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
@@ -21,11 +24,10 @@ use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::{add_noqa, rule_is_ignored};
-use crate::registry::{AsRule, Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
 use crate::{directives, fs};
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
 const CARGO_PKG_REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");

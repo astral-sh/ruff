@@ -1,6 +1,7 @@
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Comprehension, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::collect_arg_names;
 use ruff_python_ast::types::{Node, Range};
@@ -8,8 +9,6 @@ use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[violation]
 pub struct FunctionUsesLoopVariable {

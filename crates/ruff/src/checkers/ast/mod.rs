@@ -13,6 +13,7 @@ use rustpython_parser::ast::{
     Suite,
 };
 
+use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{
     binding_range, extract_handled_exceptions, to_module_path, Exceptions,
@@ -36,7 +37,7 @@ use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::definition::{
     transition_scope, Definition, DefinitionKind, Docstring, Documentable,
 };
-use crate::registry::{AsRule, Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
@@ -3298,6 +3299,10 @@ where
                     pylint::rules::comparison_of_constant(self, left, ops, comparators);
                 }
 
+                if self.settings.rules.enabled(&Rule::CompareToEmptyString) {
+                    pylint::rules::compare_to_empty_string(self, left, ops, comparators);
+                }
+
                 if self.settings.rules.enabled(&Rule::MagicValueComparison) {
                     pylint::rules::magic_value_comparison(self, left, comparators);
                 }
@@ -3430,7 +3435,7 @@ where
                     pylint::rules::merge_isinstance(self, expr, op, values);
                 }
                 if self.settings.rules.enabled(&Rule::SingleStartsEndsWith) {
-                    flake8_pie::rules::single_starts_ends_with(self, values, op);
+                    flake8_pie::rules::single_starts_ends_with(self, expr);
                 }
                 if self.settings.rules.enabled(&Rule::DuplicateIsinstanceCall) {
                     flake8_simplify::rules::duplicate_isinstance_call(self, expr);

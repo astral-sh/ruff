@@ -1,12 +1,11 @@
 use rustpython_parser::ast::Constant::Bool;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 use super::helpers;
 

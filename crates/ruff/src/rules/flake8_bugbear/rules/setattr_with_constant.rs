@@ -1,5 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_stmt;
 use ruff_python_ast::source_code::Stylist;
@@ -8,9 +9,7 @@ use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct SetAttrWithConstant;

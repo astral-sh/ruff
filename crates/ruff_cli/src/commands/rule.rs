@@ -4,7 +4,7 @@ use anyhow::Result;
 use serde::Serialize;
 
 use ruff::registry::{Linter, Rule, RuleNamespace};
-use ruff::AutofixAvailability;
+use ruff_diagnostics::Availability;
 
 use crate::args::HelpFormat;
 
@@ -34,8 +34,8 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
 
             if let Some(autofix) = rule.autofixable() {
                 output.push_str(match autofix.available {
-                    AutofixAvailability::Sometimes => "Autofix is sometimes available.",
-                    AutofixAvailability::Always => "Autofix is always available.",
+                    Availability::Sometimes => "Autofix is sometimes available.",
+                    Availability::Always => "Autofix is always available.",
                 });
                 output.push('\n');
                 output.push('\n');

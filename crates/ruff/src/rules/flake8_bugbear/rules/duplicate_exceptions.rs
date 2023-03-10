@@ -4,15 +4,15 @@ use rustpython_parser::ast::{
     Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location,
 };
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::{CallPath, Range};
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic, Rule};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct DuplicateTryBlockException {

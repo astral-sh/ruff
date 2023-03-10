@@ -1,12 +1,13 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
+use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{BindingKind, Range};
 
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticKind, Rule};
+use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
-use crate::violation::Violation;
 
 #[violation]
 pub struct UseOfDotIx;

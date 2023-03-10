@@ -1,13 +1,13 @@
 use log::error;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct UselessMetaclassType;

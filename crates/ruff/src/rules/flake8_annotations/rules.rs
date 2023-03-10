@@ -1,6 +1,7 @@
 use log::error;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::types::Range;
@@ -11,8 +12,7 @@ use ruff_python_ast::{cast, helpers};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::registry::{AsRule, Diagnostic, Rule};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::{AsRule, Rule};
 
 use super::fixes;
 use super::helpers::match_function_def;

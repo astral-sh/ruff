@@ -1,12 +1,30 @@
 use rustpython_parser::ast::{Alias, Stmt};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
+/// ## What it does
+/// Check for multiple imports on one line.
+///
+/// ## Why is this bad?
+/// Per PEP 8, "imports should usually be on separate lines."
+///
+/// ## Example
+/// ```python
+/// import sys, os
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+/// import sys
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#imports)
 #[violation]
 pub struct MultipleImportsOnOneLine;
 
@@ -17,6 +35,33 @@ impl Violation for MultipleImportsOnOneLine {
     }
 }
 
+/// ## What it does
+/// Checks for imports that are not at the top of the file.
+///
+/// ## Why is this bad?
+/// Per PEP 8, "imports are always put at the top of the file, just after any
+/// module comments and docstrings, and before module globals and constants."
+///
+/// ## Example
+/// ```python
+/// 'One string'
+/// "Two string"
+/// a = 1
+/// import os
+/// from sys import x
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import os
+/// from sys import x
+/// 'One string'
+/// "Two string"
+/// a = 1
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#imports)
 #[violation]
 pub struct ModuleImportNotAtTopOfFile;
 
@@ -27,6 +72,7 @@ impl Violation for ModuleImportNotAtTopOfFile {
     }
 }
 
+/// E401
 pub fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &[Alias]) {
     if names.len() > 1 {
         checker
@@ -35,6 +81,7 @@ pub fn multiple_imports_on_one_line(checker: &mut Checker, stmt: &Stmt, names: &
     }
 }
 
+/// E402
 pub fn module_import_not_at_top_of_file(checker: &mut Checker, stmt: &Stmt) {
     if checker.ctx.seen_import_boundary && stmt.location.column() == 0 {
         checker.diagnostics.push(Diagnostic::new(

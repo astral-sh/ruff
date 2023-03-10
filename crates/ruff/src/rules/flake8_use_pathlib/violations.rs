@@ -1,6 +1,5 @@
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-
-use crate::violation::Violation;
 
 // PTH100
 #[violation]

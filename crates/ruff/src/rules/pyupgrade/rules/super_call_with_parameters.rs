@@ -1,12 +1,12 @@
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Range, ScopeKind};
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes;
-use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
 pub struct SuperCallWithParameters;

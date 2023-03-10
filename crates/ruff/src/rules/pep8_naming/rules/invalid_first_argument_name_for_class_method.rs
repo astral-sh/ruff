@@ -1,12 +1,11 @@
 use rustpython_parser::ast::{Arguments, Expr};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::function_type;
 use ruff_python_ast::types::{Range, Scope};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 /// ## What it does
 /// Checks for class methods that use a name other than `cls` for their

@@ -1,10 +1,8 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{CallPath, Range};
-
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 /// ## What it does
 /// Checks that Django's `@receiver` decorator is listed first, prior to

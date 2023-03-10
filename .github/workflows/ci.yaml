@@ -47,7 +47,7 @@ jobs:
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v1
-      - run: cargo clippy -p ruff --target wasm32-unknown-unknown --all-features -- -D warnings
+      - run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
   cargo-test:
     strategy:
@@ -79,6 +79,30 @@ jobs:
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ruff
+          path: target/debug/ruff
+
+
+  cargo-test-wasm:
+    runs-on: ubuntu-latest
+    name: "cargo test (wasm)"
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: playground/package-lock.json
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: Swatinem/rust-cache@v1
+      - name: "Run wasm-pack"
+        run: |
+          cd crates/ruff_wasm
+          wasm-pack test --node
 
   scripts:
     name: "test scripts"
@@ -103,3 +127,39 @@ jobs:
       - uses: crate-ci/typos@master
         with:
           files: .
+
+  ecosystem:
+    name: "ecosystem"
+    runs-on: ubuntu-latest
+    needs: cargo-test
+    # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v3
+        id: ruff-target
+        with:
+          name: ruff
+          path: target/debug
+      - uses: dawidd6/action-download-artifact@v2
+        with:
+          name: ruff
+          branch: ${{ github.event.pull_request.base_ref }}
+          check_artifacts: true
+      - name: Run ecosystem check
+        run: |
+          # Make executable, since artifact download doesn't preserve this
+          chmod +x ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+
+          scripts/check_ecosystem.py ruff ${{ steps.ruff-target.outputs.download-path }}/ruff | tee ecosystem-result
+
+          echo ${{ github.event.number }} > pr-number
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ecosystem-result
+          path: |
+            ecosystem-result
+            pr-number

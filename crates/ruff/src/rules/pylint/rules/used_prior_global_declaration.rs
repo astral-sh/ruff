@@ -1,11 +1,10 @@
 use rustpython_parser::ast::Expr;
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Range, ScopeKind};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[violation]
 pub struct UsedPriorGlobalDeclaration {

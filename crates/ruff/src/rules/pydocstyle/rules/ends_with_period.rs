@@ -1,5 +1,6 @@
 use strum::IntoEnumIterator;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
@@ -7,11 +8,9 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::docstrings::sections::SectionKind;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::logical_line;
-use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
 pub struct EndsInPeriod;

@@ -1,12 +1,11 @@
 use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
 use crate::rules::pylint::helpers::in_dunder_init;
-use crate::violation::Violation;
 
 /// ## What it does
 /// Checks for `__init__` methods that return values.

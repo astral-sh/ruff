@@ -1,13 +1,13 @@
 use log::error;
 use rustpython_parser::ast::{Stmt, StmtKind};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Range, RefEquality};
 
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct EmptyTypeCheckingBlock;

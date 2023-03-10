@@ -6,6 +6,7 @@ use rustpython_common::cformat::{
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::types::Range;
@@ -14,10 +15,8 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::pyupgrade::helpers::curly_escape;
-use crate::violation::AlwaysAutofixableViolation;
 
 #[violation]
 pub struct PrintfStringFormatting;

@@ -1,12 +1,12 @@
 use rustpython_parser::ast::{Expr, Keyword};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::Violation;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct PrintFound;

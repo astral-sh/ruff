@@ -1,14 +1,32 @@
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::pycodestyle::helpers::compare;
-use crate::violation::AlwaysAutofixableViolation;
 
+/// ## What it does
+/// Checks for negative comparison using `not {foo} in {bar}`.
+///
+/// ## Why is this bad?
+/// Negative comparison should be done using `not in`.
+///
+/// ## Example
+/// ```python
+/// Z = not X in Y
+/// if not X.B in Y:\n    pass
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if x not in y:\n    pass
+/// assert (X in Y or X is Z)
+///
+/// ```
 #[violation]
 pub struct NotInTest;
 
@@ -23,6 +41,25 @@ impl AlwaysAutofixableViolation for NotInTest {
     }
 }
 
+/// ## What it does
+/// Checks for negative comparison using `not {foo} is {bar}`.
+///
+/// ## Why is this bad?
+/// Negative comparison should be done using `is not`.
+///
+/// ## Example
+/// ```python
+/// if not X is Y:
+///     pass
+/// Z = not X.B is Y
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if not (X in Y):
+///     pass
+/// zz = x is not y
+/// ```
 #[violation]
 pub struct NotIsTest;
 

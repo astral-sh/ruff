@@ -1,20 +1,26 @@
+use itertools::Either::{Left, Right};
+use std::collections::BTreeMap;
+use std::iter;
+
 use log::error;
 use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{Boolop, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use rustpython_parser::ast::{
+    Boolop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind,
+};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{match_trailing_comment, unparse_expr};
+use ruff_python_ast::helpers::{create_expr, match_trailing_comment, unparse_expr};
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::AsRule;
 
 use super::fixes;
 
@@ -120,11 +126,16 @@ pub struct SingleStartsEndsWith {
     pub attr: String,
 }
 
-impl Violation for SingleStartsEndsWith {
+impl AlwaysAutofixableViolation for SingleStartsEndsWith {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SingleStartsEndsWith { attr } = self;
         format!("Call `{attr}` once with a `tuple`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let SingleStartsEndsWith { attr } = self;
+        format!("Merge into a single `{attr}` call")
     }
 }
 
@@ -392,39 +403,116 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
 }
 
 /// PIE810
-pub fn single_starts_ends_with(checker: &mut Checker, values: &[Expr], node: &Boolop) {
-    if *node != Boolop::Or {
+pub fn single_starts_ends_with(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
         return;
-    }
+    };
 
-    // Given `foo.startswith`, insert ("foo", "startswith") into the set.
-    let mut seen = FxHashSet::default();
-    for expr in values {
-        if let ExprKind::Call {
+    let mut duplicates = BTreeMap::new();
+    for (index, call) in values.iter().enumerate() {
+        let ExprKind::Call {
             func,
             args,
             keywords,
             ..
-        } = &expr.node
-        {
-            if !(args.len() == 1 && keywords.is_empty()) {
-                continue;
+        } = &call.node else {
+            continue
+        };
+
+        if !(args.len() == 1 && keywords.is_empty()) {
+            continue;
+        }
+
+        let ExprKind::Attribute { value, attr, .. } = &func.node else {
+            continue
+        };
+
+        if attr != "startswith" && attr != "endswith" {
+            continue;
+        }
+
+        let ExprKind::Name { id: arg_name, .. } = &value.node else {
+            continue
+        };
+
+        duplicates
+            .entry((attr.as_str(), arg_name.as_str()))
+            .or_insert_with(Vec::new)
+            .push(index);
+    }
+
+    // Generate a `Diagnostic` for each duplicate.
+    for ((attr_name, arg_name), indices) in duplicates {
+        if indices.len() > 1 {
+            let mut diagnostic = Diagnostic::new(
+                SingleStartsEndsWith {
+                    attr: attr_name.to_string(),
+                },
+                Range::from(expr),
+            );
+            if checker.patch(diagnostic.kind.rule()) {
+                let words: Vec<&Expr> = indices
+                    .iter()
+                    .map(|index| &values[*index])
+                    .map(|expr| {
+                        let ExprKind::Call { func: _, args, keywords: _} = &expr.node else {
+                            unreachable!("{}", format!("Indices should only contain `{attr_name}` calls"))
+                        };
+                        args.get(0)
+                            .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
+                    })
+                    .collect();
+
+                let call = create_expr(ExprKind::Call {
+                    func: Box::new(create_expr(ExprKind::Attribute {
+                        value: Box::new(create_expr(ExprKind::Name {
+                            id: arg_name.to_string(),
+                            ctx: ExprContext::Load,
+                        })),
+                        attr: attr_name.to_string(),
+                        ctx: ExprContext::Load,
+                    })),
+                    args: vec![create_expr(ExprKind::Tuple {
+                        elts: words
+                            .iter()
+                            .flat_map(|value| {
+                                if let ExprKind::Tuple { elts, .. } = &value.node {
+                                    Left(elts.iter())
+                                } else {
+                                    Right(iter::once(*value))
+                                }
+                            })
+                            .map(Clone::clone)
+                            .collect(),
+                        ctx: ExprContext::Load,
+                    })],
+                    keywords: vec![],
+                });
+
+                // Generate the combined `BoolOp`.
+                let mut call = Some(call);
+                let bool_op = create_expr(ExprKind::BoolOp {
+                    op: Boolop::Or,
+                    values: values
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, elt)| {
+                            if indices.contains(&index) {
+                                std::mem::take(&mut call)
+                            } else {
+                                Some(elt.clone())
+                            }
+                        })
+                        .collect(),
+                });
+
+                diagnostic.amend(Fix::replacement(
+                    unparse_expr(&bool_op, checker.stylist),
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ));
             }
-            if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                if attr != "startswith" && attr != "endswith" {
-                    continue;
-                }
-                if let ExprKind::Name { id, .. } = &value.node {
-                    if !seen.insert((id, attr)) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            SingleStartsEndsWith {
-                                attr: attr.to_string(),
-                            },
-                            Range::from(value),
-                        ));
-                    }
-                }
-            }
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

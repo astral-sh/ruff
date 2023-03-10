@@ -1,14 +1,14 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_logger_candidate, SimpleCallArgs};
 use ruff_python_ast::logging::LoggingLevel;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Rule;
 use crate::rules::pyflakes::cformat::CFormatSummary;
-use crate::violation::Violation;
 
 /// ## What it does
 /// Checks for too few positional arguments for a `logging` format string.

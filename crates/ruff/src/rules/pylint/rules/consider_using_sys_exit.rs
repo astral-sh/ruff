@@ -1,12 +1,11 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{BindingKind, Range};
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
 #[violation]
 pub struct ConsiderUsingSysExit {
