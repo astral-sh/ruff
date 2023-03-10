@@ -91,13 +91,14 @@ mod tests {
 
     #[test]
     fn ruf100_3() -> Result<()> {
-        let settings = settings::Settings::for_rules(vec![
-            Rule::UnusedNOQA,
-            Rule::LineTooLong,
-            Rule::UnusedVariable,
-        ]);
-
-        let diagnostics = test_path(Path::new("ruff/RUF100_3.py"), &settings)?;
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_3.py"),
+            &settings::Settings::for_rules(vec![
+                Rule::UnusedNOQA,
+                Rule::LineTooLong,
+                Rule::UndefinedName,
+            ]),
+        )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }

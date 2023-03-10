@@ -1,13 +1,13 @@
 # noqa
-print()
-# noqa: F841
-print()
-# noqa: F841, E501
-print()
+# noqa # comment
+print()  # noqa
+print()  # noqa # comment
+print(a)  # noqa
+print(a)  # noqa # comment
 
-# TODO: do not remove comments after noqa
-# noqa # first comment
-print()
-# noqa: F841 # second comment
-# third comment # noqa: F841, E501
-print()
+# noqa: E501, F821
+# noqa: E501, F821 # comment
+print()  # noqa: E501, F821
+print()  # noqa: E501, F821 # comment
+print(a)  # noqa: E501, F821
+print(a)  # noqa: E501, F821 # comment
