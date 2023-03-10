@@ -32,15 +32,8 @@ impl From<&Cmpop> for EqCmpop {
 /// Checks for comparisons to `None` which are not using the `is` operator.
 ///
 /// ## Why is this bad?
-/// Comparison to singletons should use `is` or `is not`.
-///
-/// Comparisons to singletons like None should always be done
-/// with `is` or `is not`, never the equality operators.
-///
-/// Also, beware of writing `if x` when you really mean `if x is not None`
-/// -- e.g. when testing whether a variable or argument that defaults to
-/// None was set to some other value.  The other value might have a type
-/// (such as a container) that could be false in a boolean context!
+/// Per PEP 8, "Comparisons to singletons like None should always be done with
+/// is or is not, never the equality operators."
 ///
 /// ## Example
 /// ```python
@@ -52,6 +45,9 @@ impl From<&Cmpop> for EqCmpop {
 /// ```python
 /// if arg is not None:
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#programming-recommendations)
 #[violation]
 pub struct NoneComparison(pub EqCmpop);
 
@@ -78,10 +74,8 @@ impl AlwaysAutofixableViolation for NoneComparison {
 /// Checks for comparisons to booleans which are not using the `is` operator.
 ///
 /// ## Why is this bad?
-/// Comparison to singletons should use `is` or `is not`.
-///
-/// Comparisons to singletons like `True` or `False` should always be done
-/// with `is` or `is not`, never the equality operators.
+/// Per PEP 8, "Comparisons to singletons like None should always be done with
+/// is or is not, never the equality operators."
 ///
 /// ## Example
 /// ```python
@@ -91,9 +85,12 @@ impl AlwaysAutofixableViolation for NoneComparison {
 ///
 /// Use instead:
 /// ```python
-/// if arg:
-/// if not arg:
+/// if arg is True:
+/// if arg is False:
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#programming-recommendations)
 #[violation]
 pub struct TrueFalseComparison(pub bool, pub EqCmpop);
 

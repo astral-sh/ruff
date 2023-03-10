@@ -7,12 +7,10 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::rules::pycodestyle::logical_lines::LogicalLine;
 
 /// ## What it does
-/// Checks for indentation with invalid multiple of 4 spaces.
+/// Checks for indentation with a non-multiple of 4 spaces.
 ///
 /// ## Why is this bad?
-/// Use indent_size (PEP8 says 4) spaces per indentation level.
-/// For really old code that you don't want to mess up, you can continue
-/// to use 8-space tabs.
+/// Per PEP 8, 4 spaces per indentation level should be preferred.
 ///
 /// ## Example
 /// ```python
@@ -25,6 +23,9 @@ use crate::rules::pycodestyle::logical_lines::LogicalLine;
 /// if True:
 ///     a = 1
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct IndentationWithInvalidMultiple {
     pub indent_size: usize,
@@ -39,12 +40,10 @@ impl Violation for IndentationWithInvalidMultiple {
 }
 
 /// ## What it does
-/// Checks for indentation of comments with invalid multiple of 4 spaces.
+/// Checks for indentation of comments with a non-multiple of 4 spaces.
 ///
 /// ## Why is this bad?
-/// Use indent_size (PEP8 says 4) spaces per indentation level.
-/// For really old code that you don't want to mess up, you can continue
-/// to use 8-space tabs.
+/// Per PEP 8, 4 spaces per indentation level should be preferred.
 ///
 /// ## Example
 /// ```python
@@ -57,6 +56,9 @@ impl Violation for IndentationWithInvalidMultiple {
 /// if True:
 ///     # a = 1
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct IndentationWithInvalidMultipleComment {
     pub indent_size: usize,
@@ -71,12 +73,11 @@ impl Violation for IndentationWithInvalidMultipleComment {
 }
 
 /// ## What it does
-/// Checks for missing indented block.
+/// Checks for indented blocks that are lacking indentation.
 ///
 /// ## Why is this bad?
-/// Use indent_size (PEP8 says 4) spaces per indentation level.
-/// For really old code that you don't want to mess up, you can continue
-/// to use 8-space tabs.
+/// All indented blocks should be indented; otherwise, they are not valid
+/// Python syntax.
 ///
 /// ## Example
 /// ```python
@@ -90,6 +91,9 @@ impl Violation for IndentationWithInvalidMultipleComment {
 /// for item in items:
 ///     pass
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct NoIndentedBlock;
 
@@ -101,12 +105,11 @@ impl Violation for NoIndentedBlock {
 }
 
 /// ## What it does
-/// Checks for missing indented comment in a block.
+/// Checks for comments in a code blocks that are lacking indentation.
 ///
 /// ## Why is this bad?
-/// Use indent_size (PEP8 says 4) spaces per indentation level.
-/// For really old code that you don't want to mess up, you can continue
-/// to use 8-space tabs.
+/// Comments within an indented block should themselves be indented, to
+/// indicate that they are part of the block.
 ///
 /// ## Example
 /// ```python
@@ -121,6 +124,9 @@ impl Violation for NoIndentedBlock {
 ///     # Hi
 ///     pass
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct NoIndentedBlockComment;
 
@@ -135,9 +141,7 @@ impl Violation for NoIndentedBlockComment {
 /// Checks for unexpected indentation.
 ///
 /// ## Why is this bad?
-/// Use indent_size (PEP8 says 4) spaces per indentation level.
-/// For really old code that you don't want to mess up, you can continue
-/// to use 8-space tabs.
+/// Indentation outside of a code block is not valid Python syntax.
 ///
 /// ## Example
 /// ```python
@@ -150,6 +154,9 @@ impl Violation for NoIndentedBlockComment {
 /// a = 1
 /// b = 2
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct UnexpectedIndentation;
 
@@ -164,9 +171,7 @@ impl Violation for UnexpectedIndentation {
 /// Checks for unexpected indentation of comment.
 ///
 /// ## Why is this bad?
-/// Use indent_size (PEP8 says 4) spaces per indentation level.
-/// For really old code that you don't want to mess up, you can continue
-/// to use 8-space tabs.
+/// Comments should match the indentation of the containing code block.
 ///
 /// ## Example
 /// ```python
@@ -179,6 +184,9 @@ impl Violation for UnexpectedIndentation {
 /// a = 1
 /// # b = 2
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct UnexpectedIndentationComment;
 
@@ -190,12 +198,12 @@ impl Violation for UnexpectedIndentationComment {
 }
 
 /// ## What it does
-/// Checks for over indented code.
+/// Checks for over-indented code.
 ///
 /// ## Why is this bad?
-/// Use indent_size (PEP8 says 4) spaces per indentation level.
-/// For really old code that you don't want to mess up, you can continue
-/// to use 8-space tabs.
+/// Per PEP 8, 4 spaces per indentation level should be preferred. Increased
+/// indentation can lead to inconsistent formatting, which can hurt
+/// readability.
 ///
 /// ## Example
 /// ```python
@@ -208,6 +216,9 @@ impl Violation for UnexpectedIndentationComment {
 /// for item in items:
 ///     pass
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
 #[violation]
 pub struct OverIndented;
 

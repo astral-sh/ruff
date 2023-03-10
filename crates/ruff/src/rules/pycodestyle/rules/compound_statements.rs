@@ -10,27 +10,14 @@ use crate::registry::Rule;
 use crate::settings::{flags, Settings};
 
 /// ## What it does
-/// Checks for multiline statements on one line.
+/// Checks for compound statements (multiple statements on the same line).
 ///
 /// ## Why is this bad?
-/// Compound statements (on the same line) are generally
-/// discouraged.
-///
-/// While sometimes it's okay to put an if/for/while with a small body
-/// on the same line, never do this for multi-clause statements.
-/// Also avoid folding such long lines!
+/// Per PEP 8, "compound statements are generally discouraged".
 ///
 /// ## Example
 /// ```python
 /// if foo == 'blah': do_blah_thing()
-/// for x in lst: total += x
-/// while t < 10: t = delay()
-/// if foo == 'blah': do_blah_thing()
-/// else: do_non_blah_thing()
-/// try: something()
-/// finally: cleanup()
-/// if foo == 'blah': one(); two(); three()
-///
 /// ```
 ///
 /// Use instead:
@@ -38,6 +25,9 @@ use crate::settings::{flags, Settings};
 /// if foo == 'blah':
 ///     do_blah_thing()
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
 #[violation]
 pub struct MultipleStatementsOnOneLineColon;
 
@@ -52,12 +42,8 @@ impl Violation for MultipleStatementsOnOneLineColon {
 /// Checks for multiline statements on one line.
 ///
 /// ## Why is this bad?
-/// Compound statements (on the same line) are generally
+/// Per PEP 8, including multi-clause statements on the same line is
 /// discouraged.
-///
-/// While sometimes it's okay to put an if/for/while with a small body
-/// on the same line, never do this for multi-clause statements.
-/// Also avoid folding such long lines!
 ///
 /// ## Example
 /// ```python
@@ -70,6 +56,9 @@ impl Violation for MultipleStatementsOnOneLineColon {
 /// do_two()
 /// do_three()
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
 #[violation]
 pub struct MultipleStatementsOnOneLineSemicolon;
 
@@ -81,10 +70,10 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 }
 
 /// ## What it does
-/// Checks for statements that end with a semicolon.
+/// Checks for statements that end with an unnecessary semicolon.
 ///
 /// ## Why is this bad?
-///
+/// A trailing semicolon is unnecessary and should be removed.
 ///
 /// ## Example
 /// ```python

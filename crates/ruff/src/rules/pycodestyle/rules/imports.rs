@@ -10,16 +10,7 @@ use crate::checkers::ast::Checker;
 /// Check for multiple imports on one line.
 ///
 /// ## Why is this bad?
-/// Place imports on separate lines.
-///
-/// The following are okay:
-/// ```python
-/// from subprocess import Popen, PIPE
-/// from myclas import MyClass
-/// from foo.bar.yourclass import YourClass
-/// import myclass
-/// import foo.bar.yourclass
-/// ```
+/// Per PEP 8, "imports should usually be on separate lines."
 ///
 /// ## Example
 /// ```python
@@ -31,6 +22,9 @@ use crate::checkers::ast::Checker;
 /// import os
 /// import sys
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#imports)
 #[violation]
 pub struct MultipleImportsOnOneLine;
 
@@ -42,49 +36,11 @@ impl Violation for MultipleImportsOnOneLine {
 }
 
 /// ## What it does
-///
+/// Checks for imports that are not at the top of the file.
 ///
 /// ## Why is this bad?
-/// Place imports at the top of the file.
-///
-/// Always put imports at the top of the file, just after any module
-/// comments and docstrings, and before module globals and constants.
-///
-/// Exceptions:
-/// ```python
-/// # this is a comment
-/// import os
-/// ```
-///
-/// ```python
-/// '''this is a module docstring'''
-/// import os
-/// ```
-///
-/// ```python
-/// r'''this is a module docstring'''
-/// import os
-/// ```
-///
-/// ```python
-/// try:
-///     import x
-/// except ImportError:
-///     pass
-/// else:
-///     pass
-/// import y
-/// ```
-///
-/// ```python
-/// try:
-///     import x
-/// except ImportError:
-///     pass
-/// finally:
-///     pass
-/// import y
-/// ```
+/// Per PEP 8, "imports are always put at the top of the file, just after any
+/// module comments and docstrings, and before module globals and constants."
 ///
 /// ## Example
 /// ```python
@@ -103,6 +59,9 @@ impl Violation for MultipleImportsOnOneLine {
 /// "Two string"
 /// a = 1
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#imports)
 #[violation]
 pub struct ModuleImportNotAtTopOfFile;
 

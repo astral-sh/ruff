@@ -8,11 +8,11 @@ use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
 
 /// ## What it does
-/// Checks for all doc lines to a maximum of e.g. 72 characters.
+/// Checks for doc lines that exceed the specified maximum character length.
 ///
 /// ## Why is this bad?
-/// For flowing long blocks of text (docstrings or comments), limiting
-/// the length to 72 characters is recommended.
+/// For flowing long blocks of text (docstrings or comments), overlong lines
+/// can hurt readability.
 ///
 /// ## Example
 /// ```python

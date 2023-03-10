@@ -11,7 +11,8 @@ use ruff_macros::{derive_message_formats, violation};
 /// Checks for extraneous tabs before an operator.
 ///
 /// ## Why is this bad?
-///
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
 ///
 /// ## Example
 /// ```python
@@ -22,6 +23,9 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```python
 /// a = 12 + 3
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
 #[violation]
 pub struct TabBeforeOperator;
 
@@ -36,7 +40,8 @@ impl Violation for TabBeforeOperator {
 /// Checks for extraneous whitespace before an operator.
 ///
 /// ## Why is this bad?
-///
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
 ///
 /// ## Example
 /// ```python
@@ -47,6 +52,9 @@ impl Violation for TabBeforeOperator {
 /// ```python
 /// a = 12 + 3
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
 #[violation]
 pub struct MultipleSpacesBeforeOperator;
 
@@ -61,7 +69,8 @@ impl Violation for MultipleSpacesBeforeOperator {
 /// Checks for extraneous tabs after an operator.
 ///
 /// ## Why is this bad?
-///
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
 ///
 /// ## Example
 /// ```python
@@ -72,6 +81,9 @@ impl Violation for MultipleSpacesBeforeOperator {
 /// ```python
 /// a = 12 + 3
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
 #[violation]
 pub struct TabAfterOperator;
 
@@ -86,7 +98,8 @@ impl Violation for TabAfterOperator {
 /// Checks for extraneous whitespace after an operator.
 ///
 /// ## Why is this bad?
-///
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
 ///
 /// ## Example
 /// ```python
@@ -97,6 +110,9 @@ impl Violation for TabAfterOperator {
 /// ```python
 /// a = 12 + 3
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
 #[violation]
 pub struct MultipleSpacesAfterOperator;
 

@@ -14,8 +14,9 @@ use ruff_python_ast::types::Range;
 ///
 /// ## Why is this bad?
 /// An inline comment is a comment on the same line as a statement.
-/// Inline comments should be separated by at least two spaces from the
-/// statement. They should start with a # and a single space.
+///
+/// Per PEP8, inline comments should be separated by at least two spaces from
+/// the preceding statement.
 ///
 /// ## Example
 /// ```python
@@ -42,8 +43,8 @@ impl Violation for TooFewSpacesBeforeInlineComment {
 ///
 /// ## Why is this bad?
 /// An inline comment is a comment on the same line as a statement.
-/// Inline comments should be separated by at least two spaces from the
-/// statement. They should start with a # and a single space.
+///
+/// Per PEP8, inline comments should start with a # and a single space.
 ///
 /// ## Example
 /// ```python
@@ -57,6 +58,9 @@ impl Violation for TooFewSpacesBeforeInlineComment {
 /// x = x + 1  # Increment x
 /// x = x + 1    # Increment x
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
 #[violation]
 pub struct NoSpaceAfterInlineComment;
 
@@ -71,8 +75,10 @@ impl Violation for NoSpaceAfterInlineComment {
 /// Checks if one space is used after block comments.
 ///
 /// ## Why is this bad?
-/// Each line of a block comment starts with a # and one or multiple
-/// spaces as there can be indented text inside the comment.
+/// Per PEP8, "Block comments generally consist of one or more paragraphs built
+/// out of complete sentences, with each sentence ending in a period."
+///
+/// Block comments should start with a # and a single space.
 ///
 /// ## Example
 /// ```python
@@ -85,6 +91,9 @@ impl Violation for NoSpaceAfterInlineComment {
 /// #  - Block comment list
 /// # \xa0- Block comment list
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
 #[violation]
 pub struct NoSpaceAfterBlockComment;
 
@@ -99,8 +108,10 @@ impl Violation for NoSpaceAfterBlockComment {
 /// Checks if block comments start with a single "#".
 ///
 /// ## Why is this bad?
-/// Each line of a block comment starts with a # and one or multiple
-/// spaces as there can be indented text inside the comment.
+/// Per PEP8, "Block comments generally consist of one or more paragraphs built
+/// out of complete sentences, with each sentence ending in a period."
+///
+/// Each line of a block comment should start with a # and a single space.
 ///
 /// ## Example
 /// ```python
@@ -114,6 +125,9 @@ impl Violation for NoSpaceAfterBlockComment {
 /// #  - Block comment list
 /// # \xa0- Block comment list
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
 #[violation]
 pub struct MultipleLeadingHashesForBlockComment;
 

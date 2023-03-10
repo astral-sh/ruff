@@ -14,11 +14,13 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// ## Example
 /// ```python
 /// def l(x):
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def long_name(x):
+///     ...
 /// ```
 #[violation]
 pub struct AmbiguousFunctionName(pub String);

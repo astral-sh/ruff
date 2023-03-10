@@ -14,10 +14,12 @@ use crate::registry::AsRule;
 /// Checks for lambda expressions which are assigned to a variable.
 ///
 /// ## Why is this bad?
-/// Compound statements (on the same line) are generally discouraged.
-/// Always use a def statement instead of an assignment statement that
-/// binds a lambda expression directly to a name.
+/// Per PEP 8, you should "Always use a def statement instead of an assignment
+/// statement that binds a lambda expression directly to an identifier."
 ///
+/// Using a `def` statement leads to better tracebacks, and the assignment
+/// itself negates the primary benefit of using a `lambda` expression (i.e.,
+/// that it can be embedded inside another expression).
 ///
 /// ## Example
 /// ```python
@@ -29,6 +31,9 @@ use crate::registry::AsRule;
 /// def f(x):
 ///    return 2 * x
 /// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#programming-recommendations)
 #[violation]
 pub struct LambdaAssignment {
     pub name: String,

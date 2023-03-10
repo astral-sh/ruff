@@ -14,11 +14,13 @@ use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 /// ## Example
 /// ```python
 /// class I(object):
+///     ...
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// class Integer(object):
+///     ...
 /// ```
 #[violation]
 pub struct AmbiguousClassName(pub String);
