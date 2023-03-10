@@ -57,6 +57,8 @@ class Repository(NamedTuple):
 REPOSITORIES = {
     "zulip": Repository("zulip", "zulip", "main"),
     "bokeh": Repository("bokeh", "bokeh", "branch-3.2"),
+    "scikit-build": Repository("scikit-build", "scikit-build", "main"),
+    "airflow": Repository("apache", "airflow", "main"),
 }
 
 SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.*potentially fixable with.*)$")
@@ -73,6 +75,9 @@ async def check(*, ruff: Path, path: Path) -> "Sequence[str]":
         "check",
         "--no-cache",
         "--exit-zero",
+        "--isolated",
+        "--select",
+        "ALL",
         ".",
         stdout=PIPE,
         stderr=PIPE,
