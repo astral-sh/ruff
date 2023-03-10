@@ -49,6 +49,8 @@ pub fn run(
 ) -> Result<ExitStatus> {
     #[cfg(not(debug_assertions))]
     {
+        use colored::Colorize;
+
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
             #[allow(clippy::print_stderr)]
