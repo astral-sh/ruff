@@ -1,3 +1,4 @@
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::identifier_range;
@@ -9,8 +10,7 @@ use ruff_python_ast::visibility::{
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::Violation;
+use crate::registry::Rule;
 
 #[violation]
 pub struct PublicModule;

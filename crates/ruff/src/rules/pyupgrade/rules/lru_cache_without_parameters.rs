@@ -1,13 +1,12 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct LRUCacheWithoutParameters;

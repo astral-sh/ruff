@@ -4,12 +4,12 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
-use crate::fix::Fix;
 use crate::linter::FixTable;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 
 pub mod helpers;
 
@@ -96,43 +96,38 @@ pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
 mod tests {
     use rustpython_parser::ast::Location;
 
+    use ruff_diagnostics::Diagnostic;
+    use ruff_diagnostics::Fix;
     use ruff_python_ast::source_code::Locator;
 
     use crate::autofix::{apply_fix, apply_fixes};
-    use crate::fix::Fix;
-    use crate::registry::Diagnostic;
     use crate::rules::pycodestyle::rules::NoNewLineAtEndOfFile;
 
-    #[test]
-    fn empty_file() {
-        let fixes: Vec<Diagnostic> = vec![];
-        let locator = Locator::new(r#""#);
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
-        assert_eq!(contents, "");
-        assert_eq!(fixed.values().sum::<usize>(), 0);
-    }
-
-    impl From<Fix> for Diagnostic {
-        fn from(fix: Fix) -> Self {
-            Diagnostic {
+    fn create_diagnostics(fixes: impl IntoIterator<Item = Fix>) -> Vec<Diagnostic> {
+        fixes
+            .into_iter()
+            .map(|fix| Diagnostic {
                 // The choice of rule here is arbitrary.
                 kind: NoNewLineAtEndOfFile.into(),
                 location: fix.location,
                 end_location: fix.end_location,
                 fix: Some(fix),
                 parent: None,
-            }
-        }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn empty_file() {
+        let locator = Locator::new(r#""#);
+        let diagnostics = create_diagnostics([]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
+        assert_eq!(contents, "");
+        assert_eq!(fixed.values().sum::<usize>(), 0);
     }
 
     #[test]
     fn apply_one_replacement() {
-        let fixes: Vec<Diagnostic> = vec![Fix {
-            content: "Bar".to_string(),
-            location: Location::new(1, 8),
-            end_location: Location::new(1, 14),
-        }
-        .into()];
         let locator = Locator::new(
             r#"
 class A(object):
@@ -140,7 +135,12 @@ class A(object):
 "#
             .trim(),
         );
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        let diagnostics = create_diagnostics([Fix {
+            content: "Bar".to_string(),
+            location: Location::new(1, 8),
+            end_location: Location::new(1, 14),
+        }]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
             r#"
@@ -154,12 +154,6 @@ class A(Bar):
 
     #[test]
     fn apply_one_removal() {
-        let fixes: Vec<Diagnostic> = vec![Fix {
-            content: String::new(),
-            location: Location::new(1, 7),
-            end_location: Location::new(1, 15),
-        }
-        .into()];
         let locator = Locator::new(
             r#"
 class A(object):
@@ -167,7 +161,12 @@ class A(object):
 "#
             .trim(),
         );
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        let diagnostics = create_diagnostics([Fix {
+            content: String::new(),
+            location: Location::new(1, 7),
+            end_location: Location::new(1, 15),
+        }]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
             r#"
@@ -181,20 +180,6 @@ class A:
 
     #[test]
     fn apply_two_removals() {
-        let fixes: Vec<Diagnostic> = vec![
-            Fix {
-                content: String::new(),
-                location: Location::new(1, 7),
-                end_location: Location::new(1, 16),
-            }
-            .into(),
-            Fix {
-                content: String::new(),
-                location: Location::new(1, 16),
-                end_location: Location::new(1, 23),
-            }
-            .into(),
-        ];
         let locator = Locator::new(
             r#"
 class A(object, object):
@@ -202,7 +187,19 @@ class A(object, object):
 "#
             .trim(),
         );
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        let diagnostics = create_diagnostics([
+            Fix {
+                content: String::new(),
+                location: Location::new(1, 7),
+                end_location: Location::new(1, 16),
+            },
+            Fix {
+                content: String::new(),
+                location: Location::new(1, 16),
+                end_location: Location::new(1, 23),
+            },
+        ]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
 
         assert_eq!(
             contents,
@@ -217,20 +214,6 @@ class A:
 
     #[test]
     fn ignore_overlapping_fixes() {
-        let fixes: Vec<Diagnostic> = vec![
-            Fix {
-                content: String::new(),
-                location: Location::new(1, 7),
-                end_location: Location::new(1, 15),
-            }
-            .into(),
-            Fix {
-                content: "ignored".to_string(),
-                location: Location::new(1, 9),
-                end_location: Location::new(1, 11),
-            }
-            .into(),
-        ];
         let locator = Locator::new(
             r#"
 class A(object):
@@ -238,7 +221,19 @@ class A(object):
 "#
             .trim(),
         );
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        let diagnostics = create_diagnostics([
+            Fix {
+                content: String::new(),
+                location: Location::new(1, 7),
+                end_location: Location::new(1, 15),
+            },
+            Fix {
+                content: "ignored".to_string(),
+                location: Location::new(1, 9),
+                end_location: Location::new(1, 11),
+            },
+        ]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
             r#"

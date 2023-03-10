@@ -22,15 +22,14 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, result_like::BoolLike)]
 pub enum Certainty {

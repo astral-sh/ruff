@@ -1,13 +1,12 @@
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
-use crate::violation::Violation;
 
 #[violation]
 pub struct ErrorInsteadOfException;

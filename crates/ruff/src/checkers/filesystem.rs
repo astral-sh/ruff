@@ -1,6 +1,8 @@
 use std::path::Path;
 
-use crate::registry::{Diagnostic, Rule};
+use ruff_diagnostics::Diagnostic;
+
+use crate::registry::Rule;
 use crate::rules::flake8_no_pep420::rules::implicit_namespace_package;
 use crate::rules::pep8_naming::rules::invalid_module_name;
 use crate::settings::Settings;

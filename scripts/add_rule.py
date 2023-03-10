@@ -79,10 +79,9 @@ def main(*, name: str, code: str, linter: str) -> None:
     # Add the relevant rule function.
     with (rules_dir / f"{rule_name_snake}.rs").open("w") as fp:
         fp.write(
-            """use ruff_macros::derive_message_formats;
+            """use ruff_macros::{derive_message_formats, violation};
+use ruff_diagnostics::Violation;
 
-use ruff_macros::violation;
-use crate::violation::Violation;
 use crate::checkers::ast::Checker;
 
 #[violation]

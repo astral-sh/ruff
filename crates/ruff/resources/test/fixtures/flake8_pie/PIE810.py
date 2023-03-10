@@ -6,6 +6,8 @@ obj.endswith("foo") or obj.endswith("bar")
 obj.startswith(foo) or obj.startswith(bar)
 # error
 obj.startswith(foo) or obj.startswith("foo")
+# error
+obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
 
 # ok
 obj.startswith(("foo",  "bar"))

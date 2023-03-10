@@ -1,11 +1,11 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Binding, BindingKind, Range, Scope};
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
 use super::super::fixes;
 

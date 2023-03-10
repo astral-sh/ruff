@@ -2,12 +2,12 @@ use anyhow::{bail, Result};
 use libcst_native::{Codegen, CodegenState, CompoundStatement, Statement, Suite, With};
 use rustpython_parser::ast::Location;
 
+use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace;
 
 use crate::cst::matchers::match_module;
-use crate::fix::Fix;
 
 /// (SIM117) Convert `with a: with b:` to `with a, b:`.
 pub(crate) fn fix_multiple_with_statements(

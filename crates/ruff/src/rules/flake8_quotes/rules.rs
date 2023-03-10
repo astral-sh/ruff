@@ -2,15 +2,14 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
-use crate::fix::Fix;
 use crate::lex::docstring_detection::StateMachine;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Rule;
 use crate::settings::{flags, Settings};
-use crate::violation::AlwaysAutofixableViolation;
 
 use super::settings::Quote;
 

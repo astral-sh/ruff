@@ -1,5 +1,6 @@
 use rustpython_parser::ast::{Expr, Keyword};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -7,9 +8,7 @@ use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct ReplaceStdoutStderr;

@@ -1,4 +1,6 @@
-use crate::registry::{DiagnosticKind, Rule};
+use ruff_diagnostics::DiagnosticKind;
+
+use crate::registry::Rule;
 
 use super::rules;
 

@@ -1,12 +1,12 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Location};
 
+use ruff_diagnostics::Fix;
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
 use crate::autofix::apply_fix;
 use crate::autofix::helpers::remove_argument;
-use crate::fix::Fix;
 
 fn match_name(expr: &Expr) -> Option<&str> {
     if let ExprKind::Call { func, .. } = &expr.node {

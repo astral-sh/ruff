@@ -1,17 +1,16 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{Alias, AliasData, Stmt};
 
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Rule;
 use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
-use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
 pub struct ImportReplacements {

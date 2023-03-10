@@ -2,14 +2,13 @@ use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Boolop, Expr, ExprKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[violation]
 pub struct ConsiderMergingIsinstance {

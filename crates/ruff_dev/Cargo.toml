@@ -6,6 +6,10 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+ruff = { path = "../ruff" }
+ruff_cli = { path = "../ruff_cli" }
+ruff_diagnostics = { path = "../ruff_diagnostics" }
+
 anyhow = { workspace = true }
 clap = { workspace = true }
 itertools = { workspace = true }
@@ -13,8 +17,6 @@ libcst = { workspace = true }
 once_cell = { workspace = true }
 pretty_assertions = { version = "1.3.0" }
 regex = { workspace = true }
-ruff = { path = "../ruff" }
-ruff_cli = { path = "../ruff_cli" }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
 schemars = { workspace = true }

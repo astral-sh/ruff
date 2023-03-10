@@ -6,12 +6,12 @@ use libcst_native::{
 };
 use rustpython_parser::ast::Location;
 
+use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace;
 
 use crate::cst::matchers::match_module;
-use crate::fix::Fix;
 
 fn parenthesize_and_operand(expr: Expression) -> Expression {
     match &expr {

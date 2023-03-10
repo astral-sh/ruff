@@ -1,11 +1,9 @@
 use itertools::izip;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
-
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[violation]
 pub struct TypeComparison;

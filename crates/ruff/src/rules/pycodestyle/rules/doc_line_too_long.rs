@@ -1,12 +1,11 @@
 use rustpython_parser::ast::Location;
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
-use crate::violation::Violation;
 
 #[violation]
 pub struct DocLineTooLong(pub usize, pub usize);

@@ -1,9 +1,8 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
+use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_macros::{derive_message_formats, violation};
-
-use crate::violation::AlwaysAutofixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnusedCodes {

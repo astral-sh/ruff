@@ -3,12 +3,11 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::registry::Diagnostic;
 use crate::rules::flake8_implicit_str_concat::settings::Settings;
-use crate::violation::Violation;
 
 /// ## What it does
 /// Checks for implicitly concatenated strings on a single line.

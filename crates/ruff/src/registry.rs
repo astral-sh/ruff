@@ -1,16 +1,12 @@
-//! Registry of [`Rule`] to [`DiagnosticKind`] mappings.
+//! Registry of all [`Rule`] implementations.
 
-use rustpython_parser::ast::Location;
-use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter};
 
+use ruff_diagnostics::Violation;
 use ruff_macros::RuleNamespace;
-use ruff_python_ast::types::Range;
 
 use crate::codes::{self, RuleCodePrefix};
-use crate::fix::Fix;
 use crate::rules;
-use crate::violation::Violation;
 
 ruff_macros::register_rules!(
     // pycodestyle errors
@@ -162,6 +158,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::PropertyWithParameters,
     rules::pylint::rules::ReturnInInit,
     rules::pylint::rules::ConsiderUsingFromImport,
+    rules::pylint::rules::CompareToEmptyString,
     rules::pylint::rules::ComparisonOfConstant,
     rules::pylint::rules::ConsiderMergingIsinstance,
     rules::pylint::rules::ConsiderUsingSysExit,
@@ -210,6 +207,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
     rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
+    rules::flake8_bugbear::rules::ExceptWithNonExceptionClasses,
     rules::flake8_bugbear::rules::UnintentionalTypeAnnotation,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
@@ -610,6 +608,20 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
 
+impl Rule {
+    pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
+        let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
+        let prefix: RuleCodePrefix = RuleCodePrefix::parse(&linter, code)?;
+        Ok(prefix.into_iter().next().unwrap())
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum FromCodeError {
+    #[error("unknown rule code")]
+    Unknown,
+}
+
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
 pub enum Linter {
     /// [Pyflakes](https://pypi.org/project/pyflakes/)
@@ -881,49 +893,6 @@ impl Rule {
             | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
             _ => &LintSource::Ast,
         }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DiagnosticKind {
-    /// The identifier of the corresponding [`Rule`].
-    pub name: String,
-    /// The message body to display to the user, to explain the diagnostic.
-    pub body: String,
-    /// The message to display to the user, to explain the suggested fix.
-    pub suggestion: Option<String>,
-    /// Whether the diagnostic is automatically fixable.
-    pub fixable: bool,
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Diagnostic {
-    pub kind: DiagnosticKind,
-    pub location: Location,
-    pub end_location: Location,
-    pub fix: Option<Fix>,
-    pub parent: Option<Location>,
-}
-
-impl Diagnostic {
-    pub fn new<K: Into<DiagnosticKind>>(kind: K, range: Range) -> Self {
-        Self {
-            kind: kind.into(),
-            location: range.location,
-            end_location: range.end_location,
-            fix: None,
-            parent: None,
-        }
-    }
-
-    pub fn amend(&mut self, fix: Fix) -> &mut Self {
-        self.fix = Some(fix);
-        self
-    }
-
-    pub fn parent(&mut self, parent: Location) -> &mut Self {
-        self.parent = Some(parent);
-        self
     }
 }
 

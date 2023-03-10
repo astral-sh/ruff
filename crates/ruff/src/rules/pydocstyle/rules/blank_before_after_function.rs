@@ -1,15 +1,14 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{AsRule, Diagnostic, Rule};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct NoBlankLineBeforeFunction {

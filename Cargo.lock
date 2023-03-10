@@ -609,17 +609,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "derivative"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1969,17 +1958,12 @@ dependencies = [
  "anyhow",
  "bisection",
  "bitflags",
- "cfg-if",
  "chrono",
  "clap 4.1.8",
  "colored",
- "console_error_panic_hook",
- "console_log",
  "criterion",
- "derivative",
  "dirs",
  "fern",
- "getrandom",
  "glob",
  "globset",
  "ignore",
@@ -1987,7 +1971,6 @@ dependencies = [
  "insta",
  "is-macro",
  "itertools",
- "js-sys",
  "libcst",
  "log",
  "natord",
@@ -1999,6 +1982,7 @@ dependencies = [
  "regex",
  "result-like",
  "ruff_cache",
+ "ruff_diagnostics",
  "ruff_macros",
  "ruff_python_ast",
  "ruff_python_stdlib",
@@ -2009,7 +1993,6 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
- "serde-wasm-bindgen",
  "shellexpand",
  "smallvec",
  "strum",
@@ -2018,8 +2001,6 @@ dependencies = [
  "textwrap",
  "thiserror",
  "toml",
- "wasm-bindgen",
- "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -2062,6 +2043,7 @@ dependencies = [
  "regex",
  "ruff",
  "ruff_cache",
+ "ruff_diagnostics",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2087,6 +2069,7 @@ dependencies = [
  "regex",
  "ruff",
  "ruff_cli",
+ "ruff_diagnostics",
  "rustpython-common",
  "rustpython-parser",
  "schemars",
@@ -2094,6 +2077,15 @@ dependencies = [
  "strum",
  "strum_macros",
  "textwrap",
+]
+
+[[package]]
+name = "ruff_diagnostics"
+version = "0.0.0"
+dependencies = [
+ "ruff_python_ast",
+ "rustpython-parser",
+ "serde",
 ]
 
 [[package]]
@@ -2190,7 +2182,6 @@ name = "ruff_testing_macros"
 version = "0.0.0"
 dependencies = [
  "glob",
- "proc-macro-error",
  "proc-macro2",
  "quote",
  "syn",
@@ -2204,6 +2195,25 @@ dependencies = [
  "serde",
  "serde_test",
  "static_assertions",
+]
+
+[[package]]
+name = "ruff_wasm"
+version = "0.0.0"
+dependencies = [
+ "console_error_panic_hook",
+ "console_log",
+ "getrandom",
+ "js-sys",
+ "log",
+ "ruff",
+ "ruff_python_ast",
+ "ruff_rustpython",
+ "rustpython-parser",
+ "serde",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -2411,9 +2421,9 @@ dependencies = [
 
 [[package]]
 name = "serde-wasm-bindgen"
-version = "0.4.5"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3b4c031cd0d9014307d82b8abf653c0290fbdaeb4c02d00c63cf52f728628bf"
+checksum = "f3b143e2833c57ab9ad3ea280d21fd34e285a42837aeb0ee301f4f41890fa00e"
 dependencies = [
  "js-sys",
  "serde",

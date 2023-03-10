@@ -2,6 +2,7 @@ use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
@@ -9,9 +10,7 @@ use ruff_python_stdlib::str::{self};
 
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
 #[violation]
 pub struct YodaConditions {

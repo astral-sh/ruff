@@ -1,13 +1,13 @@
 use itertools::Itertools;
 use rustpython_parser::ast::Alias;
 
+use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{AutofixKind, Availability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 use ruff_python_stdlib::future::ALL_FEATURE_NAMES;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::{AutofixKind, Availability, Violation};
 
 #[violation]
 pub struct UnusedImport {

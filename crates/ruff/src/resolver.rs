@@ -127,7 +127,8 @@ pub fn resolve_configuration(
         }
 
         // Resolve the current path.
-        let options = pyproject::load_options(&path)?;
+        let options = pyproject::load_options(&path)
+            .map_err(|err| anyhow!("Failed to parse `{}`: {}", path.to_string_lossy(), err))?;
         let project_root = relativity.resolve(&path);
         let configuration = Configuration::from_options(options, &project_root)?;
 

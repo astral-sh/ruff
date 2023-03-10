@@ -2,15 +2,14 @@ use rustpython_parser::ast::{
     Cmpop, Comprehension, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Unaryop,
 };
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic, Rule};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::{AsRule, Rule};
 
 #[violation]
 pub struct ReimplementedBuiltin {

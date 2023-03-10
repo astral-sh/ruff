@@ -1,13 +1,14 @@
 use log::error;
 use rustpython_parser::ast::{Expr, ExprKind};
 
+use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{AutofixKind, Availability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{AsRule, Diagnostic};
+use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
-use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::helpers;
 

@@ -1,11 +1,11 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::Violation;
+use crate::registry::Rule;
 
 /// ## What it does
 /// Checks for the use of string literals in exception constructors.

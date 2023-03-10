@@ -1,14 +1,13 @@
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind};
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[violation]
 pub struct LoopVariableOverridesIterator {

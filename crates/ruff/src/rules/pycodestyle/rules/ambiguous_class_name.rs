@@ -1,9 +1,8 @@
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::registry::Diagnostic;
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
-use crate::violation::Violation;
 
 #[violation]
 pub struct AmbiguousClassName(pub String);

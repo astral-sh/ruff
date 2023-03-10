@@ -47,7 +47,7 @@ jobs:
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v1
-      - run: cargo clippy -p ruff --target wasm32-unknown-unknown --all-features -- -D warnings
+      - run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
   cargo-test:
     strategy:
@@ -79,6 +79,26 @@ jobs:
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
+
+
+  cargo-test-wasm:
+    runs-on: ubuntu-latest
+    name: "cargo test (wasm)"
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: playground/package-lock.json
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: Swatinem/rust-cache@v1
+      - name: "Run wasm-pack"
+        run: |
+          cd crates/ruff_wasm
+          wasm-pack test --node
 
   scripts:
     name: "test scripts"

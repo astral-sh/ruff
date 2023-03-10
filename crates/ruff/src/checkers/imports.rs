@@ -4,13 +4,15 @@ use std::path::Path;
 
 use rustpython_parser::ast::Suite;
 
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::visitor::Visitor;
+
 use crate::directives::IsortDirectives;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::track::{Block, ImportTracker};
 use crate::settings::{flags, Settings};
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::visitor::Visitor;
 
 #[allow(clippy::too_many_arguments)]
 pub fn check_imports(

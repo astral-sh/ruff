@@ -3,6 +3,7 @@ use log::error;
 use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
@@ -10,9 +11,7 @@ use ruff_python_ast::types::{Range, RefEquality, ScopeKind};
 
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
 /// ## What it does
 /// Checks for the presence of unused variables in function scopes.

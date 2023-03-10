@@ -2,6 +2,7 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
 use ruff_python_ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -9,9 +10,7 @@ use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::is_module_name;
 
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{AsRule, Diagnostic};
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
 pub type Settings = Strictness;
 

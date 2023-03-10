@@ -4,6 +4,8 @@ use regex::Regex;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::StmtKind;
 
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::types::Range;
@@ -15,11 +17,9 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
 use crate::docstrings::sections::{section_contexts, SectionContext, SectionKind};
 use crate::docstrings::styles::SectionStyle;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{AsRule, Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rules::pydocstyle::settings::Convention;
-use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 #[violation]
 pub struct SectionNotOverIndented {
@@ -294,18 +294,6 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
             // (e.g., "Returns", "Raises"). Break ties by checking for the presence of some of the
             // section names that are unique to each convention.
 
-            // If the docstring contains `Args:` or `Arguments:`, use the Google convention.
-            let google_sections = section_contexts(&lines, &SectionStyle::Google);
-            if google_sections
-                .iter()
-                .any(|context| matches!(context.kind, SectionKind::Arguments | SectionKind::Args))
-            {
-                for context in &google_sections {
-                    google_section(checker, docstring, context);
-                }
-                return;
-            }
-
             // If the docstring contains `Parameters:` or `Other Parameters:`, use the NumPy
             // convention.
             let numpy_sections = section_contexts(&lines, &SectionStyle::Numpy);
@@ -317,6 +305,18 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
             }) {
                 for context in &numpy_sections {
                     numpy_section(checker, docstring, context);
+                }
+                return;
+            }
+
+            // If the docstring contains `Args:` or `Arguments:`, use the Google convention.
+            let google_sections = section_contexts(&lines, &SectionStyle::Google);
+            if google_sections
+                .iter()
+                .any(|context| matches!(context.kind, SectionKind::Arguments | SectionKind::Args))
+            {
+                for context in &google_sections {
+                    google_section(checker, docstring, context);
                 }
                 return;
             }

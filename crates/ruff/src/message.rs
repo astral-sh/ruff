@@ -3,8 +3,7 @@ use std::cmp::Ordering;
 pub use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, DiagnosticKind};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 

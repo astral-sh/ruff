@@ -1,12 +1,10 @@
 use rustpython_parser::ast::Stmt;
 
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{identifier_range, ReturnStatementVisitor};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor::Visitor;
-
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 #[violation]
 pub struct TooManyReturnStatements {
