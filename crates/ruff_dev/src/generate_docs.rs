@@ -10,7 +10,6 @@ use strum::IntoEnumIterator;
 
 use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::settings::options::Options;
-use ruff::settings::options_base::ConfigurationOptions;
 use ruff_diagnostics::Availability;
 
 use crate::ROOT_DIR;
@@ -92,7 +91,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
                 let option = rest.trim_end().trim_end_matches('`');
 
                 assert!(
-                    Options::get(Some(option)).is_some(),
+                    Options::metadata().get(option).is_some(),
                     "unknown option {option}"
                 );
 
