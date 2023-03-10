@@ -110,7 +110,7 @@ class Diff(NamedTuple):
 
     def __iter__(self: Self) -> "Iterator[str]":
         """Iterate through the changed lines in diff format."""
-        for line in heapq.merge(self.removed, self.added):
+        for line in heapq.merge(sorted(self.removed), sorted(self.added)):
             if line in self.removed:
                 yield f"- {line}"
             else:
