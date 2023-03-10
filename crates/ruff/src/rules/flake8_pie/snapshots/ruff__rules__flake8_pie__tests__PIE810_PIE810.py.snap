@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: SingleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
-    suggestion: "Merge `startswith` once with a `tuple`"
+    suggestion: "Merge into a single `startswith` call"
     fixable: true
   location:
     row: 2
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: SingleStartsEndsWith
     body: "Call `endswith` once with a `tuple`"
-    suggestion: "Merge `endswith` once with a `tuple`"
+    suggestion: "Merge into a single `endswith` call"
     fixable: true
   location:
     row: 4
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: SingleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
-    suggestion: "Merge `startswith` once with a `tuple`"
+    suggestion: "Merge into a single `startswith` call"
     fixable: true
   location:
     row: 6
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: SingleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
-    suggestion: "Merge `startswith` once with a `tuple`"
+    suggestion: "Merge into a single `startswith` call"
     fixable: true
   location:
     row: 8
@@ -81,5 +81,25 @@ expression: diagnostics
     end_location:
       row: 8
       column: 44
+  parent: ~
+- kind:
+    name: SingleStartsEndsWith
+    body: "Call `startswith` once with a `tuple`"
+    suggestion: "Merge into a single `startswith` call"
+    fixable: true
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 65
+  fix:
+    content: "obj.endswith(foo) or obj.startswith((foo, \"foo\"))"
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 65
   parent: ~
 

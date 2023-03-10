@@ -135,7 +135,7 @@ impl AlwaysAutofixableViolation for SingleStartsEndsWith {
 
     fn autofix_title(&self) -> String {
         let SingleStartsEndsWith { attr } = self;
-        format!("Merge `{attr}` once with a `tuple`")
+        format!("Merge into a single `{attr}` call")
     }
 }
 
@@ -490,16 +490,23 @@ pub fn single_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 });
 
                 // Generate the combined `BoolOp`.
+                let mut first = true;
                 let bool_op = create_expr(ExprKind::BoolOp {
                     op: Boolop::Or,
-                    values: iter::once(call)
-                        .chain(
-                            values
-                                .iter()
-                                .enumerate()
-                                .filter(|(index, _)| !indices.contains(index))
-                                .map(|(_, elt)| elt.clone()),
-                        )
+                    values: values
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, elt)| {
+                            if indices.contains(&index) {
+                                if std::mem::take(&mut first) {
+                                    Some(call.clone())
+                                } else {
+                                    None
+                                }
+                            } else {
+                                Some(elt.clone())
+                            }
+                        })
                         .collect(),
                 });
 
