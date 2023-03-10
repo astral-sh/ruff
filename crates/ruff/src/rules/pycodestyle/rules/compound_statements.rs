@@ -38,7 +38,6 @@ use crate::settings::{flags, Settings};
 /// if foo == 'blah':
 ///     do_blah_thing()
 /// ```
-/// """
 #[violation]
 pub struct MultipleStatementsOnOneLineColon;
 
@@ -71,7 +70,6 @@ impl Violation for MultipleStatementsOnOneLineColon {
 /// do_two()
 /// do_three()
 /// ```
-/// """
 #[violation]
 pub struct MultipleStatementsOnOneLineSemicolon;
 
@@ -97,7 +95,6 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 /// ```python
 /// do_four()
 /// ```
-/// """
 #[violation]
 pub struct UselessSemicolon;
 

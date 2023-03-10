@@ -22,7 +22,6 @@ use ruff_python_ast::types::Range;
 /// ```python
 /// regex = r'\.png$'
 /// ```
-/// """
 #[violation]
 pub struct InvalidEscapeSequence(pub char);
 

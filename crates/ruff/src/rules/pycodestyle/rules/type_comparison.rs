@@ -23,7 +23,6 @@ use ruff_python_ast::types::Range;
 /// if isinstance(obj, int):
 /// if type(a1) is type(b1):
 /// ```
-/// """
 #[violation]
 pub struct TypeComparison;
 

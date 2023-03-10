@@ -25,7 +25,6 @@ use ruff_python_ast::whitespace::leading_space;
 /// ```python
 /// if a == 0:\n    a = 1\n    b = 1
 /// ```
-/// """
 #[violation]
 pub struct MixedSpacesAndTabs;
 

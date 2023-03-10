@@ -23,7 +23,6 @@ use crate::settings::{flags, Settings};
 /// ```python
 /// spam(1)\n#
 /// ```
-/// """
 #[violation]
 pub struct TrailingWhitespace;
 
@@ -56,7 +55,6 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
 /// ```python
 /// class Foo(object):\n\n    bang = 12
 /// ```
-/// """
 #[violation]
 pub struct BlankLineContainsWhitespace;
 

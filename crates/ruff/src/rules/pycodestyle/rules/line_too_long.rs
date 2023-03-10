@@ -30,7 +30,6 @@ use crate::settings::Settings;
 ///     param6, param7, param8, param9, param10
 /// )
 /// ```
-/// """
 #[violation]
 pub struct LineTooLong(pub usize, pub usize);
 

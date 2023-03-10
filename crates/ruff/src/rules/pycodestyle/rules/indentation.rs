@@ -25,7 +25,6 @@ use crate::rules::pycodestyle::logical_lines::LogicalLine;
 /// if True:
 ///     a = 1
 /// ```
-/// """
 #[violation]
 pub struct IndentationWithInvalidMultiple {
     pub indent_size: usize,
@@ -58,7 +57,6 @@ impl Violation for IndentationWithInvalidMultiple {
 /// if True:
 ///     # a = 1
 /// ```
-/// """
 #[violation]
 pub struct IndentationWithInvalidMultipleComment {
     pub indent_size: usize,
@@ -92,7 +90,6 @@ impl Violation for IndentationWithInvalidMultipleComment {
 /// for item in items:
 ///     pass
 /// ```
-/// """
 #[violation]
 pub struct NoIndentedBlock;
 
@@ -124,7 +121,6 @@ impl Violation for NoIndentedBlock {
 ///     # Hi
 ///     pass
 /// ```
-/// """
 #[violation]
 pub struct NoIndentedBlockComment;
 
@@ -154,7 +150,6 @@ impl Violation for NoIndentedBlockComment {
 /// a = 1
 /// b = 2
 /// ```
-/// """
 #[violation]
 pub struct UnexpectedIndentation;
 
@@ -184,7 +179,6 @@ impl Violation for UnexpectedIndentation {
 /// a = 1
 /// # b = 2
 /// ```
-/// """
 #[violation]
 pub struct UnexpectedIndentationComment;
 
@@ -214,7 +208,6 @@ impl Violation for UnexpectedIndentationComment {
 /// for item in items:
 ///     pass
 /// ```
-/// """
 #[violation]
 pub struct OverIndented;
 

@@ -21,7 +21,6 @@ use ruff_python_ast::types::Range;
 /// ```python
 /// spam(1)\n
 /// ```
-/// """
 #[violation]
 pub struct NoNewLineAtEndOfFile;
 

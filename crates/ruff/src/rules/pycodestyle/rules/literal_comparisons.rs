@@ -52,7 +52,6 @@ impl From<&Cmpop> for EqCmpop {
 /// ```python
 /// if arg is not None:
 /// ```
-/// """
 #[violation]
 pub struct NoneComparison(pub EqCmpop);
 
@@ -95,7 +94,6 @@ impl AlwaysAutofixableViolation for NoneComparison {
 /// if arg:
 /// if not arg:
 /// ```
-/// """
 #[violation]
 pub struct TrueFalseComparison(pub bool, pub EqCmpop);
 

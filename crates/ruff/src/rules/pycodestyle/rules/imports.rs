@@ -31,7 +31,6 @@ use crate::checkers::ast::Checker;
 /// import os
 /// import sys
 /// ```
-/// """
 #[violation]
 pub struct MultipleImportsOnOneLine;
 
@@ -104,7 +103,6 @@ impl Violation for MultipleImportsOnOneLine {
 /// "Two string"
 /// a = 1
 /// ```
-/// """
 #[violation]
 pub struct ModuleImportNotAtTopOfFile;
 

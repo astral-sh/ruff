@@ -27,7 +27,6 @@ use crate::rules::pycodestyle::helpers::compare;
 /// assert (X in Y or X is Z)
 ///
 /// ```
-/// """
 #[violation]
 pub struct NotInTest;
 
@@ -61,7 +60,6 @@ impl AlwaysAutofixableViolation for NotInTest {
 ///     pass
 /// zz = x is not y
 /// ```
-/// """
 #[violation]
 pub struct NotIsTest;
 

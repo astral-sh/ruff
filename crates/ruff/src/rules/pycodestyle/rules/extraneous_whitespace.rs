@@ -26,7 +26,6 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```python
 /// spam(ham[1], {eggs: 2})
 /// ```
-/// """
 #[violation]
 pub struct WhitespaceAfterOpenBracket;
 

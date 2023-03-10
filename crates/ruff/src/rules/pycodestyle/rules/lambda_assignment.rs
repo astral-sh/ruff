@@ -29,7 +29,6 @@ use crate::registry::AsRule;
 /// def f(x):
 ///    return 2 * x
 /// ```
-/// """
 #[violation]
 pub struct LambdaAssignment {
     pub name: String,

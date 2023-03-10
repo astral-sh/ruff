@@ -27,7 +27,6 @@ use ruff_python_ast::types::Range;
 /// x = x + 1  # Increment x
 /// x = x + 1    # Increment x
 /// ```
-/// """
 #[violation]
 pub struct TooFewSpacesBeforeInlineComment;
 
@@ -58,7 +57,6 @@ impl Violation for TooFewSpacesBeforeInlineComment {
 /// x = x + 1  # Increment x
 /// x = x + 1    # Increment x
 /// ```
-/// """
 #[violation]
 pub struct NoSpaceAfterInlineComment;
 
@@ -87,7 +85,6 @@ impl Violation for NoSpaceAfterInlineComment {
 /// #  - Block comment list
 /// # \xa0- Block comment list
 /// ```
-/// """
 #[violation]
 pub struct NoSpaceAfterBlockComment;
 
@@ -117,7 +114,6 @@ impl Violation for NoSpaceAfterBlockComment {
 /// #  - Block comment list
 /// # \xa0- Block comment list
 /// ```
-/// """
 #[violation]
 pub struct MultipleLeadingHashesForBlockComment;
 

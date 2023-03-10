@@ -22,7 +22,6 @@ use ruff_macros::{derive_message_formats, violation};
 /// ```python
 /// True and False
 /// ```
-/// """
 #[violation]
 pub struct MultipleSpacesAfterKeyword;
 
@@ -49,7 +48,6 @@ impl Violation for MultipleSpacesAfterKeyword {
 /// ```python
 /// True and False
 /// ```
-/// """
 #[violation]
 pub struct MultipleSpacesBeforeKeyword;
 
@@ -76,7 +74,6 @@ impl Violation for MultipleSpacesBeforeKeyword {
 /// ```python
 /// True and False
 /// ```
-/// """
 #[violation]
 pub struct TabAfterKeyword;
 
@@ -103,7 +100,6 @@ impl Violation for TabAfterKeyword {
 /// ```python
 /// True and False
 /// ```
-/// """
 #[violation]
 pub struct TabBeforeKeyword;
 
