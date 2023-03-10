@@ -313,7 +313,7 @@ dependencies = [
 
 [[package]]
 name = "clap_complete_command"
-version = "0.5.1"
+ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "183495371ea78d4c9ff638bfc6497d46fed2396e4f9c50aebc1278a4a9919a3d"
 dependencies = [
@@ -994,6 +994,12 @@ dependencies = [
  "autocfg",
  "hashbrown",
 ]
+
+[[package]]
+name = "indoc"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f2cb48b81b1dc9f39676bf99f5499babfec7cd8fe14307f7b3d747208fb5690"
 
 [[package]]
 name = "inotify"
@@ -2025,6 +2031,7 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
+ "serde_json",
  "shellexpand",
  "smallvec",
  "strum",
@@ -2080,6 +2087,7 @@ dependencies = [
  "filetime",
  "glob",
  "ignore",
+ "indoc",
  "itertools",
  "log",
  "mimalloc",
@@ -2091,6 +2099,7 @@ dependencies = [
  "ruff",
  "ruff_cache",
  "ruff_diagnostics",
+ "ruff_python_stdlib",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2505,6 +2514,7 @@ version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cad406b69c91885b5107daf2c29572f6c8cdb3c66826821e286c533490c0bc76"
 dependencies = [
+ "indexmap",
  "itoa",
  "ryu",
  "serde",

@@ -1,28 +1,34 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
+use std::collections::HashMap;
 use std::fs::write;
 use std::io;
 use std::io::Write;
 use std::ops::AddAssign;
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::{debug, error};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
+use ruff::jupyter::{read_jupyter_notebook, JupyterIndex, JupyterNotebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
-use ruff::{fix, fs};
+use ruff::{fix, fs, jupyter};
 
 use crate::cache;
+use ruff::jupyter::is_jupyter_notebook;
 
 #[derive(Debug, Default)]
 pub struct Diagnostics {
     pub messages: Vec<Message>,
     pub fixed: FxHashMap<String, FixTable>,
+    /// Jupyter notebook indexing table for each input file that is a jupyter notebook
+    /// so we can rewrite the diagnostics in the end
+    pub jupyter_index: HashMap<String, JupyterIndex>,
 }
 
 impl Diagnostics {
@@ -30,6 +36,7 @@ impl Diagnostics {
         Self {
             messages,
             fixed: FxHashMap::default(),
+            jupyter_index: HashMap::new(),
         }
     }
 }
@@ -48,6 +55,7 @@ impl AddAssign for Diagnostics {
                 }
             }
         }
+        self.jupyter_index.extend(other.jupyter_index)
     }
 }
 
@@ -85,7 +93,25 @@ pub fn lint_path(
     debug!("Checking: {}", path.display());
 
     // Read the file from disk.
-    let contents = std::fs::read_to_string(path)?;
+    let (contents, jupyter_index) = if is_jupyter_notebook(&path) {
+        // See also the black implementation
+        // <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
+        let notebook: JupyterNotebook = if let Some(notebook) = read_jupyter_notebook(path)? {
+            notebook
+        } else {
+            // Not a python notebook
+            return Ok(Diagnostics {
+                messages: vec![],
+                fixed: Default::default(),
+                jupyter_index: HashMap::new(),
+            });
+        };
+
+        let (contents, jupyter_index) = jupyter::concat_notebook(notebook);
+        (contents, Some(jupyter_index))
+    } else {
+        (std::fs::read_to_string(path)?, None)
+    };
 
     // Lint the file.
     let (
@@ -165,9 +191,24 @@ pub fn lint_path(
         }
     }
 
+    let jupyter_index = match jupyter_index {
+        None => HashMap::new(),
+        Some(jupyter_index) => {
+            let mut index = HashMap::new();
+            index.insert(
+                path.to_str()
+                    .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
+                    .to_string(),
+                jupyter_index,
+            );
+            index
+        }
+    };
+
     Ok(Diagnostics {
         messages,
         fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
+        jupyter_index,
     })
 }
 
@@ -261,5 +302,6 @@ pub fn lint_stdin(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
         )]),
+        jupyter_index: HashMap::new(),
     })
 }

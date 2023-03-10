@@ -1,6 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::io::{BufWriter, Write};
@@ -19,6 +19,7 @@ use serde::Serialize;
 use serde_json::json;
 
 use ruff::fs::{relativize_path, relativize_path_to};
+use ruff::jupyter::JupyterIndex;
 use ruff::linter::FixTable;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
@@ -162,34 +163,32 @@ impl Printer {
         Ok(())
     }
 
-    pub fn write_once(&self, diagnostics: &Diagnostics) -> Result<()> {
+    pub fn write_once(&self, diagnostics: &Diagnostics, writer: &mut impl Write) -> Result<()> {
         if matches!(self.log_level, LogLevel::Silent) {
             return Ok(());
         }
 
         if !self.flags.contains(Flags::SHOW_VIOLATIONS) {
-            let mut stdout = BufWriter::new(io::stdout().lock());
             if matches!(
                 self.format,
                 SerializationFormat::Text | SerializationFormat::Grouped
             ) {
                 if self.flags.contains(Flags::SHOW_FIXES) {
                     if !diagnostics.fixed.is_empty() {
-                        writeln!(stdout)?;
-                        print_fixed(&mut stdout, &diagnostics.fixed)?;
-                        writeln!(stdout)?;
+                        writeln!(writer)?;
+                        print_fixed(writer, &diagnostics.fixed)?;
+                        writeln!(writer)?;
                     }
                 }
-                self.post_text(&mut stdout, diagnostics)?;
+                self.post_text(writer, diagnostics)?;
             }
             return Ok(());
         }
 
-        let mut stdout = BufWriter::new(io::stdout().lock());
         match self.format {
             SerializationFormat::Json => {
                 writeln!(
-                    stdout,
+                    writer,
                     "{}",
                     serde_json::to_string_pretty(
                         &diagnostics
@@ -225,12 +224,25 @@ impl Printer {
                     for message in messages {
                         let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                         status.set_message(message.kind.body.clone());
-                        status.set_description(format!(
-                            "line {}, col {}, {}",
-                            message.location.row(),
-                            message.location.column(),
-                            message.kind.body
-                        ));
+                        let description = if let Some(jupyter_index) =
+                            diagnostics.jupyter_index.get(&message.filename)
+                        {
+                            format!(
+                                "cell {}, line {}, col {}, {}",
+                                jupyter_index.row_to_cell[message.location.row()],
+                                jupyter_index.row_to_row_in_cell[message.location.row()],
+                                message.location.column(),
+                                message.kind.body
+                            )
+                        } else {
+                            format!(
+                                "line {}, col {}, {}",
+                                message.location.row(),
+                                message.location.column(),
+                                message.kind.body
+                            )
+                        };
+                        status.set_description(description);
                         let mut case = TestCase::new(
                             format!("org.ruff.{}", message.kind.rule().noqa_code()),
                             status,
@@ -248,20 +260,25 @@ impl Printer {
                     }
                     report.add_test_suite(test_suite);
                 }
-                writeln!(stdout, "{}", report.to_string().unwrap())?;
+                writeln!(writer, "{}", report.to_string().unwrap())?;
             }
             SerializationFormat::Text => {
                 for message in &diagnostics.messages {
-                    print_message(&mut stdout, message, self.autofix_level)?;
+                    print_message(
+                        writer,
+                        message,
+                        self.autofix_level,
+                        &diagnostics.jupyter_index,
+                    )?;
                 }
                 if self.flags.contains(Flags::SHOW_FIXES) {
                     if !diagnostics.fixed.is_empty() {
-                        writeln!(stdout)?;
-                        print_fixed(&mut stdout, &diagnostics.fixed)?;
-                        writeln!(stdout)?;
+                        writeln!(writer)?;
+                        print_fixed(writer, &diagnostics.fixed)?;
+                        writeln!(writer)?;
                     }
                 }
-                self.post_text(&mut stdout, diagnostics)?;
+                self.post_text(writer, diagnostics)?;
             }
             SerializationFormat::Grouped => {
                 for (filename, messages) in group_messages_by_filename(&diagnostics.messages) {
@@ -283,28 +300,29 @@ impl Printer {
                     );
 
                     // Print the filename.
-                    writeln!(stdout, "{}:", relativize_path(filename).underline())?;
+                    writeln!(writer, "{}:", relativize_path(filename).underline())?;
 
                     // Print each message.
                     for message in messages {
                         print_grouped_message(
-                            &mut stdout,
+                            writer,
                             message,
                             self.autofix_level,
                             row_length,
                             column_length,
+                            diagnostics.jupyter_index.get(filename),
                         )?;
                     }
-                    writeln!(stdout)?;
+                    writeln!(writer)?;
                 }
                 if self.flags.contains(Flags::SHOW_FIXES) {
                     if !diagnostics.fixed.is_empty() {
-                        writeln!(stdout)?;
-                        print_fixed(&mut stdout, &diagnostics.fixed)?;
-                        writeln!(stdout)?;
+                        writeln!(writer)?;
+                        print_fixed(writer, &diagnostics.fixed)?;
+                        writeln!(writer)?;
                     }
                 }
-                self.post_text(&mut stdout, diagnostics)?;
+                self.post_text(writer, diagnostics)?;
             }
             SerializationFormat::Github => {
                 // Generate error workflow command in GitHub Actions format.
@@ -322,7 +340,7 @@ impl Printer {
                         message.kind.body,
                     );
                     writeln!(
-                        stdout,
+                        writer,
                         "::error title=Ruff \
                          ({}),file={},line={},col={},endLine={},endColumn={}::{}",
                         message.kind.rule().noqa_code(),
@@ -339,7 +357,7 @@ impl Printer {
                 // Generate JSON with violations in GitLab CI format
                 // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
                 let project_dir = env::var("CI_PROJECT_DIR").ok();
-                writeln!(stdout,
+                writeln!(writer,
                     "{}",
                     serde_json::to_string_pretty(
                         &diagnostics
@@ -378,7 +396,7 @@ impl Printer {
                         message.kind.rule().noqa_code(),
                         message.kind.body,
                     );
-                    writeln!(stdout, "{label}")?;
+                    writeln!(writer, "{label}")?;
                 }
             }
             SerializationFormat::Azure => {
@@ -386,7 +404,7 @@ impl Printer {
                 // See https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
                 for message in &diagnostics.messages {
                     writeln!(
-                        stdout,
+                        writer,
                         "##vso[task.logissue type=error\
                         ;sourcepath={};linenumber={};columnnumber={};code={};]{}",
                         message.filename,
@@ -399,7 +417,7 @@ impl Printer {
             }
         }
 
-        stdout.flush()?;
+        writer.flush()?;
 
         Ok(())
     }
@@ -522,7 +540,12 @@ impl Printer {
                 writeln!(stdout)?;
             }
             for message in &diagnostics.messages {
-                print_message(&mut stdout, message, self.autofix_level)?;
+                print_message(
+                    &mut stdout,
+                    message,
+                    self.autofix_level,
+                    &diagnostics.jupyter_index,
+                )?;
             }
         }
         stdout.flush()?;
@@ -605,16 +628,33 @@ fn print_message<T: Write>(
     stdout: &mut T,
     message: &Message,
     autofix_level: fix::FixMode,
+    jupyter_index: &HashMap<String, JupyterIndex>,
 ) -> Result<()> {
-    let label = format!(
-        "{path}{sep}{row}{sep}{col}{sep} {code_and_body}",
+    // Check if we're working on a jupyter notebook and translate positions with cell accordingly
+    let pos_label = if let Some(jupyter_index) = jupyter_index.get(&message.filename) {
+        format!(
+            "cell {cell}{sep}{row}{sep}{col}{sep}",
+            cell = jupyter_index.row_to_cell[message.location.row()],
+            sep = ":".cyan(),
+            row = jupyter_index.row_to_row_in_cell[message.location.row()],
+            col = message.location.column(),
+        )
+    } else {
+        format!(
+            "{row}{sep}{col}{sep}",
+            sep = ":".cyan(),
+            row = message.location.row(),
+            col = message.location.column(),
+        )
+    };
+    writeln!(
+        stdout,
+        "{path}{sep}{pos_label} {code_and_body}",
         path = relativize_path(&message.filename).bold(),
         sep = ":".cyan(),
-        row = message.location.row(),
-        col = message.location.column(),
+        pos_label = pos_label,
         code_and_body = CodeAndBody(message, autofix_level)
-    );
-    writeln!(stdout, "{label}")?;
+    )?;
     if let Some(source) = &message.source {
         let suggestion = message.kind.suggestion.clone();
         let footer = if suggestion.is_some() {
@@ -710,13 +750,29 @@ fn print_grouped_message<T: Write>(
     autofix_level: fix::FixMode,
     row_length: usize,
     column_length: usize,
+    jupyter_index: Option<&JupyterIndex>,
 ) -> Result<()> {
+    // Check if we're working on a jupyter notebook and translate positions with cell accordingly
+    let pos_label = if let Some(jupyter_index) = jupyter_index {
+        format!(
+            "cell {cell}{sep}{row}{sep}{col}",
+            cell = jupyter_index.row_to_cell[message.location.row()],
+            sep = ":".cyan(),
+            row = jupyter_index.row_to_row_in_cell[message.location.row()],
+            col = message.location.column(),
+        )
+    } else {
+        format!(
+            "{row}{sep}{col}",
+            sep = ":".cyan(),
+            row = message.location.row(),
+            col = message.location.column(),
+        )
+    };
     let label = format!(
-        "  {row_padding}{row}{sep}{col}{col_padding}  {code_and_body}",
+        "  {row_padding}{pos_label}{col_padding}  {code_and_body}",
         row_padding = " ".repeat(row_length - num_digits(message.location.row())),
-        row = message.location.row(),
-        sep = ":".cyan(),
-        col = message.location.column(),
+        pos_label = pos_label,
         col_padding = " ".repeat(column_length - num_digits(message.location.column())),
         code_and_body = CodeAndBody(message, autofix_level),
     );

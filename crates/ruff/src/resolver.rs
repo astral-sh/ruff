@@ -14,6 +14,7 @@ use ruff_python_stdlib::path::is_python_file;
 use rustc_hash::FxHashSet;
 
 use crate::fs;
+use crate::jupyter::is_jupyter_notebook;
 use crate::settings::configuration::Configuration;
 use crate::settings::pyproject::settings_toml;
 use crate::settings::{pyproject, AllSettings, Settings};
@@ -193,15 +194,15 @@ fn match_exclusion(file_path: &str, file_basename: &str, exclusion: &globset::Gl
     exclusion.is_match(file_path) || exclusion.is_match(file_basename)
 }
 
-/// Return `true` if the [`DirEntry`] appears to be that of a Python file.
+/// Return `true` if the [`DirEntry`] appears to be that of a Python file or jupyter notebook.
 pub fn is_python_entry(entry: &DirEntry) -> bool {
-    is_python_file(entry.path())
+    (is_python_file(entry.path()) || is_jupyter_notebook(entry.path()))
         && !entry
             .file_type()
             .map_or(false, |file_type| file_type.is_dir())
 }
 
-/// Find all Python (`.py` and `.pyi` files) in a set of paths.
+/// Find all Python (`.py`, `.pyi` and `.ipynb` files) in a set of paths.
 pub fn python_files_in_path(
     paths: &[PathBuf],
     pyproject_strategy: &PyprojectDiscovery,
