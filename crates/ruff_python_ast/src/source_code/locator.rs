@@ -19,7 +19,7 @@ impl<'a> Locator<'a> {
     }
 
     fn get_or_init_index(&self) -> &Index {
-        self.index.get_or_init(|| Index::from_str(self.contents))
+        self.index.get_or_init(|| Index::from(self.contents))
     }
 
     /// Take the source code up to the given [`Location`].
@@ -70,6 +70,7 @@ impl<'a> Locator<'a> {
 enum Index {
     /// Optimized index for an ASCII only document
     Ascii(AsciiIndex),
+
     /// Index for UTF8 documents
     Utf8(Utf8Index),
 }
@@ -82,23 +83,20 @@ impl Index {
             Index::Utf8(utf8) => utf8.byte_offset(location, contents),
         }
     }
+}
 
-    /// Builds the index for `content`
-    // Not an issue because of manual string length check
-    #[allow(clippy::cast_possible_truncation)]
-    fn from_str(content: &str) -> Self {
-        assert!(u32::try_from(content.len()).is_ok());
+impl From<&str> for Index {
+    fn from(contents: &str) -> Self {
+        assert!(u32::try_from(contents.len()).is_ok());
 
         let mut line_start_offsets: Vec<u32> = Vec::with_capacity(48);
         line_start_offsets.push(0);
 
-        for (i, byte) in content.bytes().enumerate() {
+        // SAFE because of length assertion above
+        #[allow(clippy::cast_possible_truncation)]
+        for (i, byte) in contents.bytes().enumerate() {
             if !byte.is_ascii() {
-                return Index::Utf8(continue_non_ascii_content(
-                    &content[i..],
-                    i as u32,
-                    line_start_offsets,
-                ));
+                return Index::Utf8(continue_utf8_index(&contents[i..], i, line_start_offsets));
             }
             if byte == b'\n' {
                 line_start_offsets.push((i + 1) as u32);
@@ -111,10 +109,28 @@ impl Index {
     }
 }
 
-impl From<&str> for Index {
-    fn from(value: &str) -> Self {
-        Self::from_str(value)
+// SAFE because of length assertion in `Index::from(&str)`
+#[allow(clippy::cast_possible_truncation)]
+fn continue_utf8_index(
+    non_ascii_part: &str,
+    offset: usize,
+    line_start_offsets: Vec<u32>,
+) -> Utf8Index {
+    let mut lines = line_start_offsets;
+    let mut chars = non_ascii_part.char_indices().peekable();
+
+    while let Some((position, char)) = chars.next() {
+        match char {
+            '\r' if matches!(chars.peek(), Some((_, '\n'))) => continue,
+            '\r' | '\n' => {
+                let absolute_offset = offset + position + 1;
+                lines.push(absolute_offset as u32);
+            }
+            _ => {}
+        }
     }
+
+    Utf8Index::new(lines)
 }
 
 /// Index for fast [Location] to byte offset conversions for ASCII documents.
@@ -147,87 +163,46 @@ impl AsciiIndex {
     }
 }
 
-// Not an issue because of manual string length check in `Index::from_str`
-#[allow(clippy::cast_possible_truncation)]
-fn continue_non_ascii_content(non_ascii: &str, mut offset: u32, mut lines: Vec<u32>) -> Utf8Index {
-    // Chars up to this point map 1:1 to byte offsets.
-    let mut chars_to_byte_offsets = Vec::new();
-    chars_to_byte_offsets.extend(0..offset);
-    let mut char_index = offset;
-
-    // SKIP BOM
-    let contents = if offset == 0 && non_ascii.starts_with('\u{feff}') {
-        offset += '\u{feff}'.len_utf8() as u32;
-        &non_ascii[offset as usize..]
-    } else {
-        non_ascii
-    };
-
-    let mut after_carriage_return = false;
-
-    for char in contents.chars() {
-        match char {
-            // Normalize `\r\n` to `\n`
-            '\n' if after_carriage_return => continue,
-            '\r' | '\n' => {
-                lines.push(char_index + 1);
-            }
-            _ => {}
-        }
-
-        chars_to_byte_offsets.push(offset);
-        after_carriage_return = char == '\r';
-        offset += char.len_utf8() as u32;
-        char_index += 1;
-    }
-
-    Utf8Index::new(lines, chars_to_byte_offsets)
-}
-
 /// Index for fast [Location] to byte offset conversions for UTF8 documents.
 ///
-/// The index stores two lookup tables:
-/// * the character offsets for each line
-/// * the byte offset for each character
-///
-/// The byte offset of a [Location] can then be computed using
-///
-/// ```ignore
-/// // retrieving the start character on that line and add the column (character offset)
-/// let char_offset = lines[location.row() - 1] + location.column();
-/// let byte_offset = char_to_byte_offsets[char_offset]
-/// ```
+/// The index stores the byte offset of every line. The column offset is lazily computed by
+/// adding the line start offset and then iterating to the `nth` character.
 #[derive(Debug, Clone, PartialEq)]
 struct Utf8Index {
-    /// The index is the line number in the document. The value the character at which the the line starts
-    lines_to_characters: Vec<u32>,
-
-    /// The index is the nth character in the document, the value the byte offset from the begining of the document.
-    character_to_byte_offsets: Vec<u32>,
+    line_start_byte_offsets: Vec<u32>,
 }
 
 impl Utf8Index {
-    fn new(lines: Vec<u32>, characters: Vec<u32>) -> Self {
+    fn new(line_byte_positions: Vec<u32>) -> Self {
         Self {
-            lines_to_characters: lines,
-            character_to_byte_offsets: characters,
+            line_start_byte_offsets: line_byte_positions,
         }
     }
 
     /// Truncate a [`Location`] to a byte offset in UTF-8 source code.
     fn byte_offset(&self, location: Location, contents: &str) -> usize {
-        if location.row() - 1 == self.lines_to_characters.len() && location.column() == 0 {
+        let index = &self.line_start_byte_offsets;
+
+        if location.row() - 1 == index.len() && location.column() == 0 {
             contents.len()
         } else {
-            let line_start = self.lines_to_characters[location.row() - 1];
+            // Casting is safe because the length of utf8 characters is always between 1-4
+            #[allow(clippy::cast_possible_truncation)]
+            let line_start = if location.row() == 1 && contents.starts_with('\u{feff}') {
+                '\u{feff}'.len_utf8() as u32
+            } else {
+                index[location.row() - 1]
+            };
 
-            match self
-                .character_to_byte_offsets
-                .get(line_start as usize + location.column())
-            {
-                Some(offset) => *offset as usize,
+            let rest = &contents[line_start as usize..];
+
+            let column_offset = match rest.char_indices().nth(location.column()) {
+                Some((offset, _)) => offset,
                 None => contents.len(),
-            }
+            };
+
+            let offset = line_start as usize + column_offset;
+            offset.min(contents.len())
         }
     }
 }
@@ -238,16 +213,20 @@ mod tests {
     use rustpython_parser::ast::Location;
 
     fn index_ascii(content: &str) -> AsciiIndex {
-        match Index::from_str(content) {
+        match Index::from(content) {
             Index::Ascii(ascii) => ascii,
-            Index::Utf8(_) => panic!("Expected ASCII index"),
+            Index::Utf8(_) => {
+                panic!("Expected ASCII index")
+            }
         }
     }
 
     fn index_utf8(content: &str) -> Utf8Index {
-        match Index::from_str(content) {
+        match Index::from(content) {
             Index::Utf8(utf8) => utf8,
-            Index::Ascii(_) => panic!("Expected UTF8 Index"),
+            Index::Ascii(_) => {
+                panic!("Expected UTF8 index")
+            }
         }
     }
 
@@ -275,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn ascii_truncate() {
+    fn ascii_byte_offset() {
         let contents = "x = 1\ny = 2";
         let index = index_ascii(contents);
 
@@ -294,7 +273,7 @@ mod tests {
 
     impl Utf8Index {
         fn line_count(&self) -> usize {
-            self.lines_to_characters.len()
+            self.line_start_byte_offsets.len()
         }
     }
 
@@ -303,57 +282,34 @@ mod tests {
         let contents = "x = '🫣'";
         let index = index_utf8(contents);
         assert_eq!(index.line_count(), 1);
-        assert_eq!(index, Utf8Index::new(vec![0], vec![0, 1, 2, 3, 4, 5, 9]));
+        assert_eq!(index, Utf8Index::new(vec![0]));
 
         let contents = "x = '🫣'\n";
         let index = index_utf8(contents);
         assert_eq!(index.line_count(), 2);
-        assert_eq!(
-            index,
-            Utf8Index::new(vec![0, 8], vec![0, 1, 2, 3, 4, 5, 9, 10])
-        );
+        assert_eq!(index, Utf8Index::new(vec![0, 11]));
 
         let contents = "x = '🫣'\r\n";
         let index = index_utf8(contents);
         assert_eq!(index.line_count(), 2);
-        assert_eq!(
-            index,
-            Utf8Index::new(vec![0, 8], vec![0, 1, 2, 3, 4, 5, 9, 10])
-        );
+        assert_eq!(index, Utf8Index::new(vec![0, 12]));
 
         let contents = "x = '🫣'\ny = 2\nz = x + y\n";
         let index = index_utf8(contents);
         assert_eq!(index.line_count(), 4);
-        assert_eq!(
-            index,
-            Utf8Index::new(
-                vec![0, 8, 14, 24],
-                vec![
-                    0, 1, 2, 3, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                    24, 25, 26
-                ]
-            )
-        );
+        assert_eq!(index, Utf8Index::new(vec![0, 11, 17, 27]));
 
         let contents = "# 🫣\nclass Foo:\n    \"\"\".\"\"\"";
         let index = index_utf8(contents);
         assert_eq!(index.line_count(), 3);
-        assert_eq!(
-            index,
-            Utf8Index::new(
-                vec![0, 4, 15],
-                vec![
-                    0, 1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
-                    24, 25, 26, 27, 28,
-                ]
-            )
-        );
+        assert_eq!(index, Utf8Index::new(vec![0, 7, 18]));
     }
 
     #[test]
     fn utf8_byte_offset() {
         let contents = "x = '☃'\ny = 2";
         let index = index_utf8(contents);
+        assert_eq!(index, Utf8Index::new(vec![0, 10]));
 
         // First row.
         let loc = index.byte_offset(Location::new(1, 0), contents);
