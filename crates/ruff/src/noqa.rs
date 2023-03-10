@@ -20,7 +20,7 @@ use crate::rule_redirects::get_redirect_target;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)",
+        r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<spaces_after_noqa>\s*)",
     )
     .unwrap()
 });
@@ -72,35 +72,42 @@ pub fn extract_file_exemption(line: &str) -> Exemption {
 #[derive(Debug)]
 pub enum Directive<'a> {
     None,
-    All(usize, usize, usize),
-    Codes(usize, usize, usize, Vec<&'a str>),
+    All(usize, usize, usize, usize),
+    Codes(usize, usize, usize, Vec<&'a str>, usize),
 }
 
 /// Extract the noqa `Directive` from a line of Python source code.
 pub fn extract_noqa_directive(line: &str) -> Directive {
     match NOQA_LINE_REGEX.captures(line) {
         Some(caps) => match caps.name("spaces") {
-            Some(spaces) => match caps.name("noqa") {
-                Some(noqa) => match caps.name("codes") {
-                    Some(codes) => {
-                        let codes: Vec<&str> = SPLIT_COMMA_REGEX
-                            .split(codes.as_str().trim())
-                            .map(str::trim)
-                            .filter(|code| !code.is_empty())
-                            .collect();
-                        if codes.is_empty() {
-                            warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+            Some(spaces) => match caps.name("spaces_after_noqa") {
+                Some(spaces_after_noqa) => match caps.name("noqa") {
+                    Some(noqa) => match caps.name("codes") {
+                        Some(codes) => {
+                            let codes: Vec<&str> = SPLIT_COMMA_REGEX
+                                .split(codes.as_str().trim())
+                                .map(str::trim)
+                                .filter(|code| !code.is_empty())
+                                .collect();
+                            if codes.is_empty() {
+                                warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+                            }
+                            Directive::Codes(
+                                spaces.as_str().chars().count(),
+                                noqa.start(),
+                                noqa.end(),
+                                codes,
+                                spaces_after_noqa.as_str().chars().count(),
+                            )
                         }
-                        Directive::Codes(
+                        None => Directive::All(
                             spaces.as_str().chars().count(),
                             noqa.start(),
                             noqa.end(),
-                            codes,
-                        )
-                    }
-                    None => {
-                        Directive::All(spaces.as_str().chars().count(), noqa.start(), noqa.end())
-                    }
+                            spaces_after_noqa.as_str().chars().count(),
+                        ),
+                    },
+                    None => Directive::None,
                 },
                 None => Directive::None,
             },
@@ -134,7 +141,7 @@ pub fn rule_is_ignored(
     match extract_noqa_directive(line) {
         Directive::None => false,
         Directive::All(..) => true,
-        Directive::Codes(.., codes) => includes(code, &codes),
+        Directive::Codes(.., codes, _) => includes(code, &codes),
     }
 }
 
@@ -215,7 +222,7 @@ fn add_noqa_inner(
                     Directive::All(..) => {
                         continue;
                     }
-                    Directive::Codes(.., codes) => {
+                    Directive::Codes(.., codes, _) => {
                         if includes(diagnostic.kind.rule(), &codes) {
                             continue;
                         }
@@ -235,7 +242,7 @@ fn add_noqa_inner(
                 Directive::All(..) => {
                     continue;
                 }
-                Directive::Codes(.., codes) => {
+                Directive::Codes(.., codes, _) => {
                     if includes(diagnostic.kind.rule(), &codes) {
                         continue;
                     }
@@ -280,7 +287,7 @@ fn add_noqa_inner(
                         output.push_str(line);
                         output.push_str(line_ending);
                     }
-                    Directive::Codes(_, start_byte, _, existing) => {
+                    Directive::Codes(_, start_byte, _, existing, _) => {
                         // Reconstruct the line based on the preserved rule codes.
                         // This enables us to tally the number of edits.
                         let mut formatted = String::with_capacity(line.len());

@@ -97,7 +97,7 @@ pub fn check_noqa(
                         ignored_diagnostics.push(index);
                         continue;
                     }
-                    (Directive::Codes(.., codes), matches) => {
+                    (Directive::Codes(.., codes, _), matches) => {
                         if noqa::includes(diagnostic.kind.rule(), codes) {
                             matches.push(diagnostic.kind.rule().noqa_code());
                             ignored_diagnostics.push(index);
@@ -124,7 +124,7 @@ pub fn check_noqa(
                     ignored_diagnostics.push(index);
                     continue;
                 }
-                (Directive::Codes(.., codes), matches) => {
+                (Directive::Codes(.., codes, _), matches) => {
                     if noqa::includes(diagnostic.kind.rule(), codes) {
                         matches.push(diagnostic.kind.rule().noqa_code());
                         ignored_diagnostics.push(index);
@@ -140,7 +140,7 @@ pub fn check_noqa(
     if enforce_noqa {
         for (row, (directive, matches)) in noqa_directives {
             match directive {
-                Directive::All(spaces, start_byte, end_byte) => {
+                Directive::All(spaces, start_byte, end_byte, spaces_after_noqa) => {
                     if matches.is_empty() {
                         let start = lines[row][..start_byte].chars().count();
                         let end = start + lines[row][start_byte..end_byte].chars().count();
@@ -155,17 +155,22 @@ pub fn check_noqa(
                                     Location::new(row + 1, 0),
                                     Location::new(row + 2, 0),
                                 ));
-                            } else {
+                            } else if end == lines[row].chars().count() {
                                 diagnostic.amend(Fix::deletion(
                                     Location::new(row + 1, start - spaces),
-                                    Location::new(row + 1, end),
+                                    Location::new(row + 1, end + spaces_after_noqa),
+                                ));
+                            } else {
+                                diagnostic.amend(Fix::deletion(
+                                    Location::new(row + 1, start),
+                                    Location::new(row + 1, end + spaces_after_noqa),
                                 ));
                             }
                         }
                         diagnostics.push(diagnostic);
                     }
                 }
-                Directive::Codes(spaces, start_byte, end_byte, codes) => {
+                Directive::Codes(spaces, start_byte, end_byte, codes, spaces_after_noqa) => {
                     let mut disabled_codes = vec![];
                     let mut unknown_codes = vec![];
                     let mut unmatched_codes = vec![];
@@ -230,10 +235,15 @@ pub fn check_noqa(
                                         Location::new(row + 1, 0),
                                         Location::new(row + 2, 0),
                                     ));
-                                } else {
+                                } else if end == lines[row].chars().count() {
                                     diagnostic.amend(Fix::deletion(
                                         Location::new(row + 1, start - spaces),
-                                        Location::new(row + 1, end),
+                                        Location::new(row + 1, end + spaces_after_noqa),
+                                    ));
+                                } else {
+                                    diagnostic.amend(Fix::deletion(
+                                        Location::new(row + 1, start),
+                                        Location::new(row + 1, end + spaces_after_noqa),
                                     ));
                                 }
                             } else {
