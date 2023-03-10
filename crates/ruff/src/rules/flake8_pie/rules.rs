@@ -490,7 +490,7 @@ pub fn single_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 });
 
                 // Generate the combined `BoolOp`.
-                let mut first = true;
+                let mut call = Some(call);
                 let bool_op = create_expr(ExprKind::BoolOp {
                     op: Boolop::Or,
                     values: values
@@ -498,11 +498,7 @@ pub fn single_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                         .enumerate()
                         .filter_map(|(index, elt)| {
                             if indices.contains(&index) {
-                                if std::mem::take(&mut first) {
-                                    Some(call.clone())
-                                } else {
-                                    None
-                                }
+                                std::mem::take(&mut call)
                             } else {
                                 Some(elt.clone())
                             }
