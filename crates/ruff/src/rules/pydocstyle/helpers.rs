@@ -26,6 +26,9 @@ impl<'a> Iterator for LinesWhenConsiderLineContinuation<'a> {
 
         for (line, ends_with_backslash) in lines {
             actual_lines += 1;
+
+            // line.len() is >= (ends_with_backslash as usize)
+            // so no overflow in the subtraction
             ret.push_str(&line[..line.len() - usize::from(ends_with_backslash)]);
 
             if !ends_with_backslash {

@@ -6,6 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::message::Location;
 use crate::registry::AsRule;
+use crate::rules::pydocstyle::helpers::LinesWhenConsiderLineContinuation;
 
 #[violation]
 pub struct BlankLineAfterSummary {
@@ -57,14 +58,14 @@ fn do_raw_string_line_count(content: &str) -> Strategy {
         None => return Strategy::None,
     };
 
-    // If we have follower, we need to insert a new line
+    // If it has follower, we need to insert a new line
     // or add line continuation character to separate it from the one-line summary
     if has_follower {
         return Strategy::InsertNewLineOrLineContinuation(1);
     }
 
-    // We have one line that separates summary and its follower
-    // But we may have redundant blank lines
+    // It has at least one line that separates summary and its follower
+    // May have redundant blank lines in between
     let mut blanks_to_remove = 0_usize;
     for line in lines {
         if !line.trim().is_empty() {
@@ -88,7 +89,7 @@ fn do_raw_string_line_count(content: &str) -> Strategy {
 fn do_normal_string_line_count(content: &str) -> Strategy {
     let mut lines = LinesWhenConsiderLineContinuation::from(content.trim());
 
-    // Considering line continuation means that summary can >= 1
+    // Considering line continuation means that actual lines count for summary can >= 1
     let mut summary_lines_count = 0_usize;
     match lines.next() {
         Some((_, actual_lines)) => {
@@ -99,7 +100,7 @@ fn do_normal_string_line_count(content: &str) -> Strategy {
         }
     };
 
-    // We need to count the actual lines of the follower in order to propose fix
+    // Count the actual lines of the follower in order to propose fix
     let (has_follower, actual_lines_read) = match lines.next() {
         Some((line, actual_lines_read)) => (!line.trim().is_empty(), actual_lines_read),
         None => return Strategy::None,

@@ -5292,6 +5292,8 @@ impl<'a> Checker<'a> {
                 ));
 
                 let body = str::raw_contents(contents);
+
+                // extend the Docstring class
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,
