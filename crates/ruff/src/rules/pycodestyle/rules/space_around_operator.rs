@@ -7,6 +7,25 @@ use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
+/// ## What it does
+/// Checks for extraneous tabs before an operator.
+///
+/// ## Why is this bad?
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
+///
+/// ## Example
+/// ```python
+/// a = 4\t+ 5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 12 + 3
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
 #[violation]
 pub struct TabBeforeOperator;
 
@@ -17,6 +36,25 @@ impl Violation for TabBeforeOperator {
     }
 }
 
+/// ## What it does
+/// Checks for extraneous whitespace before an operator.
+///
+/// ## Why is this bad?
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
+///
+/// ## Example
+/// ```python
+/// a = 4  + 5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 12 + 3
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
 #[violation]
 pub struct MultipleSpacesBeforeOperator;
 
@@ -27,6 +65,25 @@ impl Violation for MultipleSpacesBeforeOperator {
     }
 }
 
+/// ## What it does
+/// Checks for extraneous tabs after an operator.
+///
+/// ## Why is this bad?
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
+///
+/// ## Example
+/// ```python
+/// a = 4 +\t5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 12 + 3
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
 #[violation]
 pub struct TabAfterOperator;
 
@@ -37,6 +94,25 @@ impl Violation for TabAfterOperator {
     }
 }
 
+/// ## What it does
+/// Checks for extraneous whitespace after an operator.
+///
+/// ## Why is this bad?
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
+///
+/// ## Example
+/// ```python
+/// a = 4 +  5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 12 + 3
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
 #[violation]
 pub struct MultipleSpacesAfterOperator;
 

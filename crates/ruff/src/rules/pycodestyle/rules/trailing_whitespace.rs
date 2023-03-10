@@ -7,6 +7,25 @@ use ruff_python_ast::types::Range;
 use crate::registry::Rule;
 use crate::settings::{flags, Settings};
 
+/// ## What it does
+/// Checks for superfluous trailing whitespace.
+///
+/// ## Why is this bad?
+/// Per PEP 8, "avoid trailing whitespace anywhere. Because it’s usually
+/// invisible, it can be confusing"
+///
+/// ## Example
+/// ```python
+/// spam(1) \n#
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(1)\n#
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
 #[violation]
 pub struct TrailingWhitespace;
 
@@ -21,6 +40,26 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
     }
 }
 
+/// ## What it does
+/// Checks for superfluous whitespace in blank lines.
+///
+/// ## Why is this bad?
+/// Per PEP 8, "avoid trailing whitespace anywhere. Because it’s usually
+/// invisible, it can be confusing"
+///
+/// ## Example
+/// ```python
+/// class Foo(object):\n    \n    bang = 12
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class Foo(object):\n\n    bang = 12
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
 #[violation]
 pub struct BlankLineContainsWhitespace;
 

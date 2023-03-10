@@ -9,6 +9,25 @@ use ruff_python_ast::types::Range;
 use crate::registry::Rule;
 use crate::settings::{flags, Settings};
 
+/// ## What it does
+/// Checks for compound statements (multiple statements on the same line).
+///
+/// ## Why is this bad?
+/// Per PEP 8, "compound statements are generally discouraged".
+///
+/// ## Example
+/// ```python
+/// if foo == 'blah': do_blah_thing()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if foo == 'blah':
+///     do_blah_thing()
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
 #[violation]
 pub struct MultipleStatementsOnOneLineColon;
 
@@ -19,6 +38,27 @@ impl Violation for MultipleStatementsOnOneLineColon {
     }
 }
 
+/// ## What it does
+/// Checks for multiline statements on one line.
+///
+/// ## Why is this bad?
+/// Per PEP 8, including multi-clause statements on the same line is
+/// discouraged.
+///
+/// ## Example
+/// ```python
+/// do_one(); do_two(); do_three()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// do_one()
+/// do_two()
+/// do_three()
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
 #[violation]
 pub struct MultipleStatementsOnOneLineSemicolon;
 
@@ -29,6 +69,21 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
     }
 }
 
+/// ## What it does
+/// Checks for statements that end with an unnecessary semicolon.
+///
+/// ## Why is this bad?
+/// A trailing semicolon is unnecessary and should be removed.
+///
+/// ## Example
+/// ```python
+/// do_four();  # useless semicolon
+/// ```
+///
+/// Use instead:
+/// ```python
+/// do_four()
+/// ```
 #[violation]
 pub struct UselessSemicolon;
 
@@ -43,6 +98,7 @@ impl AlwaysAutofixableViolation for UselessSemicolon {
     }
 }
 
+/// E701, E702, E703
 pub fn compound_statements(
     lxr: &[LexResult],
     settings: &Settings,

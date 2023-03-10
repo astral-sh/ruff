@@ -9,6 +9,25 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
+/// ## What it does
+/// Checks if inline comments are separated by at least two spaces.
+///
+/// ## Why is this bad?
+/// An inline comment is a comment on the same line as a statement.
+///
+/// Per PEP8, inline comments should be separated by at least two spaces from
+/// the preceding statement.
+///
+/// ## Example
+/// ```python
+/// x = x + 1 # Increment x
+/// ```
+///
+/// Use instead:
+/// ```python
+/// x = x + 1  # Increment x
+/// x = x + 1    # Increment x
+/// ```
 #[violation]
 pub struct TooFewSpacesBeforeInlineComment;
 
@@ -19,6 +38,29 @@ impl Violation for TooFewSpacesBeforeInlineComment {
     }
 }
 
+/// ## What it does
+/// Checks if one space is used after inline comments.
+///
+/// ## Why is this bad?
+/// An inline comment is a comment on the same line as a statement.
+///
+/// Per PEP8, inline comments should start with a # and a single space.
+///
+/// ## Example
+/// ```python
+/// x = x + 1  #Increment x
+/// x = x + 1  #  Increment x
+/// x = x + 1  # \xa0Increment x
+/// ```
+///
+/// Use instead:
+/// ```python
+/// x = x + 1  # Increment x
+/// x = x + 1    # Increment x
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
 #[violation]
 pub struct NoSpaceAfterInlineComment;
 
@@ -29,6 +71,29 @@ impl Violation for NoSpaceAfterInlineComment {
     }
 }
 
+/// ## What it does
+/// Checks if one space is used after block comments.
+///
+/// ## Why is this bad?
+/// Per PEP8, "Block comments generally consist of one or more paragraphs built
+/// out of complete sentences, with each sentence ending in a period."
+///
+/// Block comments should start with a # and a single space.
+///
+/// ## Example
+/// ```python
+/// #Block comment
+/// ```
+///
+/// Use instead:
+/// ```python
+/// # Block comments:
+/// #  - Block comment list
+/// # \xa0- Block comment list
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
 #[violation]
 pub struct NoSpaceAfterBlockComment;
 
@@ -39,6 +104,30 @@ impl Violation for NoSpaceAfterBlockComment {
     }
 }
 
+/// ## What it does
+/// Checks if block comments start with a single "#".
+///
+/// ## Why is this bad?
+/// Per PEP8, "Block comments generally consist of one or more paragraphs built
+/// out of complete sentences, with each sentence ending in a period."
+///
+/// Each line of a block comment should start with a # and a single space.
+///
+/// ## Example
+/// ```python
+/// ### Block comment
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// # Block comments:
+/// #  - Block comment list
+/// # \xa0- Block comment list
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#comments)
 #[violation]
 pub struct MultipleLeadingHashesForBlockComment;
 
