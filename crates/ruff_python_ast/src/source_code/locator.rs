@@ -10,94 +10,6 @@ pub struct Locator<'a> {
     index: OnceCell<Index>,
 }
 
-pub enum Index {
-    Ascii(Vec<usize>),
-    Utf8(Vec<Vec<usize>>),
-}
-
-/// Compute the starting byte index of each line in ASCII source code.
-fn index_ascii(contents: &str) -> Vec<usize> {
-    let mut index = Vec::with_capacity(48);
-    index.push(0);
-    let bytes = contents.as_bytes();
-    for (i, byte) in bytes.iter().enumerate() {
-        if *byte == b'\n' {
-            index.push(i + 1);
-        }
-    }
-    index
-}
-
-/// Compute the starting byte index of each character in UTF-8 source code.
-fn index_utf8(contents: &str) -> Vec<Vec<usize>> {
-    let mut index = Vec::with_capacity(48);
-    let mut current_row = Vec::with_capacity(48);
-    let mut current_byte_offset = 0;
-    let mut previous_char = '\0';
-    for char in contents.chars() {
-        // Skip BOM.
-        if previous_char == '\0' && char == '\u{feff}' {
-            current_byte_offset += char.len_utf8();
-            continue;
-        }
-
-        current_row.push(current_byte_offset);
-        if char == '\n' {
-            if previous_char == '\r' {
-                current_row.pop();
-            }
-            index.push(current_row);
-            current_row = Vec::with_capacity(48);
-        }
-        current_byte_offset += char.len_utf8();
-        previous_char = char;
-    }
-    index.push(current_row);
-    index
-}
-
-/// Compute the starting byte index of each line in source code.
-pub fn index(contents: &str) -> Index {
-    if contents.is_ascii() {
-        Index::Ascii(index_ascii(contents))
-    } else {
-        Index::Utf8(index_utf8(contents))
-    }
-}
-
-/// Truncate a [`Location`] to a byte offset in ASCII source code.
-fn truncate_ascii(location: Location, index: &[usize], contents: &str) -> usize {
-    if location.row() - 1 == index.len() && location.column() == 0
-        || (!index.is_empty()
-            && location.row() - 1 == index.len() - 1
-            && index[location.row() - 1] + location.column() >= contents.len())
-    {
-        contents.len()
-    } else {
-        index[location.row() - 1] + location.column()
-    }
-}
-
-/// Truncate a [`Location`] to a byte offset in UTF-8 source code.
-fn truncate_utf8(location: Location, index: &[Vec<usize>], contents: &str) -> usize {
-    if (location.row() - 1 == index.len() && location.column() == 0)
-        || (location.row() - 1 == index.len() - 1
-            && location.column() == index[location.row() - 1].len())
-    {
-        contents.len()
-    } else {
-        index[location.row() - 1][location.column()]
-    }
-}
-
-/// Truncate a [`Location`] to a byte offset in source code.
-fn truncate(location: Location, index: &Index, contents: &str) -> usize {
-    match index {
-        Index::Ascii(index) => truncate_ascii(location, index, contents),
-        Index::Utf8(index) => truncate_utf8(location, index, contents),
-    }
-}
-
 impl<'a> Locator<'a> {
     pub const fn new(contents: &'a str) -> Self {
         Self {
@@ -107,20 +19,20 @@ impl<'a> Locator<'a> {
     }
 
     fn get_or_init_index(&self) -> &Index {
-        self.index.get_or_init(|| index(self.contents))
+        self.index.get_or_init(|| Index::from_str(self.contents))
     }
 
     /// Take the source code up to the given [`Location`].
     pub fn take(&self, location: Location) -> &'a str {
         let index = self.get_or_init_index();
-        let offset = truncate(location, index, self.contents);
+        let offset = index.byte_offset(location, self.contents);
         &self.contents[..offset]
     }
 
     /// Take the source code after the given [`Location`].
     pub fn skip(&self, location: Location) -> &'a str {
         let index = self.get_or_init_index();
-        let offset = truncate(location, index, self.contents);
+        let offset = index.byte_offset(location, self.contents);
         &self.contents[offset..]
     }
 
@@ -128,15 +40,15 @@ impl<'a> Locator<'a> {
     pub fn slice<R: Into<Range>>(&self, range: R) -> &'a str {
         let index = self.get_or_init_index();
         let range = range.into();
-        let start = truncate(range.location, index, self.contents);
-        let end = truncate(range.end_location, index, self.contents);
+        let start = index.byte_offset(range.location, self.contents);
+        let end = index.byte_offset(range.end_location, self.contents);
         &self.contents[start..end]
     }
 
     /// Return the byte offset of the given [`Location`].
     pub fn offset(&self, location: Location) -> usize {
         let index = self.get_or_init_index();
-        truncate(location, index, self.contents)
+        index.byte_offset(location, self.contents)
     }
 
     /// Return the underlying source code.
@@ -153,33 +65,186 @@ impl<'a> Locator<'a> {
     }
 }
 
+#[derive(Debug, Clone)]
+enum Index {
+    Ascii(AsciiIndex),
+    Utf8(Utf8Index),
+}
+
+impl Index {
+    /// Truncate a [`Location`] to a byte offset in source code.
+    fn byte_offset(&self, location: Location, contents: &str) -> usize {
+        match self {
+            Index::Ascii(ascii) => ascii.byte_offset(location, contents),
+            Index::Utf8(utf8) => utf8.byte_offset(location, contents),
+        }
+    }
+
+    fn from_str(content: &str) -> Self {
+        let mut line_start_offsets: Vec<u32> = Vec::with_capacity(48);
+        line_start_offsets.push(0);
+
+        for (i, byte) in content.bytes().enumerate() {
+            if !byte.is_ascii() {
+                return Index::Utf8(continue_non_ascii_content(
+                    &content[i..],
+                    i as u32,
+                    line_start_offsets,
+                ));
+            }
+            if byte == b'\n' {
+                line_start_offsets.push((i + 1) as u32);
+            }
+
+            continue;
+        }
+
+        Self::Ascii(AsciiIndex::new(line_start_offsets))
+    }
+}
+
+impl From<&str> for Index {
+    fn from(value: &str) -> Self {
+        Self::from_str(value)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+struct AsciiIndex {
+    line_start_byte_offsets: Vec<u32>,
+}
+
+impl AsciiIndex {
+    fn new(line_start_positions: Vec<u32>) -> Self {
+        Self {
+            line_start_byte_offsets: line_start_positions,
+        }
+    }
+
+    /// Truncate a [`Location`] to a byte offset in ASCII source code.
+    fn byte_offset(&self, location: Location, contents: &str) -> usize {
+        let index = &self.line_start_byte_offsets;
+
+        // If start-of-line position after last line
+        if location.row() - 1 == index.len() && location.column() == 0 {
+            contents.len()
+        } else {
+            let byte_offset = index[location.row() - 1] as usize + location.column();
+            byte_offset.min(contents.len())
+        }
+    }
+}
+
+fn continue_non_ascii_content(non_ascii: &str, mut offset: u32, mut lines: Vec<u32>) -> Utf8Index {
+    // Chars up to this point map 1:1 to byte offsets.
+    let mut chars_to_byte_offsets = Vec::new();
+    chars_to_byte_offsets.extend((0..offset).map(|i| i as u32));
+    let mut char_index = offset;
+
+    // SKIP BOM
+    let contents = if offset == 0 && non_ascii.starts_with('\u{feff}') {
+        offset += '\u{feff}'.len_utf8() as u32;
+        &non_ascii[offset as usize..]
+    } else {
+        non_ascii
+    };
+
+    let mut after_carriage_return = false;
+
+    for char in contents.chars() {
+        match char {
+            // Normalize `\r\n` to `\n`
+            '\n' if after_carriage_return => continue,
+            '\r' | '\n' => {
+                lines.push(char_index as u32 + 1);
+            }
+            _ => {}
+        }
+
+        chars_to_byte_offsets.push(offset);
+        after_carriage_return = char == '\r';
+        offset += char.len_utf8() as u32;
+        char_index += 1;
+    }
+
+    Utf8Index::new(lines, chars_to_byte_offsets)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct Utf8Index {
+    /// The index is the line number in the document. The value the character at which the the line starts
+    lines_to_characters: Vec<u32>,
+
+    /// The index is the nth character in the document, the value the absolute byte offset.
+    character_to_byte_offsets: Vec<u32>,
+}
+
+impl Utf8Index {
+    fn new(lines: Vec<u32>, characters: Vec<u32>) -> Self {
+        Self {
+            lines_to_characters: lines,
+            character_to_byte_offsets: characters,
+        }
+    }
+
+    /// Truncate a [`Location`] to a byte offset in UTF-8 source code.
+    fn byte_offset(&self, location: Location, contents: &str) -> usize {
+        if location.row() - 1 == self.lines_to_characters.len() && location.column() == 0 {
+            contents.len()
+        } else {
+            let line_start = self.lines_to_characters[location.row() - 1];
+
+            match self
+                .character_to_byte_offsets
+                .get(line_start as usize + location.column())
+            {
+                Some(offset) => *offset as usize,
+                None => contents.len(),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use crate::source_code::locator::{AsciiIndex, Index, Utf8Index};
     use rustpython_parser::ast::Location;
 
-    use super::{index_ascii, index_utf8, truncate_ascii, truncate_utf8};
+    fn index_ascii(content: &str) -> AsciiIndex {
+        match Index::from_str(content) {
+            Index::Ascii(ascii) => ascii,
+            Index::Utf8(_) => panic!("Expected ASCII index"),
+        }
+    }
+
+    fn index_utf8(content: &str) -> Utf8Index {
+        match Index::from_str(content) {
+            Index::Utf8(utf8) => utf8,
+            Index::Ascii(_) => panic!("Expected UTF8 Index"),
+        }
+    }
 
     #[test]
     fn ascii_index() {
         let contents = "";
         let index = index_ascii(contents);
-        assert_eq!(index, [0]);
+        assert_eq!(index, AsciiIndex::new(vec![0]));
 
         let contents = "x = 1";
         let index = index_ascii(contents);
-        assert_eq!(index, [0]);
+        assert_eq!(index, AsciiIndex::new(vec![0]));
 
         let contents = "x = 1\n";
         let index = index_ascii(contents);
-        assert_eq!(index, [0, 6]);
+        assert_eq!(index, AsciiIndex::new(vec![0, 6]));
 
         let contents = "x = 1\r\n";
         let index = index_ascii(contents);
-        assert_eq!(index, [0, 7]);
+        assert_eq!(index, AsciiIndex::new(vec![0, 7]));
 
         let contents = "x = 1\ny = 2\nz = x + y\n";
         let index = index_ascii(contents);
-        assert_eq!(index, [0, 6, 12, 22]);
+        assert_eq!(index, AsciiIndex::new(vec![0, 6, 12, 22]));
     }
 
     #[test]
@@ -188,81 +253,99 @@ mod tests {
         let index = index_ascii(contents);
 
         // First row.
-        let loc = truncate_ascii(Location::new(1, 0), &index, contents);
+        let loc = index.byte_offset(Location::new(1, 0), contents);
         assert_eq!(loc, 0);
 
         // Second row.
-        let loc = truncate_ascii(Location::new(2, 0), &index, contents);
+        let loc = index.byte_offset(Location::new(2, 0), contents);
         assert_eq!(loc, 6);
 
         // One-past-the-end.
-        let loc = truncate_ascii(Location::new(3, 0), &index, contents);
+        let loc = index.byte_offset(Location::new(3, 0), contents);
         assert_eq!(loc, 11);
+    }
+
+    impl Utf8Index {
+        fn line_count(&self) -> usize {
+            self.lines_to_characters.len()
+        }
     }
 
     #[test]
     fn utf8_index() {
-        let contents = "";
+        let contents = "x = '🫣'";
         let index = index_utf8(contents);
-        assert_eq!(index.len(), 1);
-        assert_eq!(index[0], Vec::<usize>::new());
+        assert_eq!(index.line_count(), 1);
+        assert_eq!(index, Utf8Index::new(vec![0], vec![0, 1, 2, 3, 4, 5, 9]));
 
-        let contents = "x = 1";
+        let contents = "x = '🫣'\n";
         let index = index_utf8(contents);
-        assert_eq!(index.len(), 1);
-        assert_eq!(index[0], [0, 1, 2, 3, 4]);
+        assert_eq!(index.line_count(), 2);
+        assert_eq!(
+            index,
+            Utf8Index::new(vec![0, 8], vec![0, 1, 2, 3, 4, 5, 9, 10])
+        );
 
-        let contents = "x = 1\n";
+        let contents = "x = '🫣'\r\n";
         let index = index_utf8(contents);
-        assert_eq!(index.len(), 2);
-        assert_eq!(index[0], [0, 1, 2, 3, 4, 5]);
-        assert_eq!(index[1], Vec::<usize>::new());
+        assert_eq!(index.line_count(), 2);
+        assert_eq!(
+            index,
+            Utf8Index::new(vec![0, 8], vec![0, 1, 2, 3, 4, 5, 9, 10])
+        );
 
-        let contents = "x = 1\r\n";
+        let contents = "x = '🫣'\ny = 2\nz = x + y\n";
         let index = index_utf8(contents);
-        assert_eq!(index.len(), 2);
-        assert_eq!(index[0], [0, 1, 2, 3, 4, 5]);
-        assert_eq!(index[1], Vec::<usize>::new());
+        assert_eq!(index.line_count(), 4);
+        assert_eq!(
+            index,
+            Utf8Index::new(
+                vec![0, 8, 14, 24],
+                vec![
+                    0, 1, 2, 3, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+                    24, 25, 26
+                ]
+            )
+        );
 
-        let contents = "x = 1\ny = 2\nz = x + y\n";
+        let contents = "# 🫣\nclass Foo:\n    \"\"\".\"\"\"";
         let index = index_utf8(contents);
-        assert_eq!(index.len(), 4);
-        assert_eq!(index[0], [0, 1, 2, 3, 4, 5]);
-        assert_eq!(index[1], [6, 7, 8, 9, 10, 11]);
-        assert_eq!(index[2], [12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
-        assert_eq!(index[3], Vec::<usize>::new());
-
-        let contents = "# \u{4e9c}\nclass Foo:\n    \"\"\".\"\"\"";
-        let index = index_utf8(contents);
-        assert_eq!(index.len(), 3);
-        assert_eq!(index[0], [0, 1, 2, 5]);
-        assert_eq!(index[1], [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
-        assert_eq!(index[2], [17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
+        assert_eq!(index.line_count(), 3);
+        assert_eq!(
+            index,
+            Utf8Index::new(
+                vec![0, 4, 15],
+                vec![
+                    0, 1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+                    24, 25, 26, 27, 28,
+                ]
+            )
+        );
     }
 
     #[test]
-    fn utf8_truncate() {
+    fn utf8_byte_offset() {
         let contents = "x = '☃'\ny = 2";
         let index = index_utf8(contents);
 
         // First row.
-        let loc = truncate_utf8(Location::new(1, 0), &index, contents);
+        let loc = index.byte_offset(Location::new(1, 0), contents);
         assert_eq!(loc, 0);
 
-        let loc = truncate_utf8(Location::new(1, 5), &index, contents);
+        let loc = index.byte_offset(Location::new(1, 5), contents);
         assert_eq!(loc, 5);
         assert_eq!(&contents[loc..], "☃'\ny = 2");
 
-        let loc = truncate_utf8(Location::new(1, 6), &index, contents);
+        let loc = index.byte_offset(Location::new(1, 6), contents);
         assert_eq!(loc, 8);
         assert_eq!(&contents[loc..], "'\ny = 2");
 
         // Second row.
-        let loc = truncate_utf8(Location::new(2, 0), &index, contents);
+        let loc = index.byte_offset(Location::new(2, 0), contents);
         assert_eq!(loc, 10);
 
         // One-past-the-end.
-        let loc = truncate_utf8(Location::new(3, 0), &index, contents);
+        let loc = index.byte_offset(Location::new(3, 0), contents);
         assert_eq!(loc, 15);
     }
 }
