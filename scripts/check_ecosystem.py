@@ -59,7 +59,7 @@ REPOSITORIES = {
     "bokeh": Repository("bokeh", "bokeh", "branch-3.2"),
 }
 
-SUMMARY_LINE_RE = re.compile(r"^Found \d+ error.*$")
+SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.*potentially fixable with.*)$")
 
 
 class RuffError(Exception):
