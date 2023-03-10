@@ -21,7 +21,7 @@ use crate::rule_redirects::get_redirect_target;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<spaces_after_noqa>\s*)",
+        r"(?P<leading_spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)",
     )
     .unwrap()
 });
@@ -80,9 +80,9 @@ pub enum Directive<'a> {
 /// Extract the noqa `Directive` from a line of Python source code.
 pub fn extract_noqa_directive(line: &str) -> Directive {
     match NOQA_LINE_REGEX.captures(line) {
-        Some(caps) => match caps.name("spaces") {
-            Some(spaces) => match caps.name("spaces_after_noqa") {
-                Some(spaces_after_noqa) => match caps.name("noqa") {
+        Some(caps) => match caps.name("leading_spaces") {
+            Some(leading_spaces) => match caps.name("trailing_spaces") {
+                Some(trailing_spaces) => match caps.name("noqa") {
                     Some(noqa) => match caps.name("codes") {
                         Some(codes) => {
                             let codes: Vec<&str> = SPLIT_COMMA_REGEX
@@ -94,18 +94,18 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
                                 warn!("Expected rule codes on `noqa` directive: \"{line}\"");
                             }
                             Directive::Codes(
-                                spaces.as_str().chars().count(),
+                                leading_spaces.as_str().chars().count(),
                                 noqa.start(),
                                 noqa.end(),
                                 codes,
-                                spaces_after_noqa.as_str().chars().count(),
+                                trailing_spaces.as_str().chars().count(),
                             )
                         }
                         None => Directive::All(
-                            spaces.as_str().chars().count(),
+                            leading_spaces.as_str().chars().count(),
                             noqa.start(),
                             noqa.end(),
-                            spaces_after_noqa.as_str().chars().count(),
+                            trailing_spaces.as_str().chars().count(),
                         ),
                     },
                     None => Directive::None,
