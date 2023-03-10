@@ -65,9 +65,12 @@ impl<'a> Locator<'a> {
     }
 }
 
+/// Index for fast [Location] to byte offset conversions.
 #[derive(Debug, Clone)]
 enum Index {
+    /// Optimized index for an ASCII only document
     Ascii(AsciiIndex),
+    /// Index for UTF8 documents
     Utf8(Utf8Index),
 }
 
@@ -80,7 +83,12 @@ impl Index {
         }
     }
 
+    /// Builds the index for `content`
+    // Not an issue because of manual string length check
+    #[allow(clippy::cast_possible_truncation)]
     fn from_str(content: &str) -> Self {
+        assert!(u32::try_from(content.len()).is_ok());
+
         let mut line_start_offsets: Vec<u32> = Vec::with_capacity(48);
         line_start_offsets.push(0);
 
@@ -109,6 +117,10 @@ impl From<&str> for Index {
     }
 }
 
+/// Index for fast [Location] to byte offset conversions for ASCII documents.
+///
+/// The index stores the byte offsets for every line. It computes the byte offset for a [Location]
+/// by retrieving the line offset from its index and adding the column.
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct AsciiIndex {
     line_start_byte_offsets: Vec<u32>,
@@ -135,10 +147,12 @@ impl AsciiIndex {
     }
 }
 
+// Not an issue because of manual string length check in `Index::from_str`
+#[allow(clippy::cast_possible_truncation)]
 fn continue_non_ascii_content(non_ascii: &str, mut offset: u32, mut lines: Vec<u32>) -> Utf8Index {
     // Chars up to this point map 1:1 to byte offsets.
     let mut chars_to_byte_offsets = Vec::new();
-    chars_to_byte_offsets.extend((0..offset).map(|i| i as u32));
+    chars_to_byte_offsets.extend(0..offset);
     let mut char_index = offset;
 
     // SKIP BOM
@@ -156,7 +170,7 @@ fn continue_non_ascii_content(non_ascii: &str, mut offset: u32, mut lines: Vec<u
             // Normalize `\r\n` to `\n`
             '\n' if after_carriage_return => continue,
             '\r' | '\n' => {
-                lines.push(char_index as u32 + 1);
+                lines.push(char_index + 1);
             }
             _ => {}
         }
@@ -170,12 +184,25 @@ fn continue_non_ascii_content(non_ascii: &str, mut offset: u32, mut lines: Vec<u
     Utf8Index::new(lines, chars_to_byte_offsets)
 }
 
+/// Index for fast [Location] to byte offset conversions for UTF8 documents.
+///
+/// The index stores two lookup tables:
+/// * the character offsets for each line
+/// * the byte offset for each character
+///
+/// The byte offset of a [Location] can then be computed using
+///
+/// ```ignore
+/// // retrieving the start character on that line and add the column (character offset)
+/// let char_offset = lines[location.row() - 1] + location.column();
+/// let byte_offset = char_to_byte_offsets[char_offset]
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 struct Utf8Index {
     /// The index is the line number in the document. The value the character at which the the line starts
     lines_to_characters: Vec<u32>,
 
-    /// The index is the nth character in the document, the value the absolute byte offset.
+    /// The index is the nth character in the document, the value the byte offset from the begining of the document.
     character_to_byte_offsets: Vec<u32>,
 }
 
