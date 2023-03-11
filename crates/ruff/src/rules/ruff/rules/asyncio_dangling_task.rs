@@ -1,7 +1,6 @@
 use std::fmt;
 
 use rustpython_parser::ast::{Expr, ExprKind};
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -63,7 +62,7 @@ impl Violation for AsyncioDanglingTask {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Method {
     CreateTask,
     EnsureFuture,

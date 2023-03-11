@@ -1,7 +1,6 @@
 use itertools::izip;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -12,7 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::helpers::compare;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum EqCmpop {
     Eq,
     NotEq,
