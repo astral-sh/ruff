@@ -2,7 +2,6 @@ use std::fmt;
 
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -31,7 +30,7 @@ impl Violation for BadStrStripCall {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum StripKind {
     Strip,
     LStrip,
@@ -60,7 +59,7 @@ impl fmt::Display for StripKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RemovalKind {
     RemovePrefix,
     RemoveSuffix,

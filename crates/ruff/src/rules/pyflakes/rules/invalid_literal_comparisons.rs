@@ -2,7 +2,6 @@ use itertools::izip;
 use log::error;
 use once_cell::unsync::Lazy;
 use rustpython_parser::ast::{Cmpop, Expr};
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -13,7 +12,7 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum IsCmpop {
     Is,
     IsNot,

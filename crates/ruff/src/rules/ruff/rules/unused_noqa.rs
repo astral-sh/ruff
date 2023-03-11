@@ -1,10 +1,9 @@
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_macros::{derive_message_formats, violation};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct UnusedCodes {
     pub unknown: Vec<String>,
     pub disabled: Vec<String>,

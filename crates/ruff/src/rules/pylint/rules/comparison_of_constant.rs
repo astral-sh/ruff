@@ -2,7 +2,6 @@ use std::fmt;
 
 use itertools::Itertools;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Located};
-use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -11,7 +10,7 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ViolationsCmpop {
     Eq,
     NotEq,

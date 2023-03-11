@@ -1,8 +1,6 @@
 use std::fmt;
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Branch {
     Elif,
     Else,
