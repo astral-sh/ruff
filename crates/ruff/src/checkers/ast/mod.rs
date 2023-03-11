@@ -2866,6 +2866,9 @@ where
                 if self.settings.rules.enabled(&Rule::BadStrStripCall) {
                     pylint::rules::bad_str_strip_call(self, func, args);
                 }
+                if self.settings.rules.enabled(&Rule::InvalidEnvvarDefault) {
+                    pylint::rules::invalid_envvar_default(self, func, args, keywords);
+                }
 
                 // flake8-pytest-style
                 if self.settings.rules.enabled(&Rule::PatchWithLambda) {
