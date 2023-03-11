@@ -65,7 +65,7 @@ impl<'a> Locator<'a> {
     }
 }
 
-/// Index for fast [Location] to byte offset conversions.
+/// Index for fast [`Location`] to byte offset conversions.
 #[derive(Debug, Clone)]
 enum Index {
     /// Optimized index for an ASCII only document
@@ -96,13 +96,17 @@ impl From<&str> for Index {
         #[allow(clippy::cast_possible_truncation)]
         for (i, byte) in contents.bytes().enumerate() {
             if !byte.is_ascii() {
-                return Index::Utf8(continue_utf8_index(&contents[i..], i, line_start_offsets));
-            }
-            if byte == b'\n' {
-                line_start_offsets.push((i + 1) as u32);
+                return Self::Utf8(continue_utf8_index(&contents[i..], i, line_start_offsets));
             }
 
-            continue;
+            match byte {
+                // Only track one line break for `\r\n`.
+                b'\r' if contents.as_bytes().get(i + 1) == Some(&b'\n') => continue,
+                b'\n' | b'\r' => {
+                    line_start_offsets.push((i + 1) as u32);
+                }
+                _ => {}
+            }
         }
 
         Self::Ascii(AsciiIndex::new(line_start_offsets))
@@ -117,11 +121,11 @@ fn continue_utf8_index(
     line_start_offsets: Vec<u32>,
 ) -> Utf8Index {
     let mut lines = line_start_offsets;
-    let mut chars = non_ascii_part.char_indices().peekable();
 
-    while let Some((position, char)) = chars.next() {
+    for (position, char) in non_ascii_part.char_indices() {
         match char {
-            '\r' if matches!(chars.peek(), Some((_, '\n'))) => continue,
+            // Only track `\n` for `\r\n`
+            '\r' if non_ascii_part.as_bytes().get(position + 1) == Some(&b'\n') => continue,
             '\r' | '\n' => {
                 let absolute_offset = offset + position + 1;
                 lines.push(absolute_offset as u32);
@@ -133,9 +137,9 @@ fn continue_utf8_index(
     Utf8Index::new(lines)
 }
 
-/// Index for fast [Location] to byte offset conversions for ASCII documents.
+/// Index for fast [`Location`] to byte offset conversions for ASCII documents.
 ///
-/// The index stores the byte offsets for every line. It computes the byte offset for a [Location]
+/// The index stores the byte offsets for every line. It computes the byte offset for a [`Location`]
 /// by retrieving the line offset from its index and adding the column.
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct AsciiIndex {
@@ -163,7 +167,7 @@ impl AsciiIndex {
     }
 }
 
-/// Index for fast [Location] to byte offset conversions for UTF8 documents.
+/// Index for fast [`Location`] to byte offset conversions for UTF8 documents.
 ///
 /// The index stores the byte offset of every line. The column offset is lazily computed by
 /// adding the line start offset and then iterating to the `nth` character.
@@ -271,6 +275,17 @@ mod tests {
         assert_eq!(loc, 11);
     }
 
+    #[test]
+    fn ascii_carriage_return() {
+        let contents = "x = 4\ry = 3";
+        let index = index_ascii(contents);
+        assert_eq!(index, AsciiIndex::new(vec![0, 6]));
+
+        assert_eq!(index.byte_offset(Location::new(1, 4), contents), 4);
+        assert_eq!(index.byte_offset(Location::new(2, 0), contents), 6);
+        assert_eq!(index.byte_offset(Location::new(2, 1), contents), 7);
+    }
+
     impl Utf8Index {
         fn line_count(&self) -> usize {
             self.line_start_byte_offsets.len()
@@ -303,6 +318,19 @@ mod tests {
         let index = index_utf8(contents);
         assert_eq!(index.line_count(), 3);
         assert_eq!(index, Utf8Index::new(vec![0, 7, 18]));
+    }
+
+    #[test]
+    fn utf8_carriage_return() {
+        let contents = "x = '🫣'\ry = 3";
+        let index = index_utf8(contents);
+        assert_eq!(index.line_count(), 2);
+        assert_eq!(index, Utf8Index::new(vec![0, 11]));
+
+        // Second '
+        assert_eq!(index.byte_offset(Location::new(1, 6), contents), 9);
+        assert_eq!(index.byte_offset(Location::new(2, 0), contents), 11);
+        assert_eq!(index.byte_offset(Location::new(2, 1), contents), 12);
     }
 
     #[test]
