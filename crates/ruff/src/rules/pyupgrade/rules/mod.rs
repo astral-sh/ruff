@@ -16,7 +16,9 @@ pub(crate) use lru_cache_without_parameters::{
 };
 pub(crate) use native_literals::{native_literals, NativeLiterals};
 pub(crate) use open_alias::{open_alias, OpenAlias};
-pub(crate) use os_error_alias::{os_error_alias, OSErrorAlias};
+pub(crate) use os_error_alias::{
+    os_error_alias_call, os_error_alias_handlers, os_error_alias_raise, OSErrorAlias,
+};
 pub(crate) use outdated_version_block::{outdated_version_block, OutdatedVersionBlock};
 pub(crate) use printf_string_formatting::{printf_string_formatting, PrintfStringFormatting};
 pub(crate) use quoted_annotation::{quoted_annotation, QuotedAnnotation};

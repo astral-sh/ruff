@@ -45,6 +45,7 @@ mod tests {
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_1.py"); "UP024_1")]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_2.py"); "UP024_2")]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_3.py"); "UP024_3")]
+    #[test_case(Rule::OSErrorAlias, Path::new("UP024_4.py"); "UP024_4")]
     #[test_case(Rule::RewriteUnicodeLiteral, Path::new("UP025.py"); "UP025")]
     #[test_case(Rule::RewriteMockImport, Path::new("UP026.py"); "UP026")]
     #[test_case(Rule::RewriteListComprehension, Path::new("UP027.py"); "UP027")]
