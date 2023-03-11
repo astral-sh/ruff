@@ -170,6 +170,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "E0118") => Rule::UsedPriorGlobalDeclaration,
         (Pylint, "E0604") => Rule::InvalidAllObject,
         (Pylint, "E0605") => Rule::InvalidAllFormat,
+        (Pylint, "W1508") => Rule::InvalidEnvvarDefault,
         (Pylint, "E1142") => Rule::AwaitOutsideAsync,
         (Pylint, "E1205") => Rule::LoggingTooManyArgs,
         (Pylint, "E1206") => Rule::LoggingTooFewArgs,

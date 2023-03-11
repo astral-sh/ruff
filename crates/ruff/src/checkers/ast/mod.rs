@@ -2358,6 +2358,9 @@ where
                 if self.settings.rules.enabled(&Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);
                 }
+                if self.settings.rules.enabled(&Rule::InvalidEnvvarDefault) {
+                    pylint::rules::invalid_envvar_default(self, expr);
+                }
                 pandas_vet::rules::check_attr(self, attr, value, expr);
             }
             ExprKind::Call {
