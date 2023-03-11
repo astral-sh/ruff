@@ -75,7 +75,6 @@ async def check(*, ruff: Path, path: Path) -> "Sequence[str]":
         "check",
         "--no-cache",
         "--exit-zero",
-        "--isolated",
         "--select",
         "ALL",
         ".",
