@@ -248,10 +248,6 @@ mod tests {
         let index = index_ascii(contents);
         assert_eq!(index, AsciiIndex::new(vec![0, 6]));
 
-        let contents = "x = 1\r\n";
-        let index = index_ascii(contents);
-        assert_eq!(index, AsciiIndex::new(vec![0, 7]));
-
         let contents = "x = 1\ny = 2\nz = x + y\n";
         let index = index_ascii(contents);
         assert_eq!(index, AsciiIndex::new(vec![0, 6, 12, 22]));
@@ -286,6 +282,17 @@ mod tests {
         assert_eq!(index.byte_offset(Location::new(2, 1), contents), 7);
     }
 
+    #[test]
+    fn ascii_carriage_return_newline() {
+        let contents = "x = 4\r\ny = 3";
+        let index = index_ascii(contents);
+        assert_eq!(index, AsciiIndex::new(vec![0, 7]));
+
+        assert_eq!(index.byte_offset(Location::new(1, 4), contents), 4);
+        assert_eq!(index.byte_offset(Location::new(2, 0), contents), 7);
+        assert_eq!(index.byte_offset(Location::new(2, 1), contents), 8);
+    }
+
     impl Utf8Index {
         fn line_count(&self) -> usize {
             self.line_start_byte_offsets.len()
@@ -303,11 +310,6 @@ mod tests {
         let index = index_utf8(contents);
         assert_eq!(index.line_count(), 2);
         assert_eq!(index, Utf8Index::new(vec![0, 11]));
-
-        let contents = "x = '🫣'\r\n";
-        let index = index_utf8(contents);
-        assert_eq!(index.line_count(), 2);
-        assert_eq!(index, Utf8Index::new(vec![0, 12]));
 
         let contents = "x = '🫣'\ny = 2\nz = x + y\n";
         let index = index_utf8(contents);
@@ -331,6 +333,19 @@ mod tests {
         assert_eq!(index.byte_offset(Location::new(1, 6), contents), 9);
         assert_eq!(index.byte_offset(Location::new(2, 0), contents), 11);
         assert_eq!(index.byte_offset(Location::new(2, 1), contents), 12);
+    }
+
+    #[test]
+    fn utf8_carriage_return_newline() {
+        let contents = "x = '🫣'\r\ny = 3";
+        let index = index_utf8(contents);
+        assert_eq!(index.line_count(), 2);
+        assert_eq!(index, Utf8Index::new(vec![0, 12]));
+
+        // Second '
+        assert_eq!(index.byte_offset(Location::new(1, 6), contents), 9);
+        assert_eq!(index.byte_offset(Location::new(2, 0), contents), 12);
+        assert_eq!(index.byte_offset(Location::new(2, 1), contents), 13);
     }
 
     #[test]
