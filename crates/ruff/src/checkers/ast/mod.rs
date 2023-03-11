@@ -2358,9 +2358,6 @@ where
                 if self.settings.rules.enabled(&Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::InvalidEnvvarDefault) {
-                    pylint::rules::invalid_envvar_default(self, expr);
-                }
                 pandas_vet::rules::check_attr(self, attr, value, expr);
             }
             ExprKind::Call {
@@ -2868,6 +2865,9 @@ where
                 }
                 if self.settings.rules.enabled(&Rule::BadStrStripCall) {
                     pylint::rules::bad_str_strip_call(self, func, args);
+                }
+                if self.settings.rules.enabled(&Rule::InvalidEnvvarDefault) {
+                    pylint::rules::invalid_envvar_default(self, func, args, keywords);
                 }
 
                 // flake8-pytest-style

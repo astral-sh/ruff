@@ -4,41 +4,41 @@ expression: diagnostics
 ---
 - kind:
     name: InvalidEnvvarDefault
-    body: "Invalid type for environment variable default, must be `str` or `none`"
+    body: "Invalid type for environment variable default; expected `str` or `None`"
     suggestion: ~
     fixable: false
   location:
     row: 3
-    column: 10
+    column: 28
   end_location:
     row: 3
-    column: 19
+    column: 30
   fix: ~
   parent: ~
 - kind:
     name: InvalidEnvvarDefault
-    body: "Invalid type for environment variable default, must be `str` or `none`"
+    body: "Invalid type for environment variable default; expected `str` or `None`"
     suggestion: ~
     fixable: false
   location:
     row: 5
-    column: 13
+    column: 30
   end_location:
     row: 5
-    column: 22
+    column: 38
   fix: ~
   parent: ~
 - kind:
     name: InvalidEnvvarDefault
-    body: "Invalid type for environment variable default, must be `str` or `none`"
+    body: "Invalid type for environment variable default; expected `str` or `None`"
     suggestion: ~
     fixable: false
   location:
     row: 6
-    column: 6
+    column: 24
   end_location:
     row: 6
-    column: 15
+    column: 29
   fix: ~
   parent: ~
 
