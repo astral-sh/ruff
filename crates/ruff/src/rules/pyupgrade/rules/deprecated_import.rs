@@ -12,28 +12,68 @@ use crate::registry::Rule;
 use crate::rules::pyupgrade::fixes;
 use crate::settings::types::PythonVersion;
 
-#[violation]
-pub struct ImportReplacements {
-    pub module: String,
-    pub members: Vec<String>,
-    pub fixable: bool,
+/// An import was moved and renamed as part of a deprecation.
+/// For example, `typing.AbstractSet` was moved to `collections.abc.Set`.
+#[derive(Debug, PartialEq, Eq)]
+struct WithRename {
+    module: String,
+    member: String,
+    target: String,
 }
 
-impl Violation for ImportReplacements {
+/// A series of imports from the same module were moved to another module,
+/// but retain their original names.
+#[derive(Debug, PartialEq, Eq)]
+struct WithoutRename {
+    target: String,
+    members: Vec<String>,
+    fixable: bool,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Deprecation {
+    WithRename(WithRename),
+    WithoutRename(WithoutRename),
+}
+
+#[violation]
+pub struct DeprecatedImport {
+    deprecation: Deprecation,
+}
+
+impl Violation for DeprecatedImport {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportReplacements {
-            module, members, ..
-        } = self;
-        let names = members.iter().map(|name| format!("`{name}`")).join(", ");
-        format!("Import from `{module}` instead: {names}")
+        match &self.deprecation {
+            Deprecation::WithoutRename(WithoutRename {
+                members, target, ..
+            }) => {
+                let names = members.iter().map(|name| format!("`{name}`")).join(", ");
+                format!("Import from `{target}` instead: {names}")
+            }
+            Deprecation::WithRename(WithRename {
+                module,
+                member,
+                target,
+            }) => {
+                format!("`{module}.{member}` is deprecated, use `{target}` instead")
+            }
+        }
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|ImportReplacements { module, .. }| format!("Import from `{module}`"))
+        if let Deprecation::WithoutRename(WithoutRename { fixable, .. }) = self.deprecation {
+            fixable.then_some(|DeprecatedImport { deprecation }| {
+                let Deprecation::WithoutRename(WithoutRename { target, .. }) = deprecation else {
+                    unreachable!();
+                };
+                format!("Import from `{target}`")
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -47,7 +87,7 @@ const RELEVANT_MODULES: &[&str] = &[
     "typing.re",
 ];
 
-// Members of `collections` that have been moved to `collections.abc`.
+// Members of `collections` that were moved to `collections.abc`.
 const COLLECTIONS_TO_ABC: &[&str] = &[
     "AsyncGenerator",
     "AsyncIterable",
@@ -76,10 +116,10 @@ const COLLECTIONS_TO_ABC: &[&str] = &[
     "ValuesView",
 ];
 
-// Members of `pipes` that have been moved to `shlex`.
+// Members of `pipes` that were moved to `shlex`.
 const PIPES_TO_SHLEX: &[&str] = &["quote"];
 
-// Members of `typing_extensions` that have been moved to `typing`.
+// Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
     "AsyncIterable",
     "AsyncIterator",
@@ -96,10 +136,10 @@ const TYPING_EXTENSIONS_TO_TYPING: &[&str] = &[
 
 // Python 3.7+
 
-// Members of `mypy_extensions` that have been moved to `typing`.
+// Members of `mypy_extensions` that were moved to `typing`.
 const MYPY_EXTENSIONS_TO_TYPING_37: &[&str] = &["NoReturn"];
 
-// Members of `typing_extensions` that have been moved to `typing`.
+// Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
     "AsyncContextManager",
     "AsyncGenerator",
@@ -111,10 +151,10 @@ const TYPING_EXTENSIONS_TO_TYPING_37: &[&str] = &[
 
 // Python 3.8+
 
-// Members of `mypy_extensions` that have been moved to `typing`.
+// Members of `mypy_extensions` that were moved to `typing`.
 const MYPY_EXTENSIONS_TO_TYPING_38: &[&str] = &["TypedDict"];
 
-// Members of `typing_extensions` that have been moved to `typing`.
+// Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
     "Final",
     "Literal",
@@ -126,7 +166,7 @@ const TYPING_EXTENSIONS_TO_TYPING_38: &[&str] = &[
 
 // Python 3.9+
 
-// Members of `typing` that have been moved to `collections.abc`.
+// Members of `typing` that were moved to `collections.abc`.
 const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
     "AsyncGenerator",
     "AsyncIterable",
@@ -153,24 +193,41 @@ const TYPING_TO_COLLECTIONS_ABC_39: &[&str] = &[
     "ValuesView",
 ];
 
-// Members of `typing` that have been moved to `collections`.
+// Members of `typing` that were moved to `collections`.
 const TYPING_TO_COLLECTIONS_39: &[&str] = &["ChainMap", "Counter", "OrderedDict"];
 
-// Members of `typing` that have been moved to `typing.re`.
+// Members of `typing` that were moved to `typing.re`.
 const TYPING_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
-// Members of `typing.re` that have been moved to `re`.
+// Members of `typing.re` that were moved to `re`.
 const TYPING_RE_TO_RE_39: &[&str] = &["Match", "Pattern"];
 
-// Members of `typing_extensions` that have been moved to `typing`.
+// Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_39: &[&str] = &["Annotated", "get_type_hints"];
+
+// Members of `typing` that were moved _and_ renamed (and thus cannot be
+// automatically fixed).
+const TYPING_TO_RENAME_PY39: &[(&str, &str)] = &[
+    (
+        "AsyncContextManager",
+        "contextlib.AbstractAsyncContextManager",
+    ),
+    ("AbstractSet", "collections.abc.Set"),
+    ("Tuple", "tuple"),
+    ("List", "list"),
+    ("FrozenSet", "frozenset"),
+    ("Dict", "dict"),
+    ("Set", "set"),
+    ("Deque", "collections.deque"),
+    ("DefaultDict", "collections.defaultdict"),
+];
 
 // Python 3.10+
 
-// Members of `typing` that have been moved to `collections.abc`.
+// Members of `typing` that were moved to `collections.abc`.
 const TYPING_TO_COLLECTIONS_ABC_310: &[&str] = &["Callable"];
 
-// Members of `typing_extensions` that have been moved to `typing`.
+// Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
     "Concatenate",
     "ParamSpecArgs",
@@ -184,7 +241,7 @@ const TYPING_EXTENSIONS_TO_TYPING_310: &[&str] = &[
 
 // Python 3.11+
 
-// Members of `typing_extensions` that have been moved to `typing`.
+// Members of `typing_extensions` that were moved to `typing`.
 const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "Any",
     "LiteralString",
@@ -204,12 +261,6 @@ const TYPING_EXTENSIONS_TO_TYPING_311: &[&str] = &[
     "overload",
     "reveal_type",
 ];
-
-struct Replacement<'a> {
-    module: &'a str,
-    members: Vec<&'a AliasData>,
-    content: Option<String>,
-}
 
 struct ImportReplacer<'a> {
     stmt: &'a Stmt,
@@ -239,17 +290,43 @@ impl<'a> ImportReplacer<'a> {
         }
     }
 
-    fn replacements(&self) -> Vec<Replacement> {
-        let mut replacements = vec![];
+    /// Return a list of deprecated imports whose members were renamed.
+    fn with_renames(&self) -> Vec<WithRename> {
+        let mut operations = vec![];
+        if self.module == "typing" {
+            if self.version >= PythonVersion::Py39 {
+                for member in self.members {
+                    if let Some(target) = TYPING_TO_RENAME_PY39.iter().find_map(|(name, target)| {
+                        if member.name == *name {
+                            Some(*target)
+                        } else {
+                            None
+                        }
+                    }) {
+                        operations.push(WithRename {
+                            module: "typing".to_string(),
+                            member: member.name.to_string(),
+                            target: target.to_string(),
+                        });
+                    }
+                }
+            }
+        }
+        operations
+    }
+
+    /// Return a list of deprecated imports whose members were moved, but not renamed.
+    fn without_renames(&self) -> Vec<(WithoutRename, Option<String>)> {
+        let mut operations = vec![];
         match self.module {
             "collections" => {
-                if let Some(replacement) = self.try_replace(COLLECTIONS_TO_ABC, "collections.abc") {
-                    replacements.push(replacement);
+                if let Some(operation) = self.try_replace(COLLECTIONS_TO_ABC, "collections.abc") {
+                    operations.push(operation);
                 }
             }
             "pipes" => {
-                if let Some(replacement) = self.try_replace(PIPES_TO_SHLEX, "shlex") {
-                    replacements.push(replacement);
+                if let Some(operation) = self.try_replace(PIPES_TO_SHLEX, "shlex") {
+                    operations.push(operation);
                 }
             }
             "typing_extensions" => {
@@ -269,9 +346,8 @@ impl<'a> ImportReplacer<'a> {
                 if self.version >= PythonVersion::Py311 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_311);
                 }
-                if let Some(replacement) = self.try_replace(&typing_extensions_to_typing, "typing")
-                {
-                    replacements.push(replacement);
+                if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
+                    operations.push(operation);
                 }
             }
             "mypy_extensions" => {
@@ -282,8 +358,8 @@ impl<'a> ImportReplacer<'a> {
                 if self.version >= PythonVersion::Py38 {
                     mypy_extensions_to_typing.extend(MYPY_EXTENSIONS_TO_TYPING_38);
                 }
-                if let Some(replacement) = self.try_replace(&mypy_extensions_to_typing, "typing") {
-                    replacements.push(replacement);
+                if let Some(operation) = self.try_replace(&mypy_extensions_to_typing, "typing") {
+                    operations.push(operation);
                 }
             }
             "typing" => {
@@ -295,10 +371,10 @@ impl<'a> ImportReplacer<'a> {
                 if self.version >= PythonVersion::Py310 {
                     typing_to_collections_abc.extend(TYPING_TO_COLLECTIONS_ABC_310);
                 }
-                if let Some(replacement) =
+                if let Some(operation) =
                     self.try_replace(&typing_to_collections_abc, "collections.abc")
                 {
-                    replacements.push(replacement);
+                    operations.push(operation);
                 }
 
                 // `typing` to `collections`
@@ -306,8 +382,8 @@ impl<'a> ImportReplacer<'a> {
                 if self.version >= PythonVersion::Py39 {
                     typing_to_collections.extend(TYPING_TO_COLLECTIONS_39);
                 }
-                if let Some(replacement) = self.try_replace(&typing_to_collections, "collections") {
-                    replacements.push(replacement);
+                if let Some(operation) = self.try_replace(&typing_to_collections, "collections") {
+                    operations.push(operation);
                 }
 
                 // `typing` to `re`
@@ -315,21 +391,29 @@ impl<'a> ImportReplacer<'a> {
                 if self.version >= PythonVersion::Py39 {
                     typing_to_re.extend(TYPING_TO_RE_39);
                 }
-                if let Some(replacement) = self.try_replace(&typing_to_re, "re") {
-                    replacements.push(replacement);
+                if let Some(operation) = self.try_replace(&typing_to_re, "re") {
+                    operations.push(operation);
                 }
             }
             "typing.re" if self.version >= PythonVersion::Py39 => {
-                if let Some(replacement) = self.try_replace(TYPING_RE_TO_RE_39, "re") {
-                    replacements.push(replacement);
+                if let Some(operation) = self.try_replace(TYPING_RE_TO_RE_39, "re") {
+                    operations.push(operation);
                 }
             }
             _ => {}
         }
-        replacements
+        operations
     }
 
-    fn try_replace(&'a self, candidates: &[&str], target: &'a str) -> Option<Replacement<'a>> {
+    fn try_replace(
+        &'a self,
+        candidates: &[&str],
+        target: &'a str,
+    ) -> Option<(WithoutRename, Option<String>)> {
+        if candidates.is_empty() {
+            return None;
+        }
+
         let (matched_names, unmatched_names) = self.partition_imports(candidates);
 
         // If we have no matched names, we don't need to do anything.
@@ -339,11 +423,16 @@ impl<'a> ImportReplacer<'a> {
 
         if unmatched_names.is_empty() {
             let matched = ImportReplacer::format_import_from(&matched_names, target);
-            Some(Replacement {
-                module: target,
-                members: matched_names,
-                content: Some(matched),
-            })
+            let operation = WithoutRename {
+                target: target.to_string(),
+                members: matched_names
+                    .iter()
+                    .map(|name| name.name.to_string())
+                    .collect(),
+                fixable: true,
+            };
+            let fix = Some(matched);
+            Some((operation, fix))
         } else {
             let indentation = indentation(self.locator, self.stmt);
 
@@ -351,11 +440,16 @@ impl<'a> ImportReplacer<'a> {
             // line, we can't add a statement after it. For example, if we have
             // `if True: import foo`, we can't add a statement to the next line.
             let Some(indentation) = indentation else {
-                return Some(Replacement {
-                    module: target,
-                    members: matched_names,
-                    content: None,
-                });
+                 let operation = WithoutRename {
+                    target: target.to_string(),
+                    members: matched_names
+                        .iter()
+                        .map(|name| name.name.to_string())
+                        .collect(),
+                    fixable: false,
+                };
+                let fix = None;
+                return Some((operation, fix));
             };
 
             let matched = ImportReplacer::format_import_from(&matched_names, target);
@@ -367,15 +461,20 @@ impl<'a> ImportReplacer<'a> {
                     .collect::<Vec<_>>(),
             );
 
-            Some(Replacement {
-                module: target,
-                members: matched_names,
-                content: Some(format!(
-                    "{unmatched}{}{}{matched}",
-                    self.stylist.line_ending().as_str(),
-                    indentation,
-                )),
-            })
+            let operation = WithoutRename {
+                target: target.to_string(),
+                members: matched_names
+                    .iter()
+                    .map(|name| name.name.to_string())
+                    .collect(),
+                fixable: true,
+            };
+            let fix = Some(format!(
+                "{unmatched}{}{}{matched}",
+                self.stylist.line_ending().as_str(),
+                indentation,
+            ));
+            Some((operation, fix))
         }
     }
 
@@ -410,7 +509,7 @@ impl<'a> ImportReplacer<'a> {
 }
 
 /// UP035
-pub fn import_replacements(
+pub fn deprecated_import(
     checker: &mut Checker,
     stmt: &Stmt,
     names: &[Alias],
@@ -442,21 +541,15 @@ pub fn import_replacements(
         checker.settings.target_version,
     );
 
-    for replacement in fixer.replacements() {
+    for (operation, fix) in fixer.without_renames() {
         let mut diagnostic = Diagnostic::new(
-            ImportReplacements {
-                module: replacement.module.to_string(),
-                members: replacement
-                    .members
-                    .iter()
-                    .map(|name| name.name.to_string())
-                    .collect(),
-                fixable: replacement.content.is_some(),
+            DeprecatedImport {
+                deprecation: Deprecation::WithoutRename(operation),
             },
             Range::from(stmt),
         );
-        if checker.patch(&Rule::ImportReplacements) {
-            if let Some(content) = replacement.content {
+        if checker.patch(&Rule::DeprecatedImport) {
+            if let Some(content) = fix {
                 diagnostic.amend(Fix::replacement(
                     content,
                     stmt.location,
@@ -464,6 +557,16 @@ pub fn import_replacements(
                 ));
             }
         }
+        checker.diagnostics.push(diagnostic);
+    }
+
+    for operation in fixer.with_renames() {
+        let diagnostic = Diagnostic::new(
+            DeprecatedImport {
+                deprecation: Deprecation::WithRename(operation),
+            },
+            Range::from(stmt),
+        );
         checker.diagnostics.push(diagnostic);
     }
 }

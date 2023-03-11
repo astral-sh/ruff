@@ -373,7 +373,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pyupgrade, "032") => Rule::FString,
         (Pyupgrade, "033") => Rule::FunctoolsCache,
         (Pyupgrade, "034") => Rule::ExtraneousParentheses,
-        (Pyupgrade, "035") => Rule::ImportReplacements,
+        (Pyupgrade, "035") => Rule::DeprecatedImport,
         (Pyupgrade, "036") => Rule::OutdatedVersionBlock,
         (Pyupgrade, "037") => Rule::QuotedAnnotation,
         (Pyupgrade, "038") => Rule::IsinstanceWithTuple,

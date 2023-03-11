@@ -41,7 +41,7 @@ if True:
         Good,
     )
 
-from typing import Callable, Match, Pattern, List, OrderedDict
+from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet
 
 if True: from collections import (
     Mapping, Counter)

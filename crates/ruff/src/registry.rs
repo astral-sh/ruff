@@ -339,7 +339,7 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::FString,
     rules::pyupgrade::rules::FunctoolsCache,
     rules::pyupgrade::rules::ExtraneousParentheses,
-    rules::pyupgrade::rules::ImportReplacements,
+    rules::pyupgrade::rules::DeprecatedImport,
     rules::pyupgrade::rules::OutdatedVersionBlock,
     rules::pyupgrade::rules::QuotedAnnotation,
     rules::pyupgrade::rules::IsinstanceWithTuple,
