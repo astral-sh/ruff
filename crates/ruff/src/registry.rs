@@ -803,7 +803,7 @@ impl Linter {
     }
 }
 
-#[derive(is_macro::Is)]
+#[derive(is_macro::Is, Copy, Clone)]
 pub enum LintSource {
     Ast,
     Io,
@@ -818,9 +818,9 @@ pub enum LintSource {
 impl Rule {
     /// The source for the diagnostic (either the AST, the filesystem, or the
     /// physical lines).
-    pub const fn lint_source(&self) -> &'static LintSource {
+    pub const fn lint_source(&self) -> LintSource {
         match self {
-            Rule::UnusedNOQA => &LintSource::Noqa,
+            Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::DocLineTooLong
@@ -836,7 +836,7 @@ impl Rule {
             | Rule::ShebangWhitespace
             | Rule::TrailingWhitespace
             | Rule::IndentationContainsTabs
-            | Rule::BlankLineContainsWhitespace => &LintSource::PhysicalLines,
+            | Rule::BlankLineContainsWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
@@ -855,10 +855,10 @@ impl Rule {
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::TrailingCommaProhibited
-            | Rule::TypeCommentInStub => &LintSource::Tokens,
-            Rule::IOError => &LintSource::Io,
-            Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
-            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => &LintSource::Filesystem,
+            | Rule::TypeCommentInStub => LintSource::Tokens,
+            Rule::IOError => LintSource::Io,
+            Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
+            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
@@ -890,8 +890,8 @@ impl Rule {
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
             | Rule::WhitespaceBeforeParameters
-            | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
-            _ => &LintSource::Ast,
+            | Rule::WhitespaceBeforePunctuation => LintSource::LogicalLines,
+            _ => LintSource::Ast,
         }
     }
 }

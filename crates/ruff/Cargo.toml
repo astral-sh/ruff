@@ -12,8 +12,6 @@ license = "MIT"
 
 [lib]
 name = "ruff"
-crate-type = ["cdylib", "rlib"]
-doctest = false
 
 [dependencies]
 ruff_cache = { path = "../ruff_cache" }
