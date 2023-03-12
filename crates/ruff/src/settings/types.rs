@@ -2,22 +2,38 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::string::ToString;
 
 use anyhow::{anyhow, bail, Result};
 use clap::ValueEnum;
 use globset::{Glob, GlobSet, GlobSetBuilder};
+use itertools::Itertools;
+use pep440_rs::{parse_version_specifiers, Version as Pep440Version, VersionSpecifier};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use crate::registry::Rule;
 use crate::rule_selector::RuleSelector;
 use crate::{fs, warn_user_once};
 
 #[derive(
-    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, JsonSchema, CacheKey,
+    Clone,
+    Copy,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    CacheKey,
+    EnumIter,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum PythonVersion {
@@ -50,6 +66,13 @@ impl FromStr for PythonVersion {
     }
 }
 
+impl From<PythonVersion> for Pep440Version {
+    fn from(version: PythonVersion) -> Self {
+        let (major, minor) = version.as_tuple();
+        Self::from_str(&format!("{major}.{minor}")).unwrap()
+    }
+}
+
 impl PythonVersion {
     pub const fn as_tuple(&self) -> (u32, u32) {
         match self {
@@ -59,6 +82,21 @@ impl PythonVersion {
             Self::Py310 => (3, 10),
             Self::Py311 => (3, 11),
         }
+    }
+
+    pub fn get_minimum_supported_version(requires_version: &RequiresVersion) -> Option<Self> {
+        let mut minimum_version = None;
+        for python_version in PythonVersion::iter() {
+            if requires_version
+                .0
+                .iter()
+                .all(|specifier| specifier.contains(&python_version.into()))
+            {
+                minimum_version = Some(python_version);
+                break;
+            }
+        }
+        minimum_version
     }
 }
 
@@ -242,5 +280,37 @@ impl Deref for Version {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct RequiresVersion(pub Vec<VersionSpecifier>);
+
+impl<'de> Deserialize<'de> for RequiresVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        parse_version_specifiers(&s)
+            .map(Self)
+            .map_err(de::Error::custom)
+    }
+}
+
+impl Serialize for RequiresVersion {
+    #[allow(unstable_name_collisions)]
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_str(
+            &self
+                .0
+                .iter()
+                .map(ToString::to_string)
+                .intersperse(", ".to_string())
+                .collect::<String>(),
+        )
     }
 }

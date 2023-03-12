@@ -47,6 +47,9 @@ path-absolutize = { workspace = true, features = [
   "use_unix_paths_on_wasm",
 ] }
 pathdiff = { version = "0.2.1" }
+pep440_rs = { git = "https://github.com/konstin/pep440-rs.git", features = [
+  "serde",
+], rev = "3148c9016cbc01a9e6116ae8080b10e14e985487" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
 rustc-hash = { workspace = true }
@@ -64,9 +67,10 @@ thiserror = { version = "1.0.38" }
 toml = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true, features = ["yaml", "redactions"] }
-test-case = { workspace = true }
 criterion = { version = "0.4.0" }
+insta = { workspace = true, features = ["yaml", "redactions"] }
+pretty_assertions = "1.3.0"
+test-case = { workspace = true }
 
 
 [features]

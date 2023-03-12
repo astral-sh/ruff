@@ -20,6 +20,7 @@ use crate::rules::{
 };
 use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
+use crate::settings::types::PythonVersion;
 use crate::warn_user;
 
 const DEFAULT_SELECTORS: &[RuleSelector] = &[
@@ -424,6 +425,15 @@ pub fn convert(
         }
     }
 
+    if let Some(project) = &external_config.project {
+        if let Some(requires_python) = &project.requires_python {
+            if options.target_version.is_none() {
+                options.target_version =
+                    PythonVersion::get_minimum_supported_version(requires_python);
+            }
+        }
+    }
+
     // Create the pyproject.toml.
     Ok(Pyproject::new(options))
 }
@@ -442,10 +452,13 @@ mod tests {
 
     use anyhow::Result;
     use itertools::Itertools;
+    use pep440_rs::parse_version_specifiers;
+    use pretty_assertions::assert_eq;
 
     use super::super::plugin::Plugin;
     use super::convert;
     use crate::flake8_to_ruff::converter::DEFAULT_SELECTORS;
+    use crate::flake8_to_ruff::pep621::Project;
     use crate::flake8_to_ruff::ExternalConfig;
     use crate::registry::Linter;
     use crate::rule_selector::RuleSelector;
@@ -453,6 +466,7 @@ mod tests {
     use crate::rules::{flake8_quotes, pydocstyle};
     use crate::settings::options::Options;
     use crate::settings::pyproject::Pyproject;
+    use crate::settings::types::{PythonVersion, RequiresVersion};
 
     fn default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> Options {
         Options {
@@ -604,6 +618,29 @@ mod tests {
                 avoid_escape: None,
             }),
             ..default_options([Linter::Flake8Quotes.into()])
+        });
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_converts_project_requires_python() -> Result<()> {
+        let actual = convert(
+            &HashMap::from([("flake8".to_string(), HashMap::default())]),
+            &ExternalConfig {
+                project: Some(&Project {
+                    requires_python: Some(RequiresVersion(
+                        parse_version_specifiers(">=3.9, <3.11").unwrap(),
+                    )),
+                }),
+                ..ExternalConfig::default()
+            },
+            Some(vec![]),
+        )?;
+        let expected = Pyproject::new(Options {
+            target_version: Some(PythonVersion::Py39),
+            ..default_options([])
         });
         assert_eq!(actual, expected);
 
