@@ -4,6 +4,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 /// ## What it does
 /// Checks for files missing a new line at the end of the file.
@@ -41,12 +42,13 @@ pub fn no_newline_at_end_of_file(
     contents: &str,
     autofix: bool,
 ) -> Option<Diagnostic> {
-    if !contents.ends_with('\n') {
+    if !contents.ends_with(['\n', '\r']) {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
-        if let Some(line) = contents.lines().last() {
+        if let Some(line) = UniversalNewlineIterator::from(contents).last() {
             // Both locations are at the end of the file (and thus the same).
-            let location = Location::new(contents.lines().count(), line.len());
+            let location =
+                Location::new(UniversalNewlineIterator::from(contents).count(), line.len());
             let mut diagnostic =
                 Diagnostic::new(NoNewLineAtEndOfFile, Range::new(location, location));
             if autofix {

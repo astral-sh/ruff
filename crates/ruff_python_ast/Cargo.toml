@@ -24,4 +24,5 @@ regex = { workspace = true }
 rustc-hash = { workspace = true }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
+serde = { workspace = true }
 smallvec = { version = "1.10.0" }

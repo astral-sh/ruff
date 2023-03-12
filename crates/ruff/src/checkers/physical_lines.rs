@@ -4,6 +4,7 @@ use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::registry::Rule;
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
@@ -56,7 +57,7 @@ pub fn check_physical_lines(
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
-    for (index, line) in contents.lines().enumerate() {
+    for (index, line) in UniversalNewlineIterator::from(contents).enumerate() {
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
             .is_some()

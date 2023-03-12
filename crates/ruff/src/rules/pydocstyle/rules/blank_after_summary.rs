@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -45,7 +46,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
 
     let mut lines_count = 1;
     let mut blanks_count = 0;
-    for line in body.trim().lines().skip(1) {
+    for line in UniversalNewlineIterator::from(body.trim()).skip(1) {
         lines_count += 1;
         if line.trim().is_empty() {
             blanks_count += 1;
@@ -64,7 +65,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
             if blanks_count > 1 {
                 // Find the "summary" line (defined as the first non-blank line).
                 let mut summary_line = 0;
-                for line in body.lines() {
+                for line in UniversalNewlineIterator::from(body) {
                     if line.trim().is_empty() {
                         summary_line += 1;
                     } else {

@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_ast::types::Range;
-use ruff_python_ast::whitespace::LinesWithTrailingNewline;
+use ruff_python_ast::whitespace::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
@@ -42,10 +42,10 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
-    if LinesWithTrailingNewline::from(body).nth(1).is_none() {
+    if NewlineWithTrailingNewline::from(body).nth(1).is_none() {
         return;
     };
-    let mut content_lines = contents.lines();
+    let mut content_lines = UniversalNewlineIterator::from(contents);
     let Some(first_line) = content_lines
         .next()
          else

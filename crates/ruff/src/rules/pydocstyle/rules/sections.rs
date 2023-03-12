@@ -10,7 +10,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visibility::is_staticmethod;
-use ruff_python_ast::whitespace::LinesWithTrailingNewline;
+use ruff_python_ast::whitespace::NewlineWithTrailingNewline;
 use ruff_python_ast::{cast, whitespace};
 
 use crate::checkers::ast::Checker;
@@ -273,7 +273,7 @@ impl AlwaysAutofixableViolation for NoBlankLinesBetweenHeaderAndContent {
 pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option<&Convention>) {
     let body = docstring.body;
 
-    let lines: Vec<&str> = LinesWithTrailingNewline::from(body).collect();
+    let lines: Vec<&str> = NewlineWithTrailingNewline::from(body).collect();
     if lines.len() < 2 {
         return;
     }
@@ -923,7 +923,7 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
 
     // Join line continuations, then resplit by line.
     let adjusted_following_lines = context.following_lines.join("\n").replace("\\\n", "");
-    let lines: Vec<&str> = LinesWithTrailingNewline::from(&adjusted_following_lines).collect();
+    let lines: Vec<&str> = NewlineWithTrailingNewline::from(&adjusted_following_lines).collect();
 
     for i in 1..lines.len() {
         let current_line = lines[i - 1];

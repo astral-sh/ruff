@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::{map_callable, to_call_path};
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
@@ -10,7 +11,7 @@ use crate::docstrings::definition::{Definition, DefinitionKind};
 pub fn logical_line(content: &str) -> Option<usize> {
     // Find the first logical line.
     let mut logical_line = None;
-    for (i, line) in content.lines().enumerate() {
+    for (i, line) in UniversalNewlineIterator::from(content).enumerate() {
         if line.trim().is_empty() {
             // Empty line. If this is the line _after_ the first logical line, stop.
             if logical_line.is_some() {

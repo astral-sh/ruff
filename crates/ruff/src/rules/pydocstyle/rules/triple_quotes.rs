@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -20,8 +21,7 @@ pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
-    let Some(first_line) = contents
-        .lines()
+    let Some(first_line) = UniversalNewlineIterator::from(contents)
         .next()
         .map(str::to_lowercase) else
     {

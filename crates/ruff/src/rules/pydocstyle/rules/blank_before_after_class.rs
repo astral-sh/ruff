@@ -1,6 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
@@ -74,8 +75,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             .locator
             .slice(Range::new(parent.location, docstring.expr.location));
 
-        let blank_lines_before = before
-            .lines()
+        let blank_lines_before = UniversalNewlineIterator::from(before)
             .rev()
             .skip(1)
             .take_while(|line| line.trim().is_empty())
@@ -137,16 +137,14 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             parent.end_location.unwrap(),
         ));
 
-        let all_blank_after = after
-            .lines()
+        let all_blank_after = UniversalNewlineIterator::from(after)
             .skip(1)
             .all(|line| line.trim().is_empty() || line.trim_start().starts_with('#'));
         if all_blank_after {
             return;
         }
 
-        let blank_lines_after = after
-            .lines()
+        let blank_lines_after = UniversalNewlineIterator::from(after)
             .skip(1)
             .take_while(|line| line.trim().is_empty())
             .count();

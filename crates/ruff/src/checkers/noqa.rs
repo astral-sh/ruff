@@ -6,6 +6,7 @@ use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::codes::NoqaCode;
 use crate::noqa;
@@ -38,7 +39,7 @@ pub fn check_noqa(
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
 
-    let lines: Vec<&str> = contents.lines().collect();
+    let lines: Vec<&str> = UniversalNewlineIterator::from(contents).collect();
     for lineno in commented_lines {
         match extract_file_exemption(lines[lineno - 1]) {
             Exemption::All => {

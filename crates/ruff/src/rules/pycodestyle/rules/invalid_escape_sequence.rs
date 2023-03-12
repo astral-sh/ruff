@@ -6,6 +6,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 /// ## What it does
 /// Checks for invalid escape sequences.
@@ -76,7 +77,7 @@ pub fn invalid_escape_sequence(
     let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];
 
     if !prefix.contains('r') {
-        for (row_offset, line) in body.lines().enumerate() {
+        for (row_offset, line) in UniversalNewlineIterator::from(body).enumerate() {
             let chars: Vec<char> = line.chars().collect();
             for col_offset in 0..chars.len() {
                 if chars[col_offset] != '\\' {

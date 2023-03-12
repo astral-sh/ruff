@@ -14,6 +14,7 @@ use rustpython_parser::ast::Location;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{LineEnding, Locator};
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::codes::NoqaCode;
 use crate::registry::{AsRule, Rule};
@@ -181,7 +182,7 @@ fn add_noqa_inner(
     // Codes that are globally exempted (within the current file).
     let mut file_exemptions: Vec<NoqaCode> = vec![];
 
-    let lines: Vec<&str> = contents.lines().collect();
+    let lines: Vec<&str> = UniversalNewlineIterator::from(contents).collect();
     for lineno in commented_lines {
         match extract_file_exemption(lines[lineno - 1]) {
             Exemption::All => {
@@ -263,7 +264,7 @@ fn add_noqa_inner(
 
     let mut count: usize = 0;
     let mut output = String::new();
-    for (lineno, line) in contents.lines().enumerate() {
+    for (lineno, line) in lines.into_iter().enumerate() {
         match matches_by_line.get(&lineno) {
             None => {
                 output.push_str(line);

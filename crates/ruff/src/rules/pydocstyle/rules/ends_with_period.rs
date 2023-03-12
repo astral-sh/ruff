@@ -4,6 +4,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -31,7 +32,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
-    if let Some(first_line) = body.trim().lines().next() {
+    if let Some(first_line) = UniversalNewlineIterator::from(body.trim()).next() {
         let trimmed = first_line.trim();
 
         // Avoid false-positives: `:param`, etc.
@@ -55,7 +56,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
     }
 
     if let Some(index) = logical_line(body) {
-        let line = body.lines().nth(index).unwrap();
+        let line = UniversalNewlineIterator::from(body).nth(index).unwrap();
         let trimmed = line.trim_end();
 
         if !trimmed.ends_with('.') {

@@ -2,7 +2,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::whitespace::LinesWithTrailingNewline;
+use ruff_python_ast::whitespace::NewlineWithTrailingNewline;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -28,7 +28,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
-    let mut lines = LinesWithTrailingNewline::from(body);
+    let mut lines = NewlineWithTrailingNewline::from(body);
     let Some(line) = lines.next() else {
         return;
     };

@@ -10,6 +10,7 @@ use ruff_python_ast::helpers::{
     has_comments_in, unparse_expr, unparse_stmt,
 };
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -281,9 +282,7 @@ pub fn nested_if_statements(
     if fixable && checker.patch(diagnostic.kind.rule()) {
         match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
             Ok(fix) => {
-                if fix
-                    .content
-                    .lines()
+                if UniversalNewlineIterator::from(&fix.content)
                     .all(|line| line.len() <= checker.settings.line_length)
                 {
                     diagnostic.amend(fix);

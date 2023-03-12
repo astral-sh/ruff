@@ -9,6 +9,7 @@ use ruff_python_ast::cast;
 use ruff_python_ast::helpers::to_call_path;
 use ruff_python_ast::types::{CallPath, Range};
 use ruff_python_ast::visibility::{is_property, is_test};
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
@@ -48,7 +49,7 @@ pub fn non_imperative_mood(
     let body = docstring.body;
 
     // Find first line, disregarding whitespace.
-    let line = match body.trim().lines().next() {
+    let line = match UniversalNewlineIterator::from(body.trim()).next() {
         Some(line) => line.trim(),
         None => return,
     };

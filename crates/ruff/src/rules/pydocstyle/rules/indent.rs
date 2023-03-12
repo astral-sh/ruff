@@ -3,7 +3,7 @@ use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace;
-use ruff_python_ast::whitespace::LinesWithTrailingNewline;
+use ruff_python_ast::whitespace::NewlineWithTrailingNewline;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -53,7 +53,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body;
 
     // Split the docstring into lines.
-    let lines: Vec<&str> = LinesWithTrailingNewline::from(body).collect();
+    let lines: Vec<&str> = NewlineWithTrailingNewline::from(body).collect();
     if lines.len() <= 1 {
         return;
     }

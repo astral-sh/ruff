@@ -40,19 +40,18 @@ pub fn raw_contents(contents: &str) -> &str {
 
 /// Return the leading quote for a string or byte literal (e.g., `"""`).
 pub fn leading_quote(content: &str) -> Option<&str> {
-    if let Some(first_line) = content.lines().next() {
-        for pattern in TRIPLE_QUOTE_STR_PREFIXES
-            .iter()
-            .chain(TRIPLE_QUOTE_BYTE_PREFIXES)
-            .chain(SINGLE_QUOTE_STR_PREFIXES)
-            .chain(SINGLE_QUOTE_BYTE_PREFIXES)
-        {
-            if first_line.starts_with(pattern) {
-                return Some(pattern);
+    TRIPLE_QUOTE_STR_PREFIXES
+        .iter()
+        .chain(TRIPLE_QUOTE_BYTE_PREFIXES)
+        .chain(SINGLE_QUOTE_STR_PREFIXES)
+        .chain(SINGLE_QUOTE_BYTE_PREFIXES)
+        .find_map(|pattern| {
+            if content.starts_with(pattern) {
+                Some(*pattern)
+            } else {
+                None
             }
-        }
-    }
-    None
+        })
 }
 
 /// Return the trailing quote string for a string or byte literal (e.g., `"""`).

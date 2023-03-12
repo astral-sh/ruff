@@ -2139,6 +2139,7 @@ dependencies = [
  "rustc-hash",
  "rustpython-common",
  "rustpython-parser",
+ "serde",
  "smallvec",
 ]
 

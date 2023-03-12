@@ -18,6 +18,7 @@ use crate::source_code::{Generator, Indexer, Locator, Stylist};
 use crate::types::{Binding, BindingKind, CallPath, Range};
 use crate::visitor;
 use crate::visitor::Visitor;
+use crate::whitespace::UniversalNewlineIterator;
 
 /// Create an `Expr` with default location from an `ExprKind`.
 pub fn create_expr(node: ExprKind) -> Expr {
@@ -1125,7 +1126,7 @@ pub fn end_of_statement(stmt: &Stmt, locator: &Locator) -> Location {
     }
 
     // Otherwise, find the end of the last line that's "part of" the statement.
-    for (lineno, line) in contents.lines().enumerate() {
+    for (lineno, line) in UniversalNewlineIterator::from(contents).enumerate() {
         if line.ends_with('\\') {
             continue;
         }

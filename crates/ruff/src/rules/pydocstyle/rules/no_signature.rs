@@ -3,6 +3,7 @@ use rustpython_parser::ast::StmtKind;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
@@ -32,7 +33,7 @@ pub fn no_signature(checker: &mut Checker, docstring: &Docstring) {
 
     let body = docstring.body;
 
-    let Some(first_line) = body.trim().lines().next() else {
+    let Some(first_line) = UniversalNewlineIterator::from(body.trim()).next() else {
         return;
     };
     if !first_line.contains(&format!("{name}(")) {
