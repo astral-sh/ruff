@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct NoEval;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct NoEval;
+
 impl Violation for NoEval {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -23,10 +23,10 @@ pub fn no_eval(checker: &mut Checker, func: &Expr) {
     if id != "eval" {
         return;
     }
-    if !checker.is_builtin("eval") {
+    if !checker.ctx.is_builtin("eval") {
         return;
     }
     checker
         .diagnostics
-        .push(Diagnostic::new(NoEval, Range::from_located(func)));
+        .push(Diagnostic::new(NoEval, Range::from(func)));
 }

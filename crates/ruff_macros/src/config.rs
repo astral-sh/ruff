@@ -44,15 +44,17 @@ pub fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> 
                 };
             }
 
-            Ok(quote! {
-              use crate::settings::options_base::{OptionEntry, OptionField, ConfigurationOptions};
+            let options_len = output.len();
 
-              #[automatically_derived]
-              impl ConfigurationOptions for #ident {
-                  fn get_available_options() -> Vec<(&'static str, OptionEntry)> {
-                      vec![#(#output),*]
-                  }
-              }
+            Ok(quote! {
+              use crate::settings::options_base::{OptionEntry, OptionField, OptionGroup};
+
+                impl #ident {
+                    pub const fn metadata() -> OptionGroup {
+                        const OPTIONS: [(&'static str, OptionEntry); #options_len] = [#(#output),*];
+                        OptionGroup::new(&OPTIONS)
+                    }
+                }
             })
         }
         _ => Err(syn::Error::new(
@@ -86,7 +88,7 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
                 let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
                 Ok(quote_spanned!(
-                    ident.span() => (#kebab_name, OptionEntry::Group(#path::get_available_options()))
+                    ident.span() => (#kebab_name, OptionEntry::Group(#path::metadata()))
                 ))
             }
             _ => Err(syn::Error::new(

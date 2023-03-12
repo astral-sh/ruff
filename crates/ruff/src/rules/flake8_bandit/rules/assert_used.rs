@@ -1,14 +1,12 @@
 use rustpython_parser::ast::Stmt;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+#[violation]
+pub struct Assert;
 
-define_violation!(
-    pub struct Assert;
-);
 impl Violation for Assert {
     #[derive_message_formats]
     fn message(&self) -> String {

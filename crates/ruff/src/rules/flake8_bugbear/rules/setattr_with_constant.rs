@@ -1,19 +1,19 @@
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::identifiers::{is_identifier, is_mangled_private};
-use ruff_python::keyword::KWLIST;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
-use crate::ast::helpers::unparse_stmt;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_stmt;
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::Range;
+use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
+use ruff_python_stdlib::keyword::KWLIST;
 
-define_violation!(
-    pub struct SetAttrWithConstant;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct SetAttrWithConstant;
+
 impl AlwaysAutofixableViolation for SetAttrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -75,9 +75,9 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment
     // (which is a `Stmt`) if the `Expr` is already being used as a `Stmt`
     // (i.e., it's directly within an `StmtKind::Expr`).
-    if let StmtKind::Expr { value: child } = &checker.current_stmt().node {
+    if let StmtKind::Expr { value: child } = &checker.ctx.current_stmt().node {
         if expr == child.as_ref() {
-            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, Range::from(expr));
 
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(

@@ -1,11 +1,12 @@
 ---
-source: src/rules/pep8_naming/mod.rs
+source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LowercaseImportedAsNonLowercase:
-      name: lowercase
-      asname: Lower
+    name: LowercaseImportedAsNonLowercase
+    body: "Lowercase `lowercase` imported as non-lowercase `Lower`"
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    LowercaseImportedAsNonLowercase:
-      name: lowercase
-      asname: Lowercase
+    name: LowercaseImportedAsNonLowercase
+    body: "Lowercase `lowercase` imported as non-lowercase `Lowercase`"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    LowercaseImportedAsNonLowercase:
-      name: another_lowercase
-      asname: AnotherLowercase
+    name: LowercaseImportedAsNonLowercase
+    body: "Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 0

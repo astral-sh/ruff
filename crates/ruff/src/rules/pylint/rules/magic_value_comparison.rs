@@ -1,19 +1,19 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
 
-use crate::ast::helpers::unparse_constant;
-use crate::ast::types::Range;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
 use crate::rules::pylint::settings::ConstantType;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct MagicValueComparison {
-        pub value: String,
-    }
-);
+#[violation]
+pub struct MagicValueComparison {
+    pub value: String,
+}
+
 impl Violation for MagicValueComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -24,6 +24,22 @@ impl Violation for MagicValueComparison {
     }
 }
 
+/// If an [`Expr`] is a constant (or unary operation on a constant), return the [`Constant`].
+fn as_constant(expr: &Expr) -> Option<&Constant> {
+    match &expr.node {
+        ExprKind::Constant { value, .. } => Some(value),
+        ExprKind::UnaryOp {
+            op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
+            operand,
+        } => match &operand.node {
+            ExprKind::Constant { value, .. } => Some(value),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// Return `true` if a [`Constant`] is a magic value.
 fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
     if let Ok(constant_type) = ConstantType::try_from(constant) {
         if allowed_types.contains(&constant_type) {
@@ -37,7 +53,7 @@ fn is_magic_value(constant: &Constant, allowed_types: &[ConstantType]) -> bool {
         Constant::Ellipsis => false,
         // Otherwise, special-case some common string and integer types.
         Constant::Str(value) => !matches!(value.as_str(), "" | "__main__"),
-        Constant::Int(value) => !matches!(value.try_into(), Ok(-1 | 0 | 1)),
+        Constant::Int(value) => !matches!(value.try_into(), Ok(0 | 1)),
         Constant::Bytes(_) => true,
         Constant::Tuple(_) => true,
         Constant::Float(_) => true,
@@ -53,21 +69,19 @@ pub fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &
     {
         // If both of the comparators are constant, skip rule for the whole expression.
         // R0133: comparison-of-constants
-        if matches!(left.node, ExprKind::Constant { .. })
-            && matches!(right.node, ExprKind::Constant { .. })
-        {
+        if as_constant(left).is_some() && as_constant(right).is_some() {
             return;
         }
     }
 
     for comparison_expr in std::iter::once(left).chain(comparators.iter()) {
-        if let ExprKind::Constant { value, .. } = &comparison_expr.node {
+        if let Some(value) = as_constant(comparison_expr) {
             if is_magic_value(value, &checker.settings.pylint.allow_magic_value_types) {
                 checker.diagnostics.push(Diagnostic::new(
                     MagicValueComparison {
-                        value: unparse_constant(value, checker.stylist),
+                        value: unparse_expr(comparison_expr, checker.stylist),
                     },
-                    Range::from_located(comparison_expr),
+                    Range::from(comparison_expr),
                 ));
             }
         }

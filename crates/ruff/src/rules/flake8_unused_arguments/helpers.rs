@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind};
 
-use crate::ast::helpers::is_docstring_stmt;
+use ruff_python_ast::helpers::is_docstring_stmt;
 
 /// Return `true` if a `Stmt` is a "empty": a `pass`, `...`, `raise
 /// NotImplementedError`, or `raise NotImplemented` (with or without arguments).

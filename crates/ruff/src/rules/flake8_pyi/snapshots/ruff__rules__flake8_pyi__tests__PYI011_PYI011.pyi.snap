@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 13
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 8
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 18
     column: 8
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 27
     column: 8
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 36
     column: 8
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 41
     column: 13
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 45
     column: 13
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 49
     column: 16
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 53
     column: 13
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 57
     column: 17
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    TypedArgumentSimpleDefaults: ~
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
   location:
     row: 61
     column: 17

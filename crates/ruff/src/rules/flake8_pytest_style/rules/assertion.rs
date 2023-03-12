@@ -10,55 +10,54 @@ use rustpython_parser::ast::{
     Unaryop,
 };
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{has_comments_in, unparse_stmt};
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{visitor, whitespace};
 
-use crate::ast::helpers::{has_comments_in, unparse_stmt};
-use crate::ast::types::Range;
-use crate::ast::visitor::Visitor;
-use crate::ast::{visitor, whitespace};
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::match_module;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::{Locator, Stylist};
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
 use super::helpers::is_falsy_constant;
 use super::unittest_assert::UnittestAssert;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for assertions that combine multiple independent conditions.
-    ///
-    /// ## Why is this bad?
-    /// Composite assertion statements are harder debug upon failure, as the
-    /// failure message will not indicate which condition failed.
-    ///
-    /// ## Example
-    /// ```python
-    /// def test_foo():
-    ///     assert something and something_else
-    ///
-    ///
-    /// def test_bar():
-    ///     assert not (something or something_else)
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// def test_foo():
-    ///     assert something
-    ///     assert something_else
-    ///
-    ///
-    /// def test_bar():
-    ///     assert not something
-    ///     assert not something_else
-    /// ```
-    pub struct CompositeAssertion {
-        pub fixable: bool,
-    }
-);
+/// ## What it does
+/// Checks for assertions that combine multiple independent conditions.
+///
+/// ## Why is this bad?
+/// Composite assertion statements are harder debug upon failure, as the
+/// failure message will not indicate which condition failed.
+///
+/// ## Example
+/// ```python
+/// def test_foo():
+///     assert something and something_else
+///
+///
+/// def test_bar():
+///     assert not (something or something_else)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def test_foo():
+///     assert something
+///     assert something_else
+///
+///
+/// def test_bar():
+///     assert not something
+///     assert not something_else
+/// ```
+#[violation]
+pub struct CompositeAssertion {
+    pub fixable: bool,
+}
+
 impl Violation for CompositeAssertion {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -73,11 +72,11 @@ impl Violation for CompositeAssertion {
     }
 }
 
-define_violation!(
-    pub struct AssertInExcept {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct AssertInExcept {
+    pub name: String,
+}
+
 impl Violation for AssertInExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -88,9 +87,9 @@ impl Violation for AssertInExcept {
     }
 }
 
-define_violation!(
-    pub struct AssertAlwaysFalse;
-);
+#[violation]
+pub struct AssertAlwaysFalse;
+
 impl Violation for AssertAlwaysFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -98,12 +97,12 @@ impl Violation for AssertAlwaysFalse {
     }
 }
 
-define_violation!(
-    pub struct UnittestAssertion {
-        pub assertion: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct UnittestAssertion {
+    pub assertion: String,
+    pub fixable: bool,
+}
+
 impl Violation for UnittestAssertion {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -163,7 +162,7 @@ where
                             AssertInExcept {
                                 name: id.to_string(),
                             },
-                            Range::from_located(current_assert),
+                            Range::from(current_assert),
                         ));
                     }
                 }
@@ -195,15 +194,15 @@ pub fn unittest_assertion(
             if let Ok(unittest_assert) = UnittestAssert::try_from(attr.as_str()) {
                 // We're converting an expression to a statement, so avoid applying the fix if
                 // the assertion is part of a larger expression.
-                let fixable = checker.current_expr_parent().is_none()
-                    && matches!(checker.current_stmt().node, StmtKind::Expr { .. })
-                    && !has_comments_in(Range::from_located(expr), checker.locator);
+                let fixable = checker.ctx.current_expr_parent().is_none()
+                    && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
+                    && !has_comments_in(Range::from(expr), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     UnittestAssertion {
                         assertion: unittest_assert.to_string(),
                         fixable,
                     },
-                    Range::from_located(func),
+                    Range::from(func),
                 );
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
@@ -226,10 +225,7 @@ pub fn unittest_assertion(
 /// PT015
 pub fn assert_falsy(stmt: &Stmt, test: &Expr) -> Option<Diagnostic> {
     if is_falsy_constant(test) {
-        Some(Diagnostic::new(
-            AssertAlwaysFalse,
-            Range::from_located(stmt),
-        ))
+        Some(Diagnostic::new(AssertAlwaysFalse, Range::from(stmt)))
     } else {
         None
     }
@@ -328,7 +324,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     };
 
     // Extract the module text.
-    let contents = locator.slice(&Range::new(
+    let contents = locator.slice(Range::new(
         Location::new(stmt.location.row(), 0),
         Location::new(stmt.end_location.unwrap().row() + 1, 0),
     ));
@@ -435,9 +431,8 @@ pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let fixable = matches!(composite, CompositionKind::Simple)
             && msg.is_none()
-            && !has_comments_in(Range::from_located(stmt), checker.locator);
-        let mut diagnostic =
-            Diagnostic::new(CompositeAssertion { fixable }, Range::from_located(stmt));
+            && !has_comments_in(Range::from(stmt), checker.locator);
+        let mut diagnostic = Diagnostic::new(CompositeAssertion { fixable }, Range::from(stmt));
         if fixable && checker.patch(diagnostic.kind.rule()) {
             if let Ok(fix) = fix_composite_condition(stmt, checker.locator, checker.stylist) {
                 diagnostic.amend(fix);

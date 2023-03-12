@@ -1,17 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
-use crate::ast::types::{Range, ScopeKind};
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Range, ScopeKind};
 
-define_violation!(
-    pub struct UsedPriorGlobalDeclaration {
-        pub name: String,
-        pub line: usize,
-    }
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct UsedPriorGlobalDeclaration {
+    pub name: String,
+    pub line: usize,
+}
+
 impl Violation for UsedPriorGlobalDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -21,7 +21,7 @@ impl Violation for UsedPriorGlobalDeclaration {
 }
 /// PLE0118
 pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
-    let globals = match &checker.current_scope().kind {
+    let globals = match &checker.ctx.current_scope().kind {
         ScopeKind::Class(class_def) => &class_def.globals,
         ScopeKind::Function(function_def) => &function_def.globals,
         _ => return,
@@ -33,7 +33,7 @@ pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &E
                     name: name.to_string(),
                     line: stmt.location.row(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             ));
         }
     }

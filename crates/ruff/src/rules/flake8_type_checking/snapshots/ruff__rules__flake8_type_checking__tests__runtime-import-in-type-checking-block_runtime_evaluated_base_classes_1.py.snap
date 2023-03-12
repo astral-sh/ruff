@@ -1,0 +1,44 @@
+---
+source: crates/ruff/src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: RuntimeImportInTypeCheckingBlock
+    body: "Move import `datetime` out of type-checking block. Import is used for more than type hinting."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 11
+  end_location:
+    row: 10
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    name: RuntimeImportInTypeCheckingBlock
+    body: "Move import `array.array` out of type-checking block. Import is used for more than type hinting."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 11
+    column: 22
+  end_location:
+    row: 11
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    name: RuntimeImportInTypeCheckingBlock
+    body: "Move import `pandas` out of type-checking block. Import is used for more than type hinting."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 13
+    column: 11
+  end_location:
+    row: 13
+    column: 17
+  fix: ~
+  parent: ~
+

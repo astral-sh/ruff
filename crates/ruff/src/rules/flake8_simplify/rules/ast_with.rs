@@ -1,48 +1,49 @@
 use log::error;
 use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{AutofixKind, Availability, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
+use ruff_python_ast::types::Range;
 
-use crate::ast::helpers::{first_colon_range, has_comments_in};
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
 use super::fix_with;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for the unnecessary nesting of multiple consecutive context
-    /// managers.
-    ///
-    /// ## Why is this bad?
-    /// In Python 3, a single `with` block can include multiple context
-    /// managers.
-    ///
-    /// Combining multiple context managers into a single `with` statement
-    /// will minimize the indentation depth of the code, making it more
-    /// readable.
-    ///
-    /// ## Example
-    /// ```python
-    /// with A() as a:
-    ///     with B() as b:
-    ///         pass
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// with A() as a, B() as b:
-    ///     pass
-    /// ```
-    ///
-    /// ## References
-    /// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
-    pub struct MultipleWithStatements {
-        pub fixable: bool,
-    }
-);
+/// ## What it does
+/// Checks for the unnecessary nesting of multiple consecutive context
+/// managers.
+///
+/// ## Why is this bad?
+/// In Python 3, a single `with` block can include multiple context
+/// managers.
+///
+/// Combining multiple context managers into a single `with` statement
+/// will minimize the indentation depth of the code, making it more
+/// readable.
+///
+/// ## Example
+/// ```python
+/// with A() as a:
+///     with B() as b:
+///         pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// with A() as a, B() as b:
+///     pass
+/// ```
+///
+/// ## References
+/// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
+#[violation]
+pub struct MultipleWithStatements {
+    pub fixable: bool,
+}
+
 impl Violation for MultipleWithStatements {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -101,7 +102,7 @@ pub fn multiple_with_statements(
         let mut diagnostic = Diagnostic::new(
             MultipleWithStatements { fixable },
             colon.map_or_else(
-                || Range::from_located(with_stmt),
+                || Range::from(with_stmt),
                 |colon| Range::new(with_stmt.location, colon.end_location),
             ),
         );

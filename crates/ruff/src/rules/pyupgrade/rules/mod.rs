@@ -5,18 +5,20 @@ pub(crate) use convert_typed_dict_functional_to_class::{
     convert_typed_dict_functional_to_class, ConvertTypedDictFunctionalToClass,
 };
 pub(crate) use datetime_utc_alias::{datetime_utc_alias, DatetimeTimezoneUTC};
+pub(crate) use deprecated_import::{deprecated_import, DeprecatedImport};
 pub(crate) use deprecated_unittest_alias::{deprecated_unittest_alias, DeprecatedUnittestAlias};
 pub(crate) use extraneous_parentheses::{extraneous_parentheses, ExtraneousParentheses};
 pub(crate) use f_strings::{f_strings, FString};
 pub(crate) use format_literals::{format_literals, FormatLiterals};
 pub(crate) use functools_cache::{functools_cache, FunctoolsCache};
-pub(crate) use import_replacements::{import_replacements, ImportReplacements};
 pub(crate) use lru_cache_without_parameters::{
     lru_cache_without_parameters, LRUCacheWithoutParameters,
 };
 pub(crate) use native_literals::{native_literals, NativeLiterals};
 pub(crate) use open_alias::{open_alias, OpenAlias};
-pub(crate) use os_error_alias::{os_error_alias, OSErrorAlias};
+pub(crate) use os_error_alias::{
+    os_error_alias_call, os_error_alias_handlers, os_error_alias_raise, OSErrorAlias,
+};
 pub(crate) use outdated_version_block::{outdated_version_block, OutdatedVersionBlock};
 pub(crate) use printf_string_formatting::{printf_string_formatting, PrintfStringFormatting};
 pub(crate) use quoted_annotation::{quoted_annotation, QuotedAnnotation};
@@ -46,12 +48,12 @@ pub(crate) use useless_object_inheritance::{useless_object_inheritance, UselessO
 mod convert_named_tuple_functional_to_class;
 mod convert_typed_dict_functional_to_class;
 mod datetime_utc_alias;
+mod deprecated_import;
 mod deprecated_unittest_alias;
 mod extraneous_parentheses;
 mod f_strings;
 mod format_literals;
 mod functools_cache;
-mod import_replacements;
 mod lru_cache_without_parameters;
 mod native_literals;
 mod open_alias;

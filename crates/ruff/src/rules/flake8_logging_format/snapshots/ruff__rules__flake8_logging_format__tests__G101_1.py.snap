@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_logging_format/mod.rs
+source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LoggingExtraAttrClash: name
+    name: LoggingExtraAttrClash
+    body: "Logging statement uses an extra field that clashes with a LogRecord field: `name`"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 8

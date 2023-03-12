@@ -1,22 +1,22 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::types::Range;
 
-use crate::ast::helpers::{create_expr, unparse_expr};
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::{AsRule, Rule};
 
 use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
 
-define_violation!(
-    pub struct ParametrizeNamesWrongType {
-        pub expected: types::ParametrizeNameType,
-    }
-);
+#[violation]
+pub struct ParametrizeNamesWrongType {
+    pub expected: types::ParametrizeNameType,
+}
+
 impl AlwaysAutofixableViolation for ParametrizeNamesWrongType {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -30,12 +30,12 @@ impl AlwaysAutofixableViolation for ParametrizeNamesWrongType {
     }
 }
 
-define_violation!(
-    pub struct ParametrizeValuesWrongType {
-        pub values: types::ParametrizeValuesType,
-        pub row: types::ParametrizeValuesRowType,
-    }
-);
+#[violation]
+pub struct ParametrizeValuesWrongType {
+    pub values: types::ParametrizeValuesType,
+    pub row: types::ParametrizeValuesRowType,
+}
+
 impl Violation for ParametrizeValuesWrongType {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -97,7 +97,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from_located(expr),
+                            Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
@@ -130,7 +130,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from_located(expr),
+                            Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
@@ -172,7 +172,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from_located(expr),
+                            Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
@@ -194,7 +194,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from_located(expr),
+                            Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
@@ -223,7 +223,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from_located(expr),
+                            Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
@@ -248,7 +248,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             ParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from_located(expr),
+                            Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
@@ -295,7 +295,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                         values: values_type,
                         row: values_row_type,
                     },
-                    Range::from_located(values),
+                    Range::from(values),
                 ));
             }
             if is_multi_named {
@@ -309,7 +309,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                         values: values_type,
                         row: values_row_type,
                     },
-                    Range::from_located(values),
+                    Range::from(values),
                 ));
             }
             if is_multi_named {
@@ -325,7 +325,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
         ParametrizeNamesWrongType {
             expected: types::ParametrizeNameType::Csv,
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
 
     if checker.patch(diagnostic.kind.rule()) {
@@ -353,7 +353,7 @@ fn handle_value_rows(
                             values: values_type,
                             row: values_row_type,
                         },
-                        Range::from_located(elt),
+                        Range::from(elt),
                     ));
                 }
             }
@@ -364,7 +364,7 @@ fn handle_value_rows(
                             values: values_type,
                             row: values_row_type,
                         },
-                        Range::from_located(elt),
+                        Range::from(elt),
                     ));
                 }
             }

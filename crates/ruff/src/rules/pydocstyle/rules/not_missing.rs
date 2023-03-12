@@ -1,18 +1,20 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::cast;
+use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visibility::{
+    is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility,
+};
 
-use crate::ast::cast;
-use crate::ast::helpers::identifier_range;
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::Violation;
-use crate::visibility::{is_call, is_init, is_magic, is_new, is_overload, is_override, Visibility};
+use crate::registry::Rule;
 
-define_violation!(
-    pub struct PublicModule;
-);
+#[violation]
+pub struct PublicModule;
+
 impl Violation for PublicModule {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -20,9 +22,9 @@ impl Violation for PublicModule {
     }
 }
 
-define_violation!(
-    pub struct PublicClass;
-);
+#[violation]
+pub struct PublicClass;
+
 impl Violation for PublicClass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -30,9 +32,9 @@ impl Violation for PublicClass {
     }
 }
 
-define_violation!(
-    pub struct PublicMethod;
-);
+#[violation]
+pub struct PublicMethod;
+
 impl Violation for PublicMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,9 +42,9 @@ impl Violation for PublicMethod {
     }
 }
 
-define_violation!(
-    pub struct PublicFunction;
-);
+#[violation]
+pub struct PublicFunction;
+
 impl Violation for PublicFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -50,9 +52,9 @@ impl Violation for PublicFunction {
     }
 }
 
-define_violation!(
-    pub struct PublicPackage;
-);
+#[violation]
+pub struct PublicPackage;
+
 impl Violation for PublicPackage {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -60,9 +62,9 @@ impl Violation for PublicPackage {
     }
 }
 
-define_violation!(
-    pub struct MagicMethod;
-);
+#[violation]
+pub struct MagicMethod;
+
 impl Violation for MagicMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -70,9 +72,9 @@ impl Violation for MagicMethod {
     }
 }
 
-define_violation!(
-    pub struct PublicNestedClass;
-);
+#[violation]
+pub struct PublicNestedClass;
+
 impl Violation for PublicNestedClass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -80,9 +82,9 @@ impl Violation for PublicNestedClass {
     }
 }
 
-define_violation!(
-    pub struct PublicInit;
-);
+#[violation]
+pub struct PublicInit;
+
 impl Violation for PublicInit {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -138,7 +140,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Function(stmt) | DefinitionKind::NestedFunction(stmt) => {
-            if is_overload(checker, cast::decorator_list(stmt)) {
+            if is_overload(&checker.ctx, cast::decorator_list(stmt)) {
                 true
             } else {
                 if checker.settings.rules.enabled(&Rule::PublicFunction) {
@@ -151,8 +153,8 @@ pub fn not_missing(
             }
         }
         DefinitionKind::Method(stmt) => {
-            if is_overload(checker, cast::decorator_list(stmt))
-                || is_override(checker, cast::decorator_list(stmt))
+            if is_overload(&checker.ctx, cast::decorator_list(stmt))
+                || is_override(&checker.ctx, cast::decorator_list(stmt))
             {
                 true
             } else if is_init(cast::name(stmt)) {

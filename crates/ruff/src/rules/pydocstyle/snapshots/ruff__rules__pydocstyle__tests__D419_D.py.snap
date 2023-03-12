@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    EmptyDocstring: ~
+    name: EmptyDocstring
+    body: Docstring is empty
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 8
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyDocstring: ~
+    name: EmptyDocstring
+    body: Docstring is empty
+    suggestion: ~
+    fixable: false
   location:
     row: 74
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    EmptyDocstring: ~
+    name: EmptyDocstring
+    body: Docstring is empty
+    suggestion: ~
+    fixable: false
   location:
     row: 80
     column: 8

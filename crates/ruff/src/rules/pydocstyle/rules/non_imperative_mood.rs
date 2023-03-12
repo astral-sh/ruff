@@ -2,17 +2,17 @@ use std::collections::BTreeSet;
 
 use imperative::Mood;
 use once_cell::sync::Lazy;
-use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::cast;
-use crate::ast::helpers::to_call_path;
-use crate::ast::types::{CallPath, Range};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::cast;
+use ruff_python_ast::helpers::to_call_path;
+use ruff_python_ast::types::{CallPath, Range};
+use ruff_python_ast::visibility::{is_property, is_test};
+
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
-use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;
-use crate::violation::Violation;
-use crate::visibility::{is_property, is_test};
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 
@@ -36,7 +36,11 @@ pub fn non_imperative_mood(
         .collect::<Vec<CallPath>>();
 
     if is_test(cast::name(parent))
-        || is_property(checker, cast::decorator_list(parent), &property_decorators)
+        || is_property(
+            &checker.ctx,
+            cast::decorator_list(parent),
+            &property_decorators,
+        )
     {
         return;
     }
@@ -59,15 +63,15 @@ pub fn non_imperative_mood(
     if let Some(false) = MOOD.is_imperative(&first_word_norm) {
         let diagnostic = Diagnostic::new(
             NonImperativeMood(line.to_string()),
-            Range::from_located(docstring.expr),
+            Range::from(docstring.expr),
         );
         checker.diagnostics.push(diagnostic);
     }
 }
 
-define_violation!(
-    pub struct NonImperativeMood(pub String);
-);
+#[violation]
+pub struct NonImperativeMood(pub String);
+
 impl Violation for NonImperativeMood {
     #[derive_message_formats]
     fn message(&self) -> String {

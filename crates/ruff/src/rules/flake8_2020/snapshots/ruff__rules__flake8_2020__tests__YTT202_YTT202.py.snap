@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_2020/mod.rs
+source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SixPY3Referenced: ~
+    name: SixPY3Referenced
+    body: "`six.PY3` referenced (python4), use `not six.PY2`"
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 3
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SixPY3Referenced: ~
+    name: SixPY3Referenced
+    body: "`six.PY3` referenced (python4), use `not six.PY2`"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 3

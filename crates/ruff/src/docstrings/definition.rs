@@ -1,3 +1,6 @@
+use ruff_python_ast::visibility::{
+    class_visibility, function_visibility, method_visibility, Modifier, Visibility, VisibleScope,
+};
 use rustpython_parser::ast::{Expr, Stmt};
 
 #[derive(Debug, Clone)]
@@ -29,4 +32,37 @@ pub struct Docstring<'a> {
 pub enum Documentable {
     Class,
     Function,
+}
+
+pub fn transition_scope(scope: &VisibleScope, stmt: &Stmt, kind: &Documentable) -> VisibleScope {
+    match kind {
+        Documentable::Function => VisibleScope {
+            modifier: Modifier::Function,
+            visibility: match scope {
+                VisibleScope {
+                    modifier: Modifier::Module,
+                    visibility: Visibility::Public,
+                } => function_visibility(stmt),
+                VisibleScope {
+                    modifier: Modifier::Class,
+                    visibility: Visibility::Public,
+                } => method_visibility(stmt),
+                _ => Visibility::Private,
+            },
+        },
+        Documentable::Class => VisibleScope {
+            modifier: Modifier::Class,
+            visibility: match scope {
+                VisibleScope {
+                    modifier: Modifier::Module,
+                    visibility: Visibility::Public,
+                } => class_visibility(stmt),
+                VisibleScope {
+                    modifier: Modifier::Class,
+                    visibility: Visibility::Public,
+                } => class_visibility(stmt),
+                _ => Visibility::Private,
+            },
+        },
+    }
 }

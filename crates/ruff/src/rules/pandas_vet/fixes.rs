@@ -1,11 +1,12 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Location};
 
-use crate::ast::helpers;
-use crate::ast::types::Range;
+use ruff_diagnostics::Fix;
+use ruff_python_ast::helpers;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
 use crate::autofix::apply_fix;
 use crate::autofix::helpers::remove_argument;
-use crate::fix::Fix;
-use crate::source_code::Locator;
 
 fn match_name(expr: &Expr) -> Option<&str> {
     if let ExprKind::Call { func, .. } = &expr.node {
@@ -50,7 +51,7 @@ pub fn fix_inplace_argument(
 
         // Apply the deletion step.
         // TODO(charlie): Find a way to
-        let contents = locator.slice(&Range::new(expr.location, expr.end_location.unwrap()));
+        let contents = locator.slice(Range::new(expr.location, expr.end_location.unwrap()));
         let output = apply_fix(&fix_me, &Locator::new(contents));
 
         // Obtain the name prefix.

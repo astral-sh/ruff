@@ -1,19 +1,19 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
 
-use crate::ast::helpers::{create_expr, unparse_expr};
-use crate::ast::types::{Range, ScopeKind};
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::types::{Range, ScopeKind};
 
-define_violation!(
-    pub struct NegateEqualOp {
-        pub left: String,
-        pub right: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct NegateEqualOp {
+    pub left: String,
+    pub right: String,
+}
+
 impl AlwaysAutofixableViolation for NegateEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -26,12 +26,12 @@ impl AlwaysAutofixableViolation for NegateEqualOp {
     }
 }
 
-define_violation!(
-    pub struct NegateNotEqualOp {
-        pub left: String,
-        pub right: String,
-    }
-);
+#[violation]
+pub struct NegateNotEqualOp {
+    pub left: String,
+    pub right: String,
+}
+
 impl AlwaysAutofixableViolation for NegateNotEqualOp {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -44,11 +44,11 @@ impl AlwaysAutofixableViolation for NegateNotEqualOp {
     }
 }
 
-define_violation!(
-    pub struct DoubleNegation {
-        pub expr: String,
-    }
-);
+#[violation]
+pub struct DoubleNegation {
+    pub expr: String,
+}
+
 impl AlwaysAutofixableViolation for DoubleNegation {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -88,12 +88,12 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     if !matches!(&ops[..], [Cmpop::Eq]) {
         return;
     }
-    if is_exception_check(checker.current_stmt()) {
+    if is_exception_check(checker.ctx.current_stmt()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.current_scope().kind {
+    if let ScopeKind::Function(def) = &checker.ctx.current_scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }
@@ -104,7 +104,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
             left: unparse_expr(left, checker.stylist),
             right: unparse_expr(&comparators[0], checker.stylist),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
@@ -139,12 +139,12 @@ pub fn negation_with_not_equal_op(
     if !matches!(&ops[..], [Cmpop::NotEq]) {
         return;
     }
-    if is_exception_check(checker.current_stmt()) {
+    if is_exception_check(checker.ctx.current_stmt()) {
         return;
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.current_scope().kind {
+    if let ScopeKind::Function(def) = &checker.ctx.current_scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }
@@ -155,7 +155,7 @@ pub fn negation_with_not_equal_op(
             left: unparse_expr(left, checker.stylist),
             right: unparse_expr(&comparators[0], checker.stylist),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
@@ -190,7 +190,7 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
         DoubleNegation {
             expr: unparse_expr(operand, checker.stylist),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(

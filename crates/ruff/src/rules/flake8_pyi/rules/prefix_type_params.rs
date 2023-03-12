@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Expr, ExprKind};
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use rustpython_parser::ast::{Expr, ExprKind};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
+use crate::checkers::ast::Checker;
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum VarKind {
     TypeVar,
     ParamSpec,
@@ -25,32 +25,32 @@ impl fmt::Display for VarKind {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks that type `TypeVar`, `ParamSpec`, and `TypeVarTuple` definitions in
-    /// stubs are prefixed with `_`.
-    ///
-    /// ## Why is this bad?
-    /// By prefixing type parameters with `_`, we can avoid accidentally exposing
-    /// names internal to the stub.
-    ///
-    /// ## Example
-    /// ```python
-    /// from typing import TypeVar
-    ///
-    /// T = TypeVar("T")
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// from typing import TypeVar
-    ///
-    /// _T = TypeVar("_T")
-    /// ```
-    pub struct PrefixTypeParams {
-        pub kind: VarKind,
-    }
-);
+/// ## What it does
+/// Checks that type `TypeVar`, `ParamSpec`, and `TypeVarTuple` definitions in
+/// stubs are prefixed with `_`.
+///
+/// ## Why is this bad?
+/// By prefixing type parameters with `_`, we can avoid accidentally exposing
+/// names internal to the stub.
+///
+/// ## Example
+/// ```python
+/// from typing import TypeVar
+///
+/// T = TypeVar("T")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from typing import TypeVar
+///
+/// _T = TypeVar("_T")
+/// ```
+#[violation]
+pub struct PrefixTypeParams {
+    pub kind: VarKind,
+}
+
 impl Violation for PrefixTypeParams {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -71,12 +71,12 @@ pub fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr])
     };
 
     if let ExprKind::Call { func, .. } = &value.node {
-        let Some(kind) = checker.resolve_call_path(func).and_then(|call_path| {
-            if checker.match_typing_call_path(&call_path, "ParamSpec") {
+        let Some(kind) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
+            if checker.ctx.match_typing_call_path(&call_path, "ParamSpec") {
                 Some(VarKind::ParamSpec)
-            } else if checker.match_typing_call_path(&call_path, "TypeVar") {
+            } else if checker.ctx.match_typing_call_path(&call_path, "TypeVar") {
                 Some(VarKind::TypeVar)
-            } else if checker.match_typing_call_path(&call_path, "TypeVarTuple") {
+            } else if checker.ctx.match_typing_call_path(&call_path, "TypeVarTuple") {
                 Some(VarKind::TypeVarTuple)
             } else {
                 None
@@ -86,7 +86,7 @@ pub fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr])
         };
         checker.diagnostics.push(Diagnostic::new(
             PrefixTypeParams { kind },
-            Range::from_located(value),
+            Range::from(value),
         ));
     }
 }

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryGeneratorList: ~
+    name: UnnecessaryGeneratorList
+    body: "Unnecessary generator (rewrite as a `list` comprehension)"
+    suggestion: "Rewrite as a `list` comprehension"
+    fixable: true
   location:
     row: 1
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UnnecessaryGeneratorList: ~
+    name: UnnecessaryGeneratorList
+    body: "Unnecessary generator (rewrite as a `list` comprehension)"
+    suggestion: "Rewrite as a `list` comprehension"
+    fixable: true
   location:
     row: 2
     column: 4

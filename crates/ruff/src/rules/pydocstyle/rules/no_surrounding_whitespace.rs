@@ -1,18 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::str::leading_quote;
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 
-use crate::ast::types::Range;
-use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
-use crate::rules::pydocstyle::helpers::leading_quote;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct NoSurroundingWhitespace;
-);
+#[violation]
+pub struct NoSurroundingWhitespace;
+
 impl AlwaysAutofixableViolation for NoSurroundingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,8 +39,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     if line == trimmed {
         return;
     }
-    let mut diagnostic =
-        Diagnostic::new(NoSurroundingWhitespace, Range::from_located(docstring.expr));
+    let mut diagnostic = Diagnostic::new(NoSurroundingWhitespace, Range::from(docstring.expr));
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(pattern) = leading_quote(contents) {
             // If removing whitespace would lead to an invalid string of quote

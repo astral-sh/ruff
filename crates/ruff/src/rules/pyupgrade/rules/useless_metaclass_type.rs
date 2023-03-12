@@ -1,16 +1,17 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::autofix::helpers;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct UselessMetaclassType;
-);
+#[violation]
+pub struct UselessMetaclassType;
+
 impl AlwaysAutofixableViolation for UselessMetaclassType {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -44,20 +45,16 @@ fn rule(targets: &[Expr], value: &Expr, location: Range) -> Option<Diagnostic> {
 /// UP001
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
     let Some(mut diagnostic) =
-        rule(targets, value, Range::from_located(stmt)) else {
+        rule(targets, value, Range::from(stmt)) else {
             return;
         };
     if checker.patch(diagnostic.kind.rule()) {
-        let deleted: Vec<&Stmt> = checker
-            .deletions
-            .iter()
-            .map(std::convert::Into::into)
-            .collect();
-        let defined_by = checker.current_stmt();
-        let defined_in = checker.current_stmt_parent();
+        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
+        let defined_by = checker.ctx.current_stmt();
+        let defined_in = checker.ctx.current_stmt_parent();
         match helpers::delete_stmt(
             defined_by.into(),
-            defined_in.map(std::convert::Into::into),
+            defined_in.map(Into::into),
             &deleted,
             checker.locator,
             checker.indexer,

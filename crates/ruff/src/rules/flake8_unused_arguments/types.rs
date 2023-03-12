@@ -1,5 +1,8 @@
+use ruff_diagnostics::DiagnosticKind;
+
+use crate::registry::Rule;
+
 use super::rules;
-use crate::registry::{DiagnosticKind, Rule};
 
 /// An AST node that can contain arguments.
 pub enum Argumentable {

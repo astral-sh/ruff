@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::Violation;
+use crate::registry::Rule;
 
-define_violation!(
-    pub struct EmptyDocstring;
-);
+#[violation]
+pub struct EmptyDocstring;
+
 impl Violation for EmptyDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -23,10 +23,9 @@ pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
     }
 
     if checker.settings.rules.enabled(&Rule::EmptyDocstring) {
-        checker.diagnostics.push(Diagnostic::new(
-            EmptyDocstring,
-            Range::from_located(docstring.expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(EmptyDocstring, Range::from(docstring.expr)));
     }
     false
 }

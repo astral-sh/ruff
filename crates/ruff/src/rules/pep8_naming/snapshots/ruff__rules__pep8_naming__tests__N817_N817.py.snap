@@ -1,11 +1,12 @@
 ---
-source: src/rules/pep8_naming/mod.rs
+source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CamelcaseImportedAsAcronym:
-      name: CaMel
-      asname: CM
+    name: CamelcaseImportedAsAcronym
+    body: "CamelCase `CaMel` imported as acronym `CM`"
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CamelcaseImportedAsAcronym:
-      name: CamelCase
-      asname: CC
+    name: CamelcaseImportedAsAcronym
+    body: "CamelCase `CamelCase` imported as acronym `CC`"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 0

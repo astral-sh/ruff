@@ -1,19 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::str::TRIPLE_QUOTE_PREFIXES;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::str::{is_triple_quote, leading_quote};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 
-use crate::ast::types::Range;
-use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
-use crate::rules::pydocstyle::helpers::leading_quote;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::{AsRule, Rule};
 
-define_violation!(
-    pub struct MultiLineSummaryFirstLine;
-);
+#[violation]
+pub struct MultiLineSummaryFirstLine;
+
 impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -25,9 +23,9 @@ impl AlwaysAutofixableViolation for MultiLineSummaryFirstLine {
     }
 }
 
-define_violation!(
-    pub struct MultiLineSummarySecondLine;
-);
+#[violation]
+pub struct MultiLineSummarySecondLine;
+
 impl AlwaysAutofixableViolation for MultiLineSummarySecondLine {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -54,16 +52,14 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     {
         return;
     };
-    if TRIPLE_QUOTE_PREFIXES.contains(&first_line) {
+    if is_triple_quote(first_line) {
         if checker
             .settings
             .rules
             .enabled(&Rule::MultiLineSummaryFirstLine)
         {
-            let mut diagnostic = Diagnostic::new(
-                MultiLineSummaryFirstLine,
-                Range::from_located(docstring.expr),
-            );
+            let mut diagnostic =
+                Diagnostic::new(MultiLineSummaryFirstLine, Range::from(docstring.expr));
             if checker.patch(diagnostic.kind.rule()) {
                 let location = docstring.expr.location;
                 let mut end_row = location.row() + 1;
@@ -87,10 +83,8 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
             .rules
             .enabled(&Rule::MultiLineSummarySecondLine)
         {
-            let mut diagnostic = Diagnostic::new(
-                MultiLineSummarySecondLine,
-                Range::from_located(docstring.expr),
-            );
+            let mut diagnostic =
+                Diagnostic::new(MultiLineSummarySecondLine, Range::from(docstring.expr));
             if checker.patch(diagnostic.kind.rule()) {
                 let mut indentation = String::from(docstring.indentation);
                 let mut fixable = true;
@@ -105,7 +99,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                     | DefinitionKind::NestedFunction(parent)
                     | DefinitionKind::Method(parent) = &docstring.kind
                     {
-                        let parent_indentation = checker.locator.slice(&Range::new(
+                        let parent_indentation = checker.locator.slice(Range::new(
                             Location::new(parent.location.row(), 0),
                             Location::new(parent.location.row(), parent.location.column()),
                         ));

@@ -2,14 +2,33 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::registry::DiagnosticKind;
-use crate::violation::Violation;
+use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Violation;
+use ruff_macros::{derive_message_formats, violation};
 
-define_violation!(
-    pub struct TabBeforeOperator;
-);
+/// ## What it does
+/// Checks for extraneous tabs before an operator.
+///
+/// ## Why is this bad?
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
+///
+/// ## Example
+/// ```python
+/// a = 4\t+ 5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 12 + 3
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
+#[violation]
+pub struct TabBeforeOperator;
+
 impl Violation for TabBeforeOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -17,9 +36,28 @@ impl Violation for TabBeforeOperator {
     }
 }
 
-define_violation!(
-    pub struct MultipleSpacesBeforeOperator;
-);
+/// ## What it does
+/// Checks for extraneous whitespace before an operator.
+///
+/// ## Why is this bad?
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
+///
+/// ## Example
+/// ```python
+/// a = 4  + 5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 12 + 3
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
+#[violation]
+pub struct MultipleSpacesBeforeOperator;
+
 impl Violation for MultipleSpacesBeforeOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -27,9 +65,28 @@ impl Violation for MultipleSpacesBeforeOperator {
     }
 }
 
-define_violation!(
-    pub struct TabAfterOperator;
-);
+/// ## What it does
+/// Checks for extraneous tabs after an operator.
+///
+/// ## Why is this bad?
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
+///
+/// ## Example
+/// ```python
+/// a = 4 +\t5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 12 + 3
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
+#[violation]
+pub struct TabAfterOperator;
+
 impl Violation for TabAfterOperator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -37,9 +94,28 @@ impl Violation for TabAfterOperator {
     }
 }
 
-define_violation!(
-    pub struct MultipleSpacesAfterOperator;
-);
+/// ## What it does
+/// Checks for extraneous whitespace after an operator.
+///
+/// ## Why is this bad?
+/// Per PEP 8, operators should be surrounded by at most a single space on either
+/// side.
+///
+/// ## Example
+/// ```python
+/// a = 4 +  5
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 12 + 3
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#whitespace-in-expressions-and-statements)
+#[violation]
+pub struct MultipleSpacesAfterOperator;
+
 impl Violation for MultipleSpacesAfterOperator {
     #[derive_message_formats]
     fn message(&self) -> String {

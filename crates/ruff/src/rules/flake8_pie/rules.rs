@@ -1,25 +1,32 @@
-use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::identifiers::is_identifier;
-use ruff_python::keyword::KWLIST;
-use rustc_hash::FxHashSet;
-use rustpython_parser::ast::{Boolop, Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use itertools::Either::{Left, Right};
+use std::collections::BTreeMap;
+use std::iter;
 
-use crate::ast::comparable::ComparableExpr;
-use crate::ast::helpers::{match_trailing_comment, unparse_expr};
-use crate::ast::types::{Range, RefEquality};
+use log::error;
+use rustc_hash::FxHashSet;
+use rustpython_parser::ast::{
+    Boolop, Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind,
+};
+
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::{create_expr, match_trailing_comment, unparse_expr};
+use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_stdlib::keyword::KWLIST;
+
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::AsRule;
 
 use super::fixes;
 
-define_violation!(
-    pub struct UnnecessaryPass;
-);
+#[violation]
+pub struct UnnecessaryPass;
+
 impl AlwaysAutofixableViolation for UnnecessaryPass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -31,9 +38,9 @@ impl AlwaysAutofixableViolation for UnnecessaryPass {
     }
 }
 
-define_violation!(
-    pub struct DupeClassFieldDefinitions(pub String);
-);
+#[violation]
+pub struct DupeClassFieldDefinitions(pub String);
+
 impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,11 +54,11 @@ impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
     }
 }
 
-define_violation!(
-    pub struct PreferUniqueEnums {
-        pub value: String,
-    }
-);
+#[violation]
+pub struct PreferUniqueEnums {
+    pub value: String,
+}
+
 impl Violation for PreferUniqueEnums {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -60,39 +67,39 @@ impl Violation for PreferUniqueEnums {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for unnecessary list comprehensions passed to `any` and `all`.
-    ///
-    /// ## Why is this bad?
-    /// `any` and `all` take any iterators, including generators. Converting a generator to a list
-    /// by way of a list comprehension is unnecessary and reduces performance due to the
-    /// overhead of creating the list.
-    ///
-    /// For example, compare the performance of `all` with a list comprehension against that
-    /// of a generator (~40x faster here):
-    ///
-    /// ```console
-    /// In [1]: %timeit all([i for i in range(1000)])
-    /// 8.14 µs ± 25.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-    ///
-    /// In [2]: %timeit all(i for i in range(1000))
-    /// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
-    /// ```
-    ///
-    /// ## Examples
-    /// ```python
-    /// any([x.id for x in bar])
-    /// all([x.id for x in bar])
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// any(x.id for x in bar)
-    /// all(x.id for x in bar)
-    /// ```
-    pub struct UnnecessaryComprehensionAnyAll;
-);
+/// ## What it does
+/// Checks for unnecessary list comprehensions passed to `any` and `all`.
+///
+/// ## Why is this bad?
+/// `any` and `all` take any iterators, including generators. Converting a generator to a list
+/// by way of a list comprehension is unnecessary and reduces performance due to the
+/// overhead of creating the list.
+///
+/// For example, compare the performance of `all` with a list comprehension against that
+/// of a generator (~40x faster here):
+///
+/// ```console
+/// In [1]: %timeit all([i for i in range(1000)])
+/// 8.14 µs ± 25.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
+///
+/// In [2]: %timeit all(i for i in range(1000))
+/// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
+/// ```
+///
+/// ## Examples
+/// ```python
+/// any([x.id for x in bar])
+/// all([x.id for x in bar])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// any(x.id for x in bar)
+/// all(x.id for x in bar)
+/// ```
+#[violation]
+pub struct UnnecessaryComprehensionAnyAll;
+
 impl AlwaysAutofixableViolation for UnnecessaryComprehensionAnyAll {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -104,9 +111,9 @@ impl AlwaysAutofixableViolation for UnnecessaryComprehensionAnyAll {
     }
 }
 
-define_violation!(
-    pub struct UnnecessarySpread;
-);
+#[violation]
+pub struct UnnecessarySpread;
+
 impl Violation for UnnecessarySpread {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -114,22 +121,27 @@ impl Violation for UnnecessarySpread {
     }
 }
 
-define_violation!(
-    pub struct SingleStartsEndsWith {
-        pub attr: String,
-    }
-);
-impl Violation for SingleStartsEndsWith {
+#[violation]
+pub struct SingleStartsEndsWith {
+    pub attr: String,
+}
+
+impl AlwaysAutofixableViolation for SingleStartsEndsWith {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SingleStartsEndsWith { attr } = self;
         format!("Call `{attr}` once with a `tuple`")
     }
+
+    fn autofix_title(&self) -> String {
+        let SingleStartsEndsWith { attr } = self;
+        format!("Merge into a single `{attr}` call")
+    }
 }
 
-define_violation!(
-    pub struct UnnecessaryDictKwargs;
-);
+#[violation]
+pub struct UnnecessaryDictKwargs;
+
 impl Violation for UnnecessaryDictKwargs {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -137,9 +149,9 @@ impl Violation for UnnecessaryDictKwargs {
     }
 }
 
-define_violation!(
-    pub struct PreferListBuiltin;
-);
+#[violation]
+pub struct PreferListBuiltin;
+
 impl AlwaysAutofixableViolation for PreferListBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -169,8 +181,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             }
         ) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
-                let mut diagnostic =
-                    Diagnostic::new(UnnecessaryPass, Range::from_located(pass_stmt));
+                let mut diagnostic = Diagnostic::new(UnnecessaryPass, Range::from(pass_stmt));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = match_trailing_comment(pass_stmt, checker.locator) {
                         diagnostic.amend(Fix::deletion(
@@ -239,14 +250,10 @@ pub fn dupe_class_field_definitions<'a, 'b>(
         if !seen_targets.insert(target) {
             let mut diagnostic = Diagnostic::new(
                 DupeClassFieldDefinitions(target.to_string()),
-                Range::from_located(stmt),
+                Range::from(stmt),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                let deleted: Vec<&Stmt> = checker
-                    .deletions
-                    .iter()
-                    .map(std::convert::Into::into)
-                    .collect();
+                let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                 let locator = checker.locator;
                 match delete_stmt(
                     stmt,
@@ -281,6 +288,7 @@ where
 
     if !bases.iter().any(|expr| {
         checker
+            .ctx
             .resolve_call_path(expr)
             .map_or(false, |call_path| call_path.as_slice() == ["enum", "Enum"])
     }) {
@@ -295,6 +303,7 @@ where
 
         if let ExprKind::Call { func, .. } = &value.node {
             if checker
+                .ctx
                 .resolve_call_path(func)
                 .map_or(false, |call_path| call_path.as_slice() == ["enum", "auto"])
             {
@@ -307,7 +316,7 @@ where
                 PreferUniqueEnums {
                     value: unparse_expr(value, checker.stylist),
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             );
             checker.diagnostics.push(diagnostic);
         }
@@ -321,7 +330,7 @@ pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], value
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
             if let ExprKind::Dict { .. } = value.node {
-                let diagnostic = Diagnostic::new(UnnecessarySpread, Range::from_located(value));
+                let diagnostic = Diagnostic::new(UnnecessarySpread, Range::from(value));
                 checker.diagnostics.push(diagnostic);
             }
         }
@@ -337,17 +346,17 @@ pub fn unnecessary_comprehension_any_all(
 ) {
     if let ExprKind::Name { id, .. } = &func.node {
         if (id == "all" || id == "any") && args.len() == 1 {
-            if !checker.is_builtin(id) {
+            if !checker.ctx.is_builtin(id) {
                 return;
             }
             if let ExprKind::ListComp { .. } = args[0].node {
                 let mut diagnostic =
-                    Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from_located(expr));
+                    Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
                 if checker.patch(diagnostic.kind.rule()) {
                     match fixes::fix_unnecessary_comprehension_any_all(
                         checker.locator,
                         checker.stylist,
-                        &args[0],
+                        expr,
                     ) {
                         Ok(fix) => {
                             diagnostic.amend(fix);
@@ -385,8 +394,7 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
                     // handle case of foo(**{**bar})
                     (keys.len() == 1 && keys[0].is_none())
                 {
-                    let diagnostic =
-                        Diagnostic::new(UnnecessaryDictKwargs, Range::from_located(expr));
+                    let diagnostic = Diagnostic::new(UnnecessaryDictKwargs, Range::from(expr));
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -395,39 +403,116 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
 }
 
 /// PIE810
-pub fn single_starts_ends_with(checker: &mut Checker, values: &[Expr], node: &Boolop) {
-    if *node != Boolop::Or {
+pub fn single_starts_ends_with(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
         return;
-    }
+    };
 
-    // Given `foo.startswith`, insert ("foo", "startswith") into the set.
-    let mut seen = FxHashSet::default();
-    for expr in values {
-        if let ExprKind::Call {
+    let mut duplicates = BTreeMap::new();
+    for (index, call) in values.iter().enumerate() {
+        let ExprKind::Call {
             func,
             args,
             keywords,
             ..
-        } = &expr.node
-        {
-            if !(args.len() == 1 && keywords.is_empty()) {
-                continue;
+        } = &call.node else {
+            continue
+        };
+
+        if !(args.len() == 1 && keywords.is_empty()) {
+            continue;
+        }
+
+        let ExprKind::Attribute { value, attr, .. } = &func.node else {
+            continue
+        };
+
+        if attr != "startswith" && attr != "endswith" {
+            continue;
+        }
+
+        let ExprKind::Name { id: arg_name, .. } = &value.node else {
+            continue
+        };
+
+        duplicates
+            .entry((attr.as_str(), arg_name.as_str()))
+            .or_insert_with(Vec::new)
+            .push(index);
+    }
+
+    // Generate a `Diagnostic` for each duplicate.
+    for ((attr_name, arg_name), indices) in duplicates {
+        if indices.len() > 1 {
+            let mut diagnostic = Diagnostic::new(
+                SingleStartsEndsWith {
+                    attr: attr_name.to_string(),
+                },
+                Range::from(expr),
+            );
+            if checker.patch(diagnostic.kind.rule()) {
+                let words: Vec<&Expr> = indices
+                    .iter()
+                    .map(|index| &values[*index])
+                    .map(|expr| {
+                        let ExprKind::Call { func: _, args, keywords: _} = &expr.node else {
+                            unreachable!("{}", format!("Indices should only contain `{attr_name}` calls"))
+                        };
+                        args.get(0)
+                            .unwrap_or_else(|| panic!("`{attr_name}` should have one argument"))
+                    })
+                    .collect();
+
+                let call = create_expr(ExprKind::Call {
+                    func: Box::new(create_expr(ExprKind::Attribute {
+                        value: Box::new(create_expr(ExprKind::Name {
+                            id: arg_name.to_string(),
+                            ctx: ExprContext::Load,
+                        })),
+                        attr: attr_name.to_string(),
+                        ctx: ExprContext::Load,
+                    })),
+                    args: vec![create_expr(ExprKind::Tuple {
+                        elts: words
+                            .iter()
+                            .flat_map(|value| {
+                                if let ExprKind::Tuple { elts, .. } = &value.node {
+                                    Left(elts.iter())
+                                } else {
+                                    Right(iter::once(*value))
+                                }
+                            })
+                            .map(Clone::clone)
+                            .collect(),
+                        ctx: ExprContext::Load,
+                    })],
+                    keywords: vec![],
+                });
+
+                // Generate the combined `BoolOp`.
+                let mut call = Some(call);
+                let bool_op = create_expr(ExprKind::BoolOp {
+                    op: Boolop::Or,
+                    values: values
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, elt)| {
+                            if indices.contains(&index) {
+                                std::mem::take(&mut call)
+                            } else {
+                                Some(elt.clone())
+                            }
+                        })
+                        .collect(),
+                });
+
+                diagnostic.amend(Fix::replacement(
+                    unparse_expr(&bool_op, checker.stylist),
+                    expr.location,
+                    expr.end_location.unwrap(),
+                ));
             }
-            if let ExprKind::Attribute { value, attr, .. } = &func.node {
-                if attr != "startswith" && attr != "endswith" {
-                    continue;
-                }
-                if let ExprKind::Name { id, .. } = &value.node {
-                    if !seen.insert((id, attr)) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            SingleStartsEndsWith {
-                                attr: attr.to_string(),
-                            },
-                            Range::from_located(value),
-                        ));
-                    }
-                }
-            }
+            checker.diagnostics.push(diagnostic);
         }
     }
 }
@@ -445,7 +530,7 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
     {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
-                let mut diagnostic = Diagnostic::new(PreferListBuiltin, Range::from_located(expr));
+                let mut diagnostic = Diagnostic::new(PreferListBuiltin, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         "list".to_string(),

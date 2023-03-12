@@ -1,18 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace;
+use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 
-use crate::ast::types::Range;
-use crate::ast::whitespace;
-use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct NewLineAfterLastParagraph;
-);
+#[violation]
+pub struct NewLineAfterLastParagraph;
+
 impl AlwaysAutofixableViolation for NewLineAfterLastParagraph {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -37,10 +36,8 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
         if line_count > 1 {
             if let Some(last_line) = contents.lines().last().map(str::trim) {
                 if last_line != "\"\"\"" && last_line != "'''" {
-                    let mut diagnostic = Diagnostic::new(
-                        NewLineAfterLastParagraph,
-                        Range::from_located(docstring.expr),
-                    );
+                    let mut diagnostic =
+                        Diagnostic::new(NewLineAfterLastParagraph, Range::from(docstring.expr));
                     if checker.patch(diagnostic.kind.rule()) {
                         // Insert a newline just before the end-quote(s).
                         let num_trailing_quotes = "'''".len();

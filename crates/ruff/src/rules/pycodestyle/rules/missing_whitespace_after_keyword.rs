@@ -3,15 +3,15 @@
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Violation;
+use ruff_macros::{derive_message_formats, violation};
 
-use crate::registry::DiagnosticKind;
 use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct MissingWhitespaceAfterKeyword;
-);
+#[violation]
+pub struct MissingWhitespaceAfterKeyword;
+
 impl Violation for MissingWhitespaceAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {

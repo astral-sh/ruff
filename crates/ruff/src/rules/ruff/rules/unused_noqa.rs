@@ -1,21 +1,20 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
-use serde::{Deserialize, Serialize};
 
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::AlwaysAutofixableViolation;
+use ruff_macros::{derive_message_formats, violation};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct UnusedCodes {
     pub unknown: Vec<String>,
     pub disabled: Vec<String>,
     pub unmatched: Vec<String>,
 }
 
-define_violation!(
-    pub struct UnusedNOQA {
-        pub codes: Option<UnusedCodes>,
-    }
-);
+#[violation]
+pub struct UnusedNOQA {
+    pub codes: Option<UnusedCodes>,
+}
+
 impl AlwaysAutofixableViolation for UnusedNOQA {
     #[derive_message_formats]
     fn message(&self) -> String {

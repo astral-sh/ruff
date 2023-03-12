@@ -1,18 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    // TODO: document referencing [PEP 585]: https://peps.python.org/pep-0585/
-    pub struct DeprecatedCollectionType {
-        pub name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+// TODO: document referencing [PEP 585]: https://peps.python.org/pep-0585/
+#[violation]
+pub struct DeprecatedCollectionType {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for DeprecatedCollectionType {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -33,6 +33,7 @@ impl AlwaysAutofixableViolation for DeprecatedCollectionType {
 /// UP006
 pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
     if let Some(binding) = checker
+        .ctx
         .resolve_call_path(expr)
         .and_then(|call_path| call_path.last().copied())
     {
@@ -40,11 +41,11 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
             DeprecatedCollectionType {
                 name: binding.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
             let binding = binding.to_lowercase();
-            if checker.is_builtin(&binding) {
+            if checker.ctx.is_builtin(&binding) {
                 diagnostic.amend(Fix::replacement(
                     binding,
                     expr.location,

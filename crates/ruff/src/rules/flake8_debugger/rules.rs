@@ -1,20 +1,21 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, Stmt};
 
-use super::types::DebuggerUsingType;
-use crate::ast::helpers::format_call_path;
-use crate::ast::types::Range;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::format_call_path;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+
+use super::types::DebuggerUsingType;
 
 // flake8-debugger
 
-define_violation!(
-    pub struct Debugger {
-        pub using_type: DebuggerUsingType,
-    }
-);
+#[violation]
+pub struct Debugger {
+    pub using_type: DebuggerUsingType,
+}
+
 impl Violation for Debugger {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -46,7 +47,7 @@ const DEBUGGERS: &[&[&str]] = &[
 
 /// Checks for the presence of a debugger call.
 pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
-    if let Some(target) = checker.resolve_call_path(func).and_then(|call_path| {
+    if let Some(target) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
         DEBUGGERS
             .iter()
             .find(|target| call_path.as_slice() == **target)
@@ -55,7 +56,7 @@ pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
             Debugger {
                 using_type: DebuggerUsingType::Call(format_call_path(target)),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }
@@ -76,7 +77,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
                 Debugger {
                     using_type: DebuggerUsingType::Import(format_call_path(&call_path)),
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     } else {
@@ -89,7 +90,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }

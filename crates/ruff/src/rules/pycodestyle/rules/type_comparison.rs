@@ -1,14 +1,31 @@
 use itertools::izip;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct TypeComparison;
-);
+/// ## What it does
+/// Checks for object type comparisons without using isinstance().
+///
+/// ## Why is this bad?
+/// Do not compare types directly.
+/// When checking if an object is a instance of a certain type, keep in mind that it might
+/// be subclassed. E.g. `bool` inherits from `int` or `Exception` inherits from `BaseException`.
+///
+/// ## Example
+/// ```python
+/// if type(obj) is type(1):
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if isinstance(obj, int):
+/// if type(a1) is type(b1):
+/// ```
+#[violation]
+pub struct TypeComparison;
+
 impl Violation for TypeComparison {
     #[derive_message_formats]
     fn message(&self) -> String {

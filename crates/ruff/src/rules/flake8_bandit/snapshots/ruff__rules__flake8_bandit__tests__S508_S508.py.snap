@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SnmpInsecureVersion: ~
+    name: SnmpInsecureVersion
+    body: The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 32
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SnmpInsecureVersion: ~
+    name: SnmpInsecureVersion
+    body: The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 32

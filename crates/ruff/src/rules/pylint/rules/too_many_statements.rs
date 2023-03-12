@@ -1,17 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{ExcepthandlerKind, Stmt, StmtKind};
 
-use crate::ast::helpers::identifier_range;
-use crate::registry::Diagnostic;
-use crate::source_code::Locator;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::source_code::Locator;
 
-define_violation!(
-    pub struct TooManyStatements {
-        pub statements: usize,
-        pub max_statements: usize,
-    }
-);
+#[violation]
+pub struct TooManyStatements {
+    pub statements: usize,
+    pub max_statements: usize,
+}
+
 impl Violation for TooManyStatements {
     #[derive_message_formats]
     fn message(&self) -> String {

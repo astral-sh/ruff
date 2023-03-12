@@ -1,23 +1,24 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
     Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location,
 };
 
-use crate::ast::helpers;
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::{CallPath, Range};
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::{CallPath, Range};
 
-define_violation!(
-    pub struct DuplicateTryBlockException {
-        pub name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::{AsRule, Rule};
+
+#[violation]
+pub struct DuplicateTryBlockException {
+    pub name: String,
+}
+
 impl Violation for DuplicateTryBlockException {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -25,11 +26,11 @@ impl Violation for DuplicateTryBlockException {
         format!("try-except block with duplicate exception `{name}`")
     }
 }
-define_violation!(
-    pub struct DuplicateHandlerException {
-        pub names: Vec<String>,
-    }
-);
+#[violation]
+pub struct DuplicateHandlerException {
+    pub names: Vec<String>,
+}
+
 impl AlwaysAutofixableViolation for DuplicateHandlerException {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -94,7 +95,7 @@ fn duplicate_handler_exceptions<'a>(
                         .sorted()
                         .collect::<Vec<String>>(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
@@ -156,7 +157,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
                     DuplicateTryBlockException {
                         name: name.join("."),
                     },
-                    Range::from_located(expr),
+                    Range::from(expr),
                 ));
             }
         }

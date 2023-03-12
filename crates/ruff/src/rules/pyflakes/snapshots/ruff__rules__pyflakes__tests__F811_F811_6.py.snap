@@ -1,11 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RedefinedWhileUnused:
-      name: os
-      line: 5
+    name: RedefinedWhileUnused
+    body: "Redefinition of unused `os` from line 5"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 11

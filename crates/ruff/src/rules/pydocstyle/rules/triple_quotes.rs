@@ -1,14 +1,13 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct TripleSingleQuotes;
-);
+#[violation]
+pub struct TripleSingleQuotes;
+
 impl Violation for TripleSingleQuotes {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -42,7 +41,7 @@ pub fn triple_quotes(checker: &mut Checker, docstring: &Docstring) {
     if !starts_with_triple {
         checker.diagnostics.push(Diagnostic::new(
             TripleSingleQuotes,
-            Range::from_located(docstring.expr),
+            Range::from(docstring.expr),
         ));
     }
 }

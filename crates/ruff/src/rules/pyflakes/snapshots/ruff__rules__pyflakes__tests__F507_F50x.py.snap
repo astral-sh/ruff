@@ -1,11 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PercentFormatPositionalCountMismatch:
-      wanted: 2
-      got: 1
+    name: PercentFormatPositionalCountMismatch
+    body: "`%`-format string has 2 placeholder(s) but 1 substitution(s)"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PercentFormatPositionalCountMismatch:
-      wanted: 2
-      got: 3
+    name: PercentFormatPositionalCountMismatch
+    body: "`%`-format string has 2 placeholder(s) but 3 substitution(s)"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 0

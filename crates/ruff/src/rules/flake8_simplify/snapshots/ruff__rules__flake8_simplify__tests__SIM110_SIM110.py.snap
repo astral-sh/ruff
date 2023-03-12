@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ReimplementedBuiltin:
-      repl: return any(check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return any(check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return any(check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 3
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return all(not check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return all(not check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return all(not check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 25
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return all(x.is_empty() for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return all(x.is_empty() for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return all(x.is_empty() for x in iterable)`"
+    fixable: true
   location:
     row: 33
     column: 4
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return any(check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return any(check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return any(check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 55
     column: 4
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return all(not check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return all(not check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return all(not check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 64
     column: 4
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return any(check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return any(check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return any(check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 73
     column: 4
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return all(not check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return all(not check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return all(not check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 83
     column: 4
@@ -129,8 +143,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return any(check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return any(check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return any(check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 124
     column: 4
@@ -140,8 +156,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return all(not check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return all(not check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return all(not check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 134
     column: 4
@@ -151,8 +169,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return any(check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return any(check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return any(check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 144
     column: 4
@@ -169,8 +189,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    ReimplementedBuiltin:
-      repl: return all(not check(x) for x in iterable)
+    name: ReimplementedBuiltin
+    body: "Use `return all(not check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return all(not check(x) for x in iterable)`"
+    fixable: true
   location:
     row: 154
     column: 4

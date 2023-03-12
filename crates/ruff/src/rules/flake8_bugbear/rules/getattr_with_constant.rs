@@ -1,18 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::identifiers::{is_identifier, is_mangled_private};
-use ruff_python::keyword::KWLIST;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location};
 
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::Range;
+use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
+use ruff_python_stdlib::keyword::KWLIST;
 
-define_violation!(
-    pub struct GetAttrWithConstant;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct GetAttrWithConstant;
+
 impl AlwaysAutofixableViolation for GetAttrWithConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -62,7 +62,7 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(GetAttrWithConstant, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(GetAttrWithConstant, Range::from(expr));
 
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(

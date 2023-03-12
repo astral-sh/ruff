@@ -3,19 +3,17 @@
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::AsRule;
 use crate::rules::pycodestyle::helpers::{is_keyword_token, is_op_token, is_soft_keyword_token};
-use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct WhitespaceBeforeParameters {
-        pub bracket: String,
-    }
-);
+#[violation]
+pub struct WhitespaceBeforeParameters {
+    pub bracket: String,
+}
 
 impl AlwaysAutofixableViolation for WhitespaceBeforeParameters {
     #[derive_message_formats]

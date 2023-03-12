@@ -2,11 +2,12 @@ use anyhow::{bail, Result};
 use libcst_native::{Codegen, CodegenState, CompoundStatement, Statement, Suite, With};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::ast::whitespace;
+use ruff_diagnostics::Fix;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace;
+
 use crate::cst::matchers::match_module;
-use crate::fix::Fix;
-use crate::source_code::{Locator, Stylist};
 
 /// (SIM117) Convert `with a: with b:` to `with a, b:`.
 pub(crate) fn fix_multiple_with_statements(
@@ -20,7 +21,7 @@ pub(crate) fn fix_multiple_with_statements(
     };
 
     // Extract the module text.
-    let contents = locator.slice(&Range::new(
+    let contents = locator.slice(Range::new(
         Location::new(stmt.location.row(), 0),
         Location::new(stmt.end_location.unwrap().row() + 1, 0),
     ));

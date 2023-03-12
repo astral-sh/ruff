@@ -15,10 +15,11 @@ mod tests {
     use test_case::test_case;
     use textwrap::dedent;
 
+    use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+
     use crate::linter::{check_path, LinterResult};
-    use crate::registry::{Linter, Rule};
+    use crate::registry::{AsRule, Linter, Rule};
     use crate::settings::flags;
-    use crate::source_code::{Indexer, Locator, Stylist};
     use crate::test::test_path;
     use crate::{directives, settings};
 
@@ -104,6 +105,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_8.pyi"); "F821_8")]
     #[test_case(Rule::UndefinedName, Path::new("F821_9.py"); "F821_9")]
     #[test_case(Rule::UndefinedName, Path::new("F821_10.py"); "F821_10")]
+    #[test_case(Rule::UndefinedName, Path::new("F821_11.py"); "F821_11")]
+    #[test_case(Rule::UndefinedName, Path::new("F821_12.py"); "F821_12")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"); "F822_0")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"); "F822_1")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"); "F822_2")]

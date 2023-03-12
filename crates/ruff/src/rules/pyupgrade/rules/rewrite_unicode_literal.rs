@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, Location};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct RewriteUnicodeLiteral;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct RewriteUnicodeLiteral;
+
 impl AlwaysAutofixableViolation for RewriteUnicodeLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -25,7 +25,7 @@ impl AlwaysAutofixableViolation for RewriteUnicodeLiteral {
 pub fn rewrite_unicode_literal(checker: &mut Checker, expr: &Expr, kind: Option<&str>) {
     if let Some(const_kind) = kind {
         if const_kind.to_lowercase() == "u" {
-            let mut diagnostic = Diagnostic::new(RewriteUnicodeLiteral, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(RewriteUnicodeLiteral, Range::from(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::deletion(
                     expr.location,

@@ -1,44 +1,45 @@
 use std::path::Path;
 
 use itertools::{EitherOrBoth, Itertools};
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Location, Stmt};
 use textwrap::indent;
 
-use super::super::track::Block;
-use super::super::{comments, format_imports};
-use crate::ast::helpers::{
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{
     count_trailing_lines, followed_by_multi_statement_line, preceded_by_multi_statement_line,
 };
-use crate::ast::types::Range;
-use crate::ast::whitespace::leading_space;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::settings::{flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::leading_space;
 
-define_violation!(
-    /// ## What it does
-    /// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
-    ///
-    /// ## Why is this bad?
-    /// Consistency is good. Use a common convention for imports to make your code
-    /// more readable and idiomatic.
-    ///
-    /// ## Example
-    /// ```python
-    /// import pandas
-    /// import numpy as np
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// import numpy as np
-    /// import pandas
-    /// ```
-    pub struct UnsortedImports;
-);
+use crate::registry::AsRule;
+use crate::settings::{flags, Settings};
+
+use super::super::track::Block;
+use super::super::{comments, format_imports};
+
+/// ## What it does
+/// De-duplicates, groups, and sorts imports based on the provided `isort` settings.
+///
+/// ## Why is this bad?
+/// Consistency is good. Use a common convention for imports to make your code
+/// more readable and idiomatic.
+///
+/// ## Example
+/// ```python
+/// import pandas
+/// import numpy as np
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import numpy as np
+/// import pandas
+/// ```
+#[violation]
+pub struct UnsortedImports;
+
 impl AlwaysAutofixableViolation for UnsortedImports {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -83,7 +84,7 @@ pub fn organize_imports(
     autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
-    let indentation = locator.slice(&extract_indentation_range(&block.imports));
+    let indentation = locator.slice(extract_indentation_range(&block.imports));
     let indentation = leading_space(indentation);
 
     let range = extract_range(&block.imports);
@@ -98,7 +99,7 @@ pub fn organize_imports(
 
     // Extract comments. Take care to grab any inline comments from the last line.
     let comments = comments::collect_comments(
-        &Range::new(
+        Range::new(
             range.location,
             Location::new(range.end_location.row() + 1, 0),
         ),
@@ -148,7 +149,7 @@ pub fn organize_imports(
         Location::new(range.location.row(), 0),
         Location::new(range.end_location.row() + 1 + num_trailing_lines, 0),
     );
-    let actual = locator.slice(&range);
+    let actual = locator.slice(range);
     if matches_ignoring_indentation(actual, &expected) {
         None
     } else {

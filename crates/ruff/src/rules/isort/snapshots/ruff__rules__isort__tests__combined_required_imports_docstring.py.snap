@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingRequiredImport: from __future__ import annotations
+    name: MissingRequiredImport
+    body: "Missing required import: `from __future__ import annotations`"
+    suggestion: "Insert required import: `from __future__ import annotations`"
+    fixable: true
   location:
     row: 1
     column: 0
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    MissingRequiredImport: from __future__ import generator_stop
+    name: MissingRequiredImport
+    body: "Missing required import: `from __future__ import generator_stop`"
+    suggestion: "Insert required import: `from __future__ import generator_stop`"
+    fixable: true
   location:
     row: 1
     column: 0

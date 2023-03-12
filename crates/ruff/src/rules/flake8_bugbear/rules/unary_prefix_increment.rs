@@ -17,17 +17,17 @@
 //! n += 1
 //! ```
 
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Unaryop};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UnaryPrefixIncrement;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct UnaryPrefixIncrement;
+
 impl Violation for UnaryPrefixIncrement {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -46,8 +46,7 @@ pub fn unary_prefix_increment(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     if !matches!(op, Unaryop::UAdd) {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
-        UnaryPrefixIncrement,
-        Range::from_located(expr),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(UnaryPrefixIncrement, Range::from(expr)));
 }

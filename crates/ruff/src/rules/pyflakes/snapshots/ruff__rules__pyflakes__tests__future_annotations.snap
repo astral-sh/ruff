@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedImport:
-      name: models.Nut
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`models.Nut` imported but unused"
+    suggestion: "Remove unused import: `models.Nut`"
+    fixable: true
   location:
     row: 8
     column: 4
@@ -25,8 +25,10 @@ expression: diagnostics
     row: 6
     column: 0
 - kind:
-    UndefinedName:
-      name: Bar
+    name: UndefinedName
+    body: "Undefined name `Bar`"
+    suggestion: ~
+    fixable: false
   location:
     row: 26
     column: 18

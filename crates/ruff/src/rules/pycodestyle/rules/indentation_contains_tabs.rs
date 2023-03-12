@@ -1,14 +1,13 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::ast::whitespace::leading_space;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::leading_space;
 
-define_violation!(
-    pub struct IndentationContainsTabs;
-);
+#[violation]
+pub struct IndentationContainsTabs;
+
 impl Violation for IndentationContainsTabs {
     #[derive_message_formats]
     fn message(&self) -> String {

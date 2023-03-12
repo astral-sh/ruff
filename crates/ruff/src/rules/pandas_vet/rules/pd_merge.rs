@@ -1,13 +1,12 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UseOfPdMerge;
-);
+#[violation]
+pub struct UseOfPdMerge;
+
 impl Violation for UseOfPdMerge {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -23,7 +22,7 @@ pub fn use_of_pd_merge(func: &Expr) -> Option<Diagnostic> {
     if let ExprKind::Attribute { attr, value, .. } = &func.node {
         if let ExprKind::Name { id, .. } = &value.node {
             if id == "pd" && attr == "merge" {
-                return Some(Diagnostic::new(UseOfPdMerge, Range::from_located(func)));
+                return Some(Diagnostic::new(UseOfPdMerge, Range::from(func)));
             }
         }
     }

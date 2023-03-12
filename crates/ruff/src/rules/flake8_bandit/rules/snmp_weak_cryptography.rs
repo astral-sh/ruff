@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, Keyword};
 
-use crate::ast::helpers::SimpleCallArgs;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct SnmpWeakCryptography;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct SnmpWeakCryptography;
+
 impl Violation for SnmpWeakCryptography {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -27,15 +27,18 @@ pub fn snmp_weak_cryptography(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["pysnmp", "hlapi", "UsmUserData"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["pysnmp", "hlapi", "UsmUserData"]
+        })
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
         if call_args.len() < 3 {
-            checker.diagnostics.push(Diagnostic::new(
-                SnmpWeakCryptography,
-                Range::from_located(func),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(SnmpWeakCryptography, Range::from(func)));
         }
     }
 }

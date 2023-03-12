@@ -104,7 +104,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 
 1. Determine a name for the new rule as per our [rule naming convention](#rule-naming-convention).
 1. Create a file for your rule (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`).
-1. In that file, define a violation struct. You can grep for `define_violation!` to see examples.
+1. In that file, define a violation struct. You can grep for `#[violation]` to see examples.
 1. Map the violation struct to a rule code in `crates/ruff/src/registry.rs` (e.g., `E402`).
 1. Define the logic for triggering the violation in `crates/ruff/src/checkers/ast.rs` (for AST-based
    checks), `crates/ruff/src/checkers/tokens.rs` (for token-based checks), `crates/ruff/src/checkers/lines.rs`
@@ -115,7 +115,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 
 To define the violation, start by creating a dedicated file for your rule under the appropriate
 rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
-contain a struct defined via `define_violation!`, along with a function that creates the violation
+contain a struct defined via `#[violation]`, along with a function that creates the violation
 based on any required inputs. (Many of the existing examples live in `crates/ruff/src/violations.rs`,
 but we're looking to place new rules in their own files.)
 

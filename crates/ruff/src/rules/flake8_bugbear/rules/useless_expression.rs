@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UselessExpression;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct UselessExpression;
+
 impl Violation for UselessExpression {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -22,18 +22,16 @@ pub fn useless_expression(checker: &mut Checker, body: &[Stmt]) {
         if let StmtKind::Expr { value } = &stmt.node {
             match &value.node {
                 ExprKind::List { .. } | ExprKind::Dict { .. } | ExprKind::Set { .. } => {
-                    checker.diagnostics.push(Diagnostic::new(
-                        UselessExpression,
-                        Range::from_located(value),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(UselessExpression, Range::from(value)));
                 }
                 ExprKind::Constant { value: val, .. } => match &val {
                     Constant::Str { .. } | Constant::Ellipsis => {}
                     _ => {
-                        checker.diagnostics.push(Diagnostic::new(
-                            UselessExpression,
-                            Range::from_located(value),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(UselessExpression, Range::from(value)));
                     }
                 },
                 _ => {}

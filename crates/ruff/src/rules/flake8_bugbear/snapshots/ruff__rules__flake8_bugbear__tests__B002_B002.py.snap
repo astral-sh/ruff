@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnaryPrefixIncrement: ~
+    name: UnaryPrefixIncrement
+    body: Python does not support the unary prefix increment
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 8
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnaryPrefixIncrement: ~
+    name: UnaryPrefixIncrement
+    body: Python does not support the unary prefix increment
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 11

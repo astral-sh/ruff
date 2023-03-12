@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DuplicateIsinstanceCall:
-      name: a
+    name: DuplicateIsinstanceCall
+    body: "Multiple `isinstance` calls for `a`, merge into a single call"
+    suggestion: "Merge `isinstance` calls for `a`"
+    fixable: true
   location:
     row: 1
     column: 3
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    DuplicateIsinstanceCall:
-      name: a
+    name: DuplicateIsinstanceCall
+    body: "Multiple `isinstance` calls for `a`, merge into a single call"
+    suggestion: "Merge `isinstance` calls for `a`"
+    fixable: true
   location:
     row: 4
     column: 3
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 53
   parent: ~
 - kind:
-    DuplicateIsinstanceCall:
-      name: a
+    name: DuplicateIsinstanceCall
+    body: "Multiple `isinstance` calls for `a`, merge into a single call"
+    suggestion: "Merge `isinstance` calls for `a`"
+    fixable: true
   location:
     row: 7
     column: 3
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 68
   parent: ~
 - kind:
-    DuplicateIsinstanceCall:
-      name: a
+    name: DuplicateIsinstanceCall
+    body: "Multiple `isinstance` calls for `a`, merge into a single call"
+    suggestion: "Merge `isinstance` calls for `a`"
+    fixable: true
   location:
     row: 10
     column: 3
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 68
   parent: ~
 - kind:
-    DuplicateIsinstanceCall:
-      name: a
+    name: DuplicateIsinstanceCall
+    body: "Multiple `isinstance` calls for `a`, merge into a single call"
+    suggestion: "Merge `isinstance` calls for `a`"
+    fixable: true
   location:
     row: 13
     column: 3
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 68
   parent: ~
 - kind:
-    DuplicateIsinstanceCall:
-      name: a
+    name: DuplicateIsinstanceCall
+    body: "Multiple `isinstance` calls for `a`, merge into a single call"
+    suggestion: "Merge `isinstance` calls for `a`"
+    fixable: true
   location:
     row: 16
     column: 4

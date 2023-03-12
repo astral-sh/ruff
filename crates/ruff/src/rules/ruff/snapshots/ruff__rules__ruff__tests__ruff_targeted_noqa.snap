@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedVariable:
-      name: x
+    name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `x`"
+    fixable: true
   location:
     row: 8
     column: 4

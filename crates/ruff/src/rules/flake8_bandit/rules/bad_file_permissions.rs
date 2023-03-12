@@ -1,20 +1,20 @@
 use num_traits::ToPrimitive;
 use once_cell::sync::Lazy;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
 
-use crate::ast::helpers::{compose_call_path, SimpleCallArgs};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{compose_call_path, SimpleCallArgs};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct BadFilePermissions {
-        pub mask: u16,
-    }
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct BadFilePermissions {
+    pub mask: u16,
+}
+
 impl Violation for BadFilePermissions {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -103,6 +103,7 @@ pub fn bad_file_permissions(
     keywords: &[Keyword],
 ) {
     if checker
+        .ctx
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["os", "chmod"])
     {
@@ -112,7 +113,7 @@ pub fn bad_file_permissions(
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(
                         BadFilePermissions { mask: int_value },
-                        Range::from_located(mode_arg),
+                        Range::from(mode_arg),
                     ));
                 }
             }

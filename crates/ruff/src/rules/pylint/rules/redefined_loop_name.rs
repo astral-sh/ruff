@@ -1,21 +1,19 @@
-use regex::Regex;
 use std::{fmt, iter};
 
+use regex::Regex;
 use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind, Withitem};
-use serde::{Deserialize, Serialize};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::{Node, Range};
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
-use crate::ast::comparable::ComparableExpr;
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::{Node, Range};
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum OuterBindingKind {
     For,
     With,
@@ -30,7 +28,7 @@ impl fmt::Display for OuterBindingKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum InnerBindingKind {
     For,
     With,
@@ -57,49 +55,49 @@ impl PartialEq<InnerBindingKind> for OuterBindingKind {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for variables defined in `for` loops and `with` statements that
-    /// get overwritten within the body, for example by another `for` loop or
-    /// `with` statement or by direct assignment.
-    ///
-    /// ## Why is this bad?
-    /// Redefinition of a loop variable inside the loop's body causes its value
-    /// to differ from the original loop iteration for the remainder of the
-    /// block, in a way that will likely cause bugs.
-    ///
-    /// In Python, unlike many other languages, `for` loops and `with`
-    /// statements don't define their own scopes. Therefore, a nested loop that
-    /// uses the same target variable name as an outer loop will reuse the same
-    /// actual variable, and the value from the last iteration will "leak out"
-    /// into the remainder of the enclosing loop.
-    ///
-    /// While this mistake is easy to spot in small examples, it can be hidden
-    /// in larger blocks of code where the definition and redefinition of the
-    /// variable may not be visible at the same time.
-    ///
-    /// ## Example
-    /// ```python
-    /// for i in range(10):
-    ///     i = 9
-    ///     print(i)  # prints 9 every iteration
-    ///
-    /// for i in range(10):
-    ///     for i in range(10):  # original value overwritten
-    ///         pass
-    ///     print(i)  # also prints 9 every iteration
-    ///
-    /// with path1.open() as f:
-    ///     with path2.open() as f:
-    ///         f = path2.open()
-    ///     print(f.readline())  # prints a line from path2
-    /// ```
-    pub struct RedefinedLoopName {
-        pub name: String,
-        pub outer_kind: OuterBindingKind,
-        pub inner_kind: InnerBindingKind,
-    }
-);
+/// ## What it does
+/// Checks for variables defined in `for` loops and `with` statements that
+/// get overwritten within the body, for example by another `for` loop or
+/// `with` statement or by direct assignment.
+///
+/// ## Why is this bad?
+/// Redefinition of a loop variable inside the loop's body causes its value
+/// to differ from the original loop iteration for the remainder of the
+/// block, in a way that will likely cause bugs.
+///
+/// In Python, unlike many other languages, `for` loops and `with`
+/// statements don't define their own scopes. Therefore, a nested loop that
+/// uses the same target variable name as an outer loop will reuse the same
+/// actual variable, and the value from the last iteration will "leak out"
+/// into the remainder of the enclosing loop.
+///
+/// While this mistake is easy to spot in small examples, it can be hidden
+/// in larger blocks of code where the definition and redefinition of the
+/// variable may not be visible at the same time.
+///
+/// ## Example
+/// ```python
+/// for i in range(10):
+///     i = 9
+///     print(i)  # prints 9 every iteration
+///
+/// for i in range(10):
+///     for i in range(10):  # original value overwritten
+///         pass
+///     print(i)  # also prints 9 every iteration
+///
+/// with path1.open() as f:
+///     with path2.open() as f:
+///         f = path2.open()
+///     print(f.readline())  # prints a line from path2
+/// ```
+#[violation]
+pub struct RedefinedLoopName {
+    pub name: String,
+    pub outer_kind: OuterBindingKind,
+    pub inner_kind: InnerBindingKind,
+}
+
 impl Violation for RedefinedLoopName {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -346,7 +344,7 @@ pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>
                         outer_kind: outer_assignment_target.binding_kind,
                         inner_kind: inner_assignment_target.binding_kind,
                     },
-                    Range::from_located(inner_assignment_target.expr),
+                    Range::from(inner_assignment_target.expr),
                 ));
             }
         }

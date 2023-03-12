@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 9
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 9
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 9
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 9
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 9
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 9
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 9
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 9
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 9
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 10
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 14
     column: 10
@@ -113,7 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 10
@@ -123,7 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 16
     column: 10
@@ -133,7 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 17
     column: 10
@@ -143,7 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 19
     column: 10
@@ -153,7 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 10
@@ -163,7 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 10
@@ -173,7 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 22
     column: 10
@@ -183,7 +237,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 24
     column: 10
@@ -193,7 +250,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 25
     column: 10
@@ -203,7 +263,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 26
     column: 10
@@ -213,7 +276,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 27
     column: 10
@@ -223,7 +289,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 28
     column: 10
@@ -233,7 +302,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 30
     column: 10
@@ -243,7 +315,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 31
     column: 10
@@ -253,7 +328,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 32
     column: 10
@@ -263,7 +341,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 33
     column: 10
@@ -273,7 +354,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 34
     column: 10
@@ -283,7 +367,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 36
     column: 10
@@ -293,7 +380,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 37
     column: 10
@@ -303,7 +393,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 38
     column: 10
@@ -313,7 +406,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 39
     column: 10
@@ -323,7 +419,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 41
     column: 10
@@ -333,7 +432,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 42
     column: 10
@@ -343,7 +445,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 43
     column: 10
@@ -353,7 +458,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 44
     column: 10
@@ -363,7 +471,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 48
     column: 11
@@ -373,7 +484,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 55
     column: 11
@@ -383,7 +497,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 62
     column: 11
@@ -393,7 +510,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 69
     column: 11
@@ -403,7 +523,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 77
     column: 8
@@ -413,7 +536,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 83
     column: 25
@@ -423,7 +549,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 84
     column: 25
@@ -433,7 +562,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 85
     column: 25
@@ -443,7 +575,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    HardcodedSQLExpression: ~
+    name: HardcodedSQLExpression
+    body: Possible SQL injection vector through string-based query construction
+    suggestion: ~
+    fixable: false
   location:
     row: 86
     column: 29

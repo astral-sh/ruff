@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DuplicateTryBlockException:
-      name: ValueError
+    name: DuplicateTryBlockException
+    body: "try-except block with duplicate exception `ValueError`"
+    suggestion: ~
+    fixable: false
   location:
     row: 19
     column: 7
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DuplicateTryBlockException:
-      name: pickle.PickleError
+    name: DuplicateTryBlockException
+    body: "try-except block with duplicate exception `pickle.PickleError`"
+    suggestion: ~
+    fixable: false
   location:
     row: 28
     column: 7
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DuplicateTryBlockException:
-      name: ValueError
+    name: DuplicateTryBlockException
+    body: "try-except block with duplicate exception `ValueError`"
+    suggestion: ~
+    fixable: false
   location:
     row: 35
     column: 7
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DuplicateTryBlockException:
-      name: TypeError
+    name: DuplicateTryBlockException
+    body: "try-except block with duplicate exception `TypeError`"
+    suggestion: ~
+    fixable: false
   location:
     row: 37
     column: 17

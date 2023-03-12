@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_print/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PPrintFound: ~
+    name: PPrintFound
+    body: "`pprint` found"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PPrintFound: ~
+    name: PPrintFound
+    body: "`pprint` found"
+    suggestion: ~
+    fixable: false
   location:
     row: 7
     column: 0

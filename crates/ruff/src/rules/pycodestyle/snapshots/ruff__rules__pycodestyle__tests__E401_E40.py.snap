@@ -1,9 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultipleImportsOnOneLine: ~
+    name: MultipleImportsOnOneLine
+    body: Multiple imports on one line
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 0

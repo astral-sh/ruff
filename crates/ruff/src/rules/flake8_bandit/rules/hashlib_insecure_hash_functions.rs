@@ -1,18 +1,19 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use super::super::helpers::string_literal;
-use crate::ast::helpers::SimpleCallArgs;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct HashlibInsecureHashFunction {
-        pub string: String,
-    }
-);
+use crate::checkers::ast::Checker;
+
+use super::super::helpers::string_literal;
+
+#[violation]
+pub struct HashlibInsecureHashFunction {
+    pub string: String,
+}
+
 impl Violation for HashlibInsecureHashFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -48,7 +49,7 @@ pub fn hashlib_insecure_hash_functions(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if let Some(hashlib_call) = checker.resolve_call_path(func).and_then(|call_path| {
+    if let Some(hashlib_call) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
         if call_path.as_slice() == ["hashlib", "new"] {
             Some(HashlibCall::New)
         } else {
@@ -73,7 +74,7 @@ pub fn hashlib_insecure_hash_functions(
                                 HashlibInsecureHashFunction {
                                     string: hash_func_name.to_string(),
                                 },
-                                Range::from_located(name_arg),
+                                Range::from(name_arg),
                             ));
                         }
                     }
@@ -90,7 +91,7 @@ pub fn hashlib_insecure_hash_functions(
                     HashlibInsecureHashFunction {
                         string: (*func_name).to_string(),
                     },
-                    Range::from_located(func),
+                    Range::from(func),
                 ));
             }
         }

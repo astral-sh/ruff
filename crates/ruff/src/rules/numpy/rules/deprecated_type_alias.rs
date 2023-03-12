@@ -1,39 +1,39 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for deprecated NumPy type aliases.
-    ///
-    /// ## Why is this bad?
-    /// NumPy's `np.int` has long been an alias of the builtin `int`. The same
-    /// goes for `np.float`, `np.bool`, and others. These aliases exist
-    /// primarily primarily for historic reasons, and have been a cause of
-    /// frequent confusion for newcomers.
-    ///
-    /// These aliases were been deprecated in 1.20, and removed in 1.24.
-    ///
-    /// ## Examples
-    /// ```python
-    /// import numpy as np
-    ///
-    /// np.bool
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// bool
-    /// ```
-    pub struct NumpyDeprecatedTypeAlias {
-        pub type_name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+/// ## What it does
+/// Checks for deprecated NumPy type aliases.
+///
+/// ## Why is this bad?
+/// NumPy's `np.int` has long been an alias of the builtin `int`. The same
+/// goes for `np.float`, `np.bool`, and others. These aliases exist
+/// primarily primarily for historic reasons, and have been a cause of
+/// frequent confusion for newcomers.
+///
+/// These aliases were been deprecated in 1.20, and removed in 1.24.
+///
+/// ## Examples
+/// ```python
+/// import numpy as np
+///
+/// np.bool
+/// ```
+///
+/// Use instead:
+/// ```python
+/// bool
+/// ```
+#[violation]
+pub struct NumpyDeprecatedTypeAlias {
+    pub type_name: String,
+}
+
 impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -49,7 +49,7 @@ impl AlwaysAutofixableViolation for NumpyDeprecatedTypeAlias {
 
 /// NPY001
 pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
-    if let Some(type_name) = checker.resolve_call_path(expr).and_then(|call_path| {
+    if let Some(type_name) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
         if call_path.as_slice() == ["numpy", "bool"]
             || call_path.as_slice() == ["numpy", "int"]
             || call_path.as_slice() == ["numpy", "float"]
@@ -68,7 +68,7 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             NumpyDeprecatedTypeAlias {
                 type_name: type_name.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(

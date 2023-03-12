@@ -1,45 +1,45 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{is_logger_candidate, SimpleCallArgs};
+use ruff_python_ast::logging::LoggingLevel;
+use ruff_python_ast::types::Range;
 
-use crate::ast::helpers::{is_logger_candidate, SimpleCallArgs};
-use crate::ast::logging::LoggingLevel;
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Rule;
 use crate::rules::pyflakes::cformat::CFormatSummary;
-use crate::violation::Violation;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for too few positional arguments for a `logging` format string.
-    ///
-    /// ## Why is this bad?
-    /// A `TypeError` will be raised if the statement is run.
-    ///
-    /// ## Example
-    /// ```python
-    /// import logging
-    ///
-    /// try:
-    ///     function()
-    /// except Exception as e:
-    ///     logging.error("%s error occurred: %s", e)
-    ///     raise
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// import logging
-    ///
-    /// try:
-    ///     function()
-    /// except Exception as e:
-    ///     logging.error("%s error occurred: %s", type(e), e)
-    ///     raise
-    /// ```
-    pub struct LoggingTooFewArgs;
-);
+/// ## What it does
+/// Checks for too few positional arguments for a `logging` format string.
+///
+/// ## Why is this bad?
+/// A `TypeError` will be raised if the statement is run.
+///
+/// ## Example
+/// ```python
+/// import logging
+///
+/// try:
+///     function()
+/// except Exception as e:
+///     logging.error("%s error occurred: %s", e)
+///     raise
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+/// try:
+///     function()
+/// except Exception as e:
+///     logging.error("%s error occurred: %s", type(e), e)
+///     raise
+/// ```
+#[violation]
+pub struct LoggingTooFewArgs;
+
 impl Violation for LoggingTooFewArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,36 +47,36 @@ impl Violation for LoggingTooFewArgs {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for too many positional arguments for a `logging` format string.
-    ///
-    /// ## Why is this bad?
-    /// A `TypeError` will be raised if the statement is run.
-    ///
-    /// ## Example
-    /// ```python
-    /// import logging
-    ///
-    /// try:
-    ///     function()
-    /// except Exception as e:
-    ///     logging.error("Error occurred: %s", type(e), e)
-    ///     raise
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// import logging
-    ///
-    /// try:
-    ///     function()
-    /// except Exception as e:
-    ///     logging.error("%s error occurred: %s", type(e), e)
-    ///     raise
-    /// ```
-    pub struct LoggingTooManyArgs;
-);
+/// ## What it does
+/// Checks for too many positional arguments for a `logging` format string.
+///
+/// ## Why is this bad?
+/// A `TypeError` will be raised if the statement is run.
+///
+/// ## Example
+/// ```python
+/// import logging
+///
+/// try:
+///     function()
+/// except Exception as e:
+///     logging.error("Error occurred: %s", type(e), e)
+///     raise
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+/// try:
+///     function()
+/// except Exception as e:
+///     logging.error("%s error occurred: %s", type(e), e)
+///     raise
+/// ```
+#[violation]
+pub struct LoggingTooManyArgs;
+
 impl Violation for LoggingTooManyArgs {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -105,7 +105,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     }
 
     if let ExprKind::Attribute { attr, .. } = &func.node {
-        if LoggingLevel::from_python_logger_method_str(attr.as_str()).is_some() {
+        if LoggingLevel::from_attribute(attr.as_str()).is_some() {
             let call_args = SimpleCallArgs::new(args, keywords);
             if let Some(msg) = call_args.get_argument("msg", Some(0)) {
                 if let ExprKind::Constant {
@@ -125,10 +125,9 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
 
                         if checker.settings.rules.enabled(&Rule::LoggingTooManyArgs) {
                             if summary.num_positional < message_args {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    LoggingTooManyArgs,
-                                    Range::from_located(func),
-                                ));
+                                checker
+                                    .diagnostics
+                                    .push(Diagnostic::new(LoggingTooManyArgs, Range::from(func)));
                             }
                         }
 
@@ -137,10 +136,9 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                                 && call_args.kwargs.is_empty()
                                 && summary.num_positional > message_args
                             {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    LoggingTooFewArgs,
-                                    Range::from_located(func),
-                                ));
+                                checker
+                                    .diagnostics
+                                    .push(Diagnostic::new(LoggingTooFewArgs, Range::from(func)));
                             }
                         }
                     }

@@ -1,7 +1,7 @@
 use rustpython_parser::ast::Constant;
 
-use crate::core::visitor;
-use crate::core::visitor::Visitor;
+use crate::cst::visitor;
+use crate::cst::visitor::Visitor;
 use crate::cst::{
     Alias, Arg, BoolOp, CmpOp, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Operator,
     Pattern, SliceIndex, Stmt, StmtKind, UnaryOp,

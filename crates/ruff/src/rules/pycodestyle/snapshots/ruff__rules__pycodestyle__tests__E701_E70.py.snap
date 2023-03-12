@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 39
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 25
     column: 7
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 27
     column: 7
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 29
     column: 9
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 31
     column: 3
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 32
     column: 17
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 33
     column: 7
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 35
     column: 7
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 37
     column: 8
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 39
     column: 14
@@ -113,7 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 54
     column: 7
@@ -123,7 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 56
     column: 7
@@ -133,7 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineColon: ~
+    name: MultipleStatementsOnOneLineColon
+    body: Multiple statements on one line (colon)
+    suggestion: ~
+    fixable: false
   location:
     row: 59
     column: 11

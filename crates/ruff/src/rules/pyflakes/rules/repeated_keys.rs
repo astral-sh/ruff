@@ -1,23 +1,23 @@
 use std::hash::{BuildHasherDefault, Hash};
 
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::comparable::{ComparableConstant, ComparableExpr};
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr};
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct MultiValueRepeatedKeyLiteral {
-        pub name: String,
-        pub repeated_value: bool,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::{AsRule, Rule};
+
+#[violation]
+pub struct MultiValueRepeatedKeyLiteral {
+    pub name: String,
+    pub repeated_value: bool,
+}
+
 impl Violation for MultiValueRepeatedKeyLiteral {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -38,12 +38,12 @@ impl Violation for MultiValueRepeatedKeyLiteral {
         }
     }
 }
-define_violation!(
-    pub struct MultiValueRepeatedKeyVariable {
-        pub name: String,
-        pub repeated_value: bool,
-    }
-);
+#[violation]
+pub struct MultiValueRepeatedKeyVariable {
+    pub name: String,
+    pub repeated_value: bool,
+}
+
 impl Violation for MultiValueRepeatedKeyVariable {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -106,7 +106,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                                     name: unparse_expr(key, checker.stylist),
                                     repeated_value: is_duplicate_value,
                                 },
-                                Range::from_located(key),
+                                Range::from(key),
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {
@@ -134,7 +134,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                                     name: dict_key.to_string(),
                                     repeated_value: is_duplicate_value,
                                 },
-                                Range::from_located(key),
+                                Range::from(key),
                             );
                             if is_duplicate_value {
                                 if checker.patch(diagnostic.kind.rule()) {

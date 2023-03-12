@@ -1,11 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    StringDotFormatExtraPositionalArguments:
-      missing:
-        - "1"
+    name: StringDotFormatExtraPositionalArguments
+    body: "`.format` call has unused arguments at position(s): 1"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -15,10 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatExtraPositionalArguments:
-      missing:
-        - "0"
-        - "2"
+    name: StringDotFormatExtraPositionalArguments
+    body: "`.format` call has unused arguments at position(s): 0, 2"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -28,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatExtraPositionalArguments:
-      missing:
-        - "2"
+    name: StringDotFormatExtraPositionalArguments
+    body: "`.format` call has unused arguments at position(s): 2"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 0
@@ -40,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatExtraPositionalArguments:
-      missing:
-        - "1"
+    name: StringDotFormatExtraPositionalArguments
+    body: "`.format` call has unused arguments at position(s): 1"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 0
@@ -52,9 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatExtraPositionalArguments:
-      missing:
-        - "1"
+    name: StringDotFormatExtraPositionalArguments
+    body: "`.format` call has unused arguments at position(s): 1"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -64,10 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatExtraPositionalArguments:
-      missing:
-        - "1"
-        - "2"
+    name: StringDotFormatExtraPositionalArguments
+    body: "`.format` call has unused arguments at position(s): 1, 2"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 0
@@ -77,9 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatExtraPositionalArguments:
-      missing:
-        - "2"
+    name: StringDotFormatExtraPositionalArguments
+    body: "`.format` call has unused arguments at position(s): 2"
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 0

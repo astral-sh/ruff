@@ -1,20 +1,19 @@
-use itertools::Itertools;
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::context::Context;
+use ruff_python_ast::helpers::{compose_call_path, create_expr, unparse_expr};
+use ruff_python_ast::types::Range;
 
-use crate::ast::helpers::compose_call_path;
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct OSErrorAlias {
-        pub name: Option<String>,
-    }
-);
+#[violation]
+pub struct OSErrorAlias {
+    pub name: Option<String>,
+}
+
 impl AlwaysAutofixableViolation for OSErrorAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -30,218 +29,151 @@ impl AlwaysAutofixableViolation for OSErrorAlias {
     }
 }
 
-const ERROR_NAMES: &[&str] = &["EnvironmentError", "IOError", "WindowsError"];
-const ERROR_MODULES: &[&str] = &["mmap", "select", "socket"];
+const ALIASES: &[(&str, &str)] = &[
+    ("", "EnvironmentError"),
+    ("", "IOError"),
+    ("", "WindowsError"),
+    ("mmap", "error"),
+    ("select", "error"),
+    ("socket", "error"),
+];
 
-fn corrected_name(checker: &Checker, original: &str) -> String {
-    if ERROR_NAMES.contains(&original)
-        && checker.is_builtin(original)
-        && checker.is_builtin("OSError")
-    {
-        "OSError".to_string()
-    } else {
-        original.to_string()
+/// Return `true` if an [`Expr`] is an alias of `OSError`.
+fn is_alias(context: &Context, expr: &Expr) -> bool {
+    context.resolve_call_path(expr).map_or(false, |call_path| {
+        ALIASES
+            .iter()
+            .any(|(module, member)| call_path.as_slice() == [*module, *member])
+    })
+}
+
+/// Return `true` if an [`Expr`] is `OSError`.
+fn is_os_error(context: &Context, expr: &Expr) -> bool {
+    context
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| call_path.as_slice() == ["", "OSError"])
+}
+
+/// Create a [`Diagnostic`] for a single target, like an [`ExprKind::Name`].
+fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
+    let mut diagnostic = Diagnostic::new(
+        OSErrorAlias {
+            name: compose_call_path(target),
+        },
+        Range::from(target),
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.amend(Fix::replacement(
+            "OSError".to_string(),
+            target.location,
+            target.end_location.unwrap(),
+        ));
     }
+    checker.diagnostics.push(diagnostic);
 }
 
-fn get_before_replace(elts: &[Expr]) -> Vec<String> {
-    elts.iter()
-        .map(|elt| {
-            if let ExprKind::Name { id, .. } = &elt.node {
-                id.to_string()
-            } else {
-                String::new()
-            }
-        })
-        .collect()
-}
+/// Create a [`Diagnostic`] for a tuple of expressions.
+fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
+    let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, Range::from(target));
+    if checker.patch(diagnostic.kind.rule()) {
+        let ExprKind::Tuple { elts, ..} = &target.node else {
+            unreachable!("expected ExprKind::Tuple");
+        };
 
-fn check_module(checker: &Checker, expr: &Expr) -> (Vec<String>, Vec<String>) {
-    let mut replacements: Vec<String> = vec![];
-    let mut before_replace: Vec<String> = vec![];
-    if let Some(call_path) = checker.resolve_call_path(expr) {
-        for module in ERROR_MODULES.iter() {
-            if call_path.as_slice() == [module, "error"] {
-                replacements.push("OSError".to_string());
-                before_replace.push(format!("{module}.error"));
-                break;
-            }
-        }
-    }
-    (replacements, before_replace)
-}
+        // Filter out any `OSErrors` aliases.
+        let mut remaining: Vec<Expr> = elts
+            .iter()
+            .filter_map(|elt| {
+                if aliases.contains(&elt) {
+                    None
+                } else {
+                    Some(elt.clone())
+                }
+            })
+            .collect();
 
-fn handle_name_or_attribute(
-    checker: &Checker,
-    item: &Expr,
-    replacements: &mut Vec<String>,
-    before_replace: &mut Vec<String>,
-) {
-    match &item.node {
-        ExprKind::Name { id, .. } => {
-            let (temp_replacements, temp_before_replace) = check_module(checker, item);
-            replacements.extend(temp_replacements);
-            before_replace.extend(temp_before_replace);
-            if replacements.is_empty() {
-                let new_name = corrected_name(checker, id);
-                replacements.push(new_name);
-                before_replace.push(id.to_string());
-            }
-        }
-        ExprKind::Attribute { .. } => {
-            let (temp_replacements, temp_before_replace) = check_module(checker, item);
-            replacements.extend(temp_replacements);
-            before_replace.extend(temp_before_replace);
-        }
-        _ => (),
-    }
-}
-
-/// Handles one block of an except (use a loop if there are multiple blocks)
-fn handle_except_block(checker: &mut Checker, handler: &Excepthandler) {
-    let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
-    let Some(error_handlers) = type_.as_ref() else {
-        return;
-    };
-    // The first part creates list of all the exceptions being caught, and
-    // what they should be changed to
-    let mut replacements: Vec<String> = vec![];
-    let mut before_replace: Vec<String> = vec![];
-    match &error_handlers.node {
-        ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
-            handle_name_or_attribute(
-                checker,
-                error_handlers,
-                &mut replacements,
-                &mut before_replace,
+        // If `OSError` itself isn't already in the tuple, add it.
+        if elts.iter().all(|elt| !is_os_error(&checker.ctx, elt)) {
+            remaining.insert(
+                0,
+                create_expr(ExprKind::Name {
+                    id: "OSError".to_string(),
+                    ctx: ExprContext::Load,
+                }),
             );
         }
-        ExprKind::Tuple { elts, .. } => {
-            before_replace = get_before_replace(elts);
-            for elt in elts {
-                match &elt.node {
-                    ExprKind::Name { id, .. } => {
-                        let new_name = corrected_name(checker, id);
-                        replacements.push(new_name);
-                    }
-                    ExprKind::Attribute { .. } => {
-                        let (new_replacements, new_before_replace) = check_module(checker, elt);
-                        replacements.extend(new_replacements);
-                        before_replace.extend(new_before_replace);
-                    }
-                    _ => (),
-                }
-            }
-        }
-        _ => return,
-    }
-    replacements = replacements
-        .iter()
-        .unique()
-        .map(std::string::ToString::to_string)
-        .collect();
-    before_replace = before_replace
-        .iter()
-        .filter(|x| !x.is_empty())
-        .map(std::string::ToString::to_string)
-        .collect();
 
-    // This part checks if there are differences between what there is and
-    // what there should be. Where differences, the changes are applied
-    handle_making_changes(checker, error_handlers, &before_replace, &replacements);
-}
-
-fn handle_making_changes(
-    checker: &mut Checker,
-    target: &Expr,
-    before_replace: &[String],
-    replacements: &[String],
-) {
-    if before_replace != replacements && !replacements.is_empty() {
-        let mut final_str: String;
-        if replacements.len() == 1 {
-            final_str = replacements.get(0).unwrap().to_string();
-        } else {
-            final_str = replacements.join(", ");
-            final_str.insert(0, '(');
-            final_str.push(')');
-        }
-        let mut diagnostic = Diagnostic::new(
-            OSErrorAlias {
-                name: compose_call_path(target),
-            },
-            Range::from_located(target),
-        );
-        if checker.patch(diagnostic.kind.rule()) {
+        if remaining.len() == 1 {
             diagnostic.amend(Fix::replacement(
-                final_str,
+                "OSError".to_string(),
+                target.location,
+                target.end_location.unwrap(),
+            ));
+        } else {
+            diagnostic.amend(Fix::replacement(
+                format!(
+                    "({})",
+                    unparse_expr(
+                        &create_expr(ExprKind::Tuple {
+                            elts: remaining,
+                            ctx: ExprContext::Load,
+                        }),
+                        checker.stylist,
+                    )
+                ),
                 target.location,
                 target.end_location.unwrap(),
             ));
         }
-        checker.diagnostics.push(diagnostic);
     }
+    checker.diagnostics.push(diagnostic);
 }
 
-pub trait OSErrorAliasChecker {
-    fn check_error(&self, checker: &mut Checker)
-    where
-        Self: Sized;
-}
-
-impl OSErrorAliasChecker for &Vec<Excepthandler> {
-    fn check_error(&self, checker: &mut Checker) {
-        for handler in self.iter() {
-            handle_except_block(checker, handler);
-        }
-    }
-}
-
-impl OSErrorAliasChecker for &Box<Expr> {
-    fn check_error(&self, checker: &mut Checker) {
-        let mut replacements: Vec<String> = vec![];
-        let mut before_replace: Vec<String> = vec![];
-        match &self.node {
+/// UP024
+pub fn os_error_alias_handlers(checker: &mut Checker, handlers: &[Excepthandler]) {
+    for handler in handlers {
+        let ExcepthandlerKind::ExceptHandler { type_, .. } = &handler.node;
+        let Some(expr) = type_.as_ref() else {
+            continue;
+        };
+        match &expr.node {
             ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
-                handle_name_or_attribute(checker, self, &mut replacements, &mut before_replace);
-            }
-            _ => return,
-        }
-        handle_making_changes(checker, self, &before_replace, &replacements);
-    }
-}
-
-impl OSErrorAliasChecker for &Expr {
-    fn check_error(&self, checker: &mut Checker) {
-        let mut replacements: Vec<String> = vec![];
-        let mut before_replace: Vec<String> = vec![];
-        let change_target: &Expr;
-        match &self.node {
-            ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
-                change_target = self;
-                handle_name_or_attribute(checker, self, &mut replacements, &mut before_replace);
-            }
-            ExprKind::Call { func, .. } => {
-                change_target = func;
-                match &func.node {
-                    ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
-                        handle_name_or_attribute(
-                            checker,
-                            func,
-                            &mut replacements,
-                            &mut before_replace,
-                        );
-                    }
-                    _ => return,
+                if is_alias(&checker.ctx, expr) {
+                    atom_diagnostic(checker, expr);
                 }
             }
-            _ => return,
+            ExprKind::Tuple { elts, .. } => {
+                // List of aliases to replace with `OSError`.
+                let mut aliases: Vec<&Expr> = vec![];
+                for elt in elts {
+                    if is_alias(&checker.ctx, elt) {
+                        aliases.push(elt);
+                    }
+                }
+                if !aliases.is_empty() {
+                    tuple_diagnostic(checker, expr, &aliases);
+                }
+            }
+            _ => {}
         }
-        handle_making_changes(checker, change_target, &before_replace, &replacements);
     }
 }
 
 /// UP024
-pub fn os_error_alias<U: OSErrorAliasChecker>(checker: &mut Checker, handlers: &U) {
-    handlers.check_error(checker);
+pub fn os_error_alias_call(checker: &mut Checker, func: &Expr) {
+    if is_alias(&checker.ctx, func) {
+        atom_diagnostic(checker, func);
+    }
+}
+
+/// UP024
+pub fn os_error_alias_raise(checker: &mut Checker, expr: &Expr) {
+    if matches!(
+        expr.node,
+        ExprKind::Name { .. } | ExprKind::Attribute { .. }
+    ) {
+        if is_alias(&checker.ctx, expr) {
+            atom_diagnostic(checker, expr);
+        }
+    }
 }

@@ -1,17 +1,15 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    // TODO: document referencing [PEP 3120]: https://peps.python.org/pep-3120/
-    pub struct UTF8EncodingDeclaration;
-);
+// TODO: document referencing [PEP 3120]: https://peps.python.org/pep-3120/
+#[violation]
+pub struct UTF8EncodingDeclaration;
+
 impl AlwaysAutofixableViolation for UTF8EncodingDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {

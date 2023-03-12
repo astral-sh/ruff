@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DupeClassFieldDefinitions: name
+    name: DupeClassFieldDefinitions
+    body: "Class field `name` is defined multiple times"
+    suggestion: "Remove duplicate field definition for `name`"
+    fixable: true
   location:
     row: 4
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DupeClassFieldDefinitions: name
+    name: DupeClassFieldDefinitions
+    body: "Class field `name` is defined multiple times"
+    suggestion: "Remove duplicate field definition for `name`"
+    fixable: true
   location:
     row: 13
     column: 4
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DupeClassFieldDefinitions: bar
+    name: DupeClassFieldDefinitions
+    body: "Class field `bar` is defined multiple times"
+    suggestion: "Remove duplicate field definition for `bar`"
+    fixable: true
   location:
     row: 23
     column: 4
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    DupeClassFieldDefinitions: bar
+    name: DupeClassFieldDefinitions
+    body: "Class field `bar` is defined multiple times"
+    suggestion: "Remove duplicate field definition for `bar`"
+    fixable: true
   location:
     row: 40
     column: 4

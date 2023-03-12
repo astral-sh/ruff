@@ -1,15 +1,33 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct LineTooLong(pub usize, pub usize);
-);
+/// ## What it does
+/// Checks for lines that exceed the specified maximum character length.
+///
+/// ## Why is this bad?
+/// Overlong lines can hurt readability.
+///
+/// ## Example
+/// ```python
+/// my_function(param1, param2, param3, param4, param5, param6, param7, param8, param9, param10)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// my_function(
+///     param1, param2, param3, param4, param5,
+///     param6, param7, param8, param9, param10
+/// )
+/// ```
+#[violation]
+pub struct LineTooLong(pub usize, pub usize);
+
 impl Violation for LineTooLong {
     #[derive_message_formats]
     fn message(&self) -> String {

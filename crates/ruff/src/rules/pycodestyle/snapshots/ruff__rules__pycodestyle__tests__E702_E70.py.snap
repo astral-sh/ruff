@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultipleStatementsOnOneLineSemicolon: ~
+    name: MultipleStatementsOnOneLineSemicolon
+    body: Multiple statements on one line (semicolon)
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 9
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineSemicolon: ~
+    name: MultipleStatementsOnOneLineSemicolon
+    body: Multiple statements on one line (semicolon)
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 16
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineSemicolon: ~
+    name: MultipleStatementsOnOneLineSemicolon
+    body: Multiple statements on one line (semicolon)
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 8
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineSemicolon: ~
+    name: MultipleStatementsOnOneLineSemicolon
+    body: Multiple statements on one line (semicolon)
+    suggestion: ~
+    fixable: false
   location:
     row: 25
     column: 10
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineSemicolon: ~
+    name: MultipleStatementsOnOneLineSemicolon
+    body: Multiple statements on one line (semicolon)
+    suggestion: ~
+    fixable: false
   location:
     row: 54
     column: 12
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleStatementsOnOneLineSemicolon: ~
+    name: MultipleStatementsOnOneLineSemicolon
+    body: Multiple statements on one line (semicolon)
+    suggestion: ~
+    fixable: false
   location:
     row: 56
     column: 12

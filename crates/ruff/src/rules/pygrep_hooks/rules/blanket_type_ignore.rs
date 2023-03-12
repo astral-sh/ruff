@@ -1,15 +1,14 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct BlanketTypeIgnore;
-);
+#[violation]
+pub struct BlanketTypeIgnore;
+
 impl Violation for BlanketTypeIgnore {
     #[derive_message_formats]
     fn message(&self) -> String {

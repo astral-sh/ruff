@@ -1,30 +1,31 @@
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::StmtKind;
 
-use crate::ast::helpers::identifier_range;
-use crate::ast::types::Range;
-use crate::ast::whitespace::LinesWithTrailingNewline;
-use crate::ast::{cast, whitespace};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visibility::is_staticmethod;
+use ruff_python_ast::whitespace::LinesWithTrailingNewline;
+use ruff_python_ast::{cast, whitespace};
+
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
-use crate::docstrings::sections::{section_contexts, SectionContext};
+use crate::docstrings::sections::{section_contexts, SectionContext, SectionKind};
 use crate::docstrings::styles::SectionStyle;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rules::pydocstyle::settings::Convention;
-use crate::violation::{AlwaysAutofixableViolation, Violation};
-use crate::visibility::is_staticmethod;
 
-define_violation!(
-    pub struct SectionNotOverIndented {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionNotOverIndented {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionNotOverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -38,11 +39,11 @@ impl AlwaysAutofixableViolation for SectionNotOverIndented {
     }
 }
 
-define_violation!(
-    pub struct SectionUnderlineNotOverIndented {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionUnderlineNotOverIndented {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -56,11 +57,11 @@ impl AlwaysAutofixableViolation for SectionUnderlineNotOverIndented {
     }
 }
 
-define_violation!(
-    pub struct CapitalizeSectionName {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct CapitalizeSectionName {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for CapitalizeSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -74,11 +75,11 @@ impl AlwaysAutofixableViolation for CapitalizeSectionName {
     }
 }
 
-define_violation!(
-    pub struct NewLineAfterSectionName {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct NewLineAfterSectionName {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for NewLineAfterSectionName {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -92,11 +93,11 @@ impl AlwaysAutofixableViolation for NewLineAfterSectionName {
     }
 }
 
-define_violation!(
-    pub struct DashedUnderlineAfterSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct DashedUnderlineAfterSection {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -110,11 +111,11 @@ impl AlwaysAutofixableViolation for DashedUnderlineAfterSection {
     }
 }
 
-define_violation!(
-    pub struct SectionUnderlineAfterName {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionUnderlineAfterName {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -128,11 +129,11 @@ impl AlwaysAutofixableViolation for SectionUnderlineAfterName {
     }
 }
 
-define_violation!(
-    pub struct SectionUnderlineMatchesSectionLength {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionUnderlineMatchesSectionLength {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -146,11 +147,11 @@ impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
     }
 }
 
-define_violation!(
-    pub struct BlankLineAfterSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct BlankLineAfterSection {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for BlankLineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -164,11 +165,11 @@ impl AlwaysAutofixableViolation for BlankLineAfterSection {
     }
 }
 
-define_violation!(
-    pub struct BlankLineBeforeSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct BlankLineBeforeSection {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for BlankLineBeforeSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -182,11 +183,11 @@ impl AlwaysAutofixableViolation for BlankLineBeforeSection {
     }
 }
 
-define_violation!(
-    pub struct BlankLineAfterLastSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct BlankLineAfterLastSection {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -200,11 +201,11 @@ impl AlwaysAutofixableViolation for BlankLineAfterLastSection {
     }
 }
 
-define_violation!(
-    pub struct EmptyDocstringSection {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct EmptyDocstringSection {
+    pub name: String,
+}
+
 impl Violation for EmptyDocstringSection {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -213,11 +214,11 @@ impl Violation for EmptyDocstringSection {
     }
 }
 
-define_violation!(
-    pub struct SectionNameEndsInColon {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct SectionNameEndsInColon {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for SectionNameEndsInColon {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -231,11 +232,11 @@ impl AlwaysAutofixableViolation for SectionNameEndsInColon {
     }
 }
 
-define_violation!(
-    pub struct UndocumentedParam {
-        pub names: Vec<String>,
-    }
-);
+#[violation]
+pub struct UndocumentedParam {
+    pub names: Vec<String>,
+}
+
 impl Violation for UndocumentedParam {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -250,11 +251,11 @@ impl Violation for UndocumentedParam {
     }
 }
 
-define_violation!(
-    pub struct NoBlankLinesBetweenHeaderAndContent {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct NoBlankLinesBetweenHeaderAndContent {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for NoBlankLinesBetweenHeaderAndContent {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -289,17 +290,45 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
             }
         }
         Some(Convention::Pep257) | None => {
-            // First, interpret as NumPy-style sections.
-            let mut found_numpy_section = false;
-            for context in &section_contexts(&lines, &SectionStyle::Numpy) {
-                found_numpy_section = true;
-                numpy_section(checker, docstring, context);
+            // There are some overlapping section names, between the Google and NumPy conventions
+            // (e.g., "Returns", "Raises"). Break ties by checking for the presence of some of the
+            // section names that are unique to each convention.
+
+            // If the docstring contains `Parameters:` or `Other Parameters:`, use the NumPy
+            // convention.
+            let numpy_sections = section_contexts(&lines, &SectionStyle::Numpy);
+            if numpy_sections.iter().any(|context| {
+                matches!(
+                    context.kind,
+                    SectionKind::Parameters | SectionKind::OtherParameters
+                )
+            }) {
+                for context in &numpy_sections {
+                    numpy_section(checker, docstring, context);
+                }
+                return;
             }
 
-            // If no such sections were identified, interpret as Google-style sections.
-            if !found_numpy_section {
-                for context in &section_contexts(&lines, &SectionStyle::Google) {
+            // If the docstring contains `Args:` or `Arguments:`, use the Google convention.
+            let google_sections = section_contexts(&lines, &SectionStyle::Google);
+            if google_sections
+                .iter()
+                .any(|context| matches!(context.kind, SectionKind::Arguments | SectionKind::Args))
+            {
+                for context in &google_sections {
                     google_section(checker, docstring, context);
+                }
+                return;
+            }
+
+            // Otherwise, use whichever convention matched more sections.
+            if google_sections.len() > numpy_sections.len() {
+                for context in &google_sections {
+                    google_section(checker, docstring, context);
+                }
+            } else {
+                for context in &numpy_sections {
+                    numpy_section(checker, docstring, context);
                 }
             }
         }
@@ -330,7 +359,7 @@ fn blanks_and_section_underline(
                 DashedUnderlineAfterSection {
                     name: context.section_name.to_string(),
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Add a dashed line (of the appropriate length) under the section header.
@@ -355,7 +384,7 @@ fn blanks_and_section_underline(
                 EmptyDocstringSection {
                     name: context.section_name.to_string(),
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             ));
         }
         return;
@@ -377,7 +406,7 @@ fn blanks_and_section_underline(
                     SectionUnderlineAfterName {
                         name: context.section_name.to_string(),
                     },
-                    Range::from_located(docstring.expr),
+                    Range::from(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Delete any blank lines between the header and the underline.
@@ -415,7 +444,7 @@ fn blanks_and_section_underline(
                     SectionUnderlineMatchesSectionLength {
                         name: context.section_name.to_string(),
                     },
-                    Range::from_located(docstring.expr),
+                    Range::from(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Replace the existing underline with a line of the appropriate length.
@@ -459,7 +488,7 @@ fn blanks_and_section_underline(
                     SectionUnderlineNotOverIndented {
                         name: context.section_name.to_string(),
                     },
-                    Range::from_located(docstring.expr),
+                    Range::from(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Replace the existing indentation with whitespace of the appropriate length.
@@ -501,7 +530,7 @@ fn blanks_and_section_underline(
                             EmptyDocstringSection {
                                 name: context.section_name.to_string(),
                             },
-                            Range::from_located(docstring.expr),
+                            Range::from(docstring.expr),
                         ));
                     }
                 } else {
@@ -514,7 +543,7 @@ fn blanks_and_section_underline(
                             NoBlankLinesBetweenHeaderAndContent {
                                 name: context.section_name.to_string(),
                             },
-                            Range::from_located(docstring.expr),
+                            Range::from(docstring.expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             // Delete any blank lines between the header and content.
@@ -546,7 +575,7 @@ fn blanks_and_section_underline(
                     EmptyDocstringSection {
                         name: context.section_name.to_string(),
                     },
-                    Range::from_located(docstring.expr),
+                    Range::from(docstring.expr),
                 ));
             }
         }
@@ -560,7 +589,7 @@ fn blanks_and_section_underline(
                 DashedUnderlineAfterSection {
                     name: context.section_name.to_string(),
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Add a dashed line (of the appropriate length) under the section header.
@@ -590,7 +619,7 @@ fn blanks_and_section_underline(
                     NoBlankLinesBetweenHeaderAndContent {
                         name: context.section_name.to_string(),
                     },
-                    Range::from_located(docstring.expr),
+                    Range::from(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Delete any blank lines between the header and content.
@@ -614,47 +643,37 @@ fn blanks_and_section_underline(
     }
 }
 
-fn common_section(
-    checker: &mut Checker,
-    docstring: &Docstring,
-    context: &SectionContext,
-    style: &SectionStyle,
-) {
+fn common_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     if checker.settings.rules.enabled(&Rule::CapitalizeSectionName) {
-        if !style.section_names().contains(&context.section_name) {
-            let capitalized_section_name = titlecase::titlecase(context.section_name);
-            if style
-                .section_names()
-                .contains(capitalized_section_name.as_str())
-            {
-                let mut diagnostic = Diagnostic::new(
-                    CapitalizeSectionName {
-                        name: context.section_name.to_string(),
-                    },
-                    Range::from_located(docstring.expr),
-                );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Replace the section title with the capitalized variant. This requires
-                    // locating the start and end of the section name.
-                    if let Some(index) = context.line.find(context.section_name) {
-                        // Map from bytes to characters.
-                        let section_name_start = &context.line[..index].chars().count();
-                        let section_name_length = &context.section_name.chars().count();
-                        diagnostic.amend(Fix::replacement(
-                            capitalized_section_name,
-                            Location::new(
-                                docstring.expr.location.row() + context.original_index,
-                                *section_name_start,
-                            ),
-                            Location::new(
-                                docstring.expr.location.row() + context.original_index,
-                                section_name_start + section_name_length,
-                            ),
-                        ));
-                    }
+        let capitalized_section_name = context.kind.as_str();
+        if context.section_name != capitalized_section_name {
+            let mut diagnostic = Diagnostic::new(
+                CapitalizeSectionName {
+                    name: context.section_name.to_string(),
+                },
+                Range::from(docstring.expr),
+            );
+            if checker.patch(diagnostic.kind.rule()) {
+                // Replace the section title with the capitalized variant. This requires
+                // locating the start and end of the section name.
+                if let Some(index) = context.line.find(context.section_name) {
+                    // Map from bytes to characters.
+                    let section_name_start = &context.line[..index].chars().count();
+                    let section_name_length = &context.section_name.chars().count();
+                    diagnostic.amend(Fix::replacement(
+                        capitalized_section_name.to_string(),
+                        Location::new(
+                            docstring.expr.location.row() + context.original_index,
+                            *section_name_start,
+                        ),
+                        Location::new(
+                            docstring.expr.location.row() + context.original_index,
+                            section_name_start + section_name_length,
+                        ),
+                    ));
                 }
-                checker.diagnostics.push(diagnostic);
             }
+            checker.diagnostics.push(diagnostic);
         }
     }
 
@@ -669,7 +688,7 @@ fn common_section(
                 SectionNotOverIndented {
                     name: context.section_name.to_string(),
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
@@ -702,7 +721,7 @@ fn common_section(
                     BlankLineAfterLastSection {
                         name: context.section_name.to_string(),
                     },
-                    Range::from_located(docstring.expr),
+                    Range::from(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
@@ -725,7 +744,7 @@ fn common_section(
                     BlankLineAfterSection {
                         name: context.section_name.to_string(),
                     },
-                    Range::from_located(docstring.expr),
+                    Range::from(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
@@ -755,7 +774,7 @@ fn common_section(
                 BlankLineBeforeSection {
                     name: context.section_name.to_string(),
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Add a blank line before the section.
@@ -777,7 +796,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
         | DefinitionKind::NestedFunction(parent)
         | DefinitionKind::Method(parent)
     ) = docstring.kind else {
-        return
+        return;
     };
     let (
         StmtKind::FunctionDef {
@@ -787,7 +806,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             args: arguments, ..
         }
     ) = &parent.node else {
-        return
+        return;
     };
 
     // Look for arguments that weren't included in the docstring.
@@ -801,7 +820,7 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             // If this is a non-static method, skip `cls` or `self`.
             usize::from(
                 matches!(docstring.kind, DefinitionKind::Method(_))
-                    && !is_staticmethod(checker, cast::decorator_list(parent)),
+                    && !is_staticmethod(&checker.ctx, cast::decorator_list(parent)),
             ),
         )
     {
@@ -933,7 +952,7 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
 }
 
 fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
-    common_section(checker, docstring, context, &SectionStyle::Numpy);
+    common_section(checker, docstring, context);
 
     if checker
         .settings
@@ -950,7 +969,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
                 NewLineAfterSectionName {
                     name: context.section_name.to_string(),
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the suffix. This requires locating the end of the section name.
@@ -977,15 +996,14 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
     }
 
     if checker.settings.rules.enabled(&Rule::UndocumentedParam) {
-        let capitalized_section_name = titlecase::titlecase(context.section_name);
-        if capitalized_section_name == "Parameters" {
+        if matches!(context.kind, SectionKind::Parameters) {
             parameters_section(checker, docstring, context);
         }
     }
 }
 
 fn google_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
-    common_section(checker, docstring, context, &SectionStyle::Google);
+    common_section(checker, docstring, context);
 
     if checker
         .settings
@@ -1002,7 +1020,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                 SectionNameEndsInColon {
                     name: context.section_name.to_string(),
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Replace the suffix. This requires locating the end of the section name.
@@ -1030,8 +1048,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
     }
 
     if checker.settings.rules.enabled(&Rule::UndocumentedParam) {
-        let capitalized_section_name = titlecase::titlecase(context.section_name);
-        if capitalized_section_name == "Args" || capitalized_section_name == "Arguments" {
+        if matches!(context.kind, SectionKind::Args | SectionKind::Arguments) {
             args_section(checker, docstring, context);
         }
     }

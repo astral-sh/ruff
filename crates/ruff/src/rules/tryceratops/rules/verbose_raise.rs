@@ -1,16 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::types::Range;
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
-define_violation!(
-    pub struct VerboseRaise;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct VerboseRaise;
+
 impl Violation for VerboseRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -72,7 +72,7 @@ pub fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
                         if id == exception_name {
                             checker
                                 .diagnostics
-                                .push(Diagnostic::new(VerboseRaise, Range::from_located(exc)));
+                                .push(Diagnostic::new(VerboseRaise, Range::from(exc)));
                         }
                     }
                 }

@@ -2,25 +2,23 @@ use anyhow::{bail, Result};
 use log::debug;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::identifiers::is_identifier;
-use ruff_python::keyword::KWLIST;
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::Range;
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_stdlib::keyword::KWLIST;
 
-use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
-use crate::violation::{Availability, Violation};
-use crate::AutofixKind;
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct ConvertTypedDictFunctionalToClass {
-        pub name: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct ConvertTypedDictFunctionalToClass {
+    pub name: String,
+    pub fixable: bool,
+}
+
 impl Violation for ConvertTypedDictFunctionalToClass {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -56,9 +54,13 @@ fn match_typed_dict_assign<'a>(
     } = &value.node else {
         return None;
     };
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TypedDict"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["typing", "TypedDict"]
+        })
+    {
         return None;
     }
     Some((class_name, args, keywords, func))
@@ -247,7 +249,7 @@ pub fn convert_typed_dict_functional_to_class(
             name: class_name.to_string(),
             fixable,
         },
-        Range::from_located(stmt),
+        Range::from(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(convert_to_class(

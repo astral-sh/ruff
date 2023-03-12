@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FunctionCallArgumentDefault:
-      name: Depends
+    name: FunctionCallArgumentDefault
+    body: "Do not perform function call `Depends` in argument defaults"
+    suggestion: ~
+    fixable: false
   location:
     row: 19
     column: 50

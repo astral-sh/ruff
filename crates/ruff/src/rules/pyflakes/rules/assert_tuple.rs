@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct AssertTuple;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct AssertTuple;
+
 impl Violation for AssertTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -22,7 +22,7 @@ pub fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
         if !elts.is_empty() {
             checker
                 .diagnostics
-                .push(Diagnostic::new(AssertTuple, Range::from_located(stmt)));
+                .push(Diagnostic::new(AssertTuple, Range::from(stmt)));
         }
     }
 }

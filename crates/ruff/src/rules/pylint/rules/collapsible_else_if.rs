@@ -1,15 +1,12 @@
 use rustpython_parser::ast::{Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::source_code::Locator;
-use crate::violation::Violation;
-
-define_violation!(
-    pub struct CollapsibleElseIf;
-);
+#[violation]
+pub struct CollapsibleElseIf;
 
 impl Violation for CollapsibleElseIf {
     #[derive_message_formats]
@@ -25,16 +22,13 @@ pub fn collapsible_else_if(orelse: &[Stmt], locator: &Locator) -> Option<Diagnos
         if matches!(first.node, StmtKind::If { .. }) {
             // Determine whether this is an `elif`, or an `if` in an `else` block.
             if locator
-                .slice(&Range {
+                .slice(Range {
                     location: first.location,
                     end_location: first.end_location.unwrap(),
                 })
                 .starts_with("if")
             {
-                return Some(Diagnostic::new(
-                    CollapsibleElseIf,
-                    Range::from_located(first),
-                ));
+                return Some(Diagnostic::new(CollapsibleElseIf, Range::from(first)));
             }
         }
     }

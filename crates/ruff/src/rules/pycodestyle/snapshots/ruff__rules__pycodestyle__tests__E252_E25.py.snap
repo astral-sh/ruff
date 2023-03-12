@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingWhitespaceAroundParameterEquals: ~
+    name: MissingWhitespaceAroundParameterEquals
+    body: Missing whitespace around parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 46
     column: 14
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundParameterEquals: ~
+    name: MissingWhitespaceAroundParameterEquals
+    body: Missing whitespace around parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 46
     column: 15
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundParameterEquals: ~
+    name: MissingWhitespaceAroundParameterEquals
+    body: Missing whitespace around parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 46
     column: 26
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundParameterEquals: ~
+    name: MissingWhitespaceAroundParameterEquals
+    body: Missing whitespace around parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 46
     column: 35

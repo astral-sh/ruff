@@ -1,17 +1,19 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
 
-use super::super::fixes;
-use crate::ast::types::{Binding, BindingKind, Range, Scope};
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Binding, BindingKind, Range, Scope};
 
-define_violation!(
-    pub struct UselessObjectInheritance {
-        pub name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+use super::super::fixes;
+
+#[violation]
+pub struct UselessObjectInheritance {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for UselessObjectInheritance {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -48,7 +50,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
             UselessObjectInheritance {
                 name: name.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 
@@ -63,7 +65,7 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(mut diagnostic) = rule(name, bases, checker.current_scope(), &checker.bindings) else {
+    let Some(mut diagnostic) = rule(name, bases, checker.ctx.current_scope(), &checker.ctx.bindings) else {
         return;
     };
     if checker.patch(diagnostic.kind.rule()) {

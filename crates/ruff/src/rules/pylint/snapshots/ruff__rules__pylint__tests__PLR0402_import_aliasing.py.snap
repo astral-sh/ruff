@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ConsiderUsingFromImport:
-      module: os
-      name: path
-      fixable: true
+    name: ConsiderUsingFromImport
+    body: "Use `from os import path` in lieu of alias"
+    suggestion: "Replace with `from os import path`"
+    fixable: true
   location:
     row: 9
     column: 7
@@ -23,10 +23,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    ConsiderUsingFromImport:
-      module: foo.bar
-      name: foobar
-      fixable: true
+    name: ConsiderUsingFromImport
+    body: "Use `from foo.bar import foobar` in lieu of alias"
+    suggestion: "Replace with `from foo.bar import foobar`"
+    fixable: true
   location:
     row: 11
     column: 7
@@ -43,10 +43,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    ConsiderUsingFromImport:
-      module: foo.bar
-      name: foobar
-      fixable: false
+    name: ConsiderUsingFromImport
+    body: "Use `from foo.bar import foobar` in lieu of alias"
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 7

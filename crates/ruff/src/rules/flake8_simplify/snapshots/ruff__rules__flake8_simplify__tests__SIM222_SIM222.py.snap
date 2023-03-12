@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ExprOrTrue: ~
+    name: ExprOrTrue
+    body: "Use `True` instead of `... or True`"
+    suggestion: "Replace with `True`"
+    fixable: true
   location:
     row: 1
     column: 8
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    ExprOrTrue: ~
+    name: ExprOrTrue
+    body: "Use `True` instead of `... or True`"
+    suggestion: "Replace with `True`"
+    fixable: true
   location:
     row: 4
     column: 15
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    ExprOrTrue: ~
+    name: ExprOrTrue
+    body: "Use `True` instead of `... or True`"
+    suggestion: "Replace with `True`"
+    fixable: true
   location:
     row: 7
     column: 14

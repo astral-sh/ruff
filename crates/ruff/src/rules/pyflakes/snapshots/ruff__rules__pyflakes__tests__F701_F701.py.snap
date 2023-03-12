@@ -1,9 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BreakOutsideLoop: ~
+    name: BreakOutsideLoop
+    body: "`break` outside loop"
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BreakOutsideLoop: ~
+    name: BreakOutsideLoop
+    body: "`break` outside loop"
+    suggestion: ~
+    fixable: false
   location:
     row: 16
     column: 4
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BreakOutsideLoop: ~
+    name: BreakOutsideLoop
+    body: "`break` outside loop"
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 4
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BreakOutsideLoop: ~
+    name: BreakOutsideLoop
+    body: "`break` outside loop"
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 0

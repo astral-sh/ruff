@@ -1,0 +1,31 @@
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dawidd6/action-download-artifact@v2
+        id: download-result
+        with:
+          name: ecosystem-result
+          workflow: ci.yaml
+          run_id: ${{ github.event.workflow_run.id }}
+          if_no_artifact_found: ignore
+      - if: steps.download-result.outputs.found_artifact
+        id: result
+        run: |
+          echo "pr-number=$(<pr-number)" >> $GITHUB_OUTPUT
+      - name: Create comment
+        if: steps.download-result.outputs.found_artifact
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          pr_number: ${{ steps.result.outputs.pr-number }}
+          filePath: ecosystem-result
+          comment_tag: ecosystem-results

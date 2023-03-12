@@ -1,21 +1,45 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Location, Stmt, StmtKind};
 
-use crate::ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
-use crate::ast::types::{Range, ScopeKind};
-use crate::ast::whitespace::leading_space;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
-use crate::violation::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::{Range, ScopeKind};
+use ruff_python_ast::whitespace::leading_space;
 
-define_violation!(
-    pub struct LambdaAssignment {
-        pub name: String,
-        pub fixable: bool,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+/// ## What it does
+/// Checks for lambda expressions which are assigned to a variable.
+///
+/// ## Why is this bad?
+/// Per PEP 8, you should "Always use a def statement instead of an assignment
+/// statement that binds a lambda expression directly to an identifier."
+///
+/// Using a `def` statement leads to better tracebacks, and the assignment
+/// itself negates the primary benefit of using a `lambda` expression (i.e.,
+/// that it can be embedded inside another expression).
+///
+/// ## Example
+/// ```python
+/// f = lambda x: 2*x
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def f(x):
+///    return 2 * x
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#programming-recommendations)
+#[violation]
+pub struct LambdaAssignment {
+    pub name: String,
+    pub fixable: bool,
+}
+
 impl Violation for LambdaAssignment {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -40,14 +64,14 @@ pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stm
             // package like dataclasses, which wouldn't consider the
             // rewritten function definition to be equivalent.
             // See https://github.com/charliermarsh/ruff/issues/3046
-            let fixable = !matches!(checker.current_scope().kind, ScopeKind::Class(_));
+            let fixable = !matches!(checker.ctx.current_scope().kind, ScopeKind::Class(_));
 
             let mut diagnostic = Diagnostic::new(
                 LambdaAssignment {
                     name: id.to_string(),
                     fixable,
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             );
 
             if checker.patch(diagnostic.kind.rule())
@@ -55,7 +79,7 @@ pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stm
                 && !match_leading_content(stmt, checker.locator)
                 && !match_trailing_content(stmt, checker.locator)
             {
-                let first_line = checker.locator.slice(&Range::new(
+                let first_line = checker.locator.slice(Range::new(
                     Location::new(stmt.location.row(), 0),
                     Location::new(stmt.location.row() + 1, 0),
                 ));

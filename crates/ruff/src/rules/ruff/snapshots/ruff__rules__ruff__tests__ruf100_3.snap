@@ -1,0 +1,205 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: UnusedNOQA
+    body: "Unused blanket `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 6
+  fix:
+    content: ""
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 2
+      column: 0
+  parent: ~
+- kind:
+    name: UnusedNOQA
+    body: "Unused blanket `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 6
+  fix:
+    content: ""
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 7
+  parent: ~
+- kind:
+    name: UnusedNOQA
+    body: "Unused blanket `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 3
+    column: 9
+  end_location:
+    row: 3
+    column: 15
+  fix:
+    content: ""
+    location:
+      row: 3
+      column: 7
+    end_location:
+      row: 3
+      column: 15
+  parent: ~
+- kind:
+    name: UnusedNOQA
+    body: "Unused blanket `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 4
+    column: 9
+  end_location:
+    row: 4
+    column: 15
+  fix:
+    content: ""
+    location:
+      row: 4
+      column: 9
+    end_location:
+      row: 4
+      column: 16
+  parent: ~
+- kind:
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 18
+  fix:
+    content: ""
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 9
+      column: 0
+  parent: ~
+- kind:
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 18
+  fix:
+    content: ""
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 19
+  parent: ~
+- kind:
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 10
+    column: 9
+  end_location:
+    row: 10
+    column: 27
+  fix:
+    content: ""
+    location:
+      row: 10
+      column: 7
+    end_location:
+      row: 10
+      column: 27
+  parent: ~
+- kind:
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 11
+    column: 9
+  end_location:
+    row: 11
+    column: 27
+  fix:
+    content: ""
+    location:
+      row: 11
+      column: 9
+    end_location:
+      row: 11
+      column: 28
+  parent: ~
+- kind:
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 12
+    column: 10
+  end_location:
+    row: 12
+    column: 28
+  fix:
+    content: "# noqa: F821"
+    location:
+      row: 12
+      column: 10
+    end_location:
+      row: 12
+      column: 28
+  parent: ~
+- kind:
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
+  location:
+    row: 13
+    column: 10
+  end_location:
+    row: 13
+    column: 28
+  fix:
+    content: "# noqa: F821"
+    location:
+      row: 13
+      column: 10
+    end_location:
+      row: 13
+      column: 28
+  parent: ~
+

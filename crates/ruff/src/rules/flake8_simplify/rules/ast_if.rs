@@ -2,19 +2,18 @@ use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
-
-use crate::ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
-use crate::ast::helpers::{
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
+use ruff_python_ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
 };
-use crate::ast::types::Range;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
+use crate::registry::AsRule;
 use crate::rules::flake8_simplify::rules::fix_if;
-use crate::violation::{AutofixKind, Availability, Violation};
 
 fn compare_expr(expr1: &ComparableExpr, expr2: &ComparableExpr) -> bool {
     expr1.eq(expr2)
@@ -34,11 +33,11 @@ fn compare_body(body1: &[Stmt], body2: &[Stmt]) -> bool {
         .all(|(stmt1, stmt2)| compare_stmt(&stmt1.into(), &stmt2.into()))
 }
 
-define_violation!(
-    pub struct CollapsibleIf {
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct CollapsibleIf {
+    pub fixable: bool,
+}
+
 impl Violation for CollapsibleIf {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -53,12 +52,12 @@ impl Violation for CollapsibleIf {
     }
 }
 
-define_violation!(
-    pub struct NeedlessBool {
-        pub condition: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct NeedlessBool {
+    pub condition: String,
+    pub fixable: bool,
+}
+
 impl Violation for NeedlessBool {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -75,29 +74,29 @@ impl Violation for NeedlessBool {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for three or more consecutive if-statements with direct returns
-    ///
-    /// ## Why is this bad?
-    /// These can be simplified by using a dictionary
-    ///
-    /// ## Example
-    /// ```python
-    /// if x == 1:
-    ///     return "Hello"
-    /// elif x == 2:
-    ///     return "Goodbye"
-    /// else:
-    ///     return "Goodnight"
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
-    /// ```
-    pub struct ManualDictLookup;
-);
+/// ## What it does
+/// Checks for three or more consecutive if-statements with direct returns
+///
+/// ## Why is this bad?
+/// These can be simplified by using a dictionary
+///
+/// ## Example
+/// ```python
+/// if x == 1:
+///     return "Hello"
+/// elif x == 2:
+///     return "Goodbye"
+/// else:
+///     return "Goodnight"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
+/// ```
+#[violation]
+pub struct ManualDictLookup;
+
 impl Violation for ManualDictLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -105,12 +104,12 @@ impl Violation for ManualDictLookup {
     }
 }
 
-define_violation!(
-    pub struct UseTernaryOperator {
-        pub contents: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct UseTernaryOperator {
+    pub contents: String,
+    pub fixable: bool,
+}
+
 impl Violation for UseTernaryOperator {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -128,29 +127,29 @@ impl Violation for UseTernaryOperator {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for `if` branches with identical arm bodies.
-    ///
-    /// ## Why is this bad?
-    /// If multiple arms of an `if` statement have the same body, using `or`
-    /// better signals the intent of the statement.
-    ///
-    /// ## Example
-    /// ```python
-    /// if x == 1:
-    ///     print("Hello")
-    /// elif x == 2:
-    ///     print("Hello")
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// if x == 1 or x == 2:
-    ///     print("Hello")
-    /// ```
-    pub struct IfWithSameArms;
-);
+/// ## What it does
+/// Checks for `if` branches with identical arm bodies.
+///
+/// ## Why is this bad?
+/// If multiple arms of an `if` statement have the same body, using `or`
+/// better signals the intent of the statement.
+///
+/// ## Example
+/// ```python
+/// if x == 1:
+///     print("Hello")
+/// elif x == 2:
+///     print("Hello")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if x == 1 or x == 2:
+///     print("Hello")
+/// ```
+#[violation]
+pub struct IfWithSameArms;
+
 impl Violation for IfWithSameArms {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -158,12 +157,12 @@ impl Violation for IfWithSameArms {
     }
 }
 
-define_violation!(
-    pub struct DictGetWithDefault {
-        pub contents: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct DictGetWithDefault {
+    pub contents: String,
+    pub fixable: bool,
+}
+
 impl Violation for DictGetWithDefault {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -275,7 +274,7 @@ pub fn nested_if_statements(
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf { fixable },
         colon.map_or_else(
-            || Range::from_located(stmt),
+            || Range::from(stmt),
             |colon| Range::new(stmt.location, colon.end_location),
         ),
     );
@@ -347,12 +346,9 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     let fixable = matches!(if_return, Bool::True)
         && matches!(else_return, Bool::False)
         && !has_comments(stmt, checker.locator)
-        && (matches!(test.node, ExprKind::Compare { .. }) || checker.is_builtin("bool"));
+        && (matches!(test.node, ExprKind::Compare { .. }) || checker.ctx.is_builtin("bool"));
 
-    let mut diagnostic = Diagnostic::new(
-        NeedlessBool { condition, fixable },
-        Range::from_located(stmt),
-    );
+    let mut diagnostic = Diagnostic::new(NeedlessBool { condition, fixable }, Range::from(stmt));
     if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
@@ -431,13 +427,13 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     }
 
     // Avoid suggesting ternary for `if sys.version_info >= ...`-style checks.
-    if contains_call_path(checker, test, &["sys", "version_info"]) {
+    if contains_call_path(&checker.ctx, test, &["sys", "version_info"]) {
         return;
     }
 
     // Avoid suggesting ternary for `if sys.platform.startswith("...")`-style
     // checks.
-    if contains_call_path(checker, test, &["sys", "platform"]) {
+    if contains_call_path(&checker.ctx, test, &["sys", "platform"]) {
         return;
     }
 
@@ -501,7 +497,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
             contents: contents.clone(),
             fixable,
         },
-        Range::from_located(stmt),
+        Range::from(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
@@ -629,7 +625,7 @@ pub fn manual_dict_lookup(
     };
     if value
         .as_ref()
-        .map_or(false, |value| contains_effect(checker, value))
+        .map_or(false, |value| contains_effect(&checker.ctx, value))
     {
         return;
     }
@@ -702,7 +698,7 @@ pub fn manual_dict_lookup(
         };
         if value
             .as_ref()
-            .map_or(false, |value| contains_effect(checker, value))
+            .map_or(false, |value| contains_effect(&checker.ctx, value))
         {
             return;
         };
@@ -729,7 +725,7 @@ pub fn manual_dict_lookup(
 
     checker
         .diagnostics
-        .push(Diagnostic::new(ManualDictLookup, Range::from_located(stmt)));
+        .push(Diagnostic::new(ManualDictLookup, Range::from(stmt)));
 }
 
 /// SIM401
@@ -784,7 +780,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(checker, default_val) {
+    if contains_effect(&checker.ctx, default_val) {
         return;
     }
 
@@ -849,7 +845,7 @@ pub fn use_dict_get_with_default(
             contents: contents.clone(),
             fixable,
         },
-        Range::from_located(stmt),
+        Range::from(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(

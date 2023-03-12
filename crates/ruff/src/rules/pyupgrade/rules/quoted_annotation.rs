@@ -1,14 +1,13 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::Rule;
 
-define_violation!(
-    pub struct QuotedAnnotation;
-);
+#[violation]
+pub struct QuotedAnnotation;
+
 impl AlwaysAutofixableViolation for QuotedAnnotation {
     #[derive_message_formats]
     fn message(&self) -> String {

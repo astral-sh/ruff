@@ -2,7 +2,10 @@
 
 use std::path::Path;
 
-use crate::registry::{Diagnostic, Rule};
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::Stylist;
+
+use crate::registry::Rule;
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
@@ -15,7 +18,6 @@ use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
-use crate::source_code::Stylist;
 
 pub fn check_physical_lines(
     path: &Path,
@@ -179,13 +181,14 @@ pub fn check_physical_lines(
 
 #[cfg(test)]
 mod tests {
-
     use std::path::Path;
 
-    use super::check_physical_lines;
+    use ruff_python_ast::source_code::{Locator, Stylist};
+
     use crate::registry::Rule;
     use crate::settings::{flags, Settings};
-    use crate::source_code::{Locator, Stylist};
+
+    use super::check_physical_lines;
 
     #[test]
     fn e501_non_ascii_char() {

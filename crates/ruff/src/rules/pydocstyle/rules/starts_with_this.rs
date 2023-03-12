@@ -1,15 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct DocstringStartsWithThis;
-);
+#[violation]
+pub struct DocstringStartsWithThis;
+
 impl Violation for DocstringStartsWithThis {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -34,6 +33,6 @@ pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     }
     checker.diagnostics.push(Diagnostic::new(
         DocstringStartsWithThis,
-        Range::from_located(docstring.expr),
+        Range::from(docstring.expr),
     ));
 }

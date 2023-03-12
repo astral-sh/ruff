@@ -1,42 +1,44 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use super::helpers;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::rules::flake8_comprehensions::fixes;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for unnecessary `list` or `reversed` calls around `sorted`
-    /// calls.
-    ///
-    /// ## Why is this bad?
-    /// It is unnecessary to use `list` around `sorted`, as the latter already
-    /// returns a list.
-    ///
-    /// It is also unnecessary to use `reversed` around `sorted`, as the latter
-    /// has a `reverse` argument that can be used in lieu of an additional
-    /// `reversed` call.
-    ///
-    /// In both cases, it's clearer to avoid the redundant call.
-    ///
-    /// ## Examples
-    /// ```python
-    /// reversed(sorted(iterable))
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// sorted(iterable, reverse=True)
-    /// ```
-    pub struct UnnecessaryCallAroundSorted {
-        pub func: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+use crate::rules::flake8_comprehensions::fixes;
+
+use super::helpers;
+
+/// ## What it does
+/// Checks for unnecessary `list` or `reversed` calls around `sorted`
+/// calls.
+///
+/// ## Why is this bad?
+/// It is unnecessary to use `list` around `sorted`, as the latter already
+/// returns a list.
+///
+/// It is also unnecessary to use `reversed` around `sorted`, as the latter
+/// has a `reverse` argument that can be used in lieu of an additional
+/// `reversed` call.
+///
+/// In both cases, it's clearer to avoid the redundant call.
+///
+/// ## Examples
+/// ```python
+/// reversed(sorted(iterable))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// sorted(iterable, reverse=True)
+/// ```
+#[violation]
+pub struct UnnecessaryCallAroundSorted {
+    pub func: String,
+}
+
 impl AlwaysAutofixableViolation for UnnecessaryCallAroundSorted {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -75,14 +77,14 @@ pub fn unnecessary_call_around_sorted(
     if inner != "sorted" {
         return;
     }
-    if !checker.is_builtin(inner) || !checker.is_builtin(outer) {
+    if !checker.ctx.is_builtin(inner) || !checker.ctx.is_builtin(outer) {
         return;
     }
     let mut diagnostic = Diagnostic::new(
         UnnecessaryCallAroundSorted {
             func: outer.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_call_around_sorted(checker.locator, checker.stylist, expr) {

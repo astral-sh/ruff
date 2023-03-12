@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedNOQA:
-      codes: ~
+    name: UnusedNOQA
+    body: "Unused blanket `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 9
     column: 11
@@ -21,12 +23,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - E501
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 13
     column: 11
@@ -43,13 +43,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - F841
-          - E501
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `F841`, `E501`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 16
     column: 11
@@ -66,14 +63,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled:
-          - F821
-        unmatched:
-          - F841
-          - W191
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `F841`, `W191`; non-enabled: `F821`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 19
     column: 11
@@ -90,13 +83,10 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown:
-          - V101
-        disabled: []
-        unmatched:
-          - F841
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `F841`; unknown: `V101`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 22
     column: 11
@@ -113,12 +103,10 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - E501
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 26
     column: 9
@@ -135,8 +123,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    UnusedVariable:
-      name: d
+    name: UnusedVariable
+    body: "Local variable `d` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `d`"
+    fixable: true
   location:
     row: 29
     column: 4
@@ -153,12 +143,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - E501
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 29
     column: 32
@@ -175,12 +163,10 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - F841
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `F841`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 55
     column: 5
@@ -197,12 +183,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - E501
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `E501`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 63
     column: 5
@@ -219,8 +203,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes: ~
+    name: UnusedNOQA
+    body: "Unused blanket `noqa` directive"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 71
     column: 5
@@ -237,10 +223,10 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    UnusedImport:
-      name: shelve
-      ignore_init: false
-      multiple: false
+    name: UnusedImport
+    body: "`shelve` imported but unused"
+    suggestion: "Remove unused import: `shelve`"
+    fixable: true
   location:
     row: 85
     column: 7
@@ -257,9 +243,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    LineTooLong:
-      - 103
-      - 88
+    name: LineTooLong
+    body: Line too long (103 > 88 characters)
+    suggestion: ~
+    fixable: false
   location:
     row: 90
     column: 88
@@ -269,12 +256,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedNOQA:
-      codes:
-        unknown: []
-        disabled: []
-        unmatched:
-          - F401
+    name: UnusedNOQA
+    body: "Unused `noqa` directive (unused: `F401`)"
+    suggestion: "Remove unused `noqa` directive"
+    fixable: true
   location:
     row: 90
     column: 91

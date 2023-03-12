@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Alias;
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UselessImportAlias;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct UselessImportAlias;
+
 impl AlwaysAutofixableViolation for UselessImportAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -33,7 +33,7 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessImportAlias, Range::from_located(alias));
+    let mut diagnostic = Diagnostic::new(UselessImportAlias, Range::from(alias));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             asname.to_string(),

@@ -3,10 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - generators
-        - nested_scopes
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` imports `generators`, `nested_scopes` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 1
     column: 0
@@ -23,10 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - unicode_literals
-        - with_statement
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` imports `unicode_literals`, `with_statement` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 2
     column: 0
@@ -43,10 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - absolute_import
-        - division
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` imports `absolute_import`, `division` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 3
     column: 0
@@ -63,9 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - generator_stop
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` import `generator_stop` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 4
     column: 0
@@ -82,10 +83,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - generator_stop
-        - print_function
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` imports `generator_stop`, `print_function` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 5
     column: 0
@@ -102,9 +103,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - generators
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` import `generators` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 6
     column: 0
@@ -121,9 +123,10 @@ expression: diagnostics
       column: 49
   parent: ~
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - generator_stop
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` import `generator_stop` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 9
     column: 4
@@ -140,9 +143,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - generators
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` import `generators` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 10
     column: 4
@@ -159,9 +163,10 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - generator_stop
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` import `generator_stop` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 13
     column: 4
@@ -178,9 +183,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UnnecessaryFutureImport:
-      names:
-        - generators
+    name: UnnecessaryFutureImport
+    body: "Unnecessary `__future__` import `generators` for target Python version"
+    suggestion: "Remove unnecessary `__future__` import"
+    fixable: true
   location:
     row: 14
     column: 4

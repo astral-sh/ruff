@@ -13,9 +13,10 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
+    use ruff_python_ast::source_code::LineEnding;
+
     use crate::registry::Rule;
     use crate::settings;
-    use crate::source_code::LineEnding;
     use crate::test::test_path;
 
     use super::settings::Settings;
@@ -103,6 +104,7 @@ mod tests {
         Path::new("E22.py")
     )]
     #[test_case(Rule::MissingWhitespaceAroundModuloOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MissingWhitespace, Path::new("E23.py"))]
     #[test_case(Rule::TooFewSpacesBeforeInlineComment, Path::new("E26.py"))]
     #[test_case(Rule::UnexpectedIndentation, Path::new("E11.py"))]
     #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]

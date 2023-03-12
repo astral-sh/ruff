@@ -1,15 +1,14 @@
-use crate::ast::types::{Range, Scope};
-use crate::registry::Diagnostic;
-use ruff_macros::{define_violation, derive_message_formats};
 use std::path::Path;
 
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Range, Scope};
 
-define_violation!(
-    pub struct UndefinedExport {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UndefinedExport {
+    pub name: String,
+}
+
 impl Violation for UndefinedExport {
     #[derive_message_formats]
     fn message(&self) -> String {

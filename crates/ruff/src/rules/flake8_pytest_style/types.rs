@@ -1,8 +1,9 @@
 use std::fmt::{Display, Formatter};
 
-use ruff_macros::CacheKey;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::CacheKey;
 
 #[derive(Clone, Copy, Debug, CacheKey, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum ParametrizeNameType {

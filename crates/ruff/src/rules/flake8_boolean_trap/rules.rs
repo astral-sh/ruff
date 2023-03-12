@@ -1,16 +1,16 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::collect_call_path;
+use ruff_python_ast::types::Range;
 
-use crate::ast::helpers::collect_call_path;
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct BooleanPositionalArgInFunctionDefinition;
-);
+#[violation]
+pub struct BooleanPositionalArgInFunctionDefinition;
+
 impl Violation for BooleanPositionalArgInFunctionDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +18,9 @@ impl Violation for BooleanPositionalArgInFunctionDefinition {
     }
 }
 
-define_violation!(
-    pub struct BooleanDefaultValueInFunctionDefinition;
-);
+#[violation]
+pub struct BooleanDefaultValueInFunctionDefinition;
+
 impl Violation for BooleanDefaultValueInFunctionDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +28,9 @@ impl Violation for BooleanDefaultValueInFunctionDefinition {
     }
 }
 
-define_violation!(
-    pub struct BooleanPositionalValueInFunctionCall;
-);
+#[violation]
+pub struct BooleanPositionalValueInFunctionCall;
+
 impl Violation for BooleanPositionalValueInFunctionCall {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -92,7 +92,7 @@ fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
     if is_boolean_arg(arg) {
         checker
             .diagnostics
-            .push(Diagnostic::new(kind, Range::from_located(arg)));
+            .push(Diagnostic::new(kind, Range::from(arg)));
     }
 }
 
@@ -135,7 +135,7 @@ pub fn check_positional_boolean_in_def(
         }
         checker.diagnostics.push(Diagnostic::new(
             BooleanPositionalArgInFunctionDefinition,
-            Range::from_located(arg),
+            Range::from(arg),
         ));
     }
 }

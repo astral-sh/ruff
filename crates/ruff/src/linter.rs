@@ -8,7 +8,11 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::ParseError;
 
-use crate::ast::types::Import;
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::types::Import;
+use ruff_python_stdlib::path::is_python_stub_file;
+
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
@@ -21,11 +25,9 @@ use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::{add_noqa, rule_is_ignored};
-use crate::registry::{Diagnostic, Rule};
-use crate::resolver::is_interface_definition_path;
+use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
 use crate::{directives, fs};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -86,14 +88,8 @@ pub fn check_path<'a>(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
-        let is_interface_definition = is_interface_definition_path(path);
-        diagnostics.extend(check_tokens(
-            locator,
-            &tokens,
-            settings,
-            autofix,
-            is_interface_definition,
-        ));
+        let is_stub = is_python_stub_file(path);
+        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix, is_stub));
     }
 
     // Run the filesystem-based rules.
@@ -212,7 +208,7 @@ pub fn check_path<'a>(
     if !diagnostics.is_empty() && !settings.per_file_ignores.is_empty() {
         let ignores = fs::ignores_from_path(path, &settings.per_file_ignores);
         if !ignores.is_empty() {
-            diagnostics.retain(|diagnostic| !ignores.contains(&diagnostic.kind.rule()));
+            diagnostics.retain(|diagnostic| !ignores.contains(diagnostic.kind.rule()));
         }
     };
 

@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct ReturnInTryExceptFinally;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct ReturnInTryExceptFinally;
+
 impl Violation for ReturnInTryExceptFinally {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -39,7 +39,7 @@ pub fn return_in_try_except_finally(
         if try_has_return || except_has_return {
             checker.diagnostics.push(Diagnostic::new(
                 ReturnInTryExceptFinally,
-                Range::from_located(finally_return),
+                Range::from(finally_return),
             ));
         }
     }

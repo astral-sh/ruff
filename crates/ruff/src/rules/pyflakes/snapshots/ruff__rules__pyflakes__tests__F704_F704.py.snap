@@ -1,10 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    YieldOutsideFunction:
-      keyword: Yield
+    name: YieldOutsideFunction
+    body: "`yield` statement outside of a function"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    YieldOutsideFunction:
-      keyword: Yield
+    name: YieldOutsideFunction
+    body: "`yield` statement outside of a function"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 0
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    YieldOutsideFunction:
-      keyword: YieldFrom
+    name: YieldOutsideFunction
+    body: "`yield from` statement outside of a function"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 0
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    YieldOutsideFunction:
-      keyword: Await
+    name: YieldOutsideFunction
+    body: "`await` statement outside of a function"
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 0

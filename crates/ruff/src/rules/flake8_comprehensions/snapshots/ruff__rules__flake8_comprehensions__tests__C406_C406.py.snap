@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryLiteralDict:
-      obj_type: list
+    name: UnnecessaryLiteralDict
+    body: "Unnecessary `list` literal (rewrite as a `dict` literal)"
+    suggestion: "Rewrite as a `dict` literal"
+    fixable: true
   location:
     row: 1
     column: 5
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    UnnecessaryLiteralDict:
-      obj_type: tuple
+    name: UnnecessaryLiteralDict
+    body: "Unnecessary `tuple` literal (rewrite as a `dict` literal)"
+    suggestion: "Rewrite as a `dict` literal"
+    fixable: true
   location:
     row: 2
     column: 5
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UnnecessaryLiteralDict:
-      obj_type: list
+    name: UnnecessaryLiteralDict
+    body: "Unnecessary `list` literal (rewrite as a `dict` literal)"
+    suggestion: "Rewrite as a `dict` literal"
+    fixable: true
   location:
     row: 3
     column: 5
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UnnecessaryLiteralDict:
-      obj_type: tuple
+    name: UnnecessaryLiteralDict
+    body: "Unnecessary `tuple` literal (rewrite as a `dict` literal)"
+    suggestion: "Rewrite as a `dict` literal"
+    fixable: true
   location:
     row: 4
     column: 5

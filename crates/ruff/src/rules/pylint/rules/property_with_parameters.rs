@@ -1,15 +1,14 @@
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Stmt};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
 
-use crate::ast::helpers::identifier_range;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct PropertyWithParameters;
-);
+#[violation]
+pub struct PropertyWithParameters;
+
 impl Violation for PropertyWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -30,7 +29,7 @@ pub fn property_with_parameters(
     {
         return;
     }
-    if checker.is_builtin("property")
+    if checker.ctx.is_builtin("property")
         && args
             .args
             .iter()

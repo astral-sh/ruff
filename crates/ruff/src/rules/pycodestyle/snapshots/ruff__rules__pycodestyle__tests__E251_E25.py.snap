@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 11
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 13
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 8
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 7
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 7
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 9
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 13
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 28
@@ -83,7 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 18
     column: 44
@@ -93,7 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 7
@@ -103,7 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedSpacesAroundKeywordParameterEquals: ~
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 9

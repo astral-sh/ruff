@@ -1,25 +1,26 @@
 use std::iter;
 
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arg, Arguments};
 
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::function_type;
+use ruff_python_ast::function_type::FunctionType;
+use ruff_python_ast::types::{Binding, FunctionDef, Lambda, Scope, ScopeKind};
+use ruff_python_ast::visibility;
+
+use crate::checkers::ast::Checker;
+
 use super::helpers;
 use super::types::Argumentable;
-use crate::ast::function_type;
-use crate::ast::function_type::FunctionType;
-use crate::ast::types::{Binding, FunctionDef, Lambda, Scope, ScopeKind};
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
-use crate::visibility;
 
-define_violation!(
-    pub struct UnusedFunctionArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedFunctionArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedFunctionArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,11 +29,11 @@ impl Violation for UnusedFunctionArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedMethodArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedMethodArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -41,11 +42,11 @@ impl Violation for UnusedMethodArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedClassMethodArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedClassMethodArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedClassMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -54,11 +55,11 @@ impl Violation for UnusedClassMethodArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedStaticMethodArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedStaticMethodArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedStaticMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -67,11 +68,11 @@ impl Violation for UnusedStaticMethodArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedLambdaArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedLambdaArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedLambdaArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -178,7 +179,7 @@ pub fn unused_arguments(
             ..
         }) => {
             match function_type::classify(
-                checker,
+                &checker.ctx,
                 parent,
                 name,
                 decorator_list,
@@ -190,7 +191,7 @@ pub fn unused_arguments(
                         .settings
                         .rules
                         .enabled(Argumentable::Function.rule_code())
-                        && !visibility::is_overload(checker, decorator_list)
+                        && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         function(
                             &Argumentable::Function,
@@ -217,9 +218,9 @@ pub fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(checker, decorator_list)
-                        && !visibility::is_override(checker, decorator_list)
-                        && !visibility::is_overload(checker, decorator_list)
+                        && !visibility::is_abstract(&checker.ctx, decorator_list)
+                        && !visibility::is_override(&checker.ctx, decorator_list)
+                        && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         method(
                             &Argumentable::Method,
@@ -246,9 +247,9 @@ pub fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(checker, decorator_list)
-                        && !visibility::is_override(checker, decorator_list)
-                        && !visibility::is_overload(checker, decorator_list)
+                        && !visibility::is_abstract(&checker.ctx, decorator_list)
+                        && !visibility::is_override(&checker.ctx, decorator_list)
+                        && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         method(
                             &Argumentable::ClassMethod,
@@ -275,9 +276,9 @@ pub fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(checker, decorator_list)
-                        && !visibility::is_override(checker, decorator_list)
-                        && !visibility::is_overload(checker, decorator_list)
+                        && !visibility::is_abstract(&checker.ctx, decorator_list)
+                        && !visibility::is_override(&checker.ctx, decorator_list)
+                        && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         function(
                             &Argumentable::StaticMethod,

@@ -1,13 +1,12 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Stmt, StmtKind};
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct BreakOutsideLoop;
-);
+#[violation]
+pub struct BreakOutsideLoop;
+
 impl Violation for BreakOutsideLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -45,6 +44,6 @@ pub fn break_outside_loop<'a>(
     if allowed {
         None
     } else {
-        Some(Diagnostic::new(BreakOutsideLoop, Range::from_located(stmt)))
+        Some(Diagnostic::new(BreakOutsideLoop, Range::from(stmt)))
     }
 }

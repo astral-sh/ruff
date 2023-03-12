@@ -1,15 +1,14 @@
 use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct NonEmptyStubBody;
-);
+#[violation]
+pub struct NonEmptyStubBody;
+
 impl Violation for NonEmptyStubBody {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -29,8 +28,7 @@ pub fn non_empty_stub_body(checker: &mut Checker, body: &[Stmt]) {
             }
         }
     }
-    checker.diagnostics.push(Diagnostic::new(
-        NonEmptyStubBody,
-        Range::from_located(&body[0]),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(NonEmptyStubBody, Range::from(&body[0])));
 }

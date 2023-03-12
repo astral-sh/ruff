@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoOverIndentation: ~
+    name: NoOverIndentation
+    body: Docstring is over-indented
+    suggestion: Remove over-indentation
+    fixable: true
   location:
     row: 252
     column: 0
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    NoOverIndentation: ~
+    name: NoOverIndentation
+    body: Docstring is over-indented
+    suggestion: Remove over-indentation
+    fixable: true
   location:
     row: 264
     column: 0
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    NoOverIndentation: ~
+    name: NoOverIndentation
+    body: Docstring is over-indented
+    suggestion: Remove over-indentation
+    fixable: true
   location:
     row: 272
     column: 0

@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::{Range, ScopeKind};
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Range, ScopeKind};
 
-define_violation!(
-    pub struct CachedInstanceMethod;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct CachedInstanceMethod;
+
 impl Violation for CachedInstanceMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -19,15 +19,18 @@ impl Violation for CachedInstanceMethod {
 }
 
 fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
-    checker.resolve_call_path(expr).map_or(false, |call_path| {
-        call_path.as_slice() == ["functools", "lru_cache"]
-            || call_path.as_slice() == ["functools", "cache"]
-    })
+    checker
+        .ctx
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["functools", "lru_cache"]
+                || call_path.as_slice() == ["functools", "cache"]
+        })
 }
 
 /// B019
 pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
-    if !matches!(checker.current_scope().kind, ScopeKind::Class(_)) {
+    if !matches!(checker.ctx.current_scope().kind, ScopeKind::Class(_)) {
         return;
     }
     for decorator in decorator_list {
@@ -49,7 +52,7 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
         ) {
             checker.diagnostics.push(Diagnostic::new(
                 CachedInstanceMethod,
-                Range::from_located(decorator),
+                Range::from(decorator),
             ));
         }
     }

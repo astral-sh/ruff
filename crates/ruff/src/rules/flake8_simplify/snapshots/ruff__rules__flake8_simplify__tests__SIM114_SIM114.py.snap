@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IfWithSameArms: ~
+    name: IfWithSameArms
+    body: "Combine `if` branches using logical `or` operator"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IfWithSameArms: ~
+    name: IfWithSameArms
+    body: "Combine `if` branches using logical `or` operator"
+    suggestion: ~
+    fixable: false
   location:
     row: 7
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IfWithSameArms: ~
+    name: IfWithSameArms
+    body: "Combine `if` branches using logical `or` operator"
+    suggestion: ~
+    fixable: false
   location:
     row: 14
     column: 0
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IfWithSameArms: ~
+    name: IfWithSameArms
+    body: "Combine `if` branches using logical `or` operator"
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 0
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IfWithSameArms: ~
+    name: IfWithSameArms
+    body: "Combine `if` branches using logical `or` operator"
+    suggestion: ~
+    fixable: false
   location:
     row: 24
     column: 4
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IfWithSameArms: ~
+    name: IfWithSameArms
+    body: "Combine `if` branches using logical `or` operator"
+    suggestion: ~
+    fixable: false
   location:
     row: 31
     column: 4
@@ -63,7 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IfWithSameArms: ~
+    name: IfWithSameArms
+    body: "Combine `if` branches using logical `or` operator"
+    suggestion: ~
+    fixable: false
   location:
     row: 38
     column: 0
@@ -73,7 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    IfWithSameArms: ~
+    name: IfWithSameArms
+    body: "Combine `if` branches using logical `or` operator"
+    suggestion: ~
+    fixable: false
   location:
     row: 62
     column: 5

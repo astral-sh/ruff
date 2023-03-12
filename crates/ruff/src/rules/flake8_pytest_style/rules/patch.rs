@@ -1,17 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::{collect_arg_names, compose_call_path, SimpleCallArgs};
-use crate::ast::types::Range;
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{collect_arg_names, compose_call_path, SimpleCallArgs};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
-define_violation!(
-    pub struct PatchWithLambda;
-);
+#[violation]
+pub struct PatchWithLambda;
+
 impl Violation for PatchWithLambda {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -83,7 +82,7 @@ fn check_patch_call(
             visitor.visit_expr(body);
 
             if !visitor.uses_args {
-                return Some(Diagnostic::new(PatchWithLambda, Range::from_located(call)));
+                return Some(Diagnostic::new(PatchWithLambda, Range::from(call)));
             }
         }
     }

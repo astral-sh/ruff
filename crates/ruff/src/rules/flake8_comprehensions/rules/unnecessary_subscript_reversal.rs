@@ -1,18 +1,19 @@
 use num_bigint::BigInt;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
 
-use super::helpers;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UnnecessarySubscriptReversal {
-        pub func: String,
-    }
-);
+use crate::checkers::ast::Checker;
+
+use super::helpers;
+
+#[violation]
+pub struct UnnecessarySubscriptReversal {
+    pub func: String,
+}
+
 impl Violation for UnnecessarySubscriptReversal {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -37,7 +38,7 @@ pub fn unnecessary_subscript_reversal(
     if !(id == "set" || id == "sorted" || id == "reversed") {
         return;
     }
-    if !checker.is_builtin(id) {
+    if !checker.ctx.is_builtin(id) {
         return;
     }
     let ExprKind::Subscript { slice, .. } = &first_arg.node else {
@@ -71,6 +72,6 @@ pub fn unnecessary_subscript_reversal(
         UnnecessarySubscriptReversal {
             func: id.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     ));
 }

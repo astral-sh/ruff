@@ -1,16 +1,17 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Stmt, StmtKind};
 
-use crate::ast::types::{Range, RefEquality};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{Range, RefEquality};
+
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct EmptyTypeCheckingBlock;
-);
+#[violation]
+pub struct EmptyTypeCheckingBlock;
+
 impl AlwaysAutofixableViolation for EmptyTypeCheckingBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -31,19 +32,16 @@ pub fn empty_type_checking_block<'a, 'b>(
     'b: 'a,
 {
     if body.len() == 1 && matches!(body[0].node, StmtKind::Pass) {
-        let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, Range::from_located(&body[0]));
+        let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, Range::from(&body[0]));
 
         // Delete the entire type-checking block.
         if checker.patch(diagnostic.kind.rule()) {
             let parent = checker
+                .ctx
                 .child_to_parent
                 .get(&RefEquality(stmt))
-                .map(std::convert::Into::into);
-            let deleted: Vec<&Stmt> = checker
-                .deletions
-                .iter()
-                .map(std::convert::Into::into)
-                .collect();
+                .map(Into::into);
+            let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
             match delete_stmt(
                 stmt,
                 parent,

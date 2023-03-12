@@ -10,10 +10,11 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use super::settings::Quote;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
+
+    use super::settings::Quote;
 
     #[test_case(Path::new("doubles.py"))]
     #[test_case(Path::new("doubles_escaped.py"))]

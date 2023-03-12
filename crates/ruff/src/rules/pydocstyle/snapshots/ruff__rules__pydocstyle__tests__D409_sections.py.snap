@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SectionUnderlineMatchesSectionLength:
-      name: Returns
+    name: SectionUnderlineMatchesSectionLength
+    body: "Section underline should match the length of its name (\"Returns\")"
+    suggestion: "Adjust underline length to match \"Returns\""
+    fixable: true
   location:
     row: 99
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    SectionUnderlineMatchesSectionLength:
-      name: Returns
+    name: SectionUnderlineMatchesSectionLength
+    body: "Section underline should match the length of its name (\"Returns\")"
+    suggestion: "Adjust underline length to match \"Returns\""
+    fixable: true
   location:
     row: 207
     column: 4

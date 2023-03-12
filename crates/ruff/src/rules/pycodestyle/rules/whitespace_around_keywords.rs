@@ -3,14 +3,28 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Violation;
+use ruff_macros::{derive_message_formats, violation};
 
-use crate::registry::DiagnosticKind;
-use crate::violation::Violation;
+/// ## What it does
+/// Checks for extraneous whitespace after keywords.
+///
+/// ## Why is this bad?
+///
+///
+/// ## Example
+/// ```python
+/// True and  False
+/// ```
+///
+/// Use instead:
+/// ```python
+/// True and False
+/// ```
+#[violation]
+pub struct MultipleSpacesAfterKeyword;
 
-define_violation!(
-    pub struct MultipleSpacesAfterKeyword;
-);
 impl Violation for MultipleSpacesAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +32,25 @@ impl Violation for MultipleSpacesAfterKeyword {
     }
 }
 
-define_violation!(
-    pub struct MultipleSpacesBeforeKeyword;
-);
+/// ## What it does
+/// Checks for extraneous whitespace before keywords.
+///
+/// ## Why is this bad?
+///
+///
+/// ## Example
+/// ```python
+/// True  and False
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// True and False
+/// ```
+#[violation]
+pub struct MultipleSpacesBeforeKeyword;
+
 impl Violation for MultipleSpacesBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +58,25 @@ impl Violation for MultipleSpacesBeforeKeyword {
     }
 }
 
-define_violation!(
-    pub struct TabAfterKeyword;
-);
+/// ## What it does
+/// Checks for extraneous tabs after keywords.
+///
+/// ## Why is this bad?
+///
+///
+/// ## Example
+/// ```python
+/// True and\tFalse
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// True and False
+/// ```
+#[violation]
+pub struct TabAfterKeyword;
+
 impl Violation for TabAfterKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -38,9 +84,25 @@ impl Violation for TabAfterKeyword {
     }
 }
 
-define_violation!(
-    pub struct TabBeforeKeyword;
-);
+/// ## What it does
+/// Checks for extraneous tabs before keywords.
+///
+/// ## Why is this bad?
+///
+///
+/// ## Example
+/// ```python
+/// True\tand False
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// True and False
+/// ```
+#[violation]
+pub struct TabBeforeKeyword;
+
 impl Violation for TabBeforeKeyword {
     #[derive_message_formats]
     fn message(&self) -> String {

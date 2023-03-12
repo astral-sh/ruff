@@ -1,33 +1,33 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{ExprKind, Stmt, Withitem};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for `self.assertRaises(Exception)`.
-    ///
-    /// ## Why is this bad?
-    /// `assertRaises(Exception)` can lead to your test passing even if the
-    /// code being tested is never executed due to a typo.
-    ///
-    /// Either assert for a more specific exception (builtin or custom), use
-    /// `assertRaisesRegex` or the context manager form of `assertRaises`.
-    ///
-    /// ## Example
-    /// ```python
-    /// self.assertRaises(Exception, foo)
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// self.assertRaises(SomeSpecificException, foo)
-    /// ```
-    pub struct AssertRaisesException;
-);
+use crate::checkers::ast::Checker;
+
+/// ## What it does
+/// Checks for `self.assertRaises(Exception)`.
+///
+/// ## Why is this bad?
+/// `assertRaises(Exception)` can lead to your test passing even if the
+/// code being tested is never executed due to a typo.
+///
+/// Either assert for a more specific exception (builtin or custom), use
+/// `assertRaisesRegex` or the context manager form of `assertRaises`.
+///
+/// ## Example
+/// ```python
+/// self.assertRaises(Exception, foo)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// self.assertRaises(SomeSpecificException, foo)
+/// ```
+#[violation]
+pub struct AssertRaisesException;
+
 impl Violation for AssertRaisesException {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -54,14 +54,14 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
         return;
     }
     if !checker
+        .ctx
         .resolve_call_path(args.first().unwrap())
         .map_or(false, |call_path| call_path.as_slice() == ["", "Exception"])
     {
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
-        AssertRaisesException,
-        Range::from_located(stmt),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(AssertRaisesException, Range::from(stmt)));
 }

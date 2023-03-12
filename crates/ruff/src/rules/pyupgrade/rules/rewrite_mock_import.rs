@@ -4,31 +4,30 @@ use libcst_native::{
     ImportAlias, ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
-use serde::{Deserialize, Serialize};
 
-use crate::ast::helpers::collect_call_path;
-use crate::ast::types::Range;
-use crate::ast::whitespace::indentation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::collect_call_path;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::indentation;
+
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::source_code::{Locator, Stylist};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::{AsRule, Rule};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum MockReference {
     Import,
     Attribute,
 }
 
-define_violation!(
-    pub struct RewriteMockImport {
-        pub reference_type: MockReference,
-    }
-);
+#[violation]
+pub struct RewriteMockImport {
+    pub reference_type: MockReference,
+}
+
 impl AlwaysAutofixableViolation for RewriteMockImport {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -143,7 +142,7 @@ fn format_import(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(&Range::from_located(stmt));
+    let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text)?;
     let mut import = match_import(&mut tree)?;
 
@@ -177,7 +176,7 @@ fn format_import_from(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(&Range::from_located(stmt));
+    let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text).unwrap();
     let mut import = match_import_from(&mut tree)?;
 
@@ -239,7 +238,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 RewriteMockImport {
                     reference_type: MockReference::Attribute,
                 },
-                Range::from_located(value),
+                Range::from(value),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
@@ -286,7 +285,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             RewriteMockImport {
                                 reference_type: MockReference::Import,
                             },
-                            Range::from_located(name),
+                            Range::from(name),
                         );
                         if let Some(content) = content.as_ref() {
                             diagnostic.amend(Fix::replacement(
@@ -314,7 +313,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     RewriteMockImport {
                         reference_type: MockReference::Import,
                     },
-                    Range::from_located(stmt),
+                    Range::from(stmt),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UselessSemicolon: ~
+    name: UselessSemicolon
+    body: Statement ends with an unnecessary semicolon
+    suggestion: Remove unnecessary semicolon
+    fixable: true
   location:
     row: 10
     column: 12
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UselessSemicolon: ~
+    name: UselessSemicolon
+    body: Statement ends with an unnecessary semicolon
+    suggestion: Remove unnecessary semicolon
+    fixable: true
   location:
     row: 12
     column: 22
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    UselessSemicolon: ~
+    name: UselessSemicolon
+    body: Statement ends with an unnecessary semicolon
+    suggestion: Remove unnecessary semicolon
+    fixable: true
   location:
     row: 25
     column: 13

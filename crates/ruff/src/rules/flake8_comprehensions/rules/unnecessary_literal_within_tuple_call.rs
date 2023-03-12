@@ -1,19 +1,21 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use super::helpers;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::rules::flake8_comprehensions::fixes;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UnnecessaryLiteralWithinTupleCall {
-        pub literal: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+use crate::rules::flake8_comprehensions::fixes;
+
+use super::helpers;
+
+#[violation]
+pub struct UnnecessaryLiteralWithinTupleCall {
+    pub literal: String,
+}
+
 impl AlwaysAutofixableViolation for UnnecessaryLiteralWithinTupleCall {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -53,7 +55,7 @@ pub fn unnecessary_literal_within_tuple_call(
     let Some(argument) = helpers::first_argument_with_matching_function("tuple", func, args) else {
         return;
     };
-    if !checker.is_builtin("tuple") {
+    if !checker.ctx.is_builtin("tuple") {
         return;
     }
     let argument_kind = match argument {
@@ -65,7 +67,7 @@ pub fn unnecessary_literal_within_tuple_call(
         UnnecessaryLiteralWithinTupleCall {
             literal: argument_kind.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_literal_within_tuple_call(

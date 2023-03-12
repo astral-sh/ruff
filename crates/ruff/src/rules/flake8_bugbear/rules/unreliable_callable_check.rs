@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UnreliableCallableCheck;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct UnreliableCallableCheck;
+
 impl Violation for UnreliableCallableCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,8 +40,7 @@ pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr
     if s != "__call__" {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
-        UnreliableCallableCheck,
-        Range::from_located(expr),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(UnreliableCallableCheck, Range::from(expr)));
 }

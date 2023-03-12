@@ -1,9 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    InvalidPrintSyntax: ~
+    name: InvalidPrintSyntax
+    body: "Use of `>>` is invalid with `print` function"
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 0

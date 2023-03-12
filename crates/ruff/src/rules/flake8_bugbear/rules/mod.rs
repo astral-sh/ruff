@@ -11,6 +11,9 @@ pub use duplicate_exceptions::{
     duplicate_exceptions, DuplicateHandlerException, DuplicateTryBlockException,
 };
 pub use except_with_empty_tuple::{except_with_empty_tuple, ExceptWithEmptyTuple};
+pub use except_with_non_exception_classes::{
+    except_with_non_exception_classes, ExceptWithNonExceptionClasses,
+};
 pub use f_string_docstring::{f_string_docstring, FStringDocstring};
 pub use function_call_argument_default::{
     function_call_argument_default, FunctionCallArgumentDefault,
@@ -34,16 +37,15 @@ pub use star_arg_unpacking_after_keyword_arg::{
 };
 pub use strip_with_multi_characters::{strip_with_multi_characters, StripWithMultiCharacters};
 pub use unary_prefix_increment::{unary_prefix_increment, UnaryPrefixIncrement};
+pub use unintentional_type_annotation::{
+    unintentional_type_annotation, UnintentionalTypeAnnotation,
+};
 pub use unreliable_callable_check::{unreliable_callable_check, UnreliableCallableCheck};
 pub use unused_loop_control_variable::{unused_loop_control_variable, UnusedLoopControlVariable};
 pub use useless_comparison::{useless_comparison, UselessComparison};
 pub use useless_contextlib_suppress::{useless_contextlib_suppress, UselessContextlibSuppress};
 pub use useless_expression::{useless_expression, UselessExpression};
 pub use zip_without_explicit_strict::{zip_without_explicit_strict, ZipWithoutExplicitStrict};
-
-pub use unintentional_type_annotation::{
-    unintentional_type_annotation, UnintentionalTypeAnnotation,
-};
 
 mod abstract_base_class;
 mod assert_false;
@@ -53,6 +55,7 @@ mod cached_instance_method;
 mod cannot_raise_literal;
 mod duplicate_exceptions;
 mod except_with_empty_tuple;
+mod except_with_non_exception_classes;
 mod f_string_docstring;
 mod function_call_argument_default;
 mod function_uses_loop_variable;

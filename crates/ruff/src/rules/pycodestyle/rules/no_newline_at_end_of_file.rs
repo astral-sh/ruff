@@ -1,15 +1,29 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct NoNewLineAtEndOfFile;
-);
+/// ## What it does
+/// Checks for files missing a new line at the end of the file.
+///
+/// ## Why is this bad?
+/// Trailing blank lines are superfluous.
+/// However the last line should end with a new line.
+///
+/// ## Example
+/// ```python
+/// spam(1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(1)\n
+/// ```
+#[violation]
+pub struct NoNewLineAtEndOfFile;
+
 impl AlwaysAutofixableViolation for NoNewLineAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {

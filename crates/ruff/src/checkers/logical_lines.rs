@@ -5,17 +5,19 @@ use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
-use crate::ast::types::Range;
-use crate::registry::{Diagnostic, Rule};
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+
+use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
 use crate::rules::pycodestyle::rules::{
-    extraneous_whitespace, indentation, missing_whitespace_after_keyword,
+    extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, space_around_operator, whitespace_around_keywords,
     whitespace_around_named_parameter_equals, whitespace_before_comment,
     whitespace_before_parameters,
 };
 use crate::settings::{flags, Settings};
-use crate::source_code::{Locator, Stylist};
 
 /// Return the amount of indentation, expanding tabs to the next multiple of 8.
 fn expand_indent(mut line: &str) -> usize {
@@ -57,7 +59,7 @@ pub fn check_logical_lines(
 
         // Extract the indentation level.
         let start_loc = line.mapping[0].1;
-        let start_line = locator.slice(&Range::new(Location::new(start_loc.row(), 0), start_loc));
+        let start_line = locator.slice(Range::new(Location::new(start_loc.row(), 0), start_loc));
         let indent_level = expand_indent(start_line);
         let indent_size = 4;
 
@@ -162,6 +164,18 @@ pub fn check_logical_lines(
                     });
                 }
             }
+
+            #[cfg(feature = "logical_lines")]
+            let should_fix = autofix.into() && settings.rules.should_fix(&Rule::MissingWhitespace);
+
+            #[cfg(not(feature = "logical_lines"))]
+            let should_fix = false;
+
+            for diagnostic in missing_whitespace(&line.text, start_loc.row(), should_fix) {
+                if settings.rules.enabled(diagnostic.kind.rule()) {
+                    diagnostics.push(diagnostic);
+                }
+            }
         }
 
         if line.flags.contains(TokenFlags::BRACKET) {
@@ -213,8 +227,9 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
+    use ruff_python_ast::source_code::Locator;
+
     use crate::checkers::logical_lines::iter_logical_lines;
-    use crate::source_code::Locator;
 
     #[test]
     fn split_logical_lines() {
@@ -291,7 +306,7 @@ f()"#;
             .into_iter()
             .map(|line| line.text)
             .collect();
-        let expected = vec!["def f():", "\"xxx\"", "", "x = 1", "f()"];
+        let expected = vec!["def f():", "\"xxxxxxxxxxxxxxxxxxxx\"", "", "x = 1", "f()"];
         assert_eq!(actual, expected);
     }
 }

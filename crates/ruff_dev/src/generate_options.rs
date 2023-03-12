@@ -1,7 +1,7 @@
 //! Generate a Markdown-compatible listing of configuration options.
 use itertools::Itertools;
 use ruff::settings::options::Options;
-use ruff::settings::options_base::{ConfigurationOptions, OptionEntry, OptionField};
+use ruff::settings::options_base::{OptionEntry, OptionField};
 
 fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: Option<&str>) {
     output.push_str(&format!("#### [`{name}`](#{name})\n"));
@@ -27,8 +27,10 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, group_name: 
 pub fn generate() -> String {
     let mut output: String = "### Top-level\n\n".into();
 
-    let mut sorted_options = Options::get_available_options();
-    sorted_options.sort_by_key(|(name, _)| *name);
+    let sorted_options: Vec<_> = Options::metadata()
+        .into_iter()
+        .sorted_by_key(|(name, _)| *name)
+        .collect();
 
     // Generate all the top-level fields.
     for (name, entry) in &sorted_options {

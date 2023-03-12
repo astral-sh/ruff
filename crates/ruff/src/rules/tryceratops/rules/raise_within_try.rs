@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Stmt, StmtKind};
 
-use crate::ast::types::Range;
-use crate::ast::visitor::{self, Visitor};
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor::{self, Visitor};
 
-define_violation!(
-    pub struct RaiseWithinTry;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct RaiseWithinTry;
+
 impl Violation for RaiseWithinTry {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -48,6 +48,6 @@ pub fn raise_within_try(checker: &mut Checker, body: &[Stmt]) {
     for stmt in raises {
         checker
             .diagnostics
-            .push(Diagnostic::new(RaiseWithinTry, Range::from_located(stmt)));
+            .push(Diagnostic::new(RaiseWithinTry, Range::from(stmt)));
     }
 }

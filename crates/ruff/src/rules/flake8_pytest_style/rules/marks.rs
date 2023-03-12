@@ -1,20 +1,21 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Location};
 
-use super::helpers::{get_mark_decorators, get_mark_name};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct IncorrectMarkParenthesesStyle {
-        pub mark_name: String,
-        pub expected_parens: String,
-        pub actual_parens: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::{AsRule, Rule};
+
+use super::helpers::{get_mark_decorators, get_mark_name};
+
+#[violation]
+pub struct IncorrectMarkParenthesesStyle {
+    pub mark_name: String,
+    pub expected_parens: String,
+    pub actual_parens: String,
+}
+
 impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -34,9 +35,9 @@ impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
     }
 }
 
-define_violation!(
-    pub struct UseFixturesWithoutParameters;
-);
+#[violation]
+pub struct UseFixturesWithoutParameters;
+
 impl AlwaysAutofixableViolation for UseFixturesWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -61,7 +62,7 @@ fn pytest_mark_parentheses(
             expected_parens: preferred.to_string(),
             actual_parens: actual.to_string(),
         },
-        Range::from_located(decorator),
+        Range::from(decorator),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(fix);
@@ -109,8 +110,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
     }
 
     if !has_parameters {
-        let mut diagnostic =
-            Diagnostic::new(UseFixturesWithoutParameters, Range::from_located(decorator));
+        let mut diagnostic = Diagnostic::new(UseFixturesWithoutParameters, Range::from(decorator));
         if checker.patch(diagnostic.kind.rule()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
             diagnostic.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));

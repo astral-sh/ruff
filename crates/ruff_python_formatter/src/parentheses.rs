@@ -1,10 +1,10 @@
 use rustpython_parser::ast::Constant;
 
-use crate::core::helpers::is_radix_literal;
-use crate::core::locator::Locator;
-use crate::core::types::Range;
-use crate::core::visitor;
-use crate::core::visitor::Visitor;
+use ruff_python_ast::source_code::Locator;
+
+use crate::cst::helpers::is_radix_literal;
+use crate::cst::visitor;
+use crate::cst::visitor::Visitor;
 use crate::cst::{Expr, ExprKind, Stmt, StmtKind};
 use crate::trivia::Parenthesize;
 
@@ -154,9 +154,8 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
                         ..
                     },
                 ) {
-                    let (source, start, end) = self.locator.slice(Range::from_located(value));
                     // TODO(charlie): Encode this in the AST via separate node types.
-                    if !is_radix_literal(&source[start..end]) {
+                    if !is_radix_literal(self.locator.slice(&**value)) {
                         value.parentheses = Parenthesize::Always;
                     }
                 }

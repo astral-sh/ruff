@@ -2,9 +2,10 @@
 
 use std::collections::BTreeSet;
 
-use ruff_macros::{CacheKey, ConfigurationOptions};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 use super::categorize::ImportType;
 
@@ -255,7 +256,7 @@ pub struct Options {
     pub lines_between_types: Option<usize>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             forced-separate = ["tests"]
         "#

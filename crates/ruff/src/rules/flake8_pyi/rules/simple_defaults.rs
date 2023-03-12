@@ -1,15 +1,14 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unaryop};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct TypedArgumentSimpleDefaults;
-);
+#[violation]
+pub struct TypedArgumentSimpleDefaults;
+
 /// PYI011
 impl Violation for TypedArgumentSimpleDefaults {
     #[derive_message_formats]
@@ -18,9 +17,9 @@ impl Violation for TypedArgumentSimpleDefaults {
     }
 }
 
-define_violation!(
-    pub struct ArgumentSimpleDefaults;
-);
+#[violation]
+pub struct ArgumentSimpleDefaults;
+
 /// PYI014
 impl Violation for ArgumentSimpleDefaults {
     #[derive_message_formats]
@@ -57,16 +56,16 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
         ExprKind::Constant {
             value: Constant::Str(..),
             ..
-        } => return checker.locator.slice(&Range::from_located(default)).len() <= 50,
+        } => return checker.locator.slice(default).len() <= 50,
         ExprKind::Constant {
             value: Constant::Bytes(..),
             ..
-        } => return checker.locator.slice(&Range::from_located(default)).len() <= 50,
+        } => return checker.locator.slice(default).len() <= 50,
         ExprKind::Constant {
             value: Constant::Int(..),
             ..
         } => {
-            return checker.locator.slice(&Range::from_located(default)).len() <= 10;
+            return checker.locator.slice(default).len() <= 10;
         }
         ExprKind::UnaryOp {
             op: Unaryop::USub,
@@ -77,7 +76,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
                 ..
             } = &operand.node
             {
-                return checker.locator.slice(&Range::from_located(operand)).len() <= 10;
+                return checker.locator.slice(operand).len() <= 10;
             }
         }
         ExprKind::BinOp {
@@ -101,7 +100,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
                     ..
                 } = &left.node
                 {
-                    return checker.locator.slice(&Range::from_located(left)).len() <= 10;
+                    return checker.locator.slice(left).len() <= 10;
                 } else if let ExprKind::UnaryOp {
                     op: Unaryop::USub,
                     operand,
@@ -114,7 +113,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
                         ..
                     } = &operand.node
                     {
-                        return checker.locator.slice(&Range::from_located(operand)).len() <= 10;
+                        return checker.locator.slice(operand).len() <= 10;
                     }
                 }
             }
@@ -122,6 +121,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
         // `sys.stdin`, etc.
         ExprKind::Attribute { .. } => {
             if checker
+                .ctx
                 .resolve_call_path(default)
                 .map_or(false, |call_path| {
                     ALLOWED_ATTRIBUTES_IN_DEFAULTS
@@ -150,7 +150,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                     if !is_valid_default_value_with_annotation(default, checker) {
                         checker.diagnostics.push(Diagnostic::new(
                             TypedArgumentSimpleDefaults,
-                            Range::from_located(default),
+                            Range::from(default),
                         ));
                     }
                 }
@@ -169,7 +169,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                     if !is_valid_default_value_with_annotation(default, checker) {
                         checker.diagnostics.push(Diagnostic::new(
                             TypedArgumentSimpleDefaults,
-                            Range::from_located(default),
+                            Range::from(default),
                         ));
                     }
                 }
@@ -191,7 +191,7 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                     if !is_valid_default_value_with_annotation(default, checker) {
                         checker.diagnostics.push(Diagnostic::new(
                             ArgumentSimpleDefaults,
-                            Range::from_located(default),
+                            Range::from(default),
                         ));
                     }
                 }
@@ -210,7 +210,7 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                     if !is_valid_default_value_with_annotation(default, checker) {
                         checker.diagnostics.push(Diagnostic::new(
                             ArgumentSimpleDefaults,
-                            Range::from_located(default),
+                            Range::from(default),
                         ));
                     }
                 }

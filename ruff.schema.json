@@ -272,7 +272,7 @@
       ]
     },
     "format": {
-      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), or `\"pylint\"` (Pylint text format).",
+      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -908,6 +908,26 @@
             "type": "string"
           }
         },
+        "runtime-evaluated-base-classes": {
+          "description": "Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "runtime-evaluated-decorators": {
+          "description": "Exempt classes decorated with any of the enumerated decorators from needing to be moved into type-checking blocks.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "strict": {
           "description": "Enforce TC001, TC002, and TC003 rules even when valid runtime imports are present for the same module. See flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
           "type": [
@@ -1451,6 +1471,7 @@
         "B027",
         "B029",
         "B03",
+        "B030",
         "B032",
         "B9",
         "B90",
@@ -1796,6 +1817,10 @@
         "PLC04",
         "PLC041",
         "PLC0414",
+        "PLC1",
+        "PLC19",
+        "PLC190",
+        "PLC1901",
         "PLC3",
         "PLC30",
         "PLC300",
@@ -1870,6 +1895,10 @@
         "PLW060",
         "PLW0602",
         "PLW0603",
+        "PLW1",
+        "PLW15",
+        "PLW150",
+        "PLW1508",
         "PLW2",
         "PLW29",
         "PLW290",
@@ -2178,7 +2207,8 @@
         "grouped",
         "github",
         "gitlab",
-        "pylint"
+        "pylint",
+        "azure"
       ]
     },
     "Strictness": {

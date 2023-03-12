@@ -1,15 +1,12 @@
-//! Registry of [`Rule`] to [`DiagnosticKind`] mappings.
+//! Registry of all [`Rule`] implementations.
 
-use ruff_macros::RuleNamespace;
-use rustpython_parser::ast::Location;
-use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::Violation;
+use ruff_macros::RuleNamespace;
+
 use crate::codes::{self, RuleCodePrefix};
-use crate::fix::Fix;
 use crate::rules;
-use crate::violation::Violation;
 
 ruff_macros::register_rules!(
     // pycodestyle errors
@@ -52,6 +49,8 @@ ruff_macros::register_rules!(
     rules::pycodestyle::rules::MultipleLeadingHashesForBlockComment,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespace,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
     #[cfg(feature = "logical_lines")]
@@ -147,6 +146,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,
     rules::pylint::rules::InvalidAllFormat,
+    rules::pylint::rules::InvalidEnvvarDefault,
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::BadStrStripCall,
@@ -159,6 +159,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::PropertyWithParameters,
     rules::pylint::rules::ReturnInInit,
     rules::pylint::rules::ConsiderUsingFromImport,
+    rules::pylint::rules::CompareToEmptyString,
     rules::pylint::rules::ComparisonOfConstant,
     rules::pylint::rules::ConsiderMergingIsinstance,
     rules::pylint::rules::ConsiderUsingSysExit,
@@ -207,6 +208,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
     rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
+    rules::flake8_bugbear::rules::ExceptWithNonExceptionClasses,
     rules::flake8_bugbear::rules::UnintentionalTypeAnnotation,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
@@ -338,7 +340,7 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::FString,
     rules::pyupgrade::rules::FunctoolsCache,
     rules::pyupgrade::rules::ExtraneousParentheses,
-    rules::pyupgrade::rules::ImportReplacements,
+    rules::pyupgrade::rules::DeprecatedImport,
     rules::pyupgrade::rules::OutdatedVersionBlock,
     rules::pyupgrade::rules::QuotedAnnotation,
     rules::pyupgrade::rules::IsinstanceWithTuple,
@@ -607,6 +609,20 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
 
+impl Rule {
+    pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
+        let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
+        let prefix: RuleCodePrefix = RuleCodePrefix::parse(&linter, code)?;
+        Ok(prefix.into_iter().next().unwrap())
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum FromCodeError {
+    #[error("unknown rule code")]
+    Unknown,
+}
+
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
 pub enum Linter {
     /// [Pyflakes](https://pypi.org/project/pyflakes/)
@@ -788,7 +804,7 @@ impl Linter {
     }
 }
 
-#[derive(is_macro::Is)]
+#[derive(is_macro::Is, Copy, Clone)]
 pub enum LintSource {
     Ast,
     Io,
@@ -803,9 +819,9 @@ pub enum LintSource {
 impl Rule {
     /// The source for the diagnostic (either the AST, the filesystem, or the
     /// physical lines).
-    pub const fn lint_source(&self) -> &'static LintSource {
+    pub const fn lint_source(&self) -> LintSource {
         match self {
-            Rule::UnusedNOQA => &LintSource::Noqa,
+            Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::DocLineTooLong
@@ -821,7 +837,7 @@ impl Rule {
             | Rule::ShebangWhitespace
             | Rule::TrailingWhitespace
             | Rule::IndentationContainsTabs
-            | Rule::BlankLineContainsWhitespace => &LintSource::PhysicalLines,
+            | Rule::BlankLineContainsWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
@@ -840,13 +856,14 @@ impl Rule {
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::TrailingCommaProhibited
-            | Rule::TypeCommentInStub => &LintSource::Tokens,
-            Rule::IOError => &LintSource::Io,
-            Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
-            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => &LintSource::Filesystem,
+            | Rule::TypeCommentInStub => LintSource::Tokens,
+            Rule::IOError => LintSource::Io,
+            Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
+            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MissingWhitespace
             | Rule::MissingWhitespaceAfterKeyword
             | Rule::MissingWhitespaceAroundArithmeticOperator
             | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
@@ -874,40 +891,9 @@ impl Rule {
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
             | Rule::WhitespaceBeforeParameters
-            | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
-            _ => &LintSource::Ast,
+            | Rule::WhitespaceBeforePunctuation => LintSource::LogicalLines,
+            _ => LintSource::Ast,
         }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Diagnostic {
-    pub kind: DiagnosticKind,
-    pub location: Location,
-    pub end_location: Location,
-    pub fix: Option<Fix>,
-    pub parent: Option<Location>,
-}
-
-impl Diagnostic {
-    pub fn new<K: Into<DiagnosticKind>>(kind: K, range: Range) -> Self {
-        Self {
-            kind: kind.into(),
-            location: range.location,
-            end_location: range.end_location,
-            fix: None,
-            parent: None,
-        }
-    }
-
-    pub fn amend(&mut self, fix: Fix) -> &mut Self {
-        self.fix = Some(fix);
-        self
-    }
-
-    pub fn parent(&mut self, parent: Location) -> &mut Self {
-        self.parent = Some(parent);
-        self
     }
 }
 

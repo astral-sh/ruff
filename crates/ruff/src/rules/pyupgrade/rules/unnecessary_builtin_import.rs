@@ -1,19 +1,20 @@
 use itertools::Itertools;
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Alias, AliasData, Located, Stmt};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::autofix;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct UnnecessaryBuiltinImport {
-        pub names: Vec<String>,
-    }
-);
+#[violation]
+pub struct UnnecessaryBuiltinImport {
+    pub names: Vec<String>,
+}
+
 impl AlwaysAutofixableViolation for UnnecessaryBuiltinImport {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -100,17 +101,13 @@ pub fn unnecessary_builtin_import(
                 .sorted()
                 .collect(),
         },
-        Range::from_located(stmt),
+        Range::from(stmt),
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        let deleted: Vec<&Stmt> = checker
-            .deletions
-            .iter()
-            .map(std::convert::Into::into)
-            .collect();
-        let defined_by = checker.current_stmt();
-        let defined_in = checker.current_stmt_parent();
+        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
+        let defined_by = checker.ctx.current_stmt();
+        let defined_in = checker.ctx.current_stmt_parent();
         let unused_imports: Vec<String> = unused_imports
             .iter()
             .map(|alias| format!("{module}.{}", alias.node.name))
@@ -118,7 +115,7 @@ pub fn unnecessary_builtin_import(
         match autofix::helpers::remove_unused_imports(
             unused_imports.iter().map(String::as_str),
             defined_by.into(),
-            defined_in.map(std::convert::Into::into),
+            defined_in.map(Into::into),
             &deleted,
             checker.locator,
             checker.indexer,

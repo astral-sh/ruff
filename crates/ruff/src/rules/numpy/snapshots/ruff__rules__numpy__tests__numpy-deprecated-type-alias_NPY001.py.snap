@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/numpy/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NumpyDeprecatedTypeAlias:
-      type_name: bool
+    name: NumpyDeprecatedTypeAlias
+    body: "Type alias `np.bool` is deprecated, replace with builtin type"
+    suggestion: "Replace `np.bool` with builtin type"
+    fixable: true
   location:
     row: 6
     column: 0
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    NumpyDeprecatedTypeAlias:
-      type_name: int
+    name: NumpyDeprecatedTypeAlias
+    body: "Type alias `np.int` is deprecated, replace with builtin type"
+    suggestion: "Replace `np.int` with builtin type"
+    fixable: true
   location:
     row: 7
     column: 0
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    NumpyDeprecatedTypeAlias:
-      type_name: object
+    name: NumpyDeprecatedTypeAlias
+    body: "Type alias `np.object` is deprecated, replace with builtin type"
+    suggestion: "Replace `np.object` with builtin type"
+    fixable: true
   location:
     row: 9
     column: 12
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    NumpyDeprecatedTypeAlias:
-      type_name: int
+    name: NumpyDeprecatedTypeAlias
+    body: "Type alias `np.int` is deprecated, replace with builtin type"
+    suggestion: "Replace `np.int` with builtin type"
+    fixable: true
   location:
     row: 12
     column: 71
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 77
   parent: ~
 - kind:
-    NumpyDeprecatedTypeAlias:
-      type_name: long
+    name: NumpyDeprecatedTypeAlias
+    body: "Type alias `np.long` is deprecated, replace with builtin type"
+    suggestion: "Replace `np.long` with builtin type"
+    fixable: true
   location:
     row: 12
     column: 79
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 86
   parent: ~
 - kind:
-    NumpyDeprecatedTypeAlias:
-      type_name: object
+    name: NumpyDeprecatedTypeAlias
+    body: "Type alias `np.object` is deprecated, replace with builtin type"
+    suggestion: "Replace `np.object` with builtin type"
+    fixable: true
   location:
     row: 17
     column: 10
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    NumpyDeprecatedTypeAlias:
-      type_name: int
+    name: NumpyDeprecatedTypeAlias
+    body: "Type alias `np.int` is deprecated, replace with builtin type"
+    suggestion: "Replace `np.int` with builtin type"
+    fixable: true
   location:
     row: 20
     column: 15

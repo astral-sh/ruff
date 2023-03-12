@@ -1,18 +1,20 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use strum::IntoEnumIterator;
 
-use crate::ast::types::Range;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::str::leading_quote;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::docstrings::styles::SectionStyle;
-use crate::fix::Fix;
+use crate::docstrings::sections::SectionKind;
 use crate::message::Location;
-use crate::registry::Diagnostic;
-use crate::rules::pydocstyle::helpers::{leading_quote, logical_line};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
+use crate::rules::pydocstyle::helpers::logical_line;
 
-define_violation!(
-    pub struct EndsInPunctuation;
-);
+#[violation]
+pub struct EndsInPunctuation;
+
 impl AlwaysAutofixableViolation for EndsInPunctuation {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,15 +42,13 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
         }
 
         // Avoid false-positives: `Args:`, etc.
-        for style in [SectionStyle::Google, SectionStyle::Numpy] {
-            for section_name in style.section_names().iter() {
-                if let Some(suffix) = trimmed.strip_suffix(section_name) {
-                    if suffix.is_empty() {
-                        return;
-                    }
-                    if suffix == ":" {
-                        return;
-                    }
+        for section_kind in SectionKind::iter() {
+            if let Some(suffix) = trimmed.strip_suffix(section_kind.as_str()) {
+                if suffix.is_empty() {
+                    return;
+                }
+                if suffix == ":" {
+                    return;
                 }
             }
         }
@@ -58,8 +58,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
         let line = body.lines().nth(index).unwrap();
         let trimmed = line.trim_end();
         if !(trimmed.ends_with('.') || trimmed.ends_with('!') || trimmed.ends_with('?')) {
-            let mut diagnostic =
-                Diagnostic::new(EndsInPunctuation, Range::from_located(docstring.expr));
+            let mut diagnostic = Diagnostic::new(EndsInPunctuation, Range::from(docstring.expr));
             // Best-effort autofix: avoid adding a period after other punctuation marks.
             if checker.patch(diagnostic.kind.rule())
                 && !trimmed.ends_with(':')

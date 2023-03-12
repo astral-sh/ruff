@@ -1,15 +1,15 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct StripWithMultiCharacters;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct StripWithMultiCharacters;
+
 impl Violation for StripWithMultiCharacters {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -38,9 +38,8 @@ pub fn strip_with_multi_characters(checker: &mut Checker, expr: &Expr, func: &Ex
 
     let num_chars = value.chars().count();
     if num_chars > 1 && num_chars != value.chars().unique().count() {
-        checker.diagnostics.push(Diagnostic::new(
-            StripWithMultiCharacters,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(StripWithMultiCharacters, Range::from(expr)));
     }
 }

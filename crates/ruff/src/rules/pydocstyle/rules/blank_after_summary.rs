@@ -1,18 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::Diagnostic;
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct BlankLineAfterSummary {
-        pub num_lines: usize,
-    }
-);
+#[violation]
+pub struct BlankLineAfterSummary {
+    pub num_lines: usize,
+}
+
 fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String {
     "Insert single blank line".to_string()
 }
@@ -59,7 +58,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
             BlankLineAfterSummary {
                 num_lines: blanks_count,
             },
-            Range::from_located(docstring.expr),
+            Range::from(docstring.expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if blanks_count > 1 {

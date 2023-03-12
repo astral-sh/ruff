@@ -1,16 +1,17 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{BindingKind, Range};
 
-use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticKind, Rule};
+use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct UseOfDotIx;
-);
+#[violation]
+pub struct UseOfDotIx;
+
 impl Violation for UseOfDotIx {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +19,9 @@ impl Violation for UseOfDotIx {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotAt;
-);
+#[violation]
+pub struct UseOfDotAt;
+
 impl Violation for UseOfDotAt {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +29,9 @@ impl Violation for UseOfDotAt {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotIat;
-);
+#[violation]
+pub struct UseOfDotIat;
+
 impl Violation for UseOfDotIat {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -38,9 +39,9 @@ impl Violation for UseOfDotIat {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotValues;
-);
+#[violation]
+pub struct UseOfDotValues;
+
 impl Violation for UseOfDotValues {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -59,7 +60,7 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
     };
 
     // Avoid flagging on function calls (e.g., `df.values()`).
-    if let Some(parent) = checker.current_expr_parent() {
+    if let Some(parent) = checker.ctx.current_expr_parent() {
         if matches!(parent.node, ExprKind::Call { .. }) {
             return;
         }
@@ -72,7 +73,7 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
     // If the target is a named variable, avoid triggering on
     // irrelevant bindings (like imports).
     if let ExprKind::Name { id, .. } = &value.node {
-        if checker.find_binding(id).map_or(true, |binding| {
+        if checker.ctx.find_binding(id).map_or(true, |binding| {
             matches!(
                 binding.kind,
                 BindingKind::Builtin
@@ -92,5 +93,5 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
 
     checker
         .diagnostics
-        .push(Diagnostic::new(violation, Range::from_located(attr_expr)));
+        .push(Diagnostic::new(violation, Range::from(attr_expr)));
 }

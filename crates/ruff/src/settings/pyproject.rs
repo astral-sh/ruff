@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use crate::settings::options::Options;
@@ -113,13 +113,7 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 /// Load `Options` from a `pyproject.toml` or `ruff.toml` file.
 pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
     if path.as_ref().ends_with("pyproject.toml") {
-        let pyproject = parse_pyproject_toml(&path).map_err(|err| {
-            anyhow!(
-                "Failed to parse `{}`: {}",
-                path.as_ref().to_string_lossy(),
-                err
-            )
-        })?;
+        let pyproject = parse_pyproject_toml(&path)?;
         Ok(pyproject
             .tool
             .and_then(|tool| tool.ruff)

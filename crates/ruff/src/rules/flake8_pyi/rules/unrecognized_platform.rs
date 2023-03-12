@@ -1,48 +1,48 @@
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::Violation;
+use crate::registry::Rule;
 
-define_violation!(
-    /// ## What it does
-    /// Check for unrecognized `sys.platform` checks. Platform checks should be
-    /// simple string comparisons.
-    ///
-    /// **Note**: this rule is only enabled in `.pyi` stub files.
-    ///
-    /// ## Why is this bad?
-    /// Some `sys.platform` checks are too complex for type checkers to
-    /// understand, and thus result in false positives. `sys.platform` checks
-    /// should be simple string comparisons, like `sys.platform == "linux"`.
-    ///
-    /// ## Example
-    /// ```python
-    /// if sys.platform.startswith("linux"):
-    ///     # Linux specific definitions
-    ///     ...
-    /// else:
-    ///     # Posix specific definitions
-    ///     ...
-    /// ```
-    ///
-    /// Instead, use a simple string comparison, such as `==` or `!=`:
-    /// ```python
-    /// if sys.platform == "linux":
-    ///     # Linux specific definitions
-    ///     ...
-    /// else:
-    ///     # Posix specific definitions
-    ///     ...
-    /// ```
-    ///
-    /// ## References
-    /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
-    pub struct UnrecognizedPlatformCheck;
-);
+/// ## What it does
+/// Check for unrecognized `sys.platform` checks. Platform checks should be
+/// simple string comparisons.
+///
+/// **Note**: this rule is only enabled in `.pyi` stub files.
+///
+/// ## Why is this bad?
+/// Some `sys.platform` checks are too complex for type checkers to
+/// understand, and thus result in false positives. `sys.platform` checks
+/// should be simple string comparisons, like `sys.platform == "linux"`.
+///
+/// ## Example
+/// ```python
+/// if sys.platform.startswith("linux"):
+///     # Linux specific definitions
+///     ...
+/// else:
+///     # Posix specific definitions
+///     ...
+/// ```
+///
+/// Instead, use a simple string comparison, such as `==` or `!=`:
+/// ```python
+/// if sys.platform == "linux":
+///     # Linux specific definitions
+///     ...
+/// else:
+///     # Posix specific definitions
+///     ...
+/// ```
+///
+/// ## References
+/// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
+#[violation]
+pub struct UnrecognizedPlatformCheck;
+
 impl Violation for UnrecognizedPlatformCheck {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -50,37 +50,37 @@ impl Violation for UnrecognizedPlatformCheck {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Check for unrecognized platform names in `sys.platform` checks.
-    ///
-    /// **Note**: this rule is only enabled in `.pyi` stub files.
-    ///
-    /// ## Why is this bad?
-    /// If a `sys.platform` check compares to a platform name outside of a
-    /// small set of known platforms (e.g. "linux", "win32", etc.), it's likely
-    /// a typo or a platform name that is not recognized by type checkers.
-    ///
-    /// The list of known platforms is: "linux", "win32", "cygwin", "darwin".
-    ///
-    /// ## Example
-    /// ```python
-    /// if sys.platform == "linus":
-    ///     ...
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// if sys.platform == "linux":
-    ///     ...
-    /// ```
-    ///
-    /// ## References
-    /// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
-    pub struct UnrecognizedPlatformName {
-        pub platform: String,
-    }
-);
+/// ## What it does
+/// Check for unrecognized platform names in `sys.platform` checks.
+///
+/// **Note**: this rule is only enabled in `.pyi` stub files.
+///
+/// ## Why is this bad?
+/// If a `sys.platform` check compares to a platform name outside of a
+/// small set of known platforms (e.g. "linux", "win32", etc.), it's likely
+/// a typo or a platform name that is not recognized by type checkers.
+///
+/// The list of known platforms is: "linux", "win32", "cygwin", "darwin".
+///
+/// ## Example
+/// ```python
+/// if sys.platform == "linus":
+///     ...
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if sys.platform == "linux":
+///     ...
+/// ```
+///
+/// ## References
+/// - [PEP 484](https://peps.python.org/pep-0484/#version-and-platform-checking)
+#[violation]
+pub struct UnrecognizedPlatformName {
+    pub platform: String,
+}
+
 impl Violation for UnrecognizedPlatformName {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -102,10 +102,14 @@ pub fn unrecognized_platform(
     };
 
     let diagnostic_unrecognized_platform_check =
-        Diagnostic::new(UnrecognizedPlatformCheck, Range::from_located(expr));
-    if !checker.resolve_call_path(left).map_or(false, |call_path| {
-        call_path.as_slice() == ["sys", "platform"]
-    }) {
+        Diagnostic::new(UnrecognizedPlatformCheck, Range::from(expr));
+    if !checker
+        .ctx
+        .resolve_call_path(left)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["sys", "platform"]
+        })
+    {
         return;
     }
 
@@ -139,7 +143,7 @@ pub fn unrecognized_platform(
                     UnrecognizedPlatformName {
                         platform: value.clone(),
                     },
-                    Range::from_located(right),
+                    Range::from(right),
                 ));
             }
         }

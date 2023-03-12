@@ -4,21 +4,22 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use crate::lex::docstring_detection::StateMachine;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
     eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, pycodestyle,
     pyupgrade, ruff,
 };
 use crate::settings::{flags, Settings};
-use crate::source_code::Locator;
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::Locator;
 
 pub fn check_tokens(
     locator: &Locator,
     tokens: &[LexResult],
     settings: &Settings,
     autofix: flags::Autofix,
-    is_interface_definition: bool,
+    is_stub: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -164,7 +165,7 @@ pub fn check_tokens(
     }
 
     // PYI033
-    if enforce_type_comment_in_stub && is_interface_definition {
+    if enforce_type_comment_in_stub && is_stub {
         diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(tokens));
     }
 

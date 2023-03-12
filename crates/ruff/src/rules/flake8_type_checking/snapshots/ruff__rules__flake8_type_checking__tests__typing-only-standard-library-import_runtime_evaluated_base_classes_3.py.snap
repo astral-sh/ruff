@@ -1,0 +1,18 @@
+---
+source: crates/ruff/src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: TypingOnlyStandardLibraryImport
+    body: "Move standard library import `uuid.UUID` into a type-checking block"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 5
+    column: 17
+  end_location:
+    row: 5
+    column: 21
+  fix: ~
+  parent: ~
+

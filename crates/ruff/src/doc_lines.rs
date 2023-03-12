@@ -7,8 +7,8 @@ use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind, Suite};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
 /// Extract doc lines (standalone comments) from a token sequence.
 pub fn doc_lines_from_tokens(lxr: &[LexResult]) -> DocLines {

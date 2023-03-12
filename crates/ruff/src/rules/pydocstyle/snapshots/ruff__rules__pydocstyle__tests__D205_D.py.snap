@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BlankLineAfterSummary:
-      num_lines: 0
+    name: BlankLineAfterSummary
+    body: 1 blank line required between summary line and description
+    suggestion: ~
+    fixable: false
   location:
     row: 200
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BlankLineAfterSummary:
-      num_lines: 2
+    name: BlankLineAfterSummary
+    body: 1 blank line required between summary line and description (found 2)
+    suggestion: Insert single blank line
+    fixable: true
   location:
     row: 210
     column: 4

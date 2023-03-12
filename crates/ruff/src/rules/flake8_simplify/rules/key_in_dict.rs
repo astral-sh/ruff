@@ -1,18 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct KeyInDict {
-        pub key: String,
-        pub dict: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct KeyInDict {
+    pub key: String,
+    pub dict: String,
+}
+
 impl AlwaysAutofixableViolation for KeyInDict {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -47,8 +47,8 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
     }
 
     // Slice exact content to preserve formatting.
-    let left_content = checker.locator.slice(&Range::from_located(left));
-    let value_content = checker.locator.slice(&Range::from_located(value));
+    let left_content = checker.locator.slice(left);
+    let value_content = checker.locator.slice(value);
 
     let mut diagnostic = Diagnostic::new(
         KeyInDict {
@@ -94,5 +94,5 @@ pub fn key_in_dict_compare(
     }
     let right = comparators.first().unwrap();
 
-    key_in_dict(checker, left, right, Range::from_located(expr));
+    key_in_dict(checker, left, right, Range::from(expr));
 }

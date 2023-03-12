@@ -1,19 +1,19 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
-define_violation!(
-    pub struct LoopVariableOverridesIterator {
-        pub name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct LoopVariableOverridesIterator {
+    pub name: String,
+}
+
 impl Violation for LoopVariableOverridesIterator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -74,7 +74,7 @@ pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, it
                 LoopVariableOverridesIterator {
                     name: name.to_string(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             ));
         }
     }

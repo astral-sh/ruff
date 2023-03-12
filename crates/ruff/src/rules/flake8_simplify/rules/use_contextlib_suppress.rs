@@ -1,19 +1,18 @@
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Located, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
+use ruff_python_ast::helpers::compose_call_path;
+use ruff_python_ast::types::Range;
 
-use crate::ast::helpers;
-use crate::ast::helpers::compose_call_path;
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct UseContextlibSuppress {
-        pub exception: String,
-    }
-);
+#[violation]
+pub struct UseContextlibSuppress {
+    pub exception: String,
+}
+
 impl Violation for UseContextlibSuppress {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -65,7 +64,7 @@ pub fn use_contextlib_suppress(
             };
             checker.diagnostics.push(Diagnostic::new(
                 UseContextlibSuppress { exception },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }

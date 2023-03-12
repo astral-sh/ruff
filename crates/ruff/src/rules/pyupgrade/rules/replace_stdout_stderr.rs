@@ -1,18 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, Keyword};
 
-use crate::ast::helpers::find_keyword;
-use crate::ast::types::Range;
-use crate::ast::whitespace::indentation;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::{Locator, Stylist};
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::indentation;
 
-define_violation!(
-    pub struct ReplaceStdoutStderr;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct ReplaceStdoutStderr;
+
 impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -81,7 +81,7 @@ fn generate_fix(
     };
     let mut contents = String::from("capture_output=True");
     if let Some(middle) =
-        extract_middle(locator.slice(&Range::new(first.end_location.unwrap(), last.location)))
+        extract_middle(locator.slice(Range::new(first.end_location.unwrap(), last.location)))
     {
         if middle.multi_line {
             let Some(indent) = indentation(locator, first) else {
@@ -105,9 +105,13 @@ fn generate_fix(
 
 /// UP022
 pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, func: &Expr, kwargs: &[Keyword]) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["subprocess", "run"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["subprocess", "run"]
+        })
+    {
         // Find `stdout` and `stderr` kwargs.
         let Some(stdout) = find_keyword(kwargs, "stdout") else {
             return;
@@ -118,11 +122,13 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, func: &Expr, kw
 
         // Verify that they're both set to `subprocess.PIPE`.
         if !checker
+            .ctx
             .resolve_call_path(&stdout.node.value)
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["subprocess", "PIPE"]
             })
             || !checker
+                .ctx
                 .resolve_call_path(&stderr.node.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["subprocess", "PIPE"]
@@ -131,7 +137,7 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, func: &Expr, kw
             return;
         }
 
-        let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) = generate_fix(checker.stylist, checker.locator, stdout, stderr) {
                 diagnostic.amend(fix);

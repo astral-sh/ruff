@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    KeyInDict:
-      key: key
-      dict: obj
+    name: KeyInDict
+    body: "Use `key in obj` instead of `key in obj.keys()`"
+    suggestion: "Convert to `key in obj`"
+    fixable: true
   location:
     row: 1
     column: 0
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    KeyInDict:
-      key: "foo[\"bar\"]"
-      dict: obj
+    name: KeyInDict
+    body: "Use `foo[\"bar\"] in obj` instead of `foo[\"bar\"] in obj.keys()`"
+    suggestion: "Convert to `foo[\"bar\"] in obj`"
+    fixable: true
   location:
     row: 3
     column: 0
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    KeyInDict:
-      key: "foo['bar']"
-      dict: obj
+    name: KeyInDict
+    body: "Use `foo['bar'] in obj` instead of `foo['bar'] in obj.keys()`"
+    suggestion: "Convert to `foo['bar'] in obj`"
+    fixable: true
   location:
     row: 5
     column: 0
@@ -60,9 +63,10 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    KeyInDict:
-      key: foo()
-      dict: obj
+    name: KeyInDict
+    body: "Use `foo() in obj` instead of `foo() in obj.keys()`"
+    suggestion: "Convert to `foo() in obj`"
+    fixable: true
   location:
     row: 7
     column: 0
@@ -79,9 +83,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    KeyInDict:
-      key: key
-      dict: obj
+    name: KeyInDict
+    body: "Use `key in obj` instead of `key in obj.keys()`"
+    suggestion: "Convert to `key in obj`"
+    fixable: true
   location:
     row: 9
     column: 4
@@ -98,9 +103,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    KeyInDict:
-      key: k
-      dict: obj
+    name: KeyInDict
+    body: "Use `k in obj` instead of `k in obj.keys()`"
+    suggestion: "Convert to `k in obj`"
+    fixable: true
   location:
     row: 16
     column: 7
@@ -117,9 +123,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    KeyInDict:
-      key: k
-      dict: obj
+    name: KeyInDict
+    body: "Use `k in obj` instead of `k in obj.keys()`"
+    suggestion: "Convert to `k in obj`"
+    fixable: true
   location:
     row: 18
     column: 7
@@ -136,9 +143,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    KeyInDict:
-      key: k
-      dict: obj
+    name: KeyInDict
+    body: "Use `k in obj` instead of `k in obj.keys()`"
+    suggestion: "Convert to `k in obj`"
+    fixable: true
   location:
     row: 20
     column: 10
@@ -155,9 +163,10 @@ expression: diagnostics
       column: 25
   parent: ~
 - kind:
-    KeyInDict:
-      key: k
-      dict: obj
+    name: KeyInDict
+    body: "Use `k in obj` instead of `k in obj.keys()`"
+    suggestion: "Convert to `k in obj`"
+    fixable: true
   location:
     row: 22
     column: 7

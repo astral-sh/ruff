@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, Keyword};
 
-use crate::ast::helpers::SimpleCallArgs;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct LoggingConfigInsecureListen;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct LoggingConfigInsecureListen;
+
 impl Violation for LoggingConfigInsecureListen {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -24,15 +24,19 @@ pub fn logging_config_insecure_listen(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["logging", "config", "listen"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["logging", "config", "listen"]
+        })
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
 
         if call_args.get_argument("verify", None).is_none() {
             checker.diagnostics.push(Diagnostic::new(
                 LoggingConfigInsecureListen,
-                Range::from_located(func),
+                Range::from(func),
             ));
         }
     }

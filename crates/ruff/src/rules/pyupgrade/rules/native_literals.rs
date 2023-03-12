@@ -1,17 +1,16 @@
 use std::fmt;
 
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::{lexer, Mode, Tok};
-use serde::{Deserialize, Serialize};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum LiteralType {
     Str,
     Bytes,
@@ -26,11 +25,11 @@ impl fmt::Display for LiteralType {
     }
 }
 
-define_violation!(
-    pub struct NativeLiterals {
-        pub literal_type: LiteralType,
-    }
-);
+#[violation]
+pub struct NativeLiterals {
+    pub literal_type: LiteralType,
+}
+
 impl AlwaysAutofixableViolation for NativeLiterals {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -58,13 +57,13 @@ pub fn native_literals(
         return;
     }
 
-    if (id == "str" || id == "bytes") && checker.is_builtin(id) {
+    if (id == "str" || id == "bytes") && checker.ctx.is_builtin(id) {
         let Some(arg) = args.get(0) else {
             let mut diagnostic = Diagnostic::new(NativeLiterals{literal_type:if id == "str" {
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
-            }}, Range::from_located(expr));
+            }}, Range::from(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     if id == "bytes" {
@@ -116,7 +115,7 @@ pub fn native_literals(
         // rust-python merges adjacent string/bytes literals into one node, but we can't
         // safely remove the outer call in this situation. We're following pyupgrade
         // here and skip.
-        let arg_code = checker.locator.slice(&Range::from_located(arg));
+        let arg_code = checker.locator.slice(arg);
         if lexer::lex_located(arg_code, Mode::Module, arg.location)
             .flatten()
             .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
@@ -134,7 +133,7 @@ pub fn native_literals(
                     LiteralType::Bytes
                 },
             },
-            Range::from_located(expr),
+            Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(

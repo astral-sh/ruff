@@ -2,14 +2,17 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 
 use std::fs;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use regex::{Captures, Regex};
+use strum::IntoEnumIterator;
+
 use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::settings::options::Options;
-use ruff::settings::options_base::ConfigurationOptions;
-use ruff::AutofixAvailability;
-use strum::IntoEnumIterator;
+use ruff_diagnostics::Availability;
+
+use crate::ROOT_DIR;
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -35,8 +38,8 @@ pub fn main(args: &Args) -> Result<()> {
 
             if let Some(autofix) = rule.autofixable() {
                 output.push_str(match autofix.available {
-                    AutofixAvailability::Sometimes => "Autofix is sometimes available.",
-                    AutofixAvailability::Always => "Autofix is always available.",
+                    Availability::Sometimes => "Autofix is sometimes available.",
+                    Availability::Always => "Autofix is always available.",
                 });
                 output.push('\n');
                 output.push('\n');
@@ -44,11 +47,17 @@ pub fn main(args: &Args) -> Result<()> {
 
             process_documentation(explanation.trim(), &mut output);
 
+            let filename = PathBuf::from(ROOT_DIR)
+                .join("docs")
+                .join("rules")
+                .join(rule.as_ref())
+                .with_extension("md");
+
             if args.dry_run {
                 println!("{output}");
             } else {
                 fs::create_dir_all("docs/rules")?;
-                fs::write(format!("docs/rules/{}.md", rule.as_ref()), output)?;
+                fs::write(filename, output)?;
             }
         }
     }
@@ -82,7 +91,7 @@ fn process_documentation(documentation: &str, out: &mut String) {
                 let option = rest.trim_end().trim_end_matches('`');
 
                 assert!(
-                    Options::get(Some(option)).is_some(),
+                    Options::metadata().get(option).is_some(),
                     "unknown option {option}"
                 );
 

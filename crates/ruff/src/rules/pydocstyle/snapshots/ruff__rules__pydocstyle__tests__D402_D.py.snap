@@ -1,9 +1,12 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NoSignature: ~
+    name: NoSignature
+    body: "First line should not be the function's signature"
+    suggestion: ~
+    fixable: false
   location:
     row: 378
     column: 4

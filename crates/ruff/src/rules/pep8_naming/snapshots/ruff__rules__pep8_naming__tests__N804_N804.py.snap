@@ -1,9 +1,12 @@
 ---
-source: src/rules/pep8_naming/mod.rs
+source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    InvalidFirstArgumentNameForClassMethod: ~
+    name: InvalidFirstArgumentNameForClassMethod
+    body: "First argument of a class method should be named `cls`"
+    suggestion: ~
+    fixable: false
   location:
     row: 30
     column: 26
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    InvalidFirstArgumentNameForClassMethod: ~
+    name: InvalidFirstArgumentNameForClassMethod
+    body: "First argument of a class method should be named `cls`"
+    suggestion: ~
+    fixable: false
   location:
     row: 38
     column: 55
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    InvalidFirstArgumentNameForClassMethod: ~
+    name: InvalidFirstArgumentNameForClassMethod
+    body: "First argument of a class method should be named `cls`"
+    suggestion: ~
+    fixable: false
   location:
     row: 43
     column: 19

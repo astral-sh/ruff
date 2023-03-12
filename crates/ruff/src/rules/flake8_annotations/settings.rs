@@ -1,9 +1,10 @@
 //! Settings for the `flake-annotations` plugin.
 
-use ruff_macros::CacheKey;
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::CacheKey;
+use ruff_macros::ConfigurationOptions;
 
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, JsonSchema,

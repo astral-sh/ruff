@@ -51,7 +51,7 @@ impl FromStr for RuleSelector {
 
             Ok(Self::Prefix {
                 prefix: RuleCodePrefix::parse(&linter, code)
-                    .map_err(|_| ParseError::Unknown(code.to_string()))?,
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?,
                 redirected_from,
             })
         }
@@ -60,7 +60,7 @@ impl FromStr for RuleSelector {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
-    #[error("Unknown rule selector `{0}`")]
+    #[error("Unknown rule selector: `{0}`")]
     // TODO(martin): tell the user how to discover rule codes via the CLI once such a command is
     // implemented (but that should of course be done only in ruff_cli and not here)
     Unknown(String),
@@ -184,6 +184,20 @@ impl JsonSchema for RuleSelector {
                 std::iter::once("ALL".to_string())
                     .chain(
                         RuleCodePrefix::iter()
+                            .filter(|p| {
+                                // Once logical lines are active by default, please remove this.
+                                // This is here because generate-all output otherwise depends on
+                                // the feature sets which makes the test running with
+                                // `--all-features` fail
+                                !Rule::from_code(&format!(
+                                    "{}{}",
+                                    p.linter().common_prefix(),
+                                    p.short_code()
+                                ))
+                                .unwrap()
+                                .lint_source()
+                                .is_logical_lines()
+                            })
                             .map(|p| {
                                 let prefix = p.linter().common_prefix();
                                 let code = p.short_code();

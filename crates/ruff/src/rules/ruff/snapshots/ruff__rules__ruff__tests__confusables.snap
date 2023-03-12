@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AmbiguousUnicodeCharacterString:
-      confusable: 𝐁
-      representant: B
+    name: AmbiguousUnicodeCharacterString
+    body: "String contains ambiguous unicode character `𝐁` (did you mean `B`?)"
+    suggestion: "Replace `𝐁` with `B`"
+    fixable: true
   location:
     row: 1
     column: 5
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 6
   parent: ~
 - kind:
-    AmbiguousUnicodeCharacterDocstring:
-      confusable: ）
-      representant: )
+    name: AmbiguousUnicodeCharacterDocstring
+    body: "Docstring contains ambiguous unicode character `）` (did you mean `)`?)"
+    suggestion: "Replace `）` with `)`"
+    fixable: true
   location:
     row: 6
     column: 55
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 56
   parent: ~
 - kind:
-    AmbiguousUnicodeCharacterComment:
-      confusable: ᜵
-      representant: /
+    name: AmbiguousUnicodeCharacterComment
+    body: "Comment contains ambiguous unicode character `᜵` (did you mean `/`?)"
+    suggestion: "Replace `᜵` with `/`"
+    fixable: true
   location:
     row: 7
     column: 61

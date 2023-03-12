@@ -1,0 +1,13 @@
+[package]
+name = "ruff_python_stdlib"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[lib]
+
+[dependencies]
+once_cell = { workspace = true }
+regex = { workspace = true }
+rustc-hash = { workspace = true }

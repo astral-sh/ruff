@@ -3,33 +3,31 @@ use regex::Regex;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
-use crate::Range;
+/// ## What it does
+/// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
+/// files.
+///
+/// ## Why is this bad?
+/// Stub (`.pyi`) files should use type annotations directly, rather
+/// than type comments, even if they're intended to support Python 2, since
+/// stub files are not executed at runtime. The one exception is `# type: ignore`.
+///
+/// ## Example
+/// ```python
+/// x = 1 # type: int
+/// ```
+///
+/// Use instead:
+/// ```python
+/// x: int = 1
+/// ```
+#[violation]
+pub struct TypeCommentInStub;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
-    /// files.
-    ///
-    /// ## Why is this bad?
-    /// Stub (`.pyi`) files should use type annotations directly, rather
-    /// than type comments, even if they're intended to support Python 2, since
-    /// stub files are not executed at runtime. The one exception is `# type: ignore`.
-    ///
-    /// ## Example
-    /// ```python
-    /// x = 1 # type: int
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// x: int = 1
-    /// ```
-    pub struct TypeCommentInStub;
-);
 impl Violation for TypeCommentInStub {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,17 +1,16 @@
 use rustpython_parser::ast::{ExprKind, Stmt};
 
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::str::is_lower;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::RaiseStatementVisitor;
+use ruff_python_ast::visitor;
+use ruff_python_stdlib::str::is_lower;
 
-use crate::ast::helpers::RaiseStatementVisitor;
-use crate::ast::visitor;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct RaiseWithoutFromInsideExcept;
-);
+#[violation]
+pub struct RaiseWithoutFromInsideExcept;
+
 impl Violation for RaiseWithoutFromInsideExcept {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -2,17 +2,17 @@
 
 use std::path::Path;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
+use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
 use crate::rules::flake8_executable::helpers::is_executable;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct ShebangMissingExecutableFile;
-);
+#[violation]
+pub struct ShebangMissingExecutableFile;
+
 impl Violation for ShebangMissingExecutableFile {
     #[derive_message_formats]
     fn message(&self) -> String {

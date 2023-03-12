@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnusedVariable:
-      name: x
+    name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `x`"
+    fixable: true
   location:
     row: 6
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable:
-      name: y
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `y`"
+    fixable: true
   location:
     row: 6
     column: 7
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable:
-      name: coords
+    name: UnusedVariable
+    body: "Local variable `coords` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `coords`"
+    fixable: true
   location:
     row: 16
     column: 13
@@ -43,8 +49,10 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    UnusedVariable:
-      name: coords
+    name: UnusedVariable
+    body: "Local variable `coords` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `coords`"
+    fixable: true
   location:
     row: 20
     column: 4
@@ -61,8 +69,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UnusedVariable:
-      name: a
+    name: UnusedVariable
+    body: "Local variable `a` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `a`"
+    fixable: true
   location:
     row: 24
     column: 5
@@ -72,8 +82,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable:
-      name: b
+    name: UnusedVariable
+    body: "Local variable `b` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `b`"
+    fixable: true
   location:
     row: 24
     column: 8
@@ -83,8 +95,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable:
-      name: x
+    name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `x`"
+    fixable: true
   location:
     row: 24
     column: 14
@@ -94,8 +108,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnusedVariable:
-      name: y
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `y`"
+    fixable: true
   location:
     row: 24
     column: 17

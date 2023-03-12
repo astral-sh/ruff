@@ -1,10 +1,10 @@
 #[cfg(target_family = "unix")]
-use anyhow::Result;
-#[cfg(target_family = "unix")]
 use std::os::unix::fs::PermissionsExt;
 #[cfg(target_family = "unix")]
 use std::path::Path;
 
+#[cfg(target_family = "unix")]
+use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
 

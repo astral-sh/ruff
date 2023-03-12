@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AbstractBaseClassWithoutAbstractMethod:
-      name: Base_1
+    name: AbstractBaseClassWithoutAbstractMethod
+    body: "`Base_1` is an abstract base class, but it has no abstract methods"
+    suggestion: ~
+    fixable: false
   location:
     row: 18
     column: 0
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod:
-      name: MetaBase_1
+    name: AbstractBaseClassWithoutAbstractMethod
+    body: "`MetaBase_1` is an abstract base class, but it has no abstract methods"
+    suggestion: ~
+    fixable: false
   location:
     row: 71
     column: 0
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod:
-      name: abc_Base_1
+    name: AbstractBaseClassWithoutAbstractMethod
+    body: "`abc_Base_1` is an abstract base class, but it has no abstract methods"
+    suggestion: ~
+    fixable: false
   location:
     row: 82
     column: 0
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod:
-      name: abc_Base_2
+    name: AbstractBaseClassWithoutAbstractMethod
+    body: "`abc_Base_2` is an abstract base class, but it has no abstract methods"
+    suggestion: ~
+    fixable: false
   location:
     row: 87
     column: 0
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod:
-      name: notabc_Base_1
+    name: AbstractBaseClassWithoutAbstractMethod
+    body: "`notabc_Base_1` is an abstract base class, but it has no abstract methods"
+    suggestion: ~
+    fixable: false
   location:
     row: 92
     column: 0
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    AbstractBaseClassWithoutAbstractMethod:
-      name: abc_set_class_variable_4
+    name: AbstractBaseClassWithoutAbstractMethod
+    body: "`abc_set_class_variable_4` is an abstract base class, but it has no abstract methods"
+    suggestion: ~
+    fixable: false
   location:
     row: 141
     column: 0

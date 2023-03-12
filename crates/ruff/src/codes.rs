@@ -1,5 +1,23 @@
 use crate::registry::{Linter, Rule};
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub struct NoqaCode(&'static str, &'static str);
+
+impl std::fmt::Display for NoqaCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}{}", self.0, self.1)
+    }
+}
+
+impl PartialEq<&str> for NoqaCode {
+    fn eq(&self, other: &&str) -> bool {
+        match other.strip_prefix(self.0) {
+            Some(suffix) => suffix == self.1,
+            None => false,
+        }
+    }
+}
+
 #[ruff_macros::map_codes]
 pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
     #[allow(clippy::enum_glob_use)]
@@ -46,6 +64,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pycodestyle, "E227") => Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E228") => Rule::MissingWhitespaceAroundModuloOperator,
+        #[cfg(feature = "logical_lines")]
+        (Pycodestyle, "E231") => Rule::MissingWhitespace,
         #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E251") => Rule::UnexpectedSpacesAroundKeywordParameterEquals,
         #[cfg(feature = "logical_lines")]
@@ -141,34 +161,36 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pyflakes, "901") => Rule::RaiseNotImplemented,
 
         // pylint
+        (Pylint, "C0414") => Rule::UselessImportAlias,
+        (Pylint, "C1901") => Rule::CompareToEmptyString,
+        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
         (Pylint, "E0100") => Rule::YieldInInit,
         (Pylint, "E0101") => Rule::ReturnInInit,
+        (Pylint, "E0117") => Rule::NonlocalWithoutBinding,
+        (Pylint, "E0118") => Rule::UsedPriorGlobalDeclaration,
         (Pylint, "E0604") => Rule::InvalidAllObject,
         (Pylint, "E0605") => Rule::InvalidAllFormat,
+        (Pylint, "W1508") => Rule::InvalidEnvvarDefault,
+        (Pylint, "E1142") => Rule::AwaitOutsideAsync,
         (Pylint, "E1205") => Rule::LoggingTooManyArgs,
         (Pylint, "E1206") => Rule::LoggingTooFewArgs,
         (Pylint, "E1307") => Rule::BadStringFormatType,
-        (Pylint, "E2502") => Rule::BidirectionalUnicode,
         (Pylint, "E1310") => Rule::BadStrStripCall,
-        (Pylint, "C0414") => Rule::UselessImportAlias,
-        (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
-        (Pylint, "E0117") => Rule::NonlocalWithoutBinding,
-        (Pylint, "E0118") => Rule::UsedPriorGlobalDeclaration,
-        (Pylint, "E1142") => Rule::AwaitOutsideAsync,
+        (Pylint, "E2502") => Rule::BidirectionalUnicode,
+        (Pylint, "R0133") => Rule::ComparisonOfConstant,
         (Pylint, "R0206") => Rule::PropertyWithParameters,
         (Pylint, "R0402") => Rule::ConsiderUsingFromImport,
-        (Pylint, "R0133") => Rule::ComparisonOfConstant,
+        (Pylint, "R0911") => Rule::TooManyReturnStatements,
+        (Pylint, "R0912") => Rule::TooManyBranches,
+        (Pylint, "R0913") => Rule::TooManyArguments,
+        (Pylint, "R0915") => Rule::TooManyStatements,
         (Pylint, "R1701") => Rule::ConsiderMergingIsinstance,
         (Pylint, "R1722") => Rule::ConsiderUsingSysExit,
-        (Pylint, "R5501") => Rule::CollapsibleElseIf,
         (Pylint, "R2004") => Rule::MagicValueComparison,
+        (Pylint, "R5501") => Rule::CollapsibleElseIf,
         (Pylint, "W0120") => Rule::UselessElseOnLoop,
         (Pylint, "W0602") => Rule::GlobalVariableNotAssigned,
         (Pylint, "W0603") => Rule::GlobalStatement,
-        (Pylint, "R0911") => Rule::TooManyReturnStatements,
-        (Pylint, "R0913") => Rule::TooManyArguments,
-        (Pylint, "R0912") => Rule::TooManyBranches,
-        (Pylint, "R0915") => Rule::TooManyStatements,
         (Pylint, "W2901") => Rule::RedefinedLoopName,
 
         // flake8-builtins
@@ -204,6 +226,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bugbear, "026") => Rule::StarArgUnpackingAfterKeywordArg,
         (Flake8Bugbear, "027") => Rule::EmptyMethodWithoutAbstractDecorator,
         (Flake8Bugbear, "029") => Rule::ExceptWithEmptyTuple,
+        (Flake8Bugbear, "030") => Rule::ExceptWithNonExceptionClasses,
         (Flake8Bugbear, "032") => Rule::UnintentionalTypeAnnotation,
         (Flake8Bugbear, "904") => Rule::RaiseWithoutFromInsideExcept,
         (Flake8Bugbear, "905") => Rule::ZipWithoutExplicitStrict,
@@ -351,7 +374,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pyupgrade, "032") => Rule::FString,
         (Pyupgrade, "033") => Rule::FunctoolsCache,
         (Pyupgrade, "034") => Rule::ExtraneousParentheses,
-        (Pyupgrade, "035") => Rule::ImportReplacements,
+        (Pyupgrade, "035") => Rule::DeprecatedImport,
         (Pyupgrade, "036") => Rule::OutdatedVersionBlock,
         (Pyupgrade, "037") => Rule::QuotedAnnotation,
         (Pyupgrade, "038") => Rule::IsinstanceWithTuple,

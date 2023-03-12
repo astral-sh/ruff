@@ -1,22 +1,22 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::str::{self};
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_stdlib::str::{self};
+
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_comparison, match_expression};
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::{Locator, Stylist};
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct YodaConditions {
-        pub suggestion: Option<String>,
-    }
-);
+#[violation]
+pub struct YodaConditions {
+    pub suggestion: Option<String>,
+}
+
 impl Violation for YodaConditions {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -50,14 +50,18 @@ fn is_constant_like(expr: &Expr) -> bool {
         ExprKind::Constant { .. } => true,
         ExprKind::Tuple { elts, .. } => elts.iter().all(is_constant_like),
         ExprKind::Name { id, .. } => str::is_upper(id),
+        ExprKind::UnaryOp {
+            op: Unaryop::UAdd | Unaryop::USub | Unaryop::Invert,
+            operand,
+        } => matches!(operand.node, ExprKind::Constant { .. }),
         _ => false,
     }
 }
 
 /// Generate a fix to reverse a comparison.
 fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Result<String> {
-    let range = Range::from_located(expr);
-    let contents = locator.slice(&range);
+    let range = Range::from(expr);
+    let contents = locator.slice(range);
 
     let mut expression = match_expression(contents)?;
     let mut comparison = match_comparison(&mut expression)?;
@@ -155,7 +159,7 @@ pub fn yoda_conditions(
             YodaConditions {
                 suggestion: Some(suggestion.to_string()),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
@@ -168,7 +172,7 @@ pub fn yoda_conditions(
     } else {
         checker.diagnostics.push(Diagnostic::new(
             YodaConditions { suggestion: None },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }

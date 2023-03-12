@@ -2,47 +2,47 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use itertools::Either::{Left, Right};
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use crate::ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for multiple `isinstance` calls on the same target.
-    ///
-    /// ## Why is this bad?
-    /// To check if an object is an instance of any one of multiple types
-    /// or classes, it is unnecessary to use multiple `isinstance` calls, as
-    /// the second argument of the `isinstance` built-in function accepts a
-    /// tuple of types and classes.
-    ///
-    /// Using a single `isinstance` call implements the same behavior with more
-    /// concise code and clearer intent.
-    ///
-    /// ## Example
-    /// ```python
-    /// if isinstance(obj, int) or isinstance(obj, float):
-    ///     pass
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// if isinstance(obj, (int, float)):
-    ///     pass
-    /// ```
-    ///
-    /// ## References
-    /// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
-    pub struct DuplicateIsinstanceCall {
-        pub name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+/// ## What it does
+/// Checks for multiple `isinstance` calls on the same target.
+///
+/// ## Why is this bad?
+/// To check if an object is an instance of any one of multiple types
+/// or classes, it is unnecessary to use multiple `isinstance` calls, as
+/// the second argument of the `isinstance` built-in function accepts a
+/// tuple of types and classes.
+///
+/// Using a single `isinstance` call implements the same behavior with more
+/// concise code and clearer intent.
+///
+/// ## Example
+/// ```python
+/// if isinstance(obj, int) or isinstance(obj, float):
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if isinstance(obj, (int, float)):
+///     pass
+/// ```
+///
+/// ## References
+/// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
+#[violation]
+pub struct DuplicateIsinstanceCall {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for DuplicateIsinstanceCall {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -56,11 +56,11 @@ impl AlwaysAutofixableViolation for DuplicateIsinstanceCall {
     }
 }
 
-define_violation!(
-    pub struct CompareWithTuple {
-        pub replacement: String,
-    }
-);
+#[violation]
+pub struct CompareWithTuple {
+    pub replacement: String,
+}
+
 impl AlwaysAutofixableViolation for CompareWithTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -74,11 +74,11 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
     }
 }
 
-define_violation!(
-    pub struct ExprAndNotExpr {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct ExprAndNotExpr {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for ExprAndNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -91,11 +91,11 @@ impl AlwaysAutofixableViolation for ExprAndNotExpr {
     }
 }
 
-define_violation!(
-    pub struct ExprOrNotExpr {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct ExprOrNotExpr {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for ExprOrNotExpr {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -108,9 +108,9 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
     }
 }
 
-define_violation!(
-    pub struct ExprOrTrue;
-);
+#[violation]
+pub struct ExprOrTrue;
+
 impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -122,9 +122,9 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
     }
 }
 
-define_violation!(
-    pub struct ExprAndFalse;
-);
+#[violation]
+pub struct ExprAndFalse;
+
 impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -172,7 +172,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         if func_name != "isinstance" {
             continue;
         }
-        if !checker.is_builtin("isinstance") {
+        if !checker.ctx.is_builtin("isinstance") {
             continue;
         }
 
@@ -193,7 +193,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                 DuplicateIsinstanceCall {
                     name: arg_name.to_string(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Grab the types used in each duplicate `isinstance` call.
@@ -313,7 +313,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
         if comparators
             .iter()
-            .any(|expr| contains_effect(checker, expr))
+            .any(|expr| contains_effect(&checker.ctx, expr))
         {
             continue;
         }
@@ -339,7 +339,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             CompareWithTuple {
                 replacement: unparse_expr(&in_expr, checker.stylist),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
             let unmatched: Vec<Expr> = values
@@ -395,7 +395,7 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(checker, expr) {
+    if contains_effect(&checker.ctx, expr) {
         return;
     }
 
@@ -406,7 +406,7 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     ExprAndNotExpr {
                         name: id.to_string(),
                     },
-                    Range::from_located(expr),
+                    Range::from(expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
@@ -449,7 +449,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(checker, expr) {
+    if contains_effect(&checker.ctx, expr) {
         return;
     }
 
@@ -460,7 +460,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     ExprOrNotExpr {
                         name: id.to_string(),
                     },
-                    Range::from_located(expr),
+                    Range::from(expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
@@ -480,7 +480,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
         return;
     };
-    if contains_effect(checker, expr) {
+    if contains_effect(&checker.ctx, expr) {
         return;
     }
     for value in values {
@@ -489,7 +489,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut diagnostic = Diagnostic::new(ExprOrTrue, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(ExprOrTrue, Range::from(value));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "True".to_string(),
@@ -507,7 +507,7 @@ pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
         return;
     };
-    if contains_effect(checker, expr) {
+    if contains_effect(&checker.ctx, expr) {
         return;
     }
     for value in values {
@@ -516,7 +516,7 @@ pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
             ..
         } = &value.node
         {
-            let mut diagnostic = Diagnostic::new(ExprAndFalse, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(ExprAndFalse, Range::from(value));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     "False".to_string(),

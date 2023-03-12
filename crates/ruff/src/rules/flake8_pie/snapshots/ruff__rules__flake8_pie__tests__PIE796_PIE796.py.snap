@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_pie/mod.rs
+source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PreferUniqueEnums:
-      value: "\"B\""
+    name: PreferUniqueEnums
+    body: "Enum contains duplicate value: `\"B\"`"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums:
-      value: "2"
+    name: PreferUniqueEnums
+    body: "Enum contains duplicate value: `2`"
+    suggestion: ~
+    fixable: false
   location:
     row: 14
     column: 4
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums:
-      value: "\"2\""
+    name: PreferUniqueEnums
+    body: "Enum contains duplicate value: `\"2\"`"
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 4
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums:
-      value: "2.5"
+    name: PreferUniqueEnums
+    body: "Enum contains duplicate value: `2.5`"
+    suggestion: ~
+    fixable: false
   location:
     row: 26
     column: 4
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums:
-      value: "False"
+    name: PreferUniqueEnums
+    body: "Enum contains duplicate value: `False`"
+    suggestion: ~
+    fixable: false
   location:
     row: 33
     column: 4
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums:
-      value: None
+    name: PreferUniqueEnums
+    body: "Enum contains duplicate value: `None`"
+    suggestion: ~
+    fixable: false
   location:
     row: 40
     column: 4
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PreferUniqueEnums:
-      value: "2"
+    name: PreferUniqueEnums
+    body: "Enum contains duplicate value: `2`"
+    suggestion: ~
+    fixable: false
   location:
     row: 54
     column: 4

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MissingWhitespaceAroundModuloOperator: ~
+    name: MissingWhitespaceAroundModuloOperator
+    body: Missing whitespace around modulo operator
+    suggestion: ~
+    fixable: false
   location:
     row: 131
     column: 5
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundModuloOperator: ~
+    name: MissingWhitespaceAroundModuloOperator
+    body: Missing whitespace around modulo operator
+    suggestion: ~
+    fixable: false
   location:
     row: 133
     column: 9
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MissingWhitespaceAroundModuloOperator: ~
+    name: MissingWhitespaceAroundModuloOperator
+    body: Missing whitespace around modulo operator
+    suggestion: ~
+    fixable: false
   location:
     row: 135
     column: 25

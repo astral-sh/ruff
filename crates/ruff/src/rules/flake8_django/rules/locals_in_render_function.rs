@@ -1,37 +1,39 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::{checkers::ast::Checker, registry::Diagnostic, violation::Violation, Range};
+use crate::checkers::ast::Checker;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for the use of `locals()` in `render` functions.
-    ///
-    /// ## Why is this bad?
-    /// Using `locals()` can expose internal variables or other unintentional
-    /// data to the rendered template.
-    ///
-    /// ## Example
-    /// ```python
-    /// from django.shortcuts import render
-    ///
-    /// def index(request):
-    ///     posts = Post.objects.all()
-    ///     return render(request, "app/index.html", locals())
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// from django.shortcuts import render
-    ///
-    /// def index(request):
-    ///     posts = Post.objects.all()
-    ///     context = {"posts": posts}
-    ///     return render(request, "app/index.html", context)
-    /// ```
-    pub struct LocalsInRenderFunction;
-);
+/// ## What it does
+/// Checks for the use of `locals()` in `render` functions.
+///
+/// ## Why is this bad?
+/// Using `locals()` can expose internal variables or other unintentional
+/// data to the rendered template.
+///
+/// ## Example
+/// ```python
+/// from django.shortcuts import render
+///
+/// def index(request):
+///     posts = Post.objects.all()
+///     return render(request, "app/index.html", locals())
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from django.shortcuts import render
+///
+/// def index(request):
+///     posts = Post.objects.all()
+///     context = {"posts": posts}
+///     return render(request, "app/index.html", context)
+/// ```
+#[violation]
+pub struct LocalsInRenderFunction;
+
 impl Violation for LocalsInRenderFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -46,9 +48,13 @@ pub fn locals_in_render_function(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["django", "shortcuts", "render"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["django", "shortcuts", "render"]
+        })
+    {
         return;
     }
 
@@ -72,10 +78,9 @@ pub fn locals_in_render_function(
         return;
     };
 
-    checker.diagnostics.push(Diagnostic::new(
-        LocalsInRenderFunction,
-        Range::from_located(locals),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(LocalsInRenderFunction, Range::from(locals)));
 }
 
 fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {
@@ -83,6 +88,7 @@ fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {
         return false
     };
     checker
+        .ctx
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["", "locals"])
 }

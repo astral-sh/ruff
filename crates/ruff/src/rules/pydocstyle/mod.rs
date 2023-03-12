@@ -12,10 +12,11 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use super::settings::{Convention, Settings};
     use crate::registry::Rule;
     use crate::settings;
     use crate::test::test_path;
+
+    use super::settings::{Convention, Settings};
 
     #[test_case(Rule::BlankLineAfterLastSection, Path::new("sections.py"); "D413")]
     #[test_case(Rule::BlankLineAfterSection, Path::new("sections.py"); "D410")]
@@ -59,7 +60,7 @@ mod tests {
     #[test_case(Rule::PublicMethod, Path::new("setter.py"); "D102_1")]
     #[test_case(Rule::PublicModule, Path::new("D.py"); "D100")]
     #[test_case(Rule::PublicNestedClass, Path::new("D.py"); "D106")]
-    #[test_case(Rule::PublicPackage, Path::new("D.py"); "D104")]
+    #[test_case(Rule::PublicPackage, Path::new("D.py"); "D104_0")]
     #[test_case(Rule::PublicPackage, Path::new("D104/__init__.py"); "D104_1")]
     #[test_case(Rule::SectionNameEndsInColon, Path::new("D.py"); "D416")]
     #[test_case(Rule::SectionNotOverIndented, Path::new("sections.py"); "D214")]
@@ -85,6 +86,16 @@ mod tests {
             },
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn bom() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/bom.py"),
+            &settings::Settings::for_rule(Rule::TripleSingleQuotes),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 

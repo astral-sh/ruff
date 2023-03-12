@@ -1,16 +1,17 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::{BindingKind, Range};
 
-use crate::ast::types::{BindingKind, Range};
 use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticKind, Rule};
+use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct UseOfDotIsNull;
-);
+#[violation]
+pub struct UseOfDotIsNull;
+
 impl Violation for UseOfDotIsNull {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,9 +19,9 @@ impl Violation for UseOfDotIsNull {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotNotNull;
-);
+#[violation]
+pub struct UseOfDotNotNull;
+
 impl Violation for UseOfDotNotNull {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,9 +29,9 @@ impl Violation for UseOfDotNotNull {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotPivotOrUnstack;
-);
+#[violation]
+pub struct UseOfDotPivotOrUnstack;
+
 impl Violation for UseOfDotPivotOrUnstack {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,9 +41,9 @@ impl Violation for UseOfDotPivotOrUnstack {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotReadTable;
-);
+#[violation]
+pub struct UseOfDotReadTable;
+
 impl Violation for UseOfDotReadTable {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -50,9 +51,9 @@ impl Violation for UseOfDotReadTable {
     }
 }
 
-define_violation!(
-    pub struct UseOfDotStack;
-);
+#[violation]
+pub struct UseOfDotStack;
+
 impl Violation for UseOfDotStack {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -81,7 +82,7 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
     // If the target is a named variable, avoid triggering on
     // irrelevant bindings (like non-Pandas imports).
     if let ExprKind::Name { id, .. } = &value.node {
-        if checker.find_binding(id).map_or(true, |binding| {
+        if checker.ctx.find_binding(id).map_or(true, |binding| {
             if let BindingKind::Importation(.., module) = &binding.kind {
                 module != &"pandas"
             } else {
@@ -105,5 +106,5 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
 
     checker
         .diagnostics
-        .push(Diagnostic::new(violation, Range::from_located(func)));
+        .push(Diagnostic::new(violation, Range::from(func)));
 }

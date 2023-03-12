@@ -1,47 +1,48 @@
 use log::error;
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{AutofixKind, Availability, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
-use crate::violation::{AutofixKind, Availability, Violation};
 
 use super::helpers;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for unnecessary `map` calls with `lambda` functions.
-    ///
-    /// ## Why is this bad?
-    /// Using `map(func, iterable)` when `func` is a `lambda` is slower than
-    /// using a generator expression or a comprehension, as the latter approach
-    /// avoids the function call overhead, in addition to being more readable.
-    ///
-    /// ## Examples
-    /// ```python
-    /// map(lambda x: x + 1, iterable)
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// (x + 1 for x in iterable)
-    /// ```
-    ///
-    /// This rule also applies to `map` calls within `list`, `set`, and `dict`
-    /// calls. For example:
-    /// - Instead of `list(map(lambda num: num * 2, nums))`, use
-    ///   `[num * 2 for num in nums]`.
-    /// - Instead of `set(map(lambda num: num % 2 == 0, nums))`, use
-    ///   `{num % 2 == 0 for num in nums}`.
-    /// - Instead of `dict(map(lambda v: (v, v ** 2), values))`, use
-    ///   `{v: v ** 2 for v in values}`.
-    pub struct UnnecessaryMap {
-        pub obj_type: String,
-    }
-);
+/// ## What it does
+/// Checks for unnecessary `map` calls with `lambda` functions.
+///
+/// ## Why is this bad?
+/// Using `map(func, iterable)` when `func` is a `lambda` is slower than
+/// using a generator expression or a comprehension, as the latter approach
+/// avoids the function call overhead, in addition to being more readable.
+///
+/// ## Examples
+/// ```python
+/// map(lambda x: x + 1, iterable)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// (x + 1 for x in iterable)
+/// ```
+///
+/// This rule also applies to `map` calls within `list`, `set`, and `dict`
+/// calls. For example:
+/// - Instead of `list(map(lambda num: num * 2, nums))`, use
+///   `[num * 2 for num in nums]`.
+/// - Instead of `set(map(lambda num: num % 2 == 0, nums))`, use
+///   `{num % 2 == 0 for num in nums}`.
+/// - Instead of `dict(map(lambda v: (v, v ** 2), values))`, use
+///   `{v: v ** 2 for v in values}`.
+#[violation]
+pub struct UnnecessaryMap {
+    pub obj_type: String,
+}
+
 impl Violation for UnnecessaryMap {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -88,7 +89,7 @@ pub fn unnecessary_map(
     };
     match id {
         "map" => {
-            if !checker.is_builtin(id) {
+            if !checker.ctx.is_builtin(id) {
                 return;
             }
 
@@ -104,7 +105,7 @@ pub fn unnecessary_map(
             };
 
             if args.len() == 2 && matches!(&args[0].node, ExprKind::Lambda { .. }) {
-                let mut diagnostic = create_diagnostic("generator", Range::from_located(expr));
+                let mut diagnostic = create_diagnostic("generator", Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
                     match fixes::fix_unnecessary_map(
                         checker.locator,
@@ -123,7 +124,7 @@ pub fn unnecessary_map(
             }
         }
         "list" | "set" => {
-            if !checker.is_builtin(id) {
+            if !checker.ctx.is_builtin(id) {
                 return;
             }
 
@@ -136,7 +137,7 @@ pub fn unnecessary_map(
                         return;
                     };
                     if let ExprKind::Lambda { .. } = argument {
-                        let mut diagnostic = create_diagnostic(id, Range::from_located(expr));
+                        let mut diagnostic = create_diagnostic(id, Range::from(expr));
                         if checker.patch(diagnostic.kind.rule()) {
                             match fixes::fix_unnecessary_map(
                                 checker.locator,
@@ -157,7 +158,7 @@ pub fn unnecessary_map(
             }
         }
         "dict" => {
-            if !checker.is_builtin(id) {
+            if !checker.ctx.is_builtin(id) {
                 return;
             }
 
@@ -169,7 +170,7 @@ pub fn unnecessary_map(
                     if let ExprKind::Lambda { body, .. } = &argument {
                         if matches!(&body.node, ExprKind::Tuple { elts, .. } | ExprKind::List { elts, .. } if elts.len() == 2)
                         {
-                            let mut diagnostic = create_diagnostic(id, Range::from_located(expr));
+                            let mut diagnostic = create_diagnostic(id, Range::from(expr));
                             if checker.patch(diagnostic.kind.rule()) {
                                 match fixes::fix_unnecessary_map(
                                     checker.locator,

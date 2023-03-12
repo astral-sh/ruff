@@ -1,10 +1,8 @@
 use rustpython_parser::ast::Location;
 
-use ruff_macros::{define_violation, derive_message_formats};
-
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
 const BIDI_UNICODE: [char; 10] = [
     '\u{202A}', //{LEFT-TO-RIGHT EMBEDDING}
@@ -26,9 +24,9 @@ const BIDI_UNICODE: [char; 10] = [
                 // to hide code
 ];
 
-define_violation!(
-    pub struct BidirectionalUnicode;
-);
+#[violation]
+pub struct BidirectionalUnicode;
+
 impl Violation for BidirectionalUnicode {
     #[derive_message_formats]
     fn message(&self) -> String {

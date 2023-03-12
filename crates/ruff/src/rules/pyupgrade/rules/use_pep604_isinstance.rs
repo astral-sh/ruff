@@ -1,16 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{Expr, ExprKind, Location, Operator};
-use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use rustpython_parser::ast::{Expr, ExprKind, Location, Operator};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::Range;
+
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum CallKind {
     Isinstance,
     Issubclass,
@@ -35,12 +35,12 @@ impl CallKind {
     }
 }
 
-define_violation!(
-    // TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
-    pub struct IsinstanceWithTuple {
-        pub kind: CallKind,
-    }
-);
+// TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
+#[violation]
+pub struct IsinstanceWithTuple {
+    pub kind: CallKind,
+}
+
 impl AlwaysAutofixableViolation for IsinstanceWithTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -73,13 +73,13 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         let Some(kind) = CallKind::from_name(id) else {
             return;
         };
-        if !checker.is_builtin(id) {
+        if !checker.ctx.is_builtin(id) {
             return;
         };
         if let Some(types) = args.get(1) {
             if let ExprKind::Tuple { elts, .. } = &types.node {
                 let mut diagnostic =
-                    Diagnostic::new(IsinstanceWithTuple { kind }, Range::from_located(expr));
+                    Diagnostic::new(IsinstanceWithTuple { kind }, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         unparse_expr(&union(elts), checker.stylist),

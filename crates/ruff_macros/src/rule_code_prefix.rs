@@ -66,12 +66,12 @@ pub fn expand<'a>(
         }
 
         impl std::str::FromStr for #prefix_ident {
-            type Err = FromCodeError;
+            type Err = crate::registry::FromCodeError;
 
             fn from_str(code: &str) -> Result<Self, Self::Err> {
                 match code {
                     #(#attributes #variant_strs => Ok(Self::#variant_idents),)*
-                    _ => Err(FromCodeError::Unknown)
+                    _ => Err(crate::registry::FromCodeError::Unknown)
                 }
             }
         }
