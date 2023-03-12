@@ -7,7 +7,7 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `env.getenv` calls with an invalid first argument
+/// Checks for `os.getenv` calls with an invalid first argument
 ///
 /// ## Why is this bad?
 /// `os.getenv` only suppors string type arguments.
