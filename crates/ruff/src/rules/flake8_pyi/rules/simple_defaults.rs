@@ -61,18 +61,16 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
             value: Constant::Bytes(..),
             ..
         } => return checker.locator.slice(default).len() <= 50,
-        // 123
-        // True / False
-        // 3.14
+        // Ex) `123`, `True`, `False`, `3.14`
         ExprKind::Constant {
             value: Constant::Int(..) | Constant::Bool(..) | Constant::Float(..),
             ..
         } => {
             return checker.locator.slice(default).len() <= 10;
         }
-        // 2j
+        // Ex) `2j`
         ExprKind::Constant {
-            value: Constant::Complex { real, imag: _ },
+            value: Constant::Complex { real, .. },
             ..
         } => {
             if *real == 0.0 {
@@ -83,8 +81,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
             op: Unaryop::USub,
             operand,
         } => {
-            // - 1
-            // - 3.14
+            // Ex) `-1`, `-3.14`
             if let ExprKind::Constant {
                 value: Constant::Int(..) | Constant::Float(..),
                 ..
@@ -92,9 +89,9 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
             {
                 return checker.locator.slice(operand).len() <= 10;
             }
-            // - 2j
+            // Ex) `-2j`
             if let ExprKind::Constant {
-                value: Constant::Complex { real, imag: _ },
+                value: Constant::Complex { real, .. },
                 ..
             } = &operand.node
             {
@@ -108,17 +105,13 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
             op: Operator::Add | Operator::Sub,
             right,
         } => {
-            // 1 + 2j
-            // 1 - 2j
-            // -1 - 2j
-            // -1 + 2j
+            // Ex) `1 + 2j`, `1 - 2j`, `-1 - 2j`, `-1 + 2j`
             if let ExprKind::Constant {
                 value: Constant::Complex { .. },
                 ..
             } = right.node
             {
-                // 1 + 2j
-                // 1 - 2j
+                // Ex) `1 + 2j`, `1 - 2j`
                 if let ExprKind::Constant {
                     value: Constant::Int(..) | Constant::Float(..),
                     ..
@@ -130,8 +123,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
                     operand,
                 } = &left.node
                 {
-                    // -1 + 2j
-                    // -1 - 2j
+                    // Ex) `-1 + 2j`, `-1 - 2j`
                     if let ExprKind::Constant {
                         value: Constant::Int(..) | Constant::Float(..),
                         ..
@@ -142,7 +134,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
                 }
             }
         }
-        // `sys.stdin`, etc.
+        // Ex) `sys.stdin`, etc.
         ExprKind::Attribute { .. } => {
             if checker
                 .ctx
