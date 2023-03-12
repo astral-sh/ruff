@@ -182,7 +182,8 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
 
     // Generate checks.
     let LinterResult {
-        data: (diagnostics, _imports), ..
+        data: (diagnostics, _imports),
+        ..
     } = check_path(
         Path::new("<filename>"),
         None,

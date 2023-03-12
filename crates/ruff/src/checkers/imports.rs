@@ -26,7 +26,7 @@ pub fn check_imports(
     autofix: flags::Autofix,
     path: &Path,
     package: Option<&Path>,
-) -> (Vec<Diagnostic>, FxHashMap<Option<PathBuf>, Vec<Import>>) {
+) -> (Vec<Diagnostic>, FxHashMap<PathBuf, Vec<Import>>) {
     // Extract all imports from the AST.
     let tracker = {
         let mut tracker = ImportTracker::new(locator, directives, path);
@@ -55,8 +55,9 @@ pub fn check_imports(
             &blocks, python_ast, locator, stylist, settings, autofix,
         ));
     }
-    let mut imports: FxHashMap<Option<PathBuf>, Vec<Import>> = FxHashMap::default();
+    let mut imports: FxHashMap<PathBuf, Vec<Import>> = FxHashMap::default();
     let mut imports_vec = vec![];
+    println!("the path {:?}", path);
     for &block in &blocks {
         block.imports.iter().for_each(|&stmt| match &stmt.node {
             StmtKind::Import { names } => {
@@ -72,7 +73,7 @@ pub fn check_imports(
                     .iter()
                     .map(|name| Import {
                         name: format!(
-                            "{}{}",
+                            "{}.{}",
                             {
                                 if let Some(n) = module {
                                     n
@@ -92,8 +93,8 @@ pub fn check_imports(
     }
 
     // to avoid depedence on ref to python_ast
-    let package = package.map(std::path::Path::to_path_buf);
+    // let package = package.map(std::path::Path::to_path_buf);
 
-    imports.insert(package, imports_vec);
+    imports.insert(path.to_owned(), imports_vec);
     (diagnostics, imports)
 }

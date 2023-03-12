@@ -12,11 +12,11 @@ use log::{debug, error};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
-use ruff::ast::types::Import;
 use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff::{fix, fs};
+use ruff_python_ast::types::Import;
 
 use crate::cache;
 
@@ -24,14 +24,11 @@ use crate::cache;
 pub struct Diagnostics {
     pub messages: Vec<Message>,
     pub fixed: FxHashMap<String, FixTable>,
-    pub imports: Vec<FxHashMap<Option<PathBuf>, Vec<Import>>>,
+    pub imports: Vec<FxHashMap<PathBuf, Vec<Import>>>,
 }
 
 impl Diagnostics {
-    pub fn new(
-        messages: Vec<Message>,
-        imports: Vec<FxHashMap<Option<PathBuf>, Vec<Import>>>,
-    ) -> Self {
+    pub fn new(messages: Vec<Message>, imports: Vec<FxHashMap<PathBuf, Vec<Import>>>) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),

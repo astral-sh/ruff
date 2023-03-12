@@ -135,7 +135,7 @@ pub fn run(
             acc
         });
     // check imports?
-    debug!("{:?}", diagnostics.imports);
+    debug!("{:#?}", diagnostics.imports);
     diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);

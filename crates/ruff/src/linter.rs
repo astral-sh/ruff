@@ -66,12 +66,12 @@ pub fn check_path<'a>(
     indexer: &'a Indexer,
     directives: &'a Directives,
     settings: &'a Settings,
-    autofix: flags::Autofix,
     noqa: flags::Noqa,
-) -> LinterResult<(Vec<Diagnostic>, FxHashMap<Option<PathBuf>, Vec<Import>>)> {
+    autofix: flags::Autofix,
+) -> LinterResult<(Vec<Diagnostic>, FxHashMap<PathBuf, Vec<Import>>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
-    let mut imports: FxHashMap<Option<PathBuf>, Vec<Import>> = FxHashMap::default();
+    let mut imports: FxHashMap<PathBuf, Vec<Import>> = FxHashMap::default();
     let mut error = None;
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
@@ -303,7 +303,7 @@ pub fn lint_only(
     settings: &Settings,
     noqa: flags::Noqa,
     autofix: flags::Autofix,
-) -> LinterResult<(Vec<Message>, FxHashMap<Option<PathBuf>, Vec<Import>>)> {
+) -> LinterResult<(Vec<Message>, FxHashMap<PathBuf, Vec<Import>>)> {
     // Tokenize once.
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
@@ -366,7 +366,7 @@ pub fn lint_fix<'a>(
     noqa: flags::Noqa,
     settings: &Settings,
 ) -> Result<(
-    LinterResult<(Vec<Message>, FxHashMap<Option<PathBuf>, Vec<Import>>)>,
+    LinterResult<(Vec<Message>, FxHashMap<PathBuf, Vec<Import>>)>,
     Cow<'a, str>,
     FixTable,
 )> {

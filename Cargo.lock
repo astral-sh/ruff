@@ -2044,6 +2044,7 @@ dependencies = [
  "ruff",
  "ruff_cache",
  "ruff_diagnostics",
+ "ruff_python_ast",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2132,6 +2133,7 @@ dependencies = [
  "rustc-hash",
  "rustpython-common",
  "rustpython-parser",
+ "serde",
  "smallvec",
 ]
 
