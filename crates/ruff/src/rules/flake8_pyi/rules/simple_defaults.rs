@@ -61,22 +61,46 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
             value: Constant::Bytes(..),
             ..
         } => return checker.locator.slice(default).len() <= 50,
+        // 123
+        // True / False
+        // 3.14
         ExprKind::Constant {
-            value: Constant::Int(..),
+            value: Constant::Int(..) | Constant::Bool(..) | Constant::Float(..),
             ..
         } => {
             return checker.locator.slice(default).len() <= 10;
+        }
+        // 2j
+        ExprKind::Constant {
+            value: Constant::Complex { real, imag: _ },
+            ..
+        } => {
+            if *real == 0.0 {
+                return checker.locator.slice(default).len() <= 10;
+            }
         }
         ExprKind::UnaryOp {
             op: Unaryop::USub,
             operand,
         } => {
+            // - 1
+            // - 3.14
             if let ExprKind::Constant {
-                value: Constant::Int(..),
+                value: Constant::Int(..) | Constant::Float(..),
                 ..
             } = &operand.node
             {
                 return checker.locator.slice(operand).len() <= 10;
+            }
+            // - 2j
+            if let ExprKind::Constant {
+                value: Constant::Complex { real, imag: _ },
+                ..
+            } = &operand.node
+            {
+                if *real == 0.0 {
+                    return checker.locator.slice(operand).len() <= 10;
+                }
             }
         }
         ExprKind::BinOp {
@@ -96,7 +120,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
                 // 1 + 2j
                 // 1 - 2j
                 if let ExprKind::Constant {
-                    value: Constant::Int(..),
+                    value: Constant::Int(..) | Constant::Float(..),
                     ..
                 } = &left.node
                 {
@@ -109,7 +133,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
                     // -1 + 2j
                     // -1 - 2j
                     if let ExprKind::Constant {
-                        value: Constant::Int(..),
+                        value: Constant::Int(..) | Constant::Float(..),
                         ..
                     } = &operand.node
                     {
