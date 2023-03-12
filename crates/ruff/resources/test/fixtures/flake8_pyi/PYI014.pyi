@@ -43,3 +43,6 @@ def f21(
 def f22(
     x=-42.5j + 4.3j,  # Error PYI014
 ) -> None: ...
+def f23(
+  x=True,  # OK
+) -> None: ...
