@@ -367,11 +367,7 @@ pub fn lint_fix<'a>(
     package: Option<&Path>,
     noqa: flags::Noqa,
     settings: &Settings,
-) -> Result<(
-    LinterResult<MessagesAndImports>,
-    Cow<'a, str>,
-    FixTable,
-)> {
+) -> Result<(LinterResult<MessagesAndImports>, Cow<'a, str>, FixTable)> {
     let mut transformed = Cow::Borrowed(contents);
 
     // Track the number of fixed errors across iterations.
