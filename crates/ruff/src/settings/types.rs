@@ -69,7 +69,7 @@ impl FromStr for PythonVersion {
 impl From<PythonVersion> for Pep440Version {
     fn from(version: PythonVersion) -> Self {
         let (major, minor) = version.as_tuple();
-        Self::from_str(&format!("{major}.{minor}")).unwrap()
+        Self::from_str(&format!("{major}.{minor}.100")).unwrap()
     }
 }
 

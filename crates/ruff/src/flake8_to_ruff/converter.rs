@@ -631,7 +631,7 @@ mod tests {
             &ExternalConfig {
                 project: Some(&Project {
                     requires_python: Some(RequiresVersion(
-                        parse_version_specifiers(">=3.9, <3.11").unwrap(),
+                        parse_version_specifiers(">=3.8.16, <3.11").unwrap(),
                     )),
                 }),
                 ..ExternalConfig::default()
@@ -639,7 +639,7 @@ mod tests {
             Some(vec![]),
         )?;
         let expected = Pyproject::new(Options {
-            target_version: Some(PythonVersion::Py39),
+            target_version: Some(PythonVersion::Py38),
             ..default_options([])
         });
         assert_eq!(actual, expected);
