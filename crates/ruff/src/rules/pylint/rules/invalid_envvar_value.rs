@@ -7,12 +7,13 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `os.getenv` calls with an invalid first argument
+/// Checks for `os.getenv` calls with an invalid `key` argument.
 ///
 /// ## Why is this bad?
-/// `os.getenv` only supports string type arguments.
+/// `os.getenv` only supports strings as the first argument (`key`).
 ///
-/// If the provided argument is not a string, `os.getenv` will not function properly.
+/// If the provided argument is not a string, `os.getenv` will throw a
+/// `TypeError` at runtime.
 ///
 /// ## Example
 /// ```python
