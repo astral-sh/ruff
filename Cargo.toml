@@ -4,6 +4,10 @@ members = ["crates/*"]
 [workspace.package]
 edition = "2021"
 rust-version = "1.67"
+homepage = "https://beta.ruff.rs/docs/"
+documentation = "https://beta.ruff.rs/docs/"
+repository = "https://github.com/charliermarsh/ruff"
+authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 
 [workspace.dependencies]
 anyhow = { version = "1.0.69" }
@@ -59,3 +63,9 @@ opt-level = 3
 # https://github.com/bytecodealliance/wasm-tools/blob/b5c3d98e40590512a3b12470ef358d5c7b983b15/crates/wasmparser/src/limits.rs#L29
 [profile.dev.package.rustpython-parser]
 opt-level = 1
+
+# Use the `--profile release-debug` flag to show symbols in release mode.
+# e.g. `cargo build --profile release-debug`
+[profile.release-debug]
+inherits = "release"
+debug = 1

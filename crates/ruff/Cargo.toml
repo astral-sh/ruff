@@ -1,12 +1,12 @@
 [package]
 name = "ruff"
 version = "0.0.255"
-authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
-edition = { workspace = true }
-rust-version = { workspace = true }
-documentation = "https://github.com/charliermarsh/ruff"
-homepage = "https://github.com/charliermarsh/ruff"
-repository = "https://github.com/charliermarsh/ruff"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
 readme = "README.md"
 license = "MIT"
 

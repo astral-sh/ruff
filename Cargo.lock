@@ -2025,6 +2025,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_benchmark"
+version = "0.0.0"
+dependencies = [
+ "criterion",
+ "mimalloc",
+ "ruff",
+ "tikv-jemallocator",
+ "ureq",
+ "url",
+]
+
+[[package]]
 name = "ruff_cache"
 version = "0.0.0"
 dependencies = [
