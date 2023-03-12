@@ -168,7 +168,7 @@ async def main(*, ruff1: Path, ruff2: Path) -> None:
             if isinstance(diff, Exception):
                 changes = "Error"
             elif diff:
-                changes = f"(+{diff.added}, -{diff.removed})"
+                changes = f"(+{len(diff.added)}, -{len(diff.removed)})"
             else:
                 changes = "No changes."
 
