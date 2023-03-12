@@ -305,7 +305,7 @@ pub fn lint_only(
     settings: &Settings,
     noqa: flags::Noqa,
     autofix: flags::Autofix,
-) -> LinterResult<(Vec<Message>, FxHashMap<PathBuf, Vec<Import>>)> {
+) -> LinterResult<MessagesAndImports> {
     // Tokenize once.
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
