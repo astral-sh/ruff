@@ -22,7 +22,7 @@ pub fn check_noqa(
     noqa_line_for: &IntMap<usize, usize>,
     settings: &Settings,
     autofix: flags::Autofix,
-) {
+) -> Vec<usize> {
     let enforce_noqa = settings.rules.enabled(&Rule::UnusedNOQA);
 
     // Whether the file is exempted from all checks.
@@ -264,7 +264,5 @@ pub fn check_noqa(
     }
 
     ignored_diagnostics.sort_unstable();
-    for index in ignored_diagnostics.iter().rev() {
-        diagnostics.swap_remove(*index);
-    }
+    ignored_diagnostics
 }
