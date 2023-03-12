@@ -1,6 +1,8 @@
 use std::cmp::Reverse;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
 use std::fmt::Display;
+use std::hash::{Hash, Hasher};
 use std::io;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -350,7 +352,7 @@ impl Printer {
                                 json!({
                                     "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body),
                                     "severity": "major",
-                                    "fingerprint": message.kind.rule().noqa_code().to_string(),
+                                    "fingerprint": fingerprint(message),
                                     "location": {
                                         "path": message.filename,
                                         "lines": {
@@ -551,6 +553,18 @@ fn num_digits(n: usize) -> usize {
         .take_while(|&n| n > 0)
         .count()
         .max(1)
+}
+
+/// Generate a unique fingerprint to identify a violation.
+fn fingerprint(message: &Message) -> String {
+    let mut hasher = DefaultHasher::new();
+    message.kind.rule().hash(&mut hasher);
+    message.location.row().hash(&mut hasher);
+    message.location.column().hash(&mut hasher);
+    message.end_location.row().hash(&mut hasher);
+    message.end_location.column().hash(&mut hasher);
+    message.filename.hash(&mut hasher);
+    format!("{:x}", hasher.finish())
 }
 
 struct CodeAndBody<'a>(&'a Message, fix::FixMode);
