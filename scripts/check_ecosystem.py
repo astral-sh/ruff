@@ -165,7 +165,14 @@ async def main(*, ruff1: Path, ruff2: Path) -> None:
         print()
 
         for name, diff in diffs.items():
-            print(f"<details><summary>{name}</summary>")
+            if isinstance(diff, Exception):
+                changes = "Error"
+            elif diff:
+                changes = f"(+{diff.added}, -{diff.removed})"
+            else:
+                changes = "No changes."
+
+            print(f"<details><summary>{name} - {changes}</summary>")
             print("<p>")
             print()
 
