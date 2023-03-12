@@ -19,6 +19,7 @@ impl Violation for UselessComparison {
     }
 }
 
+/// B015
 pub fn useless_comparison(checker: &mut Checker, expr: &Expr) {
     if matches!(expr.node, ExprKind::Compare { .. }) {
         checker

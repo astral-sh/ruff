@@ -132,6 +132,39 @@ pub fn contains_effect(ctx: &Context, expr: &Expr) -> bool {
             }
         }
 
+        // Avoid false positive for overloaded operators.
+        if let ExprKind::BinOp { left, right, .. } = &expr.node {
+            if !matches!(
+                left.node,
+                ExprKind::Constant { .. }
+                    | ExprKind::JoinedStr { .. }
+                    | ExprKind::List { .. }
+                    | ExprKind::Tuple { .. }
+                    | ExprKind::Set { .. }
+                    | ExprKind::Dict { .. }
+                    | ExprKind::ListComp { .. }
+                    | ExprKind::SetComp { .. }
+                    | ExprKind::DictComp { .. }
+            ) {
+                return true;
+            }
+            if !matches!(
+                right.node,
+                ExprKind::Constant { .. }
+                    | ExprKind::JoinedStr { .. }
+                    | ExprKind::List { .. }
+                    | ExprKind::Tuple { .. }
+                    | ExprKind::Set { .. }
+                    | ExprKind::Dict { .. }
+                    | ExprKind::ListComp { .. }
+                    | ExprKind::SetComp { .. }
+                    | ExprKind::DictComp { .. }
+            ) {
+                return true;
+            }
+            return false;
+        }
+
         // Otherwise, avoid all complex expressions.
         matches!(
             expr.node,
