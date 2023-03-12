@@ -22,9 +22,22 @@ expression: diagnostics
     fixable: false
   location:
     row: 7
-    column: 10
+    column: 14
   end_location:
     row: 7
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: InvalidEnvvarValue
+    body: "Invalid type for initial `os.getenv` argument; expected `str`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 10
+  end_location:
+    row: 8
     column: 19
   fix: ~
   parent: ~

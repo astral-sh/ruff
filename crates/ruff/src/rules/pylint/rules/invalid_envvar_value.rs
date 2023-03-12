@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -34,14 +34,24 @@ impl Violation for InvalidEnvvarValue {
 }
 
 /// PLE1507
-pub fn invalid_envvar_value(checker: &mut Checker, func: &Expr, args: &[Expr]) {
+pub fn invalid_envvar_value(
+    checker: &mut Checker,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) {
     if checker
         .ctx
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["os", "getenv"])
     {
         // Get the first argument for `getenv`
-        if let Some(expr) = args.get(0) {
+        if let Some(expr) = args.get(0).or_else(|| {
+            keywords
+                .iter()
+                .find(|keyword| keyword.node.arg.as_ref().map_or(false, |arg| arg == "key"))
+                .map(|keyword| &keyword.node.value)
+        }) {
             // Ignoring types that are inferred, only do direct constants
             if !matches!(
                 expr.node,
