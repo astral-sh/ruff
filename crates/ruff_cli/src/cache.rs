@@ -7,6 +7,7 @@ use anyhow::Result;
 use filetime::FileTime;
 use log::error;
 use path_absolutize::Absolutize;
+use ruff::linter::MessagesAndImports;
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff_cache::{CacheKey, CacheKeyHasher};
@@ -99,7 +100,7 @@ pub fn get<P: AsRef<Path>>(
     metadata: &fs::Metadata,
     settings: &AllSettings,
     autofix: flags::Autofix,
-) -> Option<(Vec<Message>, FxHashMap<PathBuf, Vec<Import>>)> {
+) -> Option<MessagesAndImports> {
     let encoded = read_sync(
         &settings.cli.cache_dir,
         cache_key(path, package, metadata, &settings.lib, autofix),

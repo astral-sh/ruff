@@ -57,7 +57,6 @@ pub fn check_imports(
     }
     let mut imports: FxHashMap<PathBuf, Vec<Import>> = FxHashMap::default();
     let mut imports_vec = vec![];
-    println!("the path {:?}", path);
     for &block in &blocks {
         block.imports.iter().for_each(|&stmt| match &stmt.node {
             StmtKind::Import { names } => {

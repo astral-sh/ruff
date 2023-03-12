@@ -51,6 +51,8 @@ impl<T> LinterResult<T> {
     }
 }
 
+pub type DiagnosticsAndImports = (Vec<Diagnostic>, FxHashMap<PathBuf, Vec<Import>>);
+pub type MessagesAndImports = (Vec<Message>, FxHashMap<PathBuf, Vec<Import>>);
 pub type FixTable = FxHashMap<&'static Rule, usize>;
 
 /// Generate `Diagnostic`s from the source code contents at the
@@ -68,7 +70,7 @@ pub fn check_path<'a>(
     settings: &'a Settings,
     noqa: flags::Noqa,
     autofix: flags::Autofix,
-) -> LinterResult<(Vec<Diagnostic>, FxHashMap<PathBuf, Vec<Import>>)> {
+) -> LinterResult<DiagnosticsAndImports> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
     let mut imports: FxHashMap<PathBuf, Vec<Import>> = FxHashMap::default();
@@ -366,7 +368,7 @@ pub fn lint_fix<'a>(
     noqa: flags::Noqa,
     settings: &Settings,
 ) -> Result<(
-    LinterResult<(Vec<Message>, FxHashMap<PathBuf, Vec<Import>>)>,
+    LinterResult<MessagesAndImports>,
     Cow<'a, str>,
     FixTable,
 )> {
