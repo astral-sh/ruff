@@ -34,7 +34,7 @@ unic-ucd-ident  = "0.9.0"
 lalrpop-util = "0.19.8"
 phf = "0.11.1"
 rustc-hash = "1.1.0"
-serde = { version = "1.0.133", optional = true, default-features = false }
+serde = { version = "1.0.133", optional = true, default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 insta = { workspace = true }

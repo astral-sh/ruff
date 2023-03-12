@@ -13,6 +13,6 @@ bstr = { workspace = true }
 itertools = { workspace = true }
 num-bigint = { workspace = true }
 num-complex = { workspace = true }
-serde = { version = "1.0.133", optional = true, default-features = false }
+serde = { version = "1.0.133", optional = true, default-features = false, features = ["derive"] }
 
 lz4_flex = "0.9.2"
