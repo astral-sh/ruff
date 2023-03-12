@@ -57,8 +57,6 @@ pub fn invalid_envvar_value(checker: &mut Checker, func: &Expr, args: &[Expr]) {
                     .diagnostics
                     .push(Diagnostic::new(InvalidEnvvarValue, Range::from(expr)));
             }
-        } else {
-            return;
         }
     }
 }
