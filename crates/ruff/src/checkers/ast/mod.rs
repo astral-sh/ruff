@@ -43,12 +43,12 @@ use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
-    flake8_django, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
-    flake8_import_conventions, flake8_logging_format, flake8_pie, flake8_print, flake8_pyi,
-    flake8_pytest_style, flake8_raise, flake8_return, flake8_self, flake8_simplify,
-    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, mccabe,
-    numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
-    pyupgrade, ruff, tryceratops,
+    flake8_django, flake8_errmsg, flake8_future_annotations, flake8_gettext,
+    flake8_implicit_str_concat, flake8_import_conventions, flake8_logging_format, flake8_pie,
+    flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise, flake8_return, flake8_self,
+    flake8_simplify, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
+    flake8_use_pathlib, mccabe, numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes,
+    pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -1157,7 +1157,20 @@ where
                         pyupgrade::rules::unnecessary_builtin_import(self, stmt, module, names);
                     }
                 }
-
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::MissingFutureAnnotationsWithImports)
+                {
+                    if let Some(module) = module.as_deref() {
+                        flake8_future_annotations::rules::check_missing_future_annotations_from_typing_import(
+                            self,
+                            stmt,
+                            module,
+                            names,
+                        );
+                    }
+                }
                 if self.settings.rules.enabled(Rule::BannedApi) {
                     if let Some(module) = module {
                         for name in names {
@@ -2372,6 +2385,16 @@ where
                 }
                 if self.settings.rules.enabled(Rule::BannedApi) {
                     flake8_tidy_imports::banned_api::banned_attribute_access(self, expr);
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::MissingFutureAnnotationsWithImports)
+                    && analyze::typing::is_pep585_builtin(expr, &self.ctx)
+                {
+                    flake8_future_annotations::rules::check_missing_future_annotations_import(
+                        self, expr,
+                    );
                 }
                 if self.settings.rules.enabled(Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);
@@ -4106,6 +4129,10 @@ where
 
         self.ctx.body = prev_body;
         self.ctx.body_index = prev_body_index;
+
+        // if self.settings.rules.enabled(&Rule::MissingFutureAnnotationsWithImports) {
+        //     flake8_future_annotations::rules::check_missing_future_annotations_import(self, body);
+        // }
     }
 }
 

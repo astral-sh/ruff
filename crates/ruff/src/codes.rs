@@ -319,6 +319,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Annotations, "206") => Rule::MissingReturnTypeClassMethod,
         (Flake8Annotations, "401") => Rule::AnyType,
 
+        // flake8-future-annotations
+        (Flake8FutureAnnotations, "100") => Rule::MissingFutureAnnotationsWithImports,
+
         // flake8-2020
         (Flake82020, "101") => Rule::SysVersionSlice3,
         (Flake82020, "102") => Rule::SysVersion2,
