@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 /// Checks for `os.getenv` calls with an invalid first argument
 ///
 /// ## Why is this bad?
-/// `os.getenv` only suppors string type arguments.
+/// `os.getenv` only supports string type arguments.
 ///
 /// If the provided argument is not a string, `os.getenv` will not function properly.
 ///
