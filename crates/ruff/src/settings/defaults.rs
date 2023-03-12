@@ -57,6 +57,9 @@ pub static EXCLUDE: Lazy<Vec<FilePattern>> = Lazy::new(|| {
     ]
 });
 
+pub static INCLUDE: Lazy<Vec<FilePattern>> =
+    Lazy::new(|| vec![FilePattern::Builtin("*.py"), FilePattern::Builtin("*.pyi")]);
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -66,9 +69,11 @@ impl Default for Settings {
             dummy_variable_rgx: DUMMY_VARIABLE_RGX.clone(),
             exclude: FilePatternSet::try_from_vec(EXCLUDE.clone()).unwrap(),
             extend_exclude: FilePatternSet::default(),
+            extend_include: FilePatternSet::default(),
             external: HashSet::default(),
             force_exclude: false,
             ignore_init_module_imports: false,
+            include: FilePatternSet::try_from_vec(INCLUDE.clone()).unwrap(),
             line_length: LINE_LENGTH,
             namespace_packages: vec![],
             per_file_ignores: vec![],
