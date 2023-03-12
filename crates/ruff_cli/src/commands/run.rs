@@ -15,6 +15,7 @@ use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError, Range};
 use ruff_diagnostics::Diagnostic;
+use rustc_hash::FxHashMap;
 
 use crate::args::Overrides;
 use crate::cache;
@@ -119,7 +120,7 @@ pub fn run(
                                 None,
                                 1,
                             )],
-                            vec![],
+                            FxHashMap::default(),
                         )
                     } else {
                         Diagnostics::default()

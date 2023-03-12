@@ -24,11 +24,11 @@ use crate::cache;
 pub struct Diagnostics {
     pub messages: Vec<Message>,
     pub fixed: FxHashMap<String, FixTable>,
-    pub imports: Vec<FxHashMap<PathBuf, Vec<Import>>>,
+    pub imports: FxHashMap<PathBuf, Vec<Import>>,
 }
 
 impl Diagnostics {
-    pub fn new(messages: Vec<Message>, imports: Vec<FxHashMap<PathBuf, Vec<Import>>>) -> Self {
+    pub fn new(messages: Vec<Message>, imports: FxHashMap<PathBuf, Vec<Import>>) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),
@@ -79,7 +79,7 @@ pub fn lint_path(
             cache::get(path, package.as_ref(), &metadata, settings, autofix.into())
         {
             debug!("Cache hit for: {}", path.to_string_lossy());
-            return Ok(Diagnostics::new(messages, vec![imports]));
+            return Ok(Diagnostics::new(messages, imports));
         }
         Some(metadata)
     } else {
@@ -171,7 +171,7 @@ pub fn lint_path(
     Ok(Diagnostics {
         messages,
         fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
-        imports: vec![imports],
+        imports,
     })
 }
 
@@ -265,6 +265,6 @@ pub fn lint_stdin(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
         )]),
-        imports: vec![imports],
+        imports,
     })
 }
