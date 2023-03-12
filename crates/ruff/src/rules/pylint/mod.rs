@@ -44,6 +44,7 @@ mod tests {
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"); "PLW1508")]
+    #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"); "PLE1507")]
     #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]

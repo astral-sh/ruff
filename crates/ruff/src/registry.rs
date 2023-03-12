@@ -147,6 +147,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::InvalidAllObject,
     rules::pylint::rules::InvalidAllFormat,
     rules::pylint::rules::InvalidEnvvarDefault,
+    rules::pylint::rules::InvalidEnvvarValue,
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::BadStrStripCall,

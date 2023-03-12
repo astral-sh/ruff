@@ -2869,6 +2869,9 @@ where
                 if self.settings.rules.enabled(&Rule::InvalidEnvvarDefault) {
                     pylint::rules::invalid_envvar_default(self, func, args, keywords);
                 }
+                if self.settings.rules.enabled(&Rule::InvalidEnvvarValue) {
+                    pylint::rules::invalid_envvar_value(self, func, args);
+                }
 
                 // flake8-pytest-style
                 if self.settings.rules.enabled(&Rule::PatchWithLambda) {
