@@ -215,7 +215,7 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
-        check_noqa(
+        let ignored = check_noqa(
             &mut diagnostics,
             contents,
             indexer.commented_lines(),
@@ -223,6 +223,11 @@ pub fn check_path(
             settings,
             error.as_ref().map_or(autofix, |_| flags::Autofix::Disabled),
         );
+        if noqa.into() {
+            for index in ignored.iter().rev() {
+                diagnostics.swap_remove(*index);
+            }
+        }
     }
 
     LinterResult::new(diagnostics, error)
