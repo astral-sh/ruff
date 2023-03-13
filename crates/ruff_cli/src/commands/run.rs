@@ -19,7 +19,6 @@ use ruff_diagnostics::Diagnostic;
 use crate::args::Overrides;
 use crate::cache;
 use crate::diagnostics::{lint_path, Diagnostics};
-use crate::iterators::par_iter;
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -76,7 +75,8 @@ pub fn run(
     );
 
     let start = Instant::now();
-    let mut diagnostics: Diagnostics = par_iter(&paths)
+    let mut diagnostics: Diagnostics = paths
+        .par_iter()
         .map(|entry| {
             match entry {
                 Ok(entry) => {
