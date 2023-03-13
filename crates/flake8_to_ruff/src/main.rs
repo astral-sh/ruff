@@ -46,8 +46,15 @@ fn main() -> Result<()> {
         .map(|tool| ExternalConfig {
             black: tool.black.as_ref(),
             isort: tool.isort.as_ref(),
+            ..Default::default()
         })
         .unwrap_or_default();
+    let external_config = ExternalConfig {
+        project: pyproject
+            .as_ref()
+            .and_then(|pyproject| pyproject.project.as_ref()),
+        ..external_config
+    };
 
     // Create Ruff's pyproject.toml section.
     let pyproject = flake8_to_ruff::convert(&config, &external_config, args.plugin)?;

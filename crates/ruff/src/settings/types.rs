@@ -2,22 +2,37 @@ use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::string::ToString;
 
 use anyhow::{anyhow, bail, Result};
 use clap::ValueEnum;
 use globset::{Glob, GlobSet, GlobSetBuilder};
+use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use crate::registry::Rule;
 use crate::rule_selector::RuleSelector;
 use crate::{fs, warn_user_once};
 
 #[derive(
-    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, JsonSchema, CacheKey,
+    Clone,
+    Copy,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    CacheKey,
+    EnumIter,
 )]
 #[serde(rename_all = "lowercase")]
 pub enum PythonVersion {
@@ -50,6 +65,13 @@ impl FromStr for PythonVersion {
     }
 }
 
+impl From<PythonVersion> for Pep440Version {
+    fn from(version: PythonVersion) -> Self {
+        let (major, minor) = version.as_tuple();
+        Self::from_str(&format!("{major}.{minor}.100")).unwrap()
+    }
+}
+
 impl PythonVersion {
     pub const fn as_tuple(&self) -> (u32, u32) {
         match self {
@@ -59,6 +81,20 @@ impl PythonVersion {
             Self::Py310 => (3, 10),
             Self::Py311 => (3, 11),
         }
+    }
+
+    pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
+        let mut minimum_version = None;
+        for python_version in PythonVersion::iter() {
+            if requires_version
+                .iter()
+                .all(|specifier| specifier.contains(&python_version.into()))
+            {
+                minimum_version = Some(python_version);
+                break;
+            }
+        }
+        minimum_version
     }
 }
 
