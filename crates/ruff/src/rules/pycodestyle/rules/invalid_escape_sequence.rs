@@ -4,7 +4,7 @@ use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::UniversalNewlineIterator;
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
@@ -77,7 +77,7 @@ pub fn invalid_escape_sequence(
     let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];
 
     if !prefix.contains('r') {
-        for (row_offset, line) in UniversalNewlineIterator::from(body).enumerate() {
+        for (row_offset, line) in body.universal_newlines().enumerate() {
             let chars: Vec<char> = line.chars().collect();
             for col_offset in 0..chars.len() {
                 if chars[col_offset] != '\\' {

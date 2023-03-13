@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
 use ruff_python_ast::types::Range;
 
@@ -45,7 +45,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     if NewlineWithTrailingNewline::from(body).nth(1).is_none() {
         return;
     };
-    let mut content_lines = UniversalNewlineIterator::from(contents);
+    let mut content_lines = contents.universal_newlines();
     let Some(first_line) = content_lines
         .next()
          else

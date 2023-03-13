@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Location;
 
-use ruff_python_ast::newlines::UniversalNewlineIterator;
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
@@ -97,7 +97,8 @@ pub fn expand_indented_block(
 
     // Compound statement: from the colon to the end of the block.
     let mut offset = 0;
-    for (index, line) in UniversalNewlineIterator::from(&contents[end_index..])
+    for (index, line) in contents[end_index..]
+        .universal_newlines()
         .skip(1)
         .enumerate()
     {

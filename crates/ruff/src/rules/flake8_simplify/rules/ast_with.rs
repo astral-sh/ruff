@@ -5,7 +5,7 @@ use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AutofixKind, Availability, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
-use ruff_python_ast::newlines::UniversalNewlineIterator;
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -114,7 +114,9 @@ pub fn multiple_with_statements(
                 with_stmt,
             ) {
                 Ok(fix) => {
-                    if UniversalNewlineIterator::from(&fix.content)
+                    if fix
+                        .content
+                        .universal_newlines()
                         .all(|line| line.len() <= checker.settings.line_length)
                     {
                         diagnostic.amend(fix);

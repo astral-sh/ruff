@@ -5,7 +5,7 @@ use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::{Diagnostic, Fix};
-use ruff_python_ast::newlines::UniversalNewlineIterator;
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
 
 use crate::codes::NoqaCode;
@@ -39,7 +39,7 @@ pub fn check_noqa(
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
 
-    let lines: Vec<&str> = UniversalNewlineIterator::from(contents).collect();
+    let lines: Vec<&str> = contents.universal_newlines().collect();
     for lineno in commented_lines {
         match extract_file_exemption(lines[lineno - 1]) {
             Exemption::All => {

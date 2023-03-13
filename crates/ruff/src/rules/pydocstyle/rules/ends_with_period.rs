@@ -2,7 +2,7 @@ use strum::IntoEnumIterator;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::UniversalNewlineIterator;
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
 
@@ -32,7 +32,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
     let contents = docstring.contents;
     let body = docstring.body;
 
-    if let Some(first_line) = UniversalNewlineIterator::from(body.trim()).next() {
+    if let Some(first_line) = body.trim().universal_newlines().next() {
         let trimmed = first_line.trim();
 
         // Avoid false-positives: `:param`, etc.
@@ -56,7 +56,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
     }
 
     if let Some(index) = logical_line(body) {
-        let line = UniversalNewlineIterator::from(body).nth(index).unwrap();
+        let line = body.universal_newlines().nth(index).unwrap();
         let trimmed = line.trim_end();
 
         if !trimmed.ends_with('.') {

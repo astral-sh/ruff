@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::{NewlineWithTrailingNewline, UniversalNewlineIterator};
+use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace;
 
@@ -34,10 +34,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
             line_count += 1;
         }
         if line_count > 1 {
-            if let Some(last_line) = UniversalNewlineIterator::from(contents)
-                .last()
-                .map(str::trim)
-            {
+            if let Some(last_line) = contents.universal_newlines().last().map(str::trim) {
                 if last_line != "\"\"\"" && last_line != "'''" {
                     let mut diagnostic =
                         Diagnostic::new(NewLineAfterLastParagraph, Range::from(docstring.expr));

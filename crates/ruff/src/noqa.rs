@@ -12,7 +12,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::newlines::UniversalNewlineIterator;
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::{LineEnding, Locator};
 use ruff_python_ast::types::Range;
 
@@ -182,7 +182,7 @@ fn add_noqa_inner(
     // Codes that are globally exempted (within the current file).
     let mut file_exemptions: Vec<NoqaCode> = vec![];
 
-    let lines: Vec<&str> = UniversalNewlineIterator::from(contents).collect();
+    let lines: Vec<&str> = contents.universal_newlines().collect();
     for lineno in commented_lines {
         match extract_file_exemption(lines[lineno - 1]) {
             Exemption::All => {

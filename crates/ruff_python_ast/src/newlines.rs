@@ -1,30 +1,13 @@
 use std::iter::FusedIterator;
 
-/// Like [`UniversalNewlineIterator`], but includes a trailing newline as an empty line.
-pub struct NewlineWithTrailingNewline<'a> {
-    trailing: Option<&'a str>,
-    underlying: UniversalNewlineIterator<'a>,
+/// Extension trait for [`str`] that provides a [`UniversalNewlineIterator`].
+pub trait StrExt {
+    fn universal_newlines(&self) -> UniversalNewlineIterator<'_>;
 }
 
-impl<'a> NewlineWithTrailingNewline<'a> {
-    pub fn from(input: &'a str) -> NewlineWithTrailingNewline<'a> {
-        NewlineWithTrailingNewline {
-            underlying: UniversalNewlineIterator::from(input),
-            trailing: if input.ends_with(['\r', '\n']) {
-                Some("")
-            } else {
-                None
-            },
-        }
-    }
-}
-
-impl<'a> Iterator for NewlineWithTrailingNewline<'a> {
-    type Item = &'a str;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a str> {
-        self.underlying.next().or_else(|| self.trailing.take())
+impl StrExt for str {
+    fn universal_newlines(&self) -> UniversalNewlineIterator<'_> {
+        UniversalNewlineIterator::from(self)
     }
 }
 
@@ -127,6 +110,34 @@ impl DoubleEndedIterator for UniversalNewlineIterator<'_> {
 }
 
 impl FusedIterator for UniversalNewlineIterator<'_> {}
+
+/// Like [`UniversalNewlineIterator`], but includes a trailing newline as an empty line.
+pub struct NewlineWithTrailingNewline<'a> {
+    trailing: Option<&'a str>,
+    underlying: UniversalNewlineIterator<'a>,
+}
+
+impl<'a> NewlineWithTrailingNewline<'a> {
+    pub fn from(input: &'a str) -> NewlineWithTrailingNewline<'a> {
+        NewlineWithTrailingNewline {
+            underlying: UniversalNewlineIterator::from(input),
+            trailing: if input.ends_with(['\r', '\n']) {
+                Some("")
+            } else {
+                None
+            },
+        }
+    }
+}
+
+impl<'a> Iterator for NewlineWithTrailingNewline<'a> {
+    type Item = &'a str;
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a str> {
+        self.underlying.next().or_else(|| self.trailing.take())
+    }
+}
 
 #[cfg(test)]
 mod tests {

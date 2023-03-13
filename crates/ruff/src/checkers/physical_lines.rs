@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::newlines::UniversalNewlineIterator;
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Stylist;
 
 use crate::registry::Rule;
@@ -57,7 +57,7 @@ pub fn check_physical_lines(
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
-    for (index, line) in UniversalNewlineIterator::from(contents).enumerate() {
+    for (index, line) in contents.universal_newlines().enumerate() {
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
             .is_some()
