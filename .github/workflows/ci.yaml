@@ -23,7 +23,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
-        run: rustup component add rustfmt
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          cache: false
+          components: rustfmt
       - run: cargo fmt --all --check
 
   cargo-clippy:
@@ -32,9 +35,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
-        run: |
-          rustup component add clippy
-      - uses: Swatinem/rust-cache@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: clippy
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   cargo-clippy-wasm:
@@ -43,10 +46,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
-        run: |
-          rustup component add clippy
-          rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32-unknown-unknown
+          components: clippy
       - run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
   cargo-test:
@@ -58,8 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
-        run: rustup show
-      - uses: Swatinem/rust-cache@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
       - run: cargo install cargo-insta
       - run: pip install black[d]==22.12.0
       - name: "Run tests (Ubuntu)"
@@ -80,6 +82,7 @@ jobs:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
       - uses: actions/upload-artifact@v3
+        if: ${{ !env.ACT }} # skip during local actions testing
         with:
           name: ruff
           path: target/debug/ruff
@@ -91,14 +94,15 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
-        run: rustup target add wasm32-unknown-unknown
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          components: rustfmt
       - uses: actions/setup-node@v3
         with:
           node-version: 18
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
-      - uses: Swatinem/rust-cache@v1
       - name: "Run wasm-pack"
         run: |
           cd crates/ruff_wasm
@@ -110,8 +114,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
-        run: rustup show
-      - uses: Swatinem/rust-cache@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
       - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --linter pylint
       - run: cargo check
       - run: |
