@@ -140,6 +140,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     };
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
+    let parallel = !cli.no_parallel;
     let mut printer_flags = PrinterFlags::empty();
     if !(cli.diff || fix_only) {
         printer_flags |= PrinterFlags::SHOW_VIOLATIONS;
@@ -153,6 +154,14 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         // `--no-cache` doesn't respect code changes, and so is often confusing during
         // development.
         warn_user_once!("Detected debug build without --no-cache.");
+    }
+
+    if !parallel {
+        // If we're not running in parallel, we need to set up a single-threaded
+        // executor.
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build_global()?;
     }
 
     if cli.add_noqa {

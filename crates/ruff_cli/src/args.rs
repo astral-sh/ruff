@@ -95,6 +95,9 @@ pub struct CheckArgs {
     /// Ignore any `# noqa` comments.
     #[arg(long)]
     ignore_noqa: bool,
+    /// Run in a single thread, rather than using all available cores.
+    #[clap(long, hide = true)]
+    no_parallel: bool,
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
@@ -267,6 +270,7 @@ pub struct CheckArgs {
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
         conflicts_with = "ignore_noqa",
+        conflicts_with = "no_parallel",
         conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
@@ -282,6 +286,7 @@ pub struct CheckArgs {
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
         conflicts_with = "ignore_noqa",
+        conflicts_with = "no_parallel",
         conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
@@ -296,6 +301,7 @@ pub struct CheckArgs {
         // conflicts_with = "show_settings",
         // Unsupported default-command arguments.
         conflicts_with = "ignore_noqa",
+        conflicts_with = "no_parallel",
         conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
@@ -371,6 +377,7 @@ impl CheckArgs {
                 ignore_noqa: self.ignore_noqa,
                 isolated: self.isolated,
                 no_cache: self.no_cache,
+                no_parallel: self.no_parallel,
                 show_files: self.show_files,
                 show_settings: self.show_settings,
                 statistics: self.statistics,
@@ -435,6 +442,7 @@ pub struct Arguments {
     pub ignore_noqa: bool,
     pub isolated: bool,
     pub no_cache: bool,
+    pub no_parallel: bool,
     pub show_files: bool,
     pub show_settings: bool,
     pub statistics: bool,
