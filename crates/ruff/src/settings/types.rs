@@ -4,21 +4,21 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::string::ToString;
 
-use anyhow::{anyhow, bail, Result};
-use clap::ValueEnum;
+use anyhow::{bail, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
-use ruff_cache::{CacheKey, CacheKeyHasher};
-use ruff_macros::CacheKey;
 use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
+use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_macros::CacheKey;
+
+use crate::fs;
 use crate::registry::Rule;
 use crate::rule_selector::RuleSelector;
-use crate::{fs, warn_user_once};
 
 #[derive(
     Clone,
@@ -34,6 +34,7 @@ use crate::{fs, warn_user_once};
     CacheKey,
     EnumIter,
 )]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum PythonVersion {
     Py37,
@@ -41,28 +42,6 @@ pub enum PythonVersion {
     Py39,
     Py310,
     Py311,
-}
-
-impl FromStr for PythonVersion {
-    type Err = anyhow::Error;
-
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        match string {
-            "py33" | "py34" | "py35" | "py36" => {
-                warn_user_once!(
-                    "Specified a version below the minimum supported Python version. Defaulting \
-                     to Python 3.7."
-                );
-                Ok(Self::Py37)
-            }
-            "py37" => Ok(Self::Py37),
-            "py38" => Ok(Self::Py38),
-            "py39" => Ok(Self::Py39),
-            "py310" => Ok(Self::Py310),
-            "py311" => Ok(Self::Py311),
-            _ => Err(anyhow!("Unknown version: {string} (try: \"py37\")")),
-        }
-    }
 }
 
 impl From<PythonVersion> for Pep440Version {
@@ -240,9 +219,8 @@ impl FromStr for PatternPrefixPair {
     }
 }
 
-#[derive(
-    Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema, Hash,
-)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema, Hash)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
 pub enum SerializationFormat {
     Text,

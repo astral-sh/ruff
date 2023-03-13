@@ -99,7 +99,7 @@ pub struct CheckArgs {
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
     /// The minimum Python version that should be supported.
-    #[arg(long)]
+    #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for
     /// configuration.
