@@ -34,8 +34,8 @@ impl TryFrom<&Cmpop> for EmptyStringCmpop {
 impl EmptyStringCmpop {
     pub fn into_unary(self) -> &'static str {
         match self {
-            Self::Is | Self::Eq => "",
-            Self::IsNot | Self::NotEq => "not ",
+            Self::Is | Self::Eq => "not ",
+            Self::IsNot | Self::NotEq => "",
         }
     }
 }

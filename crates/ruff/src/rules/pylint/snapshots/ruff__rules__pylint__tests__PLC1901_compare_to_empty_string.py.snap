@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: CompareToEmptyString
-    body: "`x is \"\"` can be simplified to `x` as an empty string is falsey"
+    body: "`x is \"\"` can be simplified to `not x` as an empty string is falsey"
     suggestion: ~
     fixable: false
   location:
@@ -17,7 +17,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: CompareToEmptyString
-    body: "`x == \"\"` can be simplified to `x` as an empty string is falsey"
+    body: "`x == \"\"` can be simplified to `not x` as an empty string is falsey"
     suggestion: ~
     fixable: false
   location:
@@ -30,7 +30,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: CompareToEmptyString
-    body: "`y is not \"\"` can be simplified to `not y` as an empty string is falsey"
+    body: "`y is not \"\"` can be simplified to `y` as an empty string is falsey"
     suggestion: ~
     fixable: false
   location:
@@ -43,7 +43,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: CompareToEmptyString
-    body: "`y != \"\"` can be simplified to `not y` as an empty string is falsey"
+    body: "`y != \"\"` can be simplified to `y` as an empty string is falsey"
     suggestion: ~
     fixable: false
   location:
@@ -56,7 +56,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: CompareToEmptyString
-    body: "`\"\" != z` can be simplified to `not z` as an empty string is falsey"
+    body: "`\"\" != z` can be simplified to `z` as an empty string is falsey"
     suggestion: ~
     fixable: false
   location:
