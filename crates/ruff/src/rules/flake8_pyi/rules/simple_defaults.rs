@@ -28,6 +28,14 @@ impl Violation for ArgumentSimpleDefaults {
     }
 }
 
+const ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS: &[&[&str]] = &[
+    &["math", "inf"],
+    &["math", "nan"],
+    &["math", "e"],
+    &["math", "pi"],
+    &["math", "tau"],
+];
+
 const ALLOWED_ATTRIBUTES_IN_DEFAULTS: &[&[&str]] = &[
     &["sys", "stdin"],
     &["sys", "stdout"],
@@ -99,6 +107,21 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
                     return checker.locator.slice(operand).len() <= 10;
                 }
             }
+            // Ex) `-math.inf`, `-math.pi`, etc.
+            if let ExprKind::Attribute { .. } = &operand.node {
+                if checker
+                    .ctx
+                    .resolve_call_path(default)
+                    .map_or(false, |call_path| {
+                        ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
+                            // reject `-math.nan`
+                            call_path.as_slice() == *target && *target != ["math", "nan"]
+                        })
+                    })
+                {
+                    return true;
+                }
+            }
         }
         ExprKind::BinOp {
             left,
@@ -134,14 +157,15 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
                 }
             }
         }
-        // Ex) `sys.stdin`, etc.
+        // Ex) `math.inf`, `sys.stdin`, etc.
         ExprKind::Attribute { .. } => {
             if checker
                 .ctx
                 .resolve_call_path(default)
                 .map_or(false, |call_path| {
-                    ALLOWED_ATTRIBUTES_IN_DEFAULTS
+                    ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS
                         .iter()
+                        .chain(ALLOWED_ATTRIBUTES_IN_DEFAULTS.iter())
                         .any(|target| call_path.as_slice() == *target)
                 })
             {
