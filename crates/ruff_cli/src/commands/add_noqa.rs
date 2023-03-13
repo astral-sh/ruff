@@ -11,7 +11,6 @@ use ruff::resolver::PyprojectDiscovery;
 use ruff::{packaging, resolver, warn_user_once};
 
 use crate::args::Overrides;
-use crate::iterators::par_iter;
 
 /// Add `noqa` directives to a collection of files.
 pub fn add_noqa(
@@ -42,7 +41,8 @@ pub fn add_noqa(
     );
 
     let start = Instant::now();
-    let modifications: usize = par_iter(&paths)
+    let modifications: usize = paths
+        .par_iter()
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
