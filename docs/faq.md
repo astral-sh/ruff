@@ -75,8 +75,7 @@ conflicts with the isort rules, like `I001`).
 
 Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
 
-1. Ruff does not yet support structural pattern matching.
-1. Flake8 has a plugin architecture and supports writing custom lint rules. (Instead, popular Flake8
+- Flake8 has a plugin architecture and supports writing custom lint rules. (Instead, popular Flake8
    plugins are re-implemented in Rust as part of Ruff itself.)
 
 There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
