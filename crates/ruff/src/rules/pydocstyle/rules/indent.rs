@@ -1,9 +1,9 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace;
-use ruff_python_ast::whitespace::NewlineWithTrailingNewline;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;

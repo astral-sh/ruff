@@ -2,8 +2,8 @@ use rustpython_parser::ast::StmtKind;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};

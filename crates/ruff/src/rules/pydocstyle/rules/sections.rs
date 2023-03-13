@@ -8,9 +8,9 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visibility::is_staticmethod;
-use ruff_python_ast::whitespace::NewlineWithTrailingNewline;
 use ruff_python_ast::{cast, whitespace};
 
 use crate::checkers::ast::Checker;

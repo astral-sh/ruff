@@ -12,9 +12,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::{LineEnding, Locator};
 use ruff_python_ast::types::Range;
-use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::codes::NoqaCode;
 use crate::registry::{AsRule, Rule};

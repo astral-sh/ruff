@@ -2,8 +2,8 @@ use rustpython_parser::ast::{Location, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use super::types::TrailingComma;
 

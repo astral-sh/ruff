@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::{map_callable, to_call_path};
-use ruff_python_ast::whitespace::UniversalNewlineIterator;
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};

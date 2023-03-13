@@ -5,8 +5,8 @@ use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::codes::NoqaCode;
 use crate::noqa;

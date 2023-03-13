@@ -1,8 +1,8 @@
 use rustpython_parser::ast::Location;
 
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 /// Return `true` if the given string is a radix literal (e.g., `0b101`).
 pub fn is_radix_literal(content: &str) -> bool {

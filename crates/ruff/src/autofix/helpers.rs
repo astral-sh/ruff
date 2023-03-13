@@ -9,8 +9,8 @@ use rustpython_parser::{lexer, Mode, Tok};
 use ruff_diagnostics::Fix;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::to_absolute;
+use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::whitespace::NewlineWithTrailingNewline;
 
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_module;

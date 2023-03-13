@@ -14,11 +14,11 @@ use rustpython_parser::{lexer, Mode, StringKind, Tok};
 use smallvec::{smallvec, SmallVec};
 
 use crate::context::Context;
+use crate::newlines::UniversalNewlineIterator;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 use crate::types::{Binding, BindingKind, CallPath, Range};
 use crate::visitor;
 use crate::visitor::Visitor;
-use crate::whitespace::UniversalNewlineIterator;
 
 /// Create an `Expr` with default location from an `ExprKind`.
 pub fn create_expr(node: ExprKind) -> Expr {

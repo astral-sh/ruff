@@ -2,9 +2,9 @@ use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 /// ## What it does
 /// Checks for files missing a new line at the end of the file.

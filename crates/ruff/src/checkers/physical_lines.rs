@@ -3,8 +3,8 @@
 use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::Stylist;
-use ruff_python_ast::whitespace::UniversalNewlineIterator;
 
 use crate::registry::Rule;
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
