@@ -18,7 +18,6 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         // The following are here because we don't yet have the many-to-one mapping enabled.
         ("SIM111", "SIM110"),
         // The following are deprecated.
-        ("C4", "C40"),
         ("C9", "C90"),
         ("T1", "T10"),
         ("T2", "T20"),
