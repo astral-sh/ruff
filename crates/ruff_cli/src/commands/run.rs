@@ -45,10 +45,7 @@ pub fn run(
     if cache.into() {
         fn init_cache(path: &std::path::Path) {
             if let Err(e) = cache::init(path) {
-                error!(
-                    "Failed to initialize cache at {}: {e:?}",
-                    path.to_string_lossy()
-                );
+                error!("Failed to initialize cache at {}: {e:?}", path.display());
             }
         }
 

@@ -54,7 +54,7 @@ pub fn add_noqa(
             match add_noqa_to_path(path, package, settings) {
                 Ok(count) => Some(count),
                 Err(e) => {
-                    error!("Failed to add noqa to {}: {e}", path.to_string_lossy());
+                    error!("Failed to add noqa to {}: {e}", path.display());
                     None
                 }
             }
