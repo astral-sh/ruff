@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use log::debug;
 use serde::{Deserialize, Serialize};
 
 use crate::flake8_to_ruff::pep621::Project;
@@ -132,6 +133,7 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
         }
         Ok(ruff)
     } else {
+        debug!("`project.requires_python` in `pyproject.toml` will not be used to set `target_version` when using `ruff.toml`.");
         parse_ruff_toml(path)
     }
 }
