@@ -631,7 +631,7 @@ mod tests {
             &HashMap::from([("flake8".to_string(), HashMap::default())]),
             &ExternalConfig {
                 project: Some(&Project {
-                    requires_python: Some(VersionSpecifiers::from_str(">=3.8.16, <3.11").unwrap()),
+                    requires_python: Some(VersionSpecifiers::from_str(">=3.8.16, <3.11")?),
                 }),
                 ..ExternalConfig::default()
             },
