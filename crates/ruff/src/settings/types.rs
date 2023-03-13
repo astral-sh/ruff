@@ -93,7 +93,7 @@ impl FromStr for FilePattern {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let pattern = s.to_string();
-        let absolute = fs::normalize_path(Path::new(&pattern));
+        let absolute = fs::normalize_path(&pattern);
         Ok(Self::User(pattern, absolute))
     }
 }

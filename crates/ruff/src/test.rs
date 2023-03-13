@@ -21,7 +21,7 @@ pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after 10 iterations.
-pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
+pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);

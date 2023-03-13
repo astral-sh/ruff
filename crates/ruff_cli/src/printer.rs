@@ -283,11 +283,7 @@ impl Printer {
                     );
 
                     // Print the filename.
-                    writeln!(
-                        stdout,
-                        "{}:",
-                        relativize_path(Path::new(&filename)).underline()
-                    )?;
+                    writeln!(stdout, "{}:", relativize_path(filename).underline())?;
 
                     // Print each message.
                     for message in messages {
@@ -316,7 +312,7 @@ impl Printer {
                 for message in &diagnostics.messages {
                     let label = format!(
                         "{}{}{}{}{}{} {} {}",
-                        relativize_path(Path::new(&message.filename)),
+                        relativize_path(&message.filename),
                         ":",
                         message.location.row(),
                         ":",
@@ -356,7 +352,7 @@ impl Printer {
                                     "fingerprint": fingerprint(message),
                                     "location": {
                                         "path": project_dir.as_ref().map_or_else(
-                                            || relativize_path(Path::new(&message.filename)),
+                                            || relativize_path(&message.filename),
                                             |project_dir| relativize_path_to(&message.filename, project_dir),
                                         ),
                                         "lines": {
@@ -377,7 +373,7 @@ impl Printer {
                 for message in &diagnostics.messages {
                     let label = format!(
                         "{}:{}: [{}] {}",
-                        relativize_path(Path::new(&message.filename)),
+                        relativize_path(&message.filename),
                         message.location.row(),
                         message.kind.rule().noqa_code(),
                         message.kind.body,
@@ -612,7 +608,7 @@ fn print_message<T: Write>(
 ) -> Result<()> {
     let label = format!(
         "{path}{sep}{row}{sep}{col}{sep} {code_and_body}",
-        path = relativize_path(Path::new(&message.filename)).bold(),
+        path = relativize_path(&message.filename).bold(),
         sep = ":".cyan(),
         row = message.location.row(),
         col = message.location.column(),
@@ -691,7 +687,7 @@ fn print_fixed<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) ->
             stdout,
             "{} {}{}",
             "-".cyan(),
-            relativize_path(Path::new(filename)).bold(),
+            relativize_path(filename).bold(),
             ":".cyan()
         )?;
         for (rule, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {

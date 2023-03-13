@@ -121,7 +121,7 @@ impl Configuration {
                 paths
                     .into_iter()
                     .map(|pattern| {
-                        let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
+                        let absolute = fs::normalize_path_to(&pattern, project_root);
                         FilePattern::User(pattern, absolute)
                     })
                     .collect()
@@ -140,7 +140,7 @@ impl Configuration {
                     paths
                         .into_iter()
                         .map(|pattern| {
-                            let absolute = fs::normalize_path_to(Path::new(&pattern), project_root);
+                            let absolute = fs::normalize_path_to(&pattern, project_root);
                             FilePattern::User(pattern, absolute)
                         })
                         .collect()
