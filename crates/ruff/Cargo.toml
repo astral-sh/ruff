@@ -46,6 +46,7 @@ path-absolutize = { workspace = true, features = [
   "once_cell_cache",
   "use_unix_paths_on_wasm",
 ] }
+pathdiff = { version = "0.2.1" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
 rustc-hash = { workspace = true }

@@ -3,9 +3,9 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
-use std::io;
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::{env, io};
 
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
@@ -18,7 +18,7 @@ use rustc_hash::FxHashMap;
 use serde::Serialize;
 use serde_json::json;
 
-use ruff::fs::relativize_path;
+use ruff::fs::{relativize_path, relativize_path_to};
 use ruff::linter::FixTable;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
@@ -341,7 +341,8 @@ impl Printer {
             }
             SerializationFormat::Gitlab => {
                 // Generate JSON with violations in GitLab CI format
-                // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implementing-a-custom-tool
+                // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
+                let project_dir = env::var("CI_PROJECT_DIR").ok();
                 writeln!(stdout,
                     "{}",
                     serde_json::to_string_pretty(
@@ -354,7 +355,10 @@ impl Printer {
                                     "severity": "major",
                                     "fingerprint": fingerprint(message),
                                     "location": {
-                                        "path": message.filename,
+                                        "path": project_dir.as_ref().map_or_else(
+                                            || relativize_path(Path::new(&message.filename)),
+                                            |project_dir| relativize_path_to(&message.filename, project_dir),
+                                        ),
                                         "lines": {
                                             "begin": message.location.row(),
                                             "end": message.end_location.row()
