@@ -3,7 +3,7 @@ mod converter;
 mod external_config;
 mod isort;
 mod parser;
-mod pep621;
+pub mod pep621;
 mod plugin;
 mod pyproject;
 
