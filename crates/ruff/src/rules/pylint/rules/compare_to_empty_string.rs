@@ -62,7 +62,7 @@ impl Violation for CompareToEmptyString {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "`{}` can be simplified to `{}` as an empty string is falsey",
+            "`{}` can be simplified to `not {}` as an empty string is falsey",
             self.existing, self.replacement,
         )
     }
