@@ -107,15 +107,19 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
         // omit a space after the colon. The remaining action comments are
         // required to include the space, and must appear on their own lines.
         let comment_text = comment_text.trim_end();
-        if comment_text == "# isort: split" {
+        if comment_text == "# isort: split" || comment_text == "# ruff: isort: split" {
             splits.push(start.row());
-        } else if comment_text == "# isort: skip_file" || comment_text == "# isort:skip_file" {
+        } else if comment_text == "# isort: skip_file"
+            || comment_text == "# isort:skip_file"
+            || comment_text == "# ruff: isort: skip_file"
+            || comment_text == "# ruff: isort:skip_file"
+        {
             return IsortDirectives {
                 skip_file: true,
                 ..IsortDirectives::default()
             };
         } else if off.is_some() {
-            if comment_text == "# isort: on" {
+            if comment_text == "# isort: on" || comment_text == "# ruff: isort: on" {
                 if let Some(start) = off {
                     for row in start.row() + 1..=end.row() {
                         exclusions.insert(row);
@@ -126,7 +130,7 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
         } else {
             if comment_text.contains("isort: skip") || comment_text.contains("isort:skip") {
                 exclusions.insert(start.row());
-            } else if comment_text == "# isort: off" {
+            } else if comment_text == "# isort: off" || comment_text == "# ruff: isort: off" {
                 off = Some(start);
             }
         }
