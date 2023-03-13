@@ -25,7 +25,7 @@ impl Violation for HashlibInsecureHashFunction {
 const WEAK_HASHES: [&str; 4] = ["md4", "md5", "sha", "sha1"];
 
 fn is_used_for_security(call_args: &SimpleCallArgs) -> bool {
-    match call_args.get_argument("usedforsecurity", None) {
+    match call_args.keyword_argument("usedforsecurity") {
         Some(expr) => !matches!(
             &expr.node,
             ExprKind::Constant {
@@ -67,7 +67,7 @@ pub fn hashlib_insecure_hash_functions(
                     return;
                 }
 
-                if let Some(name_arg) = call_args.get_argument("name", Some(0)) {
+                if let Some(name_arg) = call_args.argument("name", 0) {
                     if let Some(hash_func_name) = string_literal(name_arg) {
                         if WEAK_HASHES.contains(&hash_func_name.to_lowercase().as_str()) {
                             checker.diagnostics.push(Diagnostic::new(

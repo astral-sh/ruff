@@ -68,11 +68,11 @@ fn check_patch_call(
     new_arg_number: usize,
 ) -> Option<Diagnostic> {
     let simple_args = SimpleCallArgs::new(args, keywords);
-    if simple_args.get_argument("return_value", None).is_some() {
+    if simple_args.keyword_argument("return_value").is_some() {
         return None;
     }
 
-    if let Some(new_arg) = simple_args.get_argument("new", Some(new_arg_number)) {
+    if let Some(new_arg) = simple_args.argument("new", new_arg_number) {
         if let ExprKind::Lambda { args, body } = &new_arg.node {
             // Walk the lambda body.
             let mut visitor = LambdaBodyVisitor {

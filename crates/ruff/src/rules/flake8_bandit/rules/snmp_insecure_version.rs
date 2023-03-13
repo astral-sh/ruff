@@ -33,7 +33,7 @@ pub fn snmp_insecure_version(
         })
     {
         let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(mp_model_arg) = call_args.get_argument("mpModel", None) {
+        if let Some(mp_model_arg) = call_args.keyword_argument("mpModel") {
             if let ExprKind::Constant {
                 value: Constant::Int(value),
                 ..
