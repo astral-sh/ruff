@@ -1,4 +1,5 @@
 use rustpython_parser::ast::{Located, Location};
+use std::iter::FusedIterator;
 
 use crate::source_code::Locator;
 use crate::types::Range;
@@ -38,7 +39,7 @@ pub fn clean(indentation: &str) -> String {
         .collect()
 }
 
-/// Like `UniversalNewlineIterator`, but includes a trailing newline as an empty line.
+/// Like [`UniversalNewlineIterator`], but includes a trailing newline as an empty line.
 pub struct NewlineWithTrailingNewline<'a> {
     trailing: Option<&'a str>,
     underlying: UniversalNewlineIterator<'a>,
@@ -62,32 +63,34 @@ impl<'a> Iterator for NewlineWithTrailingNewline<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<&'a str> {
-        let mut next = self.underlying.next();
-        if next.is_none() {
-            if self.trailing.is_some() {
-                next = self.trailing;
-                self.trailing = None;
-            }
-        }
-        next
+        self.underlying.next().or_else(|| self.trailing.take())
     }
 }
 
-/// Like `str#lines`, but accommodates LF, CRLF, and CR line endings,
-/// the latter of which are not supported by `str#lines`.
+/// Like [`str#lines`], but accommodates LF, CRLF, and CR line endings,
+/// the latter of which are not supported by [`str#lines`].
+///
+/// ## Examples
+///
+/// ```rust
+/// use ruff_python_ast::whitespace::UniversalNewlineIterator;
+///
+/// let mut lines = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop");
+///
+/// assert_eq!(lines.next_back(), Some("bop"));
+/// assert_eq!(lines.next(), Some("foo"));
+/// assert_eq!(lines.next_back(), Some("baz"));
+/// assert_eq!(lines.next(), Some("bar"));
+/// assert_eq!(lines.next_back(), Some(""));
+/// assert_eq!(lines.next(), None);
+/// ```
 pub struct UniversalNewlineIterator<'a> {
     text: &'a str,
-    forward_position: usize,
-    backwards_position: usize,
 }
 
 impl<'a> UniversalNewlineIterator<'a> {
     pub fn from(text: &'a str) -> UniversalNewlineIterator<'a> {
-        UniversalNewlineIterator {
-            text,
-            forward_position: 0,
-            backwards_position: text.len(),
-        }
+        UniversalNewlineIterator { text }
     }
 }
 
@@ -96,161 +99,122 @@ impl<'a> Iterator for UniversalNewlineIterator<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<&'a str> {
-        if self.forward_position == self.text.len() {
+        if self.text.is_empty() {
             return None;
         }
 
-        let mut next_pos = None;
-        let mut line_end = None;
+        let line = match self.text.find(['\n', '\r']) {
+            // Non-last line
+            Some(line_end) => {
+                let (line, remainder) = self.text.split_at(line_end);
 
-        for (i, c) in self.text[self.forward_position..].char_indices() {
-            match c {
-                '\r' => {
-                    if let Some('\n') = self.text.chars().nth(i + self.forward_position + 1) {
-                        next_pos = Some(i + self.forward_position + 2);
-                        line_end = Some(i + self.forward_position);
-                    } else {
-                        next_pos = Some(i + self.forward_position + 1);
-                        line_end = Some(i + self.forward_position);
-                    }
-                    break;
-                }
-                '\n' => {
-                    next_pos = Some(i + self.forward_position + 1);
-                    line_end = Some(i + self.forward_position);
-                    break;
-                }
-                _ => {}
+                self.text = match remainder.as_bytes()[0] {
+                    // Explicit branch for `\n` as this is the most likely path
+                    b'\n' => &remainder[1..],
+                    // '\r\n'
+                    b'\r' if remainder.as_bytes().get(1) == Some(&b'\n') => &remainder[2..],
+                    // '\r'
+                    _ => &remainder[1..],
+                };
+
+                line
             }
-        }
+            // Last line
+            None => std::mem::take(&mut self.text),
+        };
 
-        if let Some(line_end_pos) = line_end {
-            let line = &self.text[self.forward_position..line_end_pos];
-            self.forward_position = next_pos.unwrap_or(line_end_pos);
-            Some(line)
-        } else {
-            let line = &self.text[self.forward_position..];
-            self.forward_position = self.text.len();
-            Some(line)
-        }
+        Some(line)
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
     }
 }
 
-impl<'a> DoubleEndedIterator for UniversalNewlineIterator<'a> {
+impl DoubleEndedIterator for UniversalNewlineIterator<'_> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        if self.backwards_position == 0 {
+        if self.text.is_empty() {
             return None;
         }
 
-        // Like `str#lines`, we want to ignore a trailing newline.
-        if self.backwards_position == self.text.len() {
-            if self.text.ends_with("\r\n") {
-                self.backwards_position -= 2;
-            } else if self.text.ends_with(['\r', '\n']) {
-                self.backwards_position -= 1;
+        let len = self.text.len();
+
+        // Trim any trailing newlines.
+        self.text = match self.text.as_bytes()[len - 1] {
+            b'\n' if len > 1 && self.text.as_bytes()[len - 2] == b'\r' => &self.text[..len - 2],
+            b'\n' | b'\r' => &self.text[..len - 1],
+            _ => self.text,
+        };
+
+        // Find the end of the previous line. The previous line is the text up to, but not including
+        // the newline character.
+        let line = match self.text.rfind(['\n', '\r']) {
+            // '\n' or '\r' or '\r\n'
+            Some(line_end) => {
+                let (remainder, line) = self.text.split_at(line_end + 1);
+                self.text = remainder;
+
+                line
             }
-        }
+            // Last line
+            None => std::mem::take(&mut self.text),
+        };
 
-        let mut next_pos = None;
-        let mut line_start = None;
-
-        for (i, c) in self.text[..self.backwards_position].char_indices().rev() {
-            match c {
-                '\r' => {
-                    if let Some('\n') = self.text.chars().nth(i - 1) {
-                        next_pos = Some(i - 1);
-                        line_start = Some(i + 1);
-                    } else {
-                        next_pos = Some(i);
-                        line_start = Some(i + 1);
-                    }
-                    break;
-                }
-                '\n' => {
-                    next_pos = Some(i);
-                    line_start = Some(i + 1);
-                    break;
-                }
-                _ => {}
-            }
-        }
-
-        if let Some(line_start_pos) = line_start {
-            let line = &self.text[line_start_pos..self.backwards_position];
-            self.backwards_position = next_pos.unwrap_or(line_start_pos);
-            Some(line)
-        } else {
-            let line = &self.text[..self.backwards_position];
-            self.backwards_position = 0;
-            Some(line)
-        }
+        Some(line)
     }
 }
+
+impl FusedIterator for UniversalNewlineIterator<'_> {}
 
 #[cfg(test)]
 mod tests {
     use super::UniversalNewlineIterator;
 
     #[test]
+    fn universal_newlines_empty_str() {
+        let lines: Vec<_> = UniversalNewlineIterator::from("").collect();
+        assert_eq!(lines, Vec::<&str>::default());
+
+        let lines: Vec<_> = UniversalNewlineIterator::from("").rev().collect();
+        assert_eq!(lines, Vec::<&str>::default());
+    }
+
+    #[test]
     fn universal_newlines_forward() {
-        let text = "foo\nbar\n\r\nbaz\rbop";
-        let mut lines = UniversalNewlineIterator::from(text);
+        let lines: Vec<_> = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop").collect();
+        assert_eq!(lines, vec!["foo", "bar", "", "baz", "bop"]);
 
-        assert_eq!(Some("foo"), lines.next());
-        assert_eq!(Some("bar"), lines.next());
-        assert_eq!(Some(""), lines.next());
-        assert_eq!(Some("baz"), lines.next());
-        assert_eq!(Some("bop"), lines.next());
+        let lines: Vec<_> = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop\n").collect();
+        assert_eq!(lines, vec!["foo", "bar", "", "baz", "bop"]);
 
-        assert_eq!(None, lines.next());
-
-        let text = "foo\nbar\n\r\nbaz\rbop\n";
-        let mut lines = UniversalNewlineIterator::from(text);
-
-        assert_eq!(Some("foo"), lines.next());
-        assert_eq!(Some("bar"), lines.next());
-        assert_eq!(Some(""), lines.next());
-        assert_eq!(Some("baz"), lines.next());
-        assert_eq!(Some("bop"), lines.next());
-
-        assert_eq!(None, lines.next());
-
-        let text = "foo\nbar\n\r\nbaz\rbop\n\n";
-        let mut lines = UniversalNewlineIterator::from(text);
-
-        assert_eq!(Some("foo"), lines.next());
-        assert_eq!(Some("bar"), lines.next());
-        assert_eq!(Some(""), lines.next());
-        assert_eq!(Some("baz"), lines.next());
-        assert_eq!(Some("bop"), lines.next());
-        assert_eq!(Some(""), lines.next());
-
-        assert_eq!(None, lines.next());
+        let lines: Vec<_> = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop\n\n").collect();
+        assert_eq!(lines, vec!["foo", "bar", "", "baz", "bop", ""]);
     }
 
     #[test]
     fn universal_newlines_backwards() {
-        let text = "foo\nbar\n\r\nbaz\rbop";
-        let mut lines = UniversalNewlineIterator::from(text).rev();
+        let lines: Vec<_> = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop")
+            .rev()
+            .collect();
+        assert_eq!(lines, vec!["bop", "baz", "", "bar", "foo"]);
 
-        assert_eq!(Some("bop"), lines.next());
-        assert_eq!(Some("baz"), lines.next());
-        assert_eq!(Some(""), lines.next());
-        assert_eq!(Some("bar"), lines.next());
-        assert_eq!(Some("foo"), lines.next());
+        let lines: Vec<_> = UniversalNewlineIterator::from("foo\nbar\n\nbaz\rbop\n")
+            .rev()
+            .collect();
 
-        assert_eq!(None, lines.next());
+        assert_eq!(lines, vec!["bop", "baz", "", "bar", "foo"]);
+    }
 
-        let text = "foo\nbar\n\r\nbaz\rbop\n";
-        let mut lines = UniversalNewlineIterator::from(text).rev();
+    #[test]
+    fn universal_newlines_mixed() {
+        let mut lines = UniversalNewlineIterator::from("foo\nbar\n\r\nbaz\rbop");
 
-        assert_eq!(Some("bop"), lines.next());
-        assert_eq!(Some("baz"), lines.next());
-        assert_eq!(Some(""), lines.next());
-        assert_eq!(Some("bar"), lines.next());
-        assert_eq!(Some("foo"), lines.next());
-
-        assert_eq!(None, lines.next());
+        assert_eq!(lines.next_back(), Some("bop"));
+        assert_eq!(lines.next(), Some("foo"));
+        assert_eq!(lines.next_back(), Some("baz"));
+        assert_eq!(lines.next(), Some("bar"));
+        assert_eq!(lines.next_back(), Some(""));
+        assert_eq!(lines.next(), None);
     }
 }
