@@ -306,6 +306,9 @@ Ruff is used in a number of major open-source projects, including:
 - [meson-python](https://github.com/mesonbuild/meson-python)
 - [ZenML](https://github.com/zenml-io/zenml)
 - [delta-rs](https://github.com/delta-io/delta-rs)
+- [Starlite](https://github.com/starlite-api/starlite)
+- [telemetry-airflow (Mozilla)](https://github.com/mozilla/telemetry-airflow)
+- [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
 
 ## License
 
