@@ -145,4 +145,108 @@ expression: diagnostics
     column: 10
   fix: ~
   parent: ~
+- kind:
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 80
+    column: 15
+  end_location:
+    row: 80
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 83
+    column: 15
+  end_location:
+    row: 83
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 86
+    column: 15
+  end_location:
+    row: 86
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 89
+    column: 15
+  end_location:
+    row: 89
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 92
+    column: 15
+  end_location:
+    row: 92
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 95
+    column: 15
+  end_location:
+    row: 95
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 98
+    column: 15
+  end_location:
+    row: 98
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 101
+    column: 17
+  end_location:
+    row: 102
+    column: 8
+  fix: ~
+  parent: ~
 
