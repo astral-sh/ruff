@@ -34,8 +34,8 @@ impl TryFrom<&Cmpop> for EmptyStringCmpop {
 impl EmptyStringCmpop {
     pub fn into_unary(self) -> &'static str {
         match self {
-            Self::Is | Self::Eq => "",
-            Self::IsNot | Self::NotEq => "not ",
+            Self::Is | Self::Eq => "not ",
+            Self::IsNot | Self::NotEq => "",
         }
     }
 }
@@ -62,7 +62,7 @@ impl Violation for CompareToEmptyString {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
-            "`{}` can be simplified to `not {}` as an empty string is falsey",
+            "`{}` can be simplified to `{}` as an empty string is falsey",
             self.existing, self.replacement,
         )
     }
