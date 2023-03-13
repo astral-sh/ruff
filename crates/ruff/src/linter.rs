@@ -191,8 +191,8 @@ pub fn check_path(
     {
         diagnostics.extend(check_physical_lines(
             path,
+            locator,
             stylist,
-            contents,
             indexer.commented_lines(),
             &doc_lines,
             settings,

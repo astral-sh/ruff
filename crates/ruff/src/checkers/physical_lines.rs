@@ -4,7 +4,7 @@ use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::registry::Rule;
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
@@ -22,8 +22,8 @@ use crate::settings::{flags, Settings};
 
 pub fn check_physical_lines(
     path: &Path,
+    locator: &Locator,
     stylist: &Stylist,
-    contents: &str,
     commented_lines: &[usize],
     doc_lines: &[usize],
     settings: &Settings,
@@ -57,7 +57,7 @@ pub fn check_physical_lines(
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
-    for (index, line) in contents.universal_newlines().enumerate() {
+    for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
             .is_some()
@@ -163,8 +163,8 @@ pub fn check_physical_lines(
 
     if enforce_no_newline_at_end_of_file {
         if let Some(diagnostic) = no_newline_at_end_of_file(
+            locator,
             stylist,
-            contents,
             autofix.into() && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
         ) {
             diagnostics.push(diagnostic);
@@ -200,8 +200,8 @@ mod tests {
         let check_with_max_line_length = |line_length: usize| {
             check_physical_lines(
                 Path::new("foo.py"),
+                &locator,
                 &stylist,
-                line,
                 &[],
                 &[],
                 &Settings {

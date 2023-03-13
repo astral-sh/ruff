@@ -3,7 +3,7 @@ use rustpython_parser::ast::Location;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
 /// ## What it does
@@ -38,16 +38,16 @@ impl AlwaysAutofixableViolation for NoNewLineAtEndOfFile {
 
 /// W292
 pub fn no_newline_at_end_of_file(
+    locator: &Locator,
     stylist: &Stylist,
-    contents: &str,
     autofix: bool,
 ) -> Option<Diagnostic> {
-    if !contents.ends_with(['\n', '\r']) {
+    if !locator.contents().ends_with(['\n', '\r']) {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
-        if let Some(line) = contents.universal_newlines().last() {
+        if let Some(line) = locator.contents().universal_newlines().last() {
             // Both locations are at the end of the file (and thus the same).
-            let location = Location::new(contents.universal_newlines().count(), line.len());
+            let location = Location::new(locator.count_lines(), line.len());
             let mut diagnostic =
                 Diagnostic::new(NoNewLineAtEndOfFile, Range::new(location, location));
             if autofix {
