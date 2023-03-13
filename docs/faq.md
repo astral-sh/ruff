@@ -73,10 +73,8 @@ flake8-tidy-imports. This helps minimize conflicts across plugins and allows any
 to be toggled on or off with a single (e.g.) `--select TID`, as opposed to `--select I2` (to avoid
 conflicts with the isort rules, like `I001`).
 
-Beyond the rule set, Ruff suffers from the following limitations vis-à-vis Flake8:
-
-- Flake8 has a plugin architecture and supports writing custom lint rules. (Instead, popular Flake8
-   plugins are re-implemented in Rust as part of Ruff itself.)
+Beyond the rule set, Ruff's primary limitation vis-à-vis Flake8 is that it does not support custom
+lint rules. (Instead, popular Flake8 plugins are re-implemented in Rust as part of Ruff itself.)
 
 There are a few other minor incompatibilities between Ruff and the originating Flake8 plugins:
 
