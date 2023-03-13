@@ -133,8 +133,13 @@ pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
         }
         Ok(ruff)
     } else {
-        debug!("`project.requires_python` in `pyproject.toml` will not be used to set `target_version` when using `ruff.toml`.");
-        parse_ruff_toml(path)
+        let ruff = parse_ruff_toml(path);
+        if let Ok(ruff) = &ruff {
+            if ruff.target_version.is_none() {
+                debug!("`project.requires_python` in `pyproject.toml` will not be used to set `target_version` when using `ruff.toml`.");
+            }
+        }
+        ruff
     }
 }
 
