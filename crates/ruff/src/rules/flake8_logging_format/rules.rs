@@ -146,7 +146,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             );
 
             // G001 - G004
-            if let Some(format_arg) = call_args.get_argument("msg", Some(0)) {
+            if let Some(format_arg) = call_args.argument("msg", 0) {
                 check_msg(checker, format_arg);
             }
 

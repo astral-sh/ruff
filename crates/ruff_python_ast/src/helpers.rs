@@ -1213,42 +1213,39 @@ pub struct SimpleCallArgs<'a> {
 }
 
 impl<'a> SimpleCallArgs<'a> {
-    pub fn new(args: &'a [Expr], keywords: &'a [Keyword]) -> Self {
-        let mut result = SimpleCallArgs::default();
+    pub fn new(
+        args: impl IntoIterator<Item = &'a Expr>,
+        keywords: impl IntoIterator<Item = &'a Keyword>,
+    ) -> Self {
+        let args = args
+            .into_iter()
+            .take_while(|arg| !matches!(arg.node, ExprKind::Starred { .. }))
+            .collect();
 
-        for arg in args {
-            match &arg.node {
-                ExprKind::Starred { .. } => {
-                    break;
-                }
-                _ => {
-                    result.args.push(arg);
-                }
-            }
-        }
+        let kwargs = keywords
+            .into_iter()
+            .filter_map(|keyword| {
+                let node = &keyword.node;
+                node.arg.as_ref().map(|arg| (arg.as_ref(), &node.value))
+            })
+            .collect();
 
-        for keyword in keywords {
-            if let Some(arg) = &keyword.node.arg {
-                result.kwargs.insert(arg, &keyword.node.value);
-            }
-        }
+        SimpleCallArgs { args, kwargs }
+    }
 
-        result
+    /// Get the argument with the given name.
+    /// If the argument is not found by name, return
+    /// `None`.
+    pub fn keyword_argument(&self, name: &str) -> Option<&'a Expr> {
+        self.kwargs.get(name).copied()
     }
 
     /// Get the argument with the given name or position.
     /// If the argument is not found with either name or position, return
     /// `None`.
-    pub fn get_argument(&self, name: &'a str, position: Option<usize>) -> Option<&'a Expr> {
-        if let Some(kwarg) = self.kwargs.get(name) {
-            return Some(kwarg);
-        }
-        if let Some(position) = position {
-            if position < self.args.len() {
-                return Some(self.args[position]);
-            }
-        }
-        None
+    pub fn argument(&self, name: &str, position: usize) -> Option<&'a Expr> {
+        self.keyword_argument(name)
+            .or_else(|| self.args.get(position).copied())
     }
 
     /// Return the number of positional and keyword arguments.
