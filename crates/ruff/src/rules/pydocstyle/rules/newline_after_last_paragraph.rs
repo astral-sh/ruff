@@ -1,8 +1,8 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace;
-use ruff_python_ast::whitespace::LinesWithTrailingNewline;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -29,12 +29,12 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
     let body = docstring.body;
 
     let mut line_count = 0;
-    for line in LinesWithTrailingNewline::from(body) {
+    for line in NewlineWithTrailingNewline::from(body) {
         if !line.trim().is_empty() {
             line_count += 1;
         }
         if line_count > 1 {
-            if let Some(last_line) = contents.lines().last().map(str::trim) {
+            if let Some(last_line) = contents.universal_newlines().last().map(str::trim) {
                 if last_line != "\"\"\"" && last_line != "'''" {
                     let mut diagnostic =
                         Diagnostic::new(NewLineAfterLastParagraph, Range::from(docstring.expr));

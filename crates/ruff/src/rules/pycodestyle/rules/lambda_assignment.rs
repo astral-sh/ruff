@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Arguments, Expr, ExprKind, Location, Stmt, StmtKind
 use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::{Range, ScopeKind};
 use ruff_python_ast::whitespace::leading_space;
@@ -86,7 +87,7 @@ pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stm
                 let indentation = &leading_space(first_line);
                 let mut indented = String::new();
                 for (idx, line) in function(id, args, body, checker.stylist)
-                    .lines()
+                    .universal_newlines()
                     .enumerate()
                 {
                     if idx == 0 {

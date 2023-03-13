@@ -56,10 +56,18 @@ impl<'a> Locator<'a> {
         self.contents
     }
 
+    /// Return the number of lines in the source code.
+    pub fn count_lines(&self) -> usize {
+        let index = self.get_or_init_index();
+        index.count_lines()
+    }
+
+    /// Return the number of bytes in the source code.
     pub const fn len(&self) -> usize {
         self.contents.len()
     }
 
+    /// Return `true` if the source code is empty.
     pub const fn is_empty(&self) -> bool {
         self.contents.is_empty()
     }
@@ -81,6 +89,14 @@ impl Index {
         match self {
             Index::Ascii(ascii) => ascii.byte_offset(location, contents),
             Index::Utf8(utf8) => utf8.byte_offset(location, contents),
+        }
+    }
+
+    /// Return the number of lines in the source code.
+    fn count_lines(&self) -> usize {
+        match self {
+            Index::Ascii(ascii) => ascii.line_start_byte_offsets.len(),
+            Index::Utf8(utf8) => utf8.line_start_byte_offsets.len(),
         }
     }
 }

@@ -9,6 +9,7 @@ use ruff_python_ast::helpers::{
     contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
 };
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -283,7 +284,7 @@ pub fn nested_if_statements(
             Ok(fix) => {
                 if fix
                     .content
-                    .lines()
+                    .universal_newlines()
                     .all(|line| line.len() <= checker.settings.line_length)
                 {
                     diagnostic.amend(fix);

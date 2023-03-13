@@ -7,6 +7,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::cast;
 use ruff_python_ast::helpers::to_call_path;
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::{CallPath, Range};
 use ruff_python_ast::visibility::{is_property, is_test};
 
@@ -48,7 +49,7 @@ pub fn non_imperative_mood(
     let body = docstring.body;
 
     // Find first line, disregarding whitespace.
-    let line = match body.trim().lines().next() {
+    let line = match body.trim().universal_newlines().next() {
         Some(line) => line.trim(),
         None => return,
     };

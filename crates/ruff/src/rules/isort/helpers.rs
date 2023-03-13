@@ -2,6 +2,7 @@ use rustpython_parser::ast::{Location, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
 
 use super::types::TrailingComma;
@@ -62,7 +63,7 @@ pub fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     //   # Direct comment.
     //   def f(): pass
     let mut seen_blank = false;
-    for line in locator.take(stmt.location).lines().rev() {
+    for line in locator.take(stmt.location).universal_newlines().rev() {
         let line = line.trim();
         if seen_blank {
             if line.starts_with('#') {

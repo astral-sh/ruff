@@ -14,6 +14,7 @@ use rustpython_parser::{lexer, Mode, StringKind, Tok};
 use smallvec::{smallvec, SmallVec};
 
 use crate::context::Context;
+use crate::newlines::StrExt;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 use crate::types::{Binding, BindingKind, CallPath, Range};
 use crate::visitor;
@@ -1125,7 +1126,7 @@ pub fn end_of_statement(stmt: &Stmt, locator: &Locator) -> Location {
     }
 
     // Otherwise, find the end of the last line that's "part of" the statement.
-    for (lineno, line) in contents.lines().enumerate() {
+    for (lineno, line) in contents.universal_newlines().enumerate() {
         if line.ends_with('\\') {
             continue;
         }

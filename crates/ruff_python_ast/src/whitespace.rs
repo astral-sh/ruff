@@ -1,5 +1,3 @@
-use std::str::Lines;
-
 use rustpython_parser::ast::{Located, Location};
 
 use crate::source_code::Locator;
@@ -38,39 +36,4 @@ pub fn clean(indentation: &str) -> String {
         .chars()
         .map(|char| if char.is_whitespace() { char } else { ' ' })
         .collect()
-}
-
-/// Like `str#lines`, but includes a trailing newline as an empty line.
-pub struct LinesWithTrailingNewline<'a> {
-    trailing: Option<&'a str>,
-    underlying: Lines<'a>,
-}
-
-impl<'a> LinesWithTrailingNewline<'a> {
-    pub fn from(input: &'a str) -> LinesWithTrailingNewline<'a> {
-        LinesWithTrailingNewline {
-            underlying: input.lines(),
-            trailing: if input.ends_with('\n') {
-                Some("")
-            } else {
-                None
-            },
-        }
-    }
-}
-
-impl<'a> Iterator for LinesWithTrailingNewline<'a> {
-    type Item = &'a str;
-
-    #[inline]
-    fn next(&mut self) -> Option<&'a str> {
-        let mut next = self.underlying.next();
-        if next.is_none() {
-            if self.trailing.is_some() {
-                next = self.trailing;
-                self.trailing = None;
-            }
-        }
-        next
-    }
 }
