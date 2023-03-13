@@ -8,10 +8,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 3
+    row: 10
     column: 13
   end_location:
-    row: 3
+    row: 10
     column: 23
   fix: ~
   parent: ~
@@ -21,10 +21,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 9
+    row: 16
     column: 8
   end_location:
-    row: 13
+    row: 20
     column: 5
   fix: ~
   parent: ~
@@ -34,10 +34,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 18
+    row: 25
     column: 8
   end_location:
-    row: 22
+    row: 29
     column: 5
   fix: ~
   parent: ~
@@ -47,20 +47,7 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 27
-    column: 8
-  end_location:
-    row: 31
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: TypedArgumentSimpleDefaults
-    body: Only simple default values allowed for typed arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
+    row: 34
     column: 8
   end_location:
     row: 38
@@ -73,10 +60,23 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 41
+    row: 43
+    column: 8
+  end_location:
+    row: 45
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: TypedArgumentSimpleDefaults
+    body: Only simple default values allowed for typed arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 48
     column: 13
   end_location:
-    row: 42
+    row: 49
     column: 11
   fix: ~
   parent: ~
@@ -86,10 +86,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 45
+    row: 52
     column: 13
   end_location:
-    row: 46
+    row: 53
     column: 12
   fix: ~
   parent: ~
@@ -99,10 +99,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 49
+    row: 56
     column: 16
   end_location:
-    row: 50
+    row: 57
     column: 7
   fix: ~
   parent: ~
@@ -112,10 +112,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 53
+    row: 60
     column: 13
   end_location:
-    row: 54
+    row: 61
     column: 7
   fix: ~
   parent: ~
@@ -125,10 +125,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 57
+    row: 64
     column: 17
   end_location:
-    row: 58
+    row: 65
     column: 8
   fix: ~
   parent: ~
@@ -138,10 +138,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 61
+    row: 68
     column: 17
   end_location:
-    row: 62
+    row: 69
     column: 10
   fix: ~
   parent: ~
@@ -151,49 +151,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 80
+    row: 96
     column: 15
   end_location:
-    row: 80
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: TypedArgumentSimpleDefaults
-    body: Only simple default values allowed for typed arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 83
-    column: 15
-  end_location:
-    row: 83
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: TypedArgumentSimpleDefaults
-    body: Only simple default values allowed for typed arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 86
-    column: 15
-  end_location:
-    row: 86
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: TypedArgumentSimpleDefaults
-    body: Only simple default values allowed for typed arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 89
-    column: 15
-  end_location:
-    row: 89
+    row: 96
     column: 18
   fix: ~
   parent: ~
@@ -203,10 +164,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 92
+    row: 99
     column: 15
   end_location:
-    row: 92
+    row: 99
     column: 21
   fix: ~
   parent: ~
@@ -216,23 +177,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 95
+    row: 105
     column: 15
   end_location:
-    row: 95
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: TypedArgumentSimpleDefaults
-    body: Only simple default values allowed for typed arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 98
-    column: 15
-  end_location:
-    row: 98
+    row: 105
     column: 24
   fix: ~
   parent: ~
@@ -242,10 +190,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 101
+    row: 108
     column: 17
   end_location:
-    row: 102
+    row: 109
     column: 8
   fix: ~
   parent: ~

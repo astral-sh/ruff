@@ -111,7 +111,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
             if let ExprKind::Attribute { .. } = &operand.node {
                 if checker
                     .ctx
-                    .resolve_call_path(default)
+                    .resolve_call_path(operand)
                     .map_or(false, |call_path| {
                         ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
                             // reject `-math.nan`
