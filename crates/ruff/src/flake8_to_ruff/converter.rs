@@ -449,10 +449,11 @@ fn resolve_select(plugins: &[Plugin]) -> HashSet<RuleSelector> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::str::FromStr;
 
     use anyhow::Result;
     use itertools::Itertools;
-    use pep440_rs::parse_version_specifiers;
+    use pep440_rs::VersionSpecifiers;
     use pretty_assertions::assert_eq;
 
     use super::super::plugin::Plugin;
@@ -466,7 +467,7 @@ mod tests {
     use crate::rules::{flake8_quotes, pydocstyle};
     use crate::settings::options::Options;
     use crate::settings::pyproject::Pyproject;
-    use crate::settings::types::{PythonVersion, RequiresVersion};
+    use crate::settings::types::PythonVersion;
 
     fn default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> Options {
         Options {
@@ -630,9 +631,7 @@ mod tests {
             &HashMap::from([("flake8".to_string(), HashMap::default())]),
             &ExternalConfig {
                 project: Some(&Project {
-                    requires_python: Some(RequiresVersion(
-                        parse_version_specifiers(">=3.8.16, <3.11").unwrap(),
-                    )),
+                    requires_python: Some(VersionSpecifiers::from_str(">=3.8.16, <3.11").unwrap()),
                 }),
                 ..ExternalConfig::default()
             },

@@ -7,13 +7,12 @@ use std::string::ToString;
 use anyhow::{anyhow, bail, Result};
 use clap::ValueEnum;
 use globset::{Glob, GlobSet, GlobSetBuilder};
-use itertools::Itertools;
-use pep440_rs::{parse_version_specifiers, Version as Pep440Version, VersionSpecifier};
+use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -84,11 +83,10 @@ impl PythonVersion {
         }
     }
 
-    pub fn get_minimum_supported_version(requires_version: &RequiresVersion) -> Option<Self> {
+    pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
         let mut minimum_version = None;
         for python_version in PythonVersion::iter() {
             if requires_version
-                .0
                 .iter()
                 .all(|specifier| specifier.contains(&python_version.into()))
             {
@@ -280,37 +278,5 @@ impl Deref for Version {
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct RequiresVersion(pub Vec<VersionSpecifier>);
-
-impl<'de> Deserialize<'de> for RequiresVersion {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        parse_version_specifiers(&s)
-            .map(Self)
-            .map_err(de::Error::custom)
-    }
-}
-
-impl Serialize for RequiresVersion {
-    #[allow(unstable_name_collisions)]
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.collect_str(
-            &self
-                .0
-                .iter()
-                .map(ToString::to_string)
-                .intersperse(", ".to_string())
-                .collect::<String>(),
-        )
     }
 }

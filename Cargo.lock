@@ -1538,8 +1538,8 @@ checksum = "9fa00462b37ead6d11a82c9d568b26682d78e0477dc02d1966c013af80969739"
 
 [[package]]
 name = "pep440_rs"
-version = "0.1.1"
-source = "git+https://github.com/konstin/pep440-rs.git?rev=3148c9016cbc01a9e6116ae8080b10e14e985487#3148c9016cbc01a9e6116ae8080b10e14e985487"
+version = "0.2.0"
+source = "git+https://github.com/konstin/pep440-rs.git?rev=08f3e6b2d91fa1d257cbb2675e0fc22645b2701c#08f3e6b2d91fa1d257cbb2675e0fc22645b2701c"
 dependencies = [
  "lazy_static",
  "regex",

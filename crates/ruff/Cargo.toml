@@ -49,7 +49,7 @@ path-absolutize = { workspace = true, features = [
 pathdiff = { version = "0.2.1" }
 pep440_rs = { git = "https://github.com/konstin/pep440-rs.git", features = [
   "serde",
-], rev = "3148c9016cbc01a9e6116ae8080b10e14e985487" }
+], rev = "08f3e6b2d91fa1d257cbb2675e0fc22645b2701c" }
 regex = { workspace = true }
 result-like = { version = "0.4.6" }
 rustc-hash = { workspace = true }
