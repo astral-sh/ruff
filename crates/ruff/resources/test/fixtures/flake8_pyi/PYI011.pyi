@@ -109,5 +109,8 @@ def f35(
     + 1j,
 ) -> None: ...
 def f36(
-    x: str = sys.version,  # OK
+    *, x: str = sys.version,  # OK
+) -> None: ...
+def f37(
+    *, x: str = "" + "",  # Error PYI011 Only simple default values allowed for typed arguments
 ) -> None: ...
