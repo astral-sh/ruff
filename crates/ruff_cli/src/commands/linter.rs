@@ -1,6 +1,6 @@
+use std::fmt::Write;
 use std::io;
 use std::io::BufWriter;
-use std::io::Write;
 
 use anyhow::Result;
 use itertools::Itertools;
@@ -41,7 +41,7 @@ pub fn linter(format: HelpFormat) -> Result<()> {
                         .join("/"),
                     prefix => prefix.to_string(),
                 };
-                output.push_str(&format!("{:>4} {}\n", prefix, linter.name()));
+                writeln!(output, "{:>4} {}", prefix, linter.name()).unwrap();
             }
         }
 
@@ -65,7 +65,7 @@ pub fn linter(format: HelpFormat) -> Result<()> {
         }
     }
 
-    write!(stdout, "{output}")?;
+    io::Write::write_fmt(&mut stdout, format_args!("{output}"))?;
 
     Ok(())
 }

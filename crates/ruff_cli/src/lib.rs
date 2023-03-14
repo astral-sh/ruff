@@ -18,6 +18,7 @@ pub mod args;
 mod cache;
 mod commands;
 mod diagnostics;
+mod panic;
 mod printer;
 mod resolve;
 
@@ -46,7 +47,6 @@ pub fn run(
         log_level_args,
     }: Args,
 ) -> Result<ExitStatus> {
-    #[cfg(not(debug_assertions))]
     {
         use colored::Colorize;
 
