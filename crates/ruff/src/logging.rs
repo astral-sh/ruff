@@ -1,8 +1,31 @@
+use std::sync::Mutex;
+
 use anyhow::Result;
 use colored::Colorize;
 use fern;
 use log::Level;
+use once_cell::sync::Lazy;
 
+pub(crate) static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
+
+/// Warn a user once, with uniqueness determined by the given ID.
+#[macro_export]
+macro_rules! warn_user_once_by_id {
+    ($id:expr, $($arg:tt)*) => {
+        use colored::Colorize;
+        use log::warn;
+
+        if let Ok(mut states) = $crate::logging::WARNINGS.lock() {
+            if !states.contains(&$id) {
+                let message = format!("{}", format_args!($($arg)*));
+                warn!("{}", message.bold());
+                states.push($id);
+            }
+        }
+    };
+}
+
+/// Warn a user once, with uniqueness determined by the calling location itself.
 #[macro_export]
 macro_rules! warn_user_once {
     ($($arg:tt)*) => {
