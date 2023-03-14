@@ -41,4 +41,17 @@ expression: diagnostics
     column: 19
   fix: ~
   parent: ~
+- kind:
+    name: InvalidEnvvarValue
+    body: "Invalid type for initial `os.getenv` argument; expected `str`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 12
+    column: 14
+  end_location:
+    row: 12
+    column: 23
+  fix: ~
+  parent: ~
 
