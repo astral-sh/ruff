@@ -660,6 +660,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "003") => Rule::AmbiguousUnicodeCharacterComment,
         (Ruff, "005") => Rule::UnpackInsteadOfConcatenatingToCollectionLiteral,
         (Ruff, "006") => Rule::AsyncioDanglingTask,
+        (Ruff, "007") => Rule::PairwiseOverZipped,
         (Ruff, "100") => Rule::UnusedNOQA,
 
         // flake8-django

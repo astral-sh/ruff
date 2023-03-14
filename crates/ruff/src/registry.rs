@@ -601,6 +601,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
+    rules::ruff::rules::PairwiseOverZipped,
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
     rules::flake8_django::rules::LocalsInRenderFunction,
