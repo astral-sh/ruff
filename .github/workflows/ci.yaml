@@ -34,7 +34,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: |
           rustup component add clippy
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   cargo-clippy-wasm:
@@ -46,7 +46,7 @@ jobs:
         run: |
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
   cargo-test:
@@ -59,9 +59,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - run: cargo install cargo-insta
-      - run: pip install black[d]==22.12.0
+      - run: pip install black[d]==23.1.0
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
@@ -98,7 +98,7 @@ jobs:
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@v0.4.0
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: "Run wasm-pack"
         run: |
           cd crates/ruff_wasm
@@ -111,7 +111,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --linter pylint
       - run: cargo check
       - run: |
