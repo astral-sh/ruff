@@ -1,8 +1,6 @@
 name: benchmark
 
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -11,9 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Runs on main to cache the benchmark results
-  # or on pull requests to benchmark the target branch (or retrieve the results from the cache).
-  benchmark-base:
+  run-benchmark:
     name: "Base | ${{ matrix.os }}"
     strategy:
       matrix:
@@ -21,48 +17,47 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: "Determine base ref"
-        id: base_ref
-        if: github.event_name == 'pull_request'
-        run: echo "ref=${{github.event.pull_request.base.sha || github.sha}}" >> $GITHUB_OUTPUT
-
-      - name: "Restore benchmark results"
-        id: benchmark_cache
-        uses: dawidd6/action-download-artifact@v2
-        with:
-          name: base-benchmark-results-${{ matrix.os }}
-          path: ./target/criterion
-          commit: ${{ steps.base_ref.outputs.ref }}
-          if_no_artifact_found: ignore
-
-      - name: "Checkout Branch"
-        if: steps.benchmark_cache.outputs.found_artifact != 'true'
+      - name: "PR - Checkout Branch"
         uses: actions/checkout@v3
         with:
-          ref: ${{steps.base_ref.outputs.ref}}
+          ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: "Install Rust toolchain"
-        if: steps.benchmark_cache.outputs.found_artifact != 'true'
+      - name: "PR - Install Rust toolchain"
         run: rustup show
 
       - uses: Swatinem/rust-cache@v1
-        if: steps.benchmark_cache.outputs.found_artifact != 'true'
 
-      - name: "Build benchmarks"
+      - name: "PR - Build benchmarks"
         uses: actions-rs/cargo@v1
-        if: steps.benchmark_cache.outputs.found_artifact != 'true'
         with:
           command: bench
           args: -p ruff_benchmark --no-run
 
-      - name: "Run benchmarks"
-        if: steps.benchmark_cache.outputs.found_artifact != 'true'
+      - name: "PR - Run benchmarks"
+        run: cargo benchmark --save-baseline=pr
+
+      - name: "Main - Checkout Branch"
+        uses: actions/checkout@v3
+        with:
+          clean: false
+          ref: main
+
+      - name: "Main - Install Rust toolchain"
+        run: rustup show
+
+      - name: "Main - Build benchmarks"
+        uses: actions-rs/cargo@v1
+        with:
+          command: bench
+          args: -p ruff_benchmark --no-run
+
+      - name: "Main - Run benchmarks"
         run: cargo benchmark --save-baseline=main
 
       - name: "Upload benchmark results"
         uses: actions/upload-artifact@v3
         with:
-          name: base-benchmark-results-${{ matrix.os }}
+          name: benchmark-results-${{ matrix.os }}
           path: ./target/criterion
 
       # Cleanup
@@ -71,51 +66,11 @@ jobs:
         with:
           path: ./target/criterion
 
-
-  benchmark-pr:
-    if: github.event_name == 'pull_request'
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    name: "PR | ${{ matrix.os }}"
-
-    steps:
-      - name: "Checkout Branch"
-        uses: actions/checkout@v3
-
-      - name: "Install Rust toolchain"
-        run: rustup show
-
-      - uses: Swatinem/rust-cache@v1
-
-      - name: "Build benchmarks"
-        uses: actions-rs/cargo@v1
-        with:
-          command: bench
-          args: -p ruff_benchmark --no-run
-
-      - name: "Run benchmarks"
-        run: cargo benchmark --save-baseline=pr
-
-      - name: "Upload benchmark results"
-        uses: actions/upload-artifact@v3
-        with:
-          name: pr-benchmark-results-${{ matrix.os }}
-          path: ./target/criterion
-
-      - name: Remove Criterion Artifact
-        uses: JesseTG/rm@v1.0.3
-        with:
-          path: ./target/criterion
-
   benchmark-compare:
     runs-on: ubuntu-latest
     name: "Compare Benchmarks"
-    if: github.event_name == 'pull_request'
     needs:
-      - benchmark-base
-      - benchmark-pr
+      - run-benchmark
 
     steps:
     - name: "Install Rust toolchain"
@@ -127,13 +82,7 @@ jobs:
     - name: "Linux | Download PR benchmark results"
       uses: actions/download-artifact@v3
       with:
-        name: pr-benchmark-results-ubuntu-latest
-        path: ./target/criterion
-
-    - name: "Linux | Download base benchmark results"
-      uses: actions/download-artifact@v3
-      with:
-        name: base-benchmark-results-ubuntu-latest
+        name: benchmark-results-ubuntu-latest
         path: ./target/criterion
 
     - name: "Linux | Compare benchmark results"
@@ -145,7 +94,6 @@ jobs:
         critcmp main pr >> summary.md
         echo "\`\`\`" >> summary.md
         echo "" >> summary.md
-        cat summary.md > $GITHUB_STEP_SUMMARY
 
     - name: "Linux | Cleanup benchmark results"
       run: rm -rf ./target/criterion
@@ -153,23 +101,18 @@ jobs:
     - name: "Windows | Download PR benchmark results"
       uses: actions/download-artifact@v3
       with:
-        name: pr-benchmark-results-windows-latest
-        path: ./target/criterion
-
-    - name: "Windows | Download base benchmark results"
-      uses: actions/download-artifact@v3
-      with:
-        name: base-benchmark-results-windows-latest
+        name: benchmark-results-windows-latest
         path: ./target/criterion
 
     - name: "Windows | Compare benchmark results"
       shell: bash
       run: |
-        echo "### Windows" >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        critcmp main pr >> $GITHUB_STEP_SUMMARY
-        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Windows" >> summary.md
+        echo "\`\`\`" >> summary.md
+        critcmp main pr >> summary.md
+        echo "\`\`\`" >> summary.md
+        echo "" >> summary.md
+        cat summary.md > $GITHUB_STEP_SUMMARY
 
     - name: Find Comment
       # Check if the event is not triggered by a fork
