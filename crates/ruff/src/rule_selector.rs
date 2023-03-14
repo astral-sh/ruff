@@ -277,6 +277,7 @@ pub(crate) enum Specificity {
     Code5Chars,
 }
 
+#[cfg(feature = "clap")]
 mod clap_completion {
     use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
     use strum::IntoEnumIterator;
@@ -316,9 +317,7 @@ mod clap_completion {
                 .map_err(|e| clap::Error::raw(clap::error::ErrorKind::InvalidValue, e))
         }
 
-        fn possible_values(
-            &self,
-        ) -> Option<Box<dyn Iterator<Item = clap::builder::PossibleValue> + '_>> {
+        fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
             Some(Box::new(
                 std::iter::once(PossibleValue::new("ALL").help("all rules")).chain(
                     Linter::iter()

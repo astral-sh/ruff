@@ -211,7 +211,7 @@ Options:
       --format <FORMAT>
           Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint, azure]
       --target-version <TARGET_VERSION>
-          The minimum Python version that should be supported
+          The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311]
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
       --statistics
