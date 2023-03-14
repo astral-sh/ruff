@@ -61,7 +61,7 @@ jobs:
         run: rustup show
       - uses: Swatinem/rust-cache@v2
       - run: cargo install cargo-insta
-      - run: pip install black[d]==22.12.0
+      - run: pip install black[d]==23.1.0
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
