@@ -160,7 +160,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`nested_try_finally` is too complex (3)"
+    body: "`nested_try_finally` is too complex (1)"
     suggestion: ~
     fixable: false
   location:
