@@ -68,6 +68,7 @@ fn union(elts: &[Expr]) -> Expr {
     }
 }
 
+/// UP038
 pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, args: &[Expr]) {
     if let ExprKind::Name { id, .. } = &func.node {
         let Some(kind) = CallKind::from_name(id) else {
@@ -78,6 +79,9 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         };
         if let Some(types) = args.get(1) {
             if let ExprKind::Tuple { elts, .. } = &types.node {
+                if elts.is_empty() {
+                    return;
+                }
                 let mut diagnostic =
                     Diagnostic::new(IsinstanceWithTuple { kind }, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
