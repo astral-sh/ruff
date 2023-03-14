@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -34,6 +34,37 @@ impl Violation for InvalidEnvvarValue {
     }
 }
 
+fn is_valid_key(expr: &Expr) -> bool {
+    // We can't infer the types of these defaults, so assume they're valid.
+    if matches!(
+        expr.node,
+        ExprKind::Name { .. }
+            | ExprKind::Attribute { .. }
+            | ExprKind::Subscript { .. }
+            | ExprKind::Call { .. }
+    ) {
+        return true;
+    }
+
+    if let ExprKind::BinOp {
+        left,
+        right,
+        op: Operator::Add,
+    } = &expr.node
+    {
+        return is_valid_key(left) && is_valid_key(right);
+    }
+
+    // Otherwise, the default must be a string.
+    matches!(
+        expr.node,
+        ExprKind::Constant {
+            value: Constant::Str { .. },
+            ..
+        } | ExprKind::JoinedStr { .. }
+    )
+}
+
 /// PLE1507
 pub fn invalid_envvar_value(
     checker: &mut Checker,
@@ -46,28 +77,20 @@ pub fn invalid_envvar_value(
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["os", "getenv"])
     {
-        // Get the first argument for `getenv`
-        if let Some(expr) = args.get(0).or_else(|| {
+        // Find the `key` argument, if it exists.
+        let Some(expr) = args.get(0).or_else(|| {
             keywords
                 .iter()
                 .find(|keyword| keyword.node.arg.as_ref().map_or(false, |arg| arg == "key"))
                 .map(|keyword| &keyword.node.value)
-        }) {
-            // Ignoring types that are inferred, only do direct constants
-            if !matches!(
-                expr.node,
-                ExprKind::Constant {
-                    value: Constant::Str { .. },
-                    ..
-                } | ExprKind::Name { .. }
-                    | ExprKind::Attribute { .. }
-                    | ExprKind::Subscript { .. }
-                    | ExprKind::Call { .. }
-            ) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(InvalidEnvvarValue, Range::from(expr)));
-            }
+        }) else {
+            return;
+        };
+
+        if !is_valid_key(expr) {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(InvalidEnvvarValue, Range::from(expr)));
         }
     }
 }

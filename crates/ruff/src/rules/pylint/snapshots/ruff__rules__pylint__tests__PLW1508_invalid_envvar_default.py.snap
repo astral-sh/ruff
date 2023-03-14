@@ -41,4 +41,17 @@ expression: diagnostics
     column: 29
   fix: ~
   parent: ~
+- kind:
+    name: InvalidEnvvarDefault
+    body: "Invalid type for environment variable default; expected `str` or `None`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 16
+  end_location:
+    row: 10
+    column: 26
+  fix: ~
+  parent: ~
 
