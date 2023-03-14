@@ -7,11 +7,12 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Result};
 use globset::{Glob, GlobMatcher};
 use regex::Regex;
-use ruff_cache::cache_dir;
 use rustc_hash::{FxHashMap, FxHashSet};
 use strum::IntoEnumIterator;
 
-use self::rule_table::RuleTable;
+use ruff_cache::cache_dir;
+use ruff_macros::CacheKey;
+
 use crate::registry::{Rule, RuleNamespace, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
@@ -22,8 +23,9 @@ use crate::rules::{
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
-use crate::warn_user_once;
-use ruff_macros::CacheKey;
+use crate::warn_user_once_by_id;
+
+use self::rule_table::RuleTable;
 
 pub mod configuration;
 pub mod defaults;
@@ -361,7 +363,8 @@ impl From<&Configuration> for RuleTable {
 
         for (from, target) in redirects {
             // TODO(martin): This belongs into the ruff_cli crate.
-            crate::warn_user!(
+            warn_user_once_by_id!(
+                from,
                 "`{from}` has been remapped to `{}{}`.",
                 target.linter().common_prefix(),
                 target.short_code()
@@ -389,16 +392,11 @@ impl From<&Configuration> for RuleTable {
 
         // Validate that we didn't enable any incompatible rules. Use this awkward
         // approach to give each pair it's own `warn_user_once`.
-        let [pair1, pair2] = INCOMPATIBLE_CODES;
-        let (preferred, expendable, message) = pair1;
-        if rules.enabled(preferred) && rules.enabled(expendable) {
-            warn_user_once!("{}", message);
-            rules.disable(expendable);
-        }
-        let (preferred, expendable, message) = pair2;
-        if rules.enabled(preferred) && rules.enabled(expendable) {
-            warn_user_once!("{}", message);
-            rules.disable(expendable);
+        for (preferred, expendable, message) in INCOMPATIBLE_CODES {
+            if rules.enabled(preferred) && rules.enabled(expendable) {
+                warn_user_once_by_id!(expendable.as_ref(), "{}", message);
+                rules.disable(expendable);
+            }
         }
 
         rules
@@ -428,11 +426,12 @@ pub fn resolve_per_file_ignores(
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use super::configuration::RuleSelection;
     use crate::codes::{self, Pycodestyle};
     use crate::registry::Rule;
     use crate::settings::configuration::Configuration;
     use crate::settings::rule_table::RuleTable;
+
+    use super::configuration::RuleSelection;
 
     #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(selections: impl IntoIterator<Item = RuleSelection>) -> FxHashSet<Rule> {
@@ -471,7 +470,7 @@ mod tests {
 
         let actual = resolve_rules([RuleSelection {
             select: Some(vec![Pycodestyle::W.into()]),
-            ignore: vec![codes::Pycodestyle::W292.into()],
+            ignore: vec![Pycodestyle::W292.into()],
             ..RuleSelection::default()
         }]);
         let expected = FxHashSet::from_iter([
