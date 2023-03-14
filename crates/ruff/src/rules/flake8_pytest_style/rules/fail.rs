@@ -22,7 +22,7 @@ impl Violation for FailWithoutMessage {
 pub fn fail_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_fail(func, checker) {
         let call_args = SimpleCallArgs::new(args, keywords);
-        let msg = call_args.get_argument("msg", Some(0));
+        let msg = call_args.argument("msg", 0);
 
         if let Some(msg) = msg {
             if is_empty_or_null_string(msg) {

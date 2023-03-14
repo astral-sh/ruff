@@ -78,13 +78,15 @@ pub fn lint_path(
         if let Some((messages, imports)) =
             cache::get(path, package.as_ref(), &metadata, settings, autofix.into())
         {
-            debug!("Cache hit for: {}", path.to_string_lossy());
+            debug!("Cache hit for: {}", path.display());
             return Ok(Diagnostics::new(messages, imports));
         }
         Some(metadata)
     } else {
         None
     };
+
+    debug!("Checking: {}", path.display());
 
     // Read the file from disk.
     let contents = std::fs::read_to_string(path)?;

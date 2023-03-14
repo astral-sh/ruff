@@ -176,6 +176,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "E1206") => Rule::LoggingTooFewArgs,
         (Pylint, "E1307") => Rule::BadStringFormatType,
         (Pylint, "E1310") => Rule::BadStrStripCall,
+        (Pylint, "E1507") => Rule::InvalidEnvvarValue,
         (Pylint, "E2502") => Rule::BidirectionalUnicode,
         (Pylint, "R0133") => Rule::ComparisonOfConstant,
         (Pylint, "R0206") => Rule::PropertyWithParameters,

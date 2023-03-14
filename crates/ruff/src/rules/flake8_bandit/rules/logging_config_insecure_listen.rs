@@ -33,7 +33,7 @@ pub fn logging_config_insecure_listen(
     {
         let call_args = SimpleCallArgs::new(args, keywords);
 
-        if call_args.get_argument("verify", None).is_none() {
+        if call_args.keyword_argument("verify").is_none() {
             checker.diagnostics.push(Diagnostic::new(
                 LoggingConfigInsecureListen,
                 Range::from(func),

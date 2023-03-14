@@ -2874,6 +2874,9 @@ where
                 if self.settings.rules.enabled(&Rule::InvalidEnvvarDefault) {
                     pylint::rules::invalid_envvar_default(self, func, args, keywords);
                 }
+                if self.settings.rules.enabled(&Rule::InvalidEnvvarValue) {
+                    pylint::rules::invalid_envvar_value(self, func, args, keywords);
+                }
 
                 // flake8-pytest-style
                 if self.settings.rules.enabled(&Rule::PatchWithLambda) {
@@ -4973,7 +4976,9 @@ impl<'a> Checker<'a> {
                     if let Some(diagnostic) =
                         flake8_type_checking::rules::runtime_import_in_type_checking_block(binding)
                     {
-                        diagnostics.push(diagnostic);
+                        if self.settings.rules.enabled(diagnostic.kind.rule()) {
+                            diagnostics.push(diagnostic);
+                        }
                     }
                     if let Some(diagnostic) =
                         flake8_type_checking::rules::typing_only_runtime_import(

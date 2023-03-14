@@ -39,7 +39,7 @@ pub fn unsafe_yaml_load(checker: &mut Checker, func: &Expr, args: &[Expr], keywo
         .map_or(false, |call_path| call_path.as_slice() == ["yaml", "load"])
     {
         let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(loader_arg) = call_args.get_argument("Loader", Some(1)) {
+        if let Some(loader_arg) = call_args.argument("Loader", 1) {
             if !checker
                 .ctx
                 .resolve_call_path(loader_arg)

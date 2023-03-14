@@ -3,18 +3,22 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use log::debug;
 use serde::{Deserialize, Serialize};
 
+use crate::flake8_to_ruff::pep621::Project;
 use crate::settings::options::Options;
+use crate::settings::types::PythonVersion;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Tools {
     ruff: Option<Options>,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct Pyproject {
     tool: Option<Tools>,
+    project: Option<Project>,
 }
 
 impl Pyproject {
@@ -23,6 +27,7 @@ impl Pyproject {
             tool: Some(Tools {
                 ruff: Some(options),
             }),
+            project: None,
         }
     }
 }
@@ -114,12 +119,27 @@ pub fn find_user_settings_toml() -> Option<PathBuf> {
 pub fn load_options<P: AsRef<Path>>(path: P) -> Result<Options> {
     if path.as_ref().ends_with("pyproject.toml") {
         let pyproject = parse_pyproject_toml(&path)?;
-        Ok(pyproject
+        let mut ruff = pyproject
             .tool
             .and_then(|tool| tool.ruff)
-            .unwrap_or_default())
+            .unwrap_or_default();
+        if ruff.target_version.is_none() {
+            if let Some(project) = pyproject.project {
+                if let Some(requires_python) = project.requires_python {
+                    ruff.target_version =
+                        PythonVersion::get_minimum_supported_version(&requires_python);
+                }
+            }
+        }
+        Ok(ruff)
     } else {
-        parse_ruff_toml(path)
+        let ruff = parse_ruff_toml(path);
+        if let Ok(ruff) = &ruff {
+            if ruff.target_version.is_none() {
+                debug!("`project.requires_python` in `pyproject.toml` will not be used to set `target_version` when using `ruff.toml`.");
+            }
+        }
+        ruff
     }
 }
 

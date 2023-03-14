@@ -376,9 +376,11 @@ pub struct Options {
         "#
     )]
     /// The Python version to target, e.g., when considering automatic code
-    /// upgrades, like rewriting type annotations. Note that the target
-    /// version will _not_ be inferred from the _current_ Python version,
-    /// and instead must be specified explicitly (as seen below).
+    /// upgrades, like rewriting type annotations.
+    ///
+    /// If omitted, the target version will be inferred from the
+    /// `project.requires-python` field in the relevant `pyproject.toml`
+    /// (e.g., `requires-python = ">=3.8"`), if present.
     pub target_version: Option<PythonVersion>,
     #[option(
         default = r#"["TODO", "FIXME", "XXX"]"#,

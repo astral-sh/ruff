@@ -46,7 +46,7 @@ pub fn jinja2_autoescape_false(
     {
         let call_args = SimpleCallArgs::new(args, keywords);
 
-        if let Some(autoescape_arg) = call_args.get_argument("autoescape", None) {
+        if let Some(autoescape_arg) = call_args.keyword_argument("autoescape") {
             match &autoescape_arg.node {
                 ExprKind::Constant {
                     value: Constant::Bool(true),

@@ -108,7 +108,7 @@ pub fn bad_file_permissions(
         .map_or(false, |call_path| call_path.as_slice() == ["os", "chmod"])
     {
         let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(mode_arg) = call_args.get_argument("mode", Some(1)) {
+        if let Some(mode_arg) = call_args.argument("mode", 1) {
             if let Some(int_value) = get_int_value(mode_arg) {
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(

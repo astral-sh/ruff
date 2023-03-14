@@ -7,6 +7,14 @@ def f():
 
 
 def f():
+    # ruff: isort: off
+    import sys
+    import os
+    import collections
+    # ruff: isort: on
+
+
+def f():
     import sys
     import os  # isort: skip
     import collections

@@ -6,6 +6,7 @@ pub mod function_type;
 pub mod hashable;
 pub mod helpers;
 pub mod logging;
+pub mod newlines;
 pub mod operations;
 pub mod relocate;
 pub mod source_code;

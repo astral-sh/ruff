@@ -94,7 +94,7 @@ fn force_single_line_imports<'a>(
                                     } else {
                                         CommentSet {
                                             atop: vec![],
-                                            inline: vec![],
+                                            inline: comment_set.inline.clone(),
                                         }
                                     },
                                     TrailingComma::Absent,
@@ -373,6 +373,7 @@ mod tests {
     #[test_case(Path::new("inline_comments.py"))]
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
+    #[test_case(Path::new("isort_skip_file.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
     #[test_case(Path::new("natural_order.py"))]
@@ -391,12 +392,12 @@ mod tests {
     #[test_case(Path::new("preserve_tabs_2.py"))]
     #[test_case(Path::new("relative_imports_order.py"))]
     #[test_case(Path::new("reorder_within_section.py"))]
+    #[test_case(Path::new("ruff_skip_file.py"))]
     #[test_case(Path::new("separate_first_party_imports.py"))]
     #[test_case(Path::new("separate_future_imports.py"))]
     #[test_case(Path::new("separate_local_folder_imports.py"))]
     #[test_case(Path::new("separate_third_party_imports.py"))]
     #[test_case(Path::new("skip.py"))]
-    #[test_case(Path::new("skip_file.py"))]
     #[test_case(Path::new("sort_similar_imports.py"))]
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("star_before_others.py"))]

@@ -56,7 +56,7 @@ pub fn request_with_no_cert_validation(
         None
     }) {
         let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(verify_arg) = call_args.get_argument("verify", None) {
+        if let Some(verify_arg) = call_args.keyword_argument("verify") {
             if let ExprKind::Constant {
                 value: Constant::Bool(false),
                 ..

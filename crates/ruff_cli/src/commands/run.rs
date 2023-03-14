@@ -20,7 +20,6 @@ use rustc_hash::FxHashMap;
 use crate::args::Overrides;
 use crate::cache;
 use crate::diagnostics::{lint_path, Diagnostics};
-use crate::iterators::par_iter;
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -46,10 +45,7 @@ pub fn run(
     if cache.into() {
         fn init_cache(path: &std::path::Path) {
             if let Err(e) = cache::init(path) {
-                error!(
-                    "Failed to initialize cache at {}: {e:?}",
-                    path.to_string_lossy()
-                );
+                error!("Failed to initialize cache at {}: {e:?}", path.display());
             }
         }
 
@@ -77,7 +73,8 @@ pub fn run(
     );
 
     let start = Instant::now();
-    let mut diagnostics: Diagnostics = par_iter(&paths)
+    let mut diagnostics: Diagnostics = paths
+        .par_iter()
         .map(|entry| {
             match entry {
                 Ok(entry) => {

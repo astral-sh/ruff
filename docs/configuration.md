@@ -211,7 +211,7 @@ Options:
       --format <FORMAT>
           Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint, azure]
       --target-version <TARGET_VERSION>
-          The minimum Python version that should be supported
+          The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311]
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
       --statistics
@@ -418,12 +418,17 @@ automatically add `noqa` directives to all failing lines, with the appropriate r
 
 ### Action comments
 
-Ruff respects `isort`'s [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+Ruff respects isort's [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 (`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which
 enable selectively enabling and disabling import sorting for blocks of code and other inline
 configuration.
 
-See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+Ruff will also respect variants of these action comments with a `# ruff:` prefix
+(e.g., `# ruff: isort: skip_file`, `# ruff: isort: on`, and so on). These variants more clearly
+convey that the action comment is intended for Ruff, but are functionally equivalent to the
+isort variants.
+
+See the [isort documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
 
 ## Exit codes

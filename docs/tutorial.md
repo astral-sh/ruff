@@ -93,11 +93,13 @@ For a full enumeration of the supported settings, see [_Settings_](settings.md).
 specifically, we'll want to make note of the minimum supported Python version:
 
 ```toml
+[project]
+# Support Python 3.10+.
+requires-python = ">=3.10"
+
 [tool.ruff]
 # Decrease the maximum line length to 79 characters.
 line-length = 79
-# Support Python 3.10+.
-target-version = "py310"
 src = ["src"]
 ```
 
@@ -240,7 +242,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.254'
+  rev: 'v0.0.255'
   hooks:
     - id: ruff
 ```

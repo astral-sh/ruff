@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -49,13 +49,33 @@ fn is_valid_default(expr: &Expr) -> bool {
         return true;
     }
 
+    // Allow string concatenation.
+    if let ExprKind::BinOp {
+        left,
+        right,
+        op: Operator::Add,
+    } = &expr.node
+    {
+        return is_valid_default(left) && is_valid_default(right);
+    }
+
+    // Allow string formatting.
+    if let ExprKind::BinOp {
+        left,
+        op: Operator::Mod,
+        ..
+    } = &expr.node
+    {
+        return is_valid_default(left);
+    }
+
     // Otherwise, the default must be a string or `None`.
     matches!(
         expr.node,
         ExprKind::Constant {
             value: Constant::Str { .. } | Constant::None { .. },
             ..
-        }
+        } | ExprKind::JoinedStr { .. }
     )
 }
 

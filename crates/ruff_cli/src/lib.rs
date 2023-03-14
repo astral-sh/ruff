@@ -18,7 +18,6 @@ pub mod args;
 mod cache;
 mod commands;
 mod diagnostics;
-mod iterators;
 mod printer;
 mod resolve;
 

@@ -313,13 +313,14 @@ dependencies = [
 
 [[package]]
 name = "clap_complete_command"
-version = "0.4.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4160b4a4f72ef58bd766bad27c09e6ef1cc9d82a22f6a0f55d152985a4a48e31"
+checksum = "183495371ea78d4c9ff638bfc6497d46fed2396e4f9c50aebc1278a4a9919a3d"
 dependencies = [
  "clap 4.1.8",
  "clap_complete",
  "clap_complete_fig",
+ "clap_complete_nushell",
 ]
 
 [[package]]
@@ -327,6 +328,16 @@ name = "clap_complete_fig"
 version = "4.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63a06158a72dbb088f864887b4409fd22600ba379f3cee3040f842234cc5c2d0"
+dependencies = [
+ "clap 4.1.8",
+ "clap_complete",
+]
+
+[[package]]
+name = "clap_complete_nushell"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7fa41f5e6aa83bd151b70fd0ceaee703d68cd669522795dc812df9edad1252c"
 dependencies = [
  "clap 4.1.8",
  "clap_complete",
@@ -769,7 +780,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.254"
+version = "0.0.255"
 dependencies = [
  "anyhow",
  "clap 4.1.8",
@@ -1504,6 +1515,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "pathdiff"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
+
+[[package]]
 name = "peg"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1529,6 +1546,18 @@ name = "peg-runtime"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fa00462b37ead6d11a82c9d568b26682d78e0477dc02d1966c013af80969739"
+
+[[package]]
+name = "pep440_rs"
+version = "0.2.0"
+source = "git+https://github.com/konstin/pep440-rs.git?rev=a8fef4ec47f4c25b070b39cdbe6a0b9847e49941#a8fef4ec47f4c25b070b39cdbe6a0b9847e49941"
+dependencies = [
+ "lazy_static",
+ "regex",
+ "serde",
+ "tracing",
+ "unicode-width",
+]
 
 [[package]]
 name = "percent-encoding"
@@ -1953,7 +1982,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.254"
+version = "0.0.255"
 dependencies = [
  "anyhow",
  "bisection",
@@ -1979,6 +2008,9 @@ dependencies = [
  "num-traits",
  "once_cell",
  "path-absolutize",
+ "pathdiff",
+ "pep440_rs",
+ "pretty_assertions",
  "regex",
  "result-like",
  "ruff_cache",
@@ -2004,6 +2036,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruff_benchmark"
+version = "0.0.0"
+dependencies = [
+ "criterion",
+ "mimalloc",
+ "ruff",
+ "tikv-jemallocator",
+ "ureq",
+ "url",
+]
+
+[[package]]
 name = "ruff_cache"
 version = "0.0.0"
 dependencies = [
@@ -2016,7 +2060,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.254"
+version = "0.0.255"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2263,7 +2307,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=1871a1632e310985414211222f5bf8069678892f#1871a1632e310985414211222f5bf8069678892f"
+source = "git+https://github.com/RustPython/RustPython.git?rev=c15f670f2c30cfae6b41a1874893590148c74bc4#c15f670f2c30cfae6b41a1874893590148c74bc4"
 dependencies = [
  "num-bigint",
  "rustpython-compiler-core",
@@ -2272,7 +2316,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=1871a1632e310985414211222f5bf8069678892f#1871a1632e310985414211222f5bf8069678892f"
+source = "git+https://github.com/RustPython/RustPython.git?rev=c15f670f2c30cfae6b41a1874893590148c74bc4#c15f670f2c30cfae6b41a1874893590148c74bc4"
 dependencies = [
  "ascii",
  "bitflags",
@@ -2297,7 +2341,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=1871a1632e310985414211222f5bf8069678892f#1871a1632e310985414211222f5bf8069678892f"
+source = "git+https://github.com/RustPython/RustPython.git?rev=c15f670f2c30cfae6b41a1874893590148c74bc4#c15f670f2c30cfae6b41a1874893590148c74bc4"
 dependencies = [
  "bitflags",
  "bstr 0.2.17",
@@ -2311,7 +2355,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/RustPython/RustPython.git?rev=1871a1632e310985414211222f5bf8069678892f#1871a1632e310985414211222f5bf8069678892f"
+source = "git+https://github.com/RustPython/RustPython.git?rev=c15f670f2c30cfae6b41a1874893590148c74bc4#c15f670f2c30cfae6b41a1874893590148c74bc4"
 dependencies = [
  "ahash",
  "anyhow",
@@ -2836,7 +2880,19 @@ checksum = "8ce8c33a8d48bd45d624a6e523445fd21ec13d3653cd51f681abf67418f54eb8"
 dependencies = [
  "cfg-if",
  "pin-project-lite",
+ "tracing-attributes",
  "tracing-core",
+]
+
+[[package]]
+name = "tracing-attributes"
+version = "0.1.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4017f8f45139870ca7e672686113917c71c7a6e02d4924eda67186083c03081a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
