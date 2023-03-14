@@ -109,11 +109,13 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
         let comment_text = comment_text.trim_end();
         if matches!(comment_text, "# isort: split" | "# ruff: isort: split") {
             splits.push(start.row());
-        } else if comment_text == "# isort: skip_file"
-            || comment_text == "# isort:skip_file"
-            || comment_text == "# ruff: isort: skip_file"
-            || comment_text == "# ruff: isort:skip_file"
-        {
+        } else if matches!(
+            comment_text,
+            "# isort: skip_file"
+                | "# isort:skip_file"
+                | "# ruff: isort: skip_file"
+                | "# ruff: isort:skip_file"
+        ) {
             return IsortDirectives {
                 skip_file: true,
                 ..IsortDirectives::default()
