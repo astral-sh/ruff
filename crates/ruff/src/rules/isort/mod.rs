@@ -94,7 +94,7 @@ fn force_single_line_imports<'a>(
                                     } else {
                                         CommentSet {
                                             atop: vec![],
-                                            inline: vec![],
+                                            inline: comment_set.inline.clone(),
                                         }
                                     },
                                     TrailingComma::Absent,
