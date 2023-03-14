@@ -17,3 +17,7 @@ def errors():
 def ok():
     if x and not y:
         print("x is not an empty string, but y is an empty string")
+
+
+data.loc[data["a"] != ""]
+data.loc[data["a"] != "", :]

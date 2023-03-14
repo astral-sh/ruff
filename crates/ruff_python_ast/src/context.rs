@@ -251,6 +251,11 @@ impl<'a> Context<'a> {
         self.exprs.iter().rev().nth(2)
     }
 
+    /// Return an [`Iterator`] over the current `Expr` parents.
+    pub fn expr_ancestors(&self) -> impl Iterator<Item = &RefEquality<'a, Expr>> {
+        self.exprs.iter().rev().skip(1)
+    }
+
     /// Return the `Stmt` that immediately follows the current `Stmt`, if any.
     pub fn current_sibling_stmt(&self) -> Option<&'a Stmt> {
         self.body.get(self.body_index + 1)
