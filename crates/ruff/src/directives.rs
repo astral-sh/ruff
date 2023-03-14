@@ -107,7 +107,7 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
         // omit a space after the colon. The remaining action comments are
         // required to include the space, and must appear on their own lines.
         let comment_text = comment_text.trim_end();
-        if comment_text == "# isort: split" || comment_text == "# ruff: isort: split" {
+        if matches!(comment_text, "# isort: split" | "# ruff: isort: split") {
             splits.push(start.row());
         } else if comment_text == "# isort: skip_file"
             || comment_text == "# isort:skip_file"
