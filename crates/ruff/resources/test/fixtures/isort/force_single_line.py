@@ -10,9 +10,10 @@ from third_party import lib4
 
 from foo import bar  # comment 3
 from foo2 import bar2  # comment 4
+from foo3 import bar3, baz3  # comment 5
 
-# comment 5
+# comment 6
 from bar import (
-     a, # comment 6
-     b, # comment 7
+     a, # comment 7
+     b, # comment 8
 )

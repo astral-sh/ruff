@@ -46,10 +46,3 @@ bindings = "bin"
 manifest-path = "crates/ruff_cli/Cargo.toml"
 python-source = "python"
 strip = true
-
-[tool.ruff]
-fix = true
-select = ["F", "I"]
-
-[tool.ruff.isort]
-force-single-line = true
