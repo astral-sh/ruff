@@ -1,19 +1,24 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unaryop};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct TypedArgumentSimpleDefaults;
 
 /// PYI011
-impl Violation for TypedArgumentSimpleDefaults {
+impl AlwaysAutofixableViolation for TypedArgumentSimpleDefaults {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for typed arguments")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace default value by `...`".to_string()
     }
 }
 
@@ -111,7 +116,7 @@ fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> 
             if let ExprKind::Attribute { .. } = &operand.node {
                 if checker
                     .ctx
-                    .resolve_call_path(default)
+                    .resolve_call_path(operand)
                     .map_or(false, |call_path| {
                         ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS.iter().any(|target| {
                             // reject `-math.nan`
@@ -188,10 +193,18 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
             {
                 if arg.node.annotation.is_some() {
                     if !is_valid_default_value_with_annotation(default, checker) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            TypedArgumentSimpleDefaults,
-                            Range::from(default),
-                        ));
+                        let mut diagnostic =
+                            Diagnostic::new(TypedArgumentSimpleDefaults, Range::from(default));
+
+                        if checker.patch(diagnostic.kind.rule()) {
+                            diagnostic.amend(Fix::replacement(
+                                "...".to_string(),
+                                default.location,
+                                default.end_location.unwrap(),
+                            ));
+                        }
+
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -207,10 +220,18 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
             {
                 if kwarg.node.annotation.is_some() {
                     if !is_valid_default_value_with_annotation(default, checker) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            TypedArgumentSimpleDefaults,
-                            Range::from(default),
-                        ));
+                        let mut diagnostic =
+                            Diagnostic::new(TypedArgumentSimpleDefaults, Range::from(default));
+
+                        if checker.patch(diagnostic.kind.rule()) {
+                            diagnostic.amend(Fix::replacement(
+                                "...".to_string(),
+                                default.location,
+                                default.end_location.unwrap(),
+                            ));
+                        }
+
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }

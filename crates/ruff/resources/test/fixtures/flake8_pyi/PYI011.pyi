@@ -1,3 +1,10 @@
+import math
+import os
+import sys
+from math import inf
+
+import numpy as np
+
 def f12(
     x,
     y: str = os.pathsep,  # Error PYI011 Only simple default values allowed for typed arguments
@@ -100,4 +107,10 @@ def f34(
 def f35(
     x: complex = math.inf  # Error PYI011 Only simple default values allowed for typed arguments
     + 1j,
+) -> None: ...
+def f36(
+    *, x: str = sys.version,  # OK
+) -> None: ...
+def f37(
+    *, x: str = "" + "",  # Error PYI011 Only simple default values allowed for typed arguments
 ) -> None: ...
