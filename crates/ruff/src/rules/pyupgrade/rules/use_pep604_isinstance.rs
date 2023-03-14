@@ -79,9 +79,19 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
         };
         if let Some(types) = args.get(1) {
             if let ExprKind::Tuple { elts, .. } = &types.node {
+                // Ex) `()`
                 if elts.is_empty() {
                     return;
                 }
+
+                // Ex) `(*args,)`
+                if elts
+                    .iter()
+                    .any(|elt| matches!(elt.node, ExprKind::Starred { .. }))
+                {
+                    return;
+                }
+
                 let mut diagnostic =
                     Diagnostic::new(IsinstanceWithTuple { kind }, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
