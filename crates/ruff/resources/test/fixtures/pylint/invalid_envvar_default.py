@@ -8,5 +8,5 @@ os.getenv("AA", "GOOD")
 os.getenv("AA", f"GOOD")
 os.getenv("AA", "GOOD" + "BAD")
 os.getenv("AA", "GOOD" + 1)
+os.getenv("AA", "GOOD %s" % "BAD")
 os.getenv("B", Z)
-

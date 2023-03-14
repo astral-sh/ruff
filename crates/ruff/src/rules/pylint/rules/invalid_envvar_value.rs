@@ -46,6 +46,7 @@ fn is_valid_key(expr: &Expr) -> bool {
         return true;
     }
 
+    // Allow string concatenation.
     if let ExprKind::BinOp {
         left,
         right,
@@ -53,6 +54,16 @@ fn is_valid_key(expr: &Expr) -> bool {
     } = &expr.node
     {
         return is_valid_key(left) && is_valid_key(right);
+    }
+
+    // Allow string formatting.
+    if let ExprKind::BinOp {
+        left,
+        op: Operator::Mod,
+        ..
+    } = &expr.node
+    {
+        return is_valid_key(left);
     }
 
     // Otherwise, the default must be a string.
