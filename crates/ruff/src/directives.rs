@@ -105,23 +105,27 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
 
         // `isort` allows for `# isort: skip` and `# isort: skip_file` to include or
         // omit a space after the colon. The remaining action comments are
-        // required to include the space, and must appear on their own lines.
-        let comment_text = comment_text.trim_end();
-        if matches!(comment_text, "# isort: split" | "# ruff: isort: split") {
+        // required to include the space, and must appear on their own lines. We're a
+        // bit more lenient and allow comments to appear inline, without without a
+        // space after the colon.
+        let Some(action) = comment_text.trim_end()
+            .split_once("# isort:")
+            .or_else(|| comment_text.split_once("# ruff: isort:"))
+            .map(|(.., action)| action)
+            .map(str::trim_start) else
+        {
+            continue;
+        };
+
+        if action == "split" {
             splits.push(start.row());
-        } else if matches!(
-            comment_text,
-            "# isort: skip_file"
-                | "# isort:skip_file"
-                | "# ruff: isort: skip_file"
-                | "# ruff: isort:skip_file"
-        ) {
+        } else if action == "skip_file" {
             return IsortDirectives {
                 skip_file: true,
                 ..IsortDirectives::default()
             };
         } else if off.is_some() {
-            if comment_text == "# isort: on" || comment_text == "# ruff: isort: on" {
+            if action == "on" {
                 if let Some(start) = off {
                     for row in start.row() + 1..=end.row() {
                         exclusions.insert(row);
@@ -130,9 +134,9 @@ pub fn extract_isort_directives(lxr: &[LexResult]) -> IsortDirectives {
                 off = None;
             }
         } else {
-            if comment_text.contains("isort: skip") || comment_text.contains("isort:skip") {
+            if action == "skip" {
                 exclusions.insert(start.row());
-            } else if comment_text == "# isort: off" || comment_text == "# ruff: isort: off" {
+            } else if action == "off" {
                 off = Some(start);
             }
         }

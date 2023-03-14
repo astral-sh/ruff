@@ -1,0 +1,6 @@
+---
+source: crates/ruff/src/rules/isort/mod.rs
+expression: diagnostics
+---
+[]
+
