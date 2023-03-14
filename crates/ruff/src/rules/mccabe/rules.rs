@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{ExcepthandlerKind, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{ExcepthandlerKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -74,13 +74,10 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
-            StmtKind::While { test, body, orelse } => {
+            StmtKind::While { body, orelse, .. } => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
-                if let ExprKind::BoolOp { .. } = &test.node {
-                    complexity += 1;
-                }
             }
             StmtKind::Match { cases, .. } => {
                 complexity += 1;
@@ -100,8 +97,10 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 orelse,
                 finalbody,
             } => {
-                complexity += 1;
                 complexity += get_complexity_number(body);
+                if !orelse.is_empty() {
+                    complexity += 1;
+                }
                 complexity += get_complexity_number(orelse);
                 complexity += get_complexity_number(finalbody);
                 for handler in handlers {
@@ -307,7 +306,7 @@ def nested_try_finally():
         print(3)
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_complexity_number(&stmts), 3);
+        assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
 
@@ -372,6 +371,35 @@ class Class:
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 9);
+        Ok(())
+    }
+
+    #[test]
+    fn finally() -> Result<()> {
+        let source = r#"
+def process_detect_lines():
+    try:
+        pass
+    finally:
+        pass
+"#;
+        let stmts = parser::parse_program(source, "<filename>")?;
+        assert_eq!(get_complexity_number(&stmts), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn if_in_finally() -> Result<()> {
+        let source = r#"
+def process_detect_lines():
+    try:
+        pass
+    finally:
+        if res:
+            errors.append(f"Non-zero exit code {res}")
+"#;
+        let stmts = parser::parse_program(source, "<filename>")?;
+        assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
 }
