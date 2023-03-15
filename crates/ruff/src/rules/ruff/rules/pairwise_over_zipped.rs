@@ -1,14 +1,14 @@
 use ruff_diagnostics::{Diagnostic, Violation};
-use ruff_macros::{violation, derive_message_formats};
+use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Stylist;
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_python_ast::helpers::unparse_constant;
 use crate::checkers::ast::Checker;
 use crate::Range;
+use ruff_python_ast::helpers::unparse_constant;
 
 #[violation]
-pub struct PairwiseOverZipped { }
+pub struct PairwiseOverZipped {}
 
 impl Violation for PairwiseOverZipped {
     #[derive_message_formats]
@@ -18,15 +18,19 @@ impl Violation for PairwiseOverZipped {
 }
 
 #[derive(Debug)]
-struct SliceInfo { 
+struct SliceInfo {
     arg_name: String,
     slice_start: i32,
     slice_end: i32,
 }
 
 impl SliceInfo {
-    pub fn new(arg_name: String, slice_start: i32, slice_end: i32) -> Self { 
-        Self { arg_name, slice_start, slice_end }
+    pub fn new(arg_name: String, slice_start: i32, slice_end: i32) -> Self {
+        Self {
+            arg_name,
+            slice_start,
+            slice_end,
+        }
     }
 }
 
@@ -36,22 +40,32 @@ fn get_slice_info<'a>(expr: &'a Expr, stylist: &Stylist) -> Option<SliceInfo> {
         return None;
     };
 
-    let ExprKind::Name { id: arg_id, .. } = &value.node else { 
+    let ExprKind::Name { id: arg_id, .. } = &value.node else {
         return None;
     };
 
     let mut lower_bound = 0;
     let mut upper_bound = 0;
-    if let ExprKind::Slice { lower, upper, .. } = &slice.node { 
-        if lower.is_some() { 
-            if let ExprKind::Constant { value: lower_value, .. } = &lower.as_ref().unwrap().node { 
-                lower_bound = unparse_constant(lower_value, stylist).parse::<i32>().unwrap_or(0);
+    if let ExprKind::Slice { lower, upper, .. } = &slice.node {
+        if lower.is_some() {
+            if let ExprKind::Constant {
+                value: lower_value, ..
+            } = &lower.as_ref().unwrap().node
+            {
+                lower_bound = unparse_constant(lower_value, stylist)
+                    .parse::<i32>()
+                    .unwrap_or(0);
             }
         }
 
-        if upper.is_some() { 
-            if let ExprKind::Constant { value: upper_value, .. } = &upper.as_ref().unwrap().node { 
-                upper_bound = unparse_constant(upper_value, stylist).parse::<i32>().unwrap_or(0);
+        if upper.is_some() {
+            if let ExprKind::Constant {
+                value: upper_value, ..
+            } = &upper.as_ref().unwrap().node
+            {
+                upper_bound = unparse_constant(upper_value, stylist)
+                    .parse::<i32>()
+                    .unwrap_or(0);
             }
         }
     };
@@ -65,8 +79,8 @@ pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
             // First arg can be a Name or a Subscript
             let first_arg_info_opt = match &args[0].node {
                 ExprKind::Name { id: arg_id, .. } => Some(SliceInfo::new(arg_id.to_string(), 0, 0)),
-                ExprKind::Subscript {  .. } => get_slice_info(&args[0], checker.stylist),
-                _ => None
+                ExprKind::Subscript { .. } => get_slice_info(&args[0], checker.stylist),
+                _ => None,
             };
 
             // If it's not one of those, return
@@ -81,13 +95,15 @@ pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
             let second_arg_info = get_slice_info(&args[1], checker.stylist).unwrap();
 
             let first_arg_info = first_arg_info_opt.unwrap();
-            let args_are_successive = (first_arg_info.slice_start == 0 && second_arg_info.slice_start == 1) || (first_arg_info.slice_end == -1 && second_arg_info.slice_start == 1);
+            let args_are_successive = (first_arg_info.slice_start == 0
+                || first_arg_info.slice_end == -1)
+                && second_arg_info.slice_start == 1;
+
             if first_arg_info.arg_name == second_arg_info.arg_name && args_are_successive {
-                checker.diagnostics.push(Diagnostic::new(
-                    PairwiseOverZipped {},
-                    Range::from(func),
-                ));
-            }         
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PairwiseOverZipped {}, Range::from(func)));
+            }
         }
     }
 }
