@@ -1,7 +1,7 @@
 //! Utils for reading and writing jupyter notebooks
 
-mod jupyter;
+mod notebook;
 mod schema;
 
-pub use jupyter::*;
+pub use notebook::*;
 pub use schema::*;
