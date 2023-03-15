@@ -67,19 +67,17 @@ pub fn check_imports(
                     end_location: stmt.end_location.unwrap(),
                 });
             }
-            StmtKind::ImportFrom { module, names, .. } => imports_vec.extend(
-                names
-                    .iter()
-                    .map(|name| Import {
-                        name: format!(
-                            "{}.{}",
-                            module.as_ref().unwrap_or(&String::new()),
-                            name.node.name
-                        ),
-                        location: name.location,
-                        end_location: name.end_location.unwrap(),
-                    })
-            ),
+            StmtKind::ImportFrom { module, names, .. } => {
+                imports_vec.extend(names.iter().map(|name| Import {
+                    name: format!(
+                        "{}.{}",
+                        module.as_ref().unwrap_or(&String::new()),
+                        name.node.name
+                    ),
+                    location: name.location,
+                    end_location: name.end_location.unwrap(),
+                }));
+            }
             _ => unreachable!("Should only have import statements"),
         });
     }
