@@ -1,0 +1,57 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 5
+  end_location:
+    row: 10
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 12
+    column: 5
+  end_location:
+    row: 12
+    column: 8
+  fix: ~
+  parent: ~
+
