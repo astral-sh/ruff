@@ -4685,31 +4685,37 @@ impl<'a> Checker<'a> {
         while let Some((scopes, ..)) = self.deferred.assignments.pop() {
             let scope_index = scopes[scopes.len() - 1];
             let parent_scope_index = scopes[scopes.len() - 2];
+
+            // pyflakes
             if self.settings.rules.enabled(&Rule::UnusedVariable) {
                 pyflakes::rules::unused_variable(self, scope_index);
             }
             if self.settings.rules.enabled(&Rule::UnusedAnnotation) {
                 pyflakes::rules::unused_annotation(self, scope_index);
             }
-            if self.settings.rules.enabled(&Rule::UnusedFunctionArgument)
-                || self.settings.rules.enabled(&Rule::UnusedMethodArgument)
-                || self
-                    .settings
-                    .rules
-                    .enabled(&Rule::UnusedClassMethodArgument)
-                || self
-                    .settings
-                    .rules
-                    .enabled(&Rule::UnusedStaticMethodArgument)
-                || self.settings.rules.enabled(&Rule::UnusedLambdaArgument)
-            {
-                self.diagnostics
-                    .extend(flake8_unused_arguments::rules::unused_arguments(
-                        self,
-                        &self.ctx.scopes[parent_scope_index],
-                        &self.ctx.scopes[scope_index],
-                        &self.ctx.bindings,
-                    ));
+
+            if !self.is_stub {
+                // flake8-unused-arguments
+                if self.settings.rules.enabled(&Rule::UnusedFunctionArgument)
+                    || self.settings.rules.enabled(&Rule::UnusedMethodArgument)
+                    || self
+                        .settings
+                        .rules
+                        .enabled(&Rule::UnusedClassMethodArgument)
+                    || self
+                        .settings
+                        .rules
+                        .enabled(&Rule::UnusedStaticMethodArgument)
+                    || self.settings.rules.enabled(&Rule::UnusedLambdaArgument)
+                {
+                    self.diagnostics
+                        .extend(flake8_unused_arguments::rules::unused_arguments(
+                            self,
+                            &self.ctx.scopes[parent_scope_index],
+                            &self.ctx.scopes[scope_index],
+                            &self.ctx.bindings,
+                        ));
+                }
             }
         }
     }
