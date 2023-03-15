@@ -16,11 +16,26 @@ while True:
             continue  # [continue-in-finally]
         pass
 
+try:
+    pass
+finally:
+    test = "aa"
+    match test:
+        case "aa":
+            continue # [continue-in-finally]
+
+try:
+    pass
+finally:
+    with "aa" as f:
+        continue # [continue-in-finally]
 
 while True:
     try:
         pass
     finally:
+        if True:
+            continue  # [continue-in-finally]
         continue  # [continue-in-finally]
 
         def test():

@@ -1,4 +1,5 @@
-use rustpython_parser::ast::{Stmt, StmtKind};
+use libcst_native::Pass;
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -42,13 +43,31 @@ impl Violation for ContinueInFinally {
     }
 }
 
-/// PLE0116
-pub fn continue_in_finally(checker: &mut Checker, body: &[Stmt]) {
+fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
     for stmt in body {
         if matches!(stmt.node, StmtKind::Continue { .. }) {
             checker
                 .diagnostics
                 .push(Diagnostic::new(ContinueInFinally, Range::from(stmt)));
         }
+
+        match &stmt.node {
+            StmtKind::If { body, .. }
+            | StmtKind::With { body, .. }
+            | StmtKind::AsyncWith { body, .. } => {
+                traverse_body(checker, body);
+            }
+            StmtKind::Match { cases, .. } => {
+                for case in cases {
+                    traverse_body(checker, &case.body);
+                }
+            }
+            _ => {}
+        }
     }
+}
+
+/// PLE0116
+pub fn continue_in_finally(checker: &mut Checker, body: &[Stmt]) {
+    traverse_body(checker, body);
 }
