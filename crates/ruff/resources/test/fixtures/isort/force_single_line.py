@@ -1,5 +1,10 @@
 import sys, math
 from os import path, uname
+from json import detect_encoding
+from json import dump
+from json import dumps as json_dumps
+from json import load
+from json import loads as json_loads
 from logging.handlers import StreamHandler, FileHandler
 
 # comment 1

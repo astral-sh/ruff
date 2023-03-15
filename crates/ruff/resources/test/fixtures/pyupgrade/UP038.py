@@ -5,3 +5,5 @@ isinstance(1, int)  # OK
 issubclass("yes", int)  # OK
 isinstance(1, int | float)  # OK
 issubclass("yes", int | str)  # OK
+isinstance(1, ())  # OK
+isinstance(1, (int, *(str, bytes)))  # OK

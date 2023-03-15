@@ -1,7 +1,14 @@
+name: PR Check Comment
+
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      workflow_run_id:
+        description: The ecosystem workflow that triggers the workflow run
+        required: true
 
 permissions:
   pull-requests: write
@@ -16,7 +23,7 @@ jobs:
         with:
           name: ecosystem-result
           workflow: ci.yaml
-          run_id: ${{ github.event.workflow_run.id }}
+          run_id: ${{ github.event.workflow_run.id || github.event.inputs.workflow_run_id }}
           if_no_artifact_found: ignore
       - if: steps.download-result.outputs.found_artifact
         id: result

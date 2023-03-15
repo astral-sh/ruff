@@ -292,15 +292,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 75
+    column: 91
   fix:
-    content: "from typing import Match, Pattern, List, OrderedDict, AbstractSet\nfrom collections.abc import Callable"
+    content: "from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager\nfrom collections.abc import Callable"
     location:
       row: 44
       column: 0
     end_location:
       row: 44
-      column: 75
+      column: 91
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -312,15 +312,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 75
+    column: 91
   fix:
-    content: "from typing import Callable, Match, Pattern, List, AbstractSet\nfrom collections import OrderedDict"
+    content: "from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager\nfrom collections import OrderedDict"
     location:
       row: 44
       column: 0
     end_location:
       row: 44
-      column: 75
+      column: 91
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -332,15 +332,15 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 75
+    column: 91
   fix:
-    content: "from typing import Callable, List, OrderedDict, AbstractSet\nfrom re import Match, Pattern"
+    content: "from typing import Callable, List, OrderedDict, AbstractSet, ContextManager\nfrom re import Match, Pattern"
     location:
       row: 44
       column: 0
     end_location:
       row: 44
-      column: 75
+      column: 91
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -352,7 +352,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 75
+    column: 91
   fix: ~
   parent: ~
 - kind:
@@ -365,7 +365,20 @@ expression: diagnostics
     column: 0
   end_location:
     row: 44
-    column: 75
+    column: 91
+  fix: ~
+  parent: ~
+- kind:
+    name: DeprecatedImport
+    body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 44
+    column: 0
+  end_location:
+    row: 44
+    column: 91
   fix: ~
   parent: ~
 - kind:
