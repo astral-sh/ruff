@@ -209,9 +209,10 @@ pub fn write_jupyter_notebook(path: &Path, notebook: &JupyterNotebook) -> anyhow
 mod test {
     use std::path::Path;
 
+    #[cfg(feature = "jupyter_notebook")]
+    use super::is_jupyter_notebook;
+    use super::{concat_notebook, read_jupyter_notebook};
     use crate::jupyter::JupyterIndex;
-
-    use super::{concat_notebook, is_jupyter_notebook, read_jupyter_notebook};
 
     #[test]
     fn test_valid() {
@@ -251,6 +252,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "jupyter_notebook")]
     fn inclusions() {
         let path = Path::new("foo/bar/baz");
         assert!(!is_jupyter_notebook(path));
