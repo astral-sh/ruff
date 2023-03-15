@@ -4,6 +4,7 @@ use ruff_python_ast::source_code::Stylist;
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use crate::checkers::ast::Checker;
+use crate::settings::types::PythonVersion;
 use crate::Range;
 use ruff_python_ast::helpers::unparse_constant;
 
@@ -75,7 +76,11 @@ fn get_slice_info(expr: &Expr, stylist: &Stylist) -> Option<SliceInfo> {
 
 pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
     if let ExprKind::Name { id, .. } = &func.node {
-        if checker.ctx.is_builtin(id) && id == "zip" && args.len() > 1 {
+        // Ensure that the checker settings are valid for the rule to apply
+        let valid_checker =
+            checker.ctx.is_builtin(id) && checker.settings.target_version >= PythonVersion::Py310;
+
+        if valid_checker && id == "zip" && args.len() > 1 {
             // First arg can be a Name or a Subscript
             let first_arg_info_opt = match &args[0].node {
                 ExprKind::Name { id: arg_id, .. } => Some(SliceInfo::new(arg_id.to_string(), 0, 0)),
