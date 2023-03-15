@@ -1,8 +1,6 @@
 name: Benchmark
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -11,35 +9,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-baseline-binary:
-    if: github.event_name != 'pull_request'
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, windows-latest ]
-    runs-on: ${{ matrix.os }}
-    name: Build Benchmark Binary | ${{ matrix.os }}
-
-    steps:
-      - name: "Checkout Branch"
-        uses: actions/checkout@v3
-
-      - name: "Install Rust toolchain"
-        run: rustup show
-
-      - uses: Swatinem/rust-cache@v1
-
-      - name: "Build benchmarks"
-        uses: actions-rs/cargo@v1
-        with:
-          command: bench
-          args: -p ruff_benchmark --no-run
-
-      - name: "Save Binary"
-        uses: actions/upload-artifact@v3
-        with:
-          name: ruff-benchmark-${{ matrix.os }}
-          path: ./target/release/ruff_benchmark
-
   run-benchmark:
     if: github.event_name == 'pull_request'
     name: "Run | ${{ matrix.os }}"
@@ -68,33 +37,16 @@ jobs:
       - name: "PR - Run benchmarks"
         run: cargo benchmark --save-baseline=pr
 
-      - name: "Main - Download pre-built binary"
-        uses: dawidd6/action-download-artifact@v2
-        id: download_base_bin
-        with:
-          name: ruff-benchmark-${{ matrix.os }}
-          commit: ${{ github.event.pull_request.base.sha }}
-          path: ./target/release/ruff_benchmark
-          if_no_artifact_found: ignore
-          search_artifacts: true # Necessary because of build matrix (different run for each os)
-
-      - name: "Main - Set executable flag"
-        if: steps.download_base_bin.outputs.found_artifact == 'true'
-        run: chmod +x ./target/release/ruff_benchmark
-
       - name: "Main - Checkout Branch"
-        if: steps.download_base_bin.outputs.found_artifact != 'true'
         uses: actions/checkout@v3
         with:
           clean: false
           ref: main
 
       - name: "Main - Install Rust toolchain"
-        if: steps.download_base_bin.outputs.found_artifact != 'true'
         run: rustup show
 
       - name: "Main - Build benchmarks"
-        if: steps.download_base_bin.outputs.found_artifact != 'true'
         uses: actions-rs/cargo@v1
         with:
           command: bench
