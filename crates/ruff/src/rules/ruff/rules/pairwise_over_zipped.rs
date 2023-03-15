@@ -35,7 +35,7 @@ impl SliceInfo {
 }
 
 // Get arg name, lower bound, and upper bound for an expression, if it's a slice
-fn get_slice_info<'a>(expr: &'a Expr, stylist: &Stylist) -> Option<SliceInfo> {
+fn get_slice_info(expr: &Expr, stylist: &Stylist) -> Option<SliceInfo> {
     let ExprKind::Subscript { value, slice, .. } = &expr.node else {
         return None;
     };
