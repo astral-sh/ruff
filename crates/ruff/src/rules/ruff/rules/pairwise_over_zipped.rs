@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{violation, derive_message_formats};
+use ruff_python_ast::source_code::Stylist;
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_python_ast::helpers::unparse_constant;
@@ -7,7 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::Range;
 
 #[violation]
-pub struct PairwiseOverZipped {}
+pub struct PairwiseOverZipped { }
 
 impl Violation for PairwiseOverZipped {
     #[derive_message_formats]
@@ -16,39 +17,77 @@ impl Violation for PairwiseOverZipped {
     }
 }
 
+#[derive(Debug)]
+struct SliceInfo { 
+    arg_name: String,
+    slice_start: i32,
+    slice_end: i32,
+}
+
+impl SliceInfo {
+    pub fn new(arg_name: String, slice_start: i32, slice_end: i32) -> Self { 
+        Self { arg_name, slice_start, slice_end }
+    }
+}
+
+// Get arg name, lower bound, and upper bound for an expression, if it's a slice
+fn get_slice_info<'a>(expr: &'a Expr, stylist: &Stylist) -> Option<SliceInfo> {
+    let ExprKind::Subscript { value, slice, .. } = &expr.node else {
+        return None;
+    };
+
+    let ExprKind::Name { id: arg_id, .. } = &value.node else { 
+        return None;
+    };
+
+    let mut lower_bound = 0;
+    let mut upper_bound = 0;
+    if let ExprKind::Slice { lower, upper, .. } = &slice.node { 
+        if lower.is_some() { 
+            if let ExprKind::Constant { value: lower_value, .. } = &lower.as_ref().unwrap().node { 
+                lower_bound = unparse_constant(lower_value, stylist).parse::<i32>().unwrap_or(0);
+            }
+        }
+
+        if upper.is_some() { 
+            if let ExprKind::Constant { value: upper_value, .. } = &upper.as_ref().unwrap().node { 
+                upper_bound = unparse_constant(upper_value, stylist).parse::<i32>().unwrap_or(0);
+            }
+        }
+    };
+
+    Some(SliceInfo::new(arg_id.to_string(), lower_bound, upper_bound))
+}
+
 pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
     if let ExprKind::Name { id, .. } = &func.node {
-        if id == "zip" {
-            let ExprKind::Name { id: first_arg_id, .. } = &args[0].node else {
-               return;
+        if checker.ctx.is_builtin(id) && id == "zip" && args.len() > 1 {
+            // First arg can be a Name or a Subscript
+            let first_arg_info_opt = match &args[0].node {
+                ExprKind::Name { id: arg_id, .. } => Some(SliceInfo::new(arg_id.to_string(), 0, 0)),
+                ExprKind::Subscript {  .. } => get_slice_info(&args[0], checker.stylist),
+                _ => None
             };
 
-            let ExprKind::Subscript { value: second_arg, slice, .. } = &args[1].node else {
+            // If it's not one of those, return
+            if first_arg_info_opt.is_none() {
                 return;
-            };
-
-            let ExprKind::Name { id: second_arg_id, .. } = &second_arg.node else {
-                return;
-            };
-
-            // Make sure that the lower end of the slice is 1, or else we can't guarantee that
-            // successive pairs are desired
-            let mut lower_bound = 0;
-            if let ExprKind::Slice { lower, .. } = &slice.node {
-                // If there's no lower bound, it can't be a successive pair request
-                let ExprKind::Constant { value, .. } = &lower.as_ref().unwrap().node else { 
-                    return;
-                };
-
-                lower_bound = unparse_constant(value, checker.stylist).parse::<i32>().unwrap();
             }
 
-            if first_arg_id == second_arg_id && lower_bound == 1 {
+            // Second arg can only be a subscript
+            let ExprKind::Subscript { .. } = &args[1].node else {
+                return;
+            };
+            let second_arg_info = get_slice_info(&args[1], checker.stylist).unwrap();
+
+            let first_arg_info = first_arg_info_opt.unwrap();
+            let args_are_successive = (first_arg_info.slice_start == 0 && second_arg_info.slice_start == 1) || (first_arg_info.slice_end == -1 && second_arg_info.slice_start == 1);
+            if first_arg_info.arg_name == second_arg_info.arg_name && args_are_successive {
                 checker.diagnostics.push(Diagnostic::new(
                     PairwiseOverZipped {},
                     Range::from(func),
                 ));
-            }
+            }         
         }
     }
 }

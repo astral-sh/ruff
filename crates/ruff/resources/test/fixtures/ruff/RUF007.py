@@ -8,6 +8,8 @@ list(zip(input, otherInput))
 # Error - prefer pairwise here
 zip(input, input[1:])
 list(zip(input, input[1:]))
+zip(input[:-1], input[1:])
+list(zip(input[:-1], input[1:]))
 
 # Don't want the error triggered here since it's not successive - pairwise() is not a valid substitute!
 zip(input, input[2:])
