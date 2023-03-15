@@ -252,12 +252,13 @@ mod test {
         printer.write_once(&diagnostics, &mut writer)?;
         // TODO(konstin): Set jupyter notebooks as none-fixable for now
         // TODO(konstin) 2: Make jupyter notebooks fixable
-        let expected = format!("{root_path}/valid.ipynb:cell 1:2:5: F841 [*] Local variable `x` is assigned to but never used
-{root_path}/valid.ipynb:cell 3:1:24: B006 Do not use mutable data structures for argument defaults
+        let expected = format!(
+            "{valid_ipynb}:cell 1:2:5: F841 [*] Local variable `x` is assigned to but never used
+{valid_ipynb}:cell 3:1:24: B006 Do not use mutable data structures for argument defaults
 Found 2 errors.
 [*] 1 potentially fixable with the --fix option.
 ",
-            root_path = root_path.absolutize()?.display()
+            valid_ipynb = root_path.join("valid.ipynb").absolutize()?.display()
         );
 
         assert_eq!(expected, String::from_utf8(writer)?);
