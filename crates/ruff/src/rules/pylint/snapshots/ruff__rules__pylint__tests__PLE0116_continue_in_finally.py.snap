@@ -1,0 +1,83 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 5
+    column: 8
+  end_location:
+    row: 5
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 16
+    column: 12
+  end_location:
+    row: 16
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 24
+    column: 8
+  end_location:
+    row: 24
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 32
+    column: 16
+  end_location:
+    row: 32
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 39
+    column: 8
+  end_location:
+    row: 39
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 52
+    column: 8
+  end_location:
+    row: 52
+    column: 16
+  fix: ~
+  parent: ~
+
