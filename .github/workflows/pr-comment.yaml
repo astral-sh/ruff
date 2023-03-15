@@ -2,7 +2,7 @@ name: PR Check Comment
 
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: [CI, Benchmark]
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -17,22 +17,66 @@ jobs:
   comment:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
       - uses: dawidd6/action-download-artifact@v2
-        id: download-result
+        name: Download PR Number
+        with:
+          name: pr-number
+          run_id: ${{ github.event.workflow_run.id ||  github.event.inputs.workflow_run_id }}
+          if_no_artifact_found: ignore
+
+      - name: Extract PR Number
+        id: pr-number
+        run: |
+          if [[ -f pr-number ]]
+          then
+            echo "pr-number=$(<pr-number)" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: dawidd6/action-download-artifact@v2
+        name: "Download Ecosystem Result"
+        id: download-ecosystem-result
+        if: steps.pr-number.outputs.pr-number
         with:
           name: ecosystem-result
           workflow: ci.yaml
-          run_id: ${{ github.event.workflow_run.id || github.event.inputs.workflow_run_id }}
+          pr: ${{ steps.pr-number.outputs.pr-number }}
+          path: pr/ecosystem
           if_no_artifact_found: ignore
-      - if: steps.download-result.outputs.found_artifact
-        id: result
+
+      - uses: dawidd6/action-download-artifact@v2
+        name: "Download Benchmark Result"
+        id: download-benchmark-result
+        if: steps.pr-number.outputs.pr-number
+        with:
+          name: summary
+          workflow: benchmark.yaml
+          pr: ${{ steps.pr-number.outputs.pr-number }}
+          path: pr/benchmark
+          if_no_artifact_found: ignore
+
+      - name: Generate Comment
+        id: generate-comment
+        if: steps.download-ecosystem-result.outputs.found_artifact == 'true' || steps.download-benchmark-result.outputs.found_artifact == 'true'
         run: |
-          echo "pr-number=$(<pr-number)" >> $GITHUB_OUTPUT
-      - name: Create comment
-        if: steps.download-result.outputs.found_artifact
+          echo 'comment<<EOF' >> $GITHUB_OUTPUT
+          echo '## PR Check Results' >> $GITHUB_OUTPUT
+
+          if [[ -f pr/ecosystem/ecosystem-result ]]
+          then
+            cat pr/ecosystem/ecosystem-result >> $GITHUB_OUTPUT
+          fi
+
+          if [[ -f pr/benchmark/summary.md ]]
+          then
+            cat pr/benchmark/summary.md >> $GITHUB_OUTPUT
+          fi
+
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Create or update comment
+        if: steps.generate-comment.outputs.comment
         uses: thollander/actions-comment-pull-request@v2
         with:
-          pr_number: ${{ steps.result.outputs.pr-number }}
-          filePath: ecosystem-result
-          comment_tag: ecosystem-results
+          pr_number: ${{ steps.pr-number.outputs.pr-number }}
+          message: ${{ steps.generate-comment.outputs.comment }}
+          comment_tag: PR Check Results

@@ -1,6 +1,8 @@
-name: benchmark
+name: Benchmark
 
 on:
+  push:
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -9,8 +11,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build-baseline-binary:
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+    name: Build Benchmark Binary | ${{ matrix.os }}
+
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@v3
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - uses: Swatinem/rust-cache@v1
+
+      - name: "Build benchmarks"
+        uses: actions-rs/cargo@v1
+        with:
+          command: bench
+          args: -p ruff_benchmark --no-run
+
+      - name: "Save Binary"
+        uses: actions/upload-artifact@v3
+        with:
+          name: ruff-benchmark-${{ matrix.os }}
+          path: ./target/release/ruff_benchmark
+
   run-benchmark:
-    name: "Base | ${{ matrix.os }}"
+    if: github.event_name == 'pull_request'
+    name: "Run | ${{ matrix.os }}"
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -36,16 +68,33 @@ jobs:
       - name: "PR - Run benchmarks"
         run: cargo benchmark --save-baseline=pr
 
+      - name: "Main - Download pre-built binary"
+        uses: dawidd6/action-download-artifact@v2
+        id: download_base_bin
+        with:
+          name: ruff-benchmark-${{ matrix.os }}
+          commit: ${{ github.event.pull_request.base.sha }}
+          path: ./target/release/ruff_benchmark
+          if_no_artifact_found: ignore
+          search_artifacts: true # Necessary because of build matrix (different run for each os)
+
+      - name: "Main - Set executable flag"
+        if: steps.download_base_bin.outputs.found_artifact == 'true'
+        run: chmod +x ./target/release/ruff_benchmark
+
       - name: "Main - Checkout Branch"
+        if: steps.download_base_bin.outputs.found_artifact != 'true'
         uses: actions/checkout@v3
         with:
           clean: false
           ref: main
 
       - name: "Main - Install Rust toolchain"
+        if: steps.download_base_bin.outputs.found_artifact != 'true'
         run: rustup show
 
       - name: "Main - Build benchmarks"
+        if: steps.download_base_bin.outputs.found_artifact != 'true'
         uses: actions-rs/cargo@v1
         with:
           command: bench
@@ -67,8 +116,9 @@ jobs:
           path: ./target/criterion
 
   benchmark-compare:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    name: "Compare Benchmarks"
+    name: Compare
     needs:
       - run-benchmark
 
@@ -77,7 +127,8 @@ jobs:
       run: rustup show
 
     - name: "Install critcmp"
-      run: cargo install --debug critcmp # Use debug build: Building takes much longer than the "slowness" of using the debug build.
+      # Use debug build: Building takes much longer than the "slowness" of using the debug build.
+      run: cargo install --debug critcmp
 
     - name: "Linux | Download PR benchmark results"
       uses: actions/download-artifact@v3
@@ -88,8 +139,8 @@ jobs:
     - name: "Linux | Compare benchmark results"
       shell: bash
       run: |
-        echo "## Benchmark Results" >> summary.md
-        echo "### Linux" >> summary.md
+        echo "### Benchmark Results" >> summary.md
+        echo "#### Linux" >> summary.md
         echo "\`\`\`" >> summary.md
         critcmp main pr >> summary.md
         echo "\`\`\`" >> summary.md
@@ -107,29 +158,24 @@ jobs:
     - name: "Windows | Compare benchmark results"
       shell: bash
       run: |
-        echo "### Windows" >> summary.md
+        echo "#### Windows" >> summary.md
         echo "\`\`\`" >> summary.md
         critcmp main pr >> summary.md
         echo "\`\`\`" >> summary.md
         echo "" >> summary.md
+
+        echo ${{ github.event.pull_request.number }} > pr-number
+
         cat summary.md > $GITHUB_STEP_SUMMARY
 
-    - name: Find Comment
-      # Check if the event is not triggered by a fork
-      if: github.event.pull_request.head.repo.full_name == github.repository
-      uses: peter-evans/find-comment@v2
-      id: fc
+    - uses: actions/upload-artifact@v3
+      name: Upload PR Number
       with:
-        issue-number: ${{ github.event.pull_request.number }}
-        comment-author: 'github-actions[bot]'
-        body-includes: Benchmark Results
+        name: pr-number
+        path: pr-number
 
-    - name: Create or update comment
-      # Check if the event is not triggered by a fork
-      if: github.event.pull_request.head.repo.full_name == github.repository
-      uses: peter-evans/create-or-update-comment@v2
+    - uses: actions/upload-artifact@v3
+      name: Upload Summary
       with:
-        issue-number: ${{ github.event.pull_request.number }}
-        edit-mode: replace
-        comment-id: ${{ steps.fc.outputs.comment-id }}
-        body-file: summary.md
+        name: summary
+        path: summary.md
