@@ -12,7 +12,7 @@ use log::{debug, error};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
-use ruff::jupyter::{index_notebook, is_jupyter_notebook, read_jupyter_notebook, JupyterIndex};
+use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, JupyterNotebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
@@ -59,7 +59,7 @@ impl AddAssign for Diagnostics {
 
 /// Returns either an indexed python jupyter notebook or a diagnostic (which is empty if we skip)
 fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnostics> {
-    let notebook = match read_jupyter_notebook(path) {
+    let notebook = match JupyterNotebook::read(path) {
         Ok(notebook) => {
             if !notebook
                 .metadata
@@ -85,13 +85,12 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnost
                     None,
                     1,
                 )],
-                fixed: FxHashMap::default(),
-                jupyter_index: FxHashMap::default(),
+                ..Diagnostics::default()
             });
         }
     };
 
-    Ok(index_notebook(&notebook))
+    Ok(notebook.index())
 }
 
 /// Lint the source code at the given `Path`.
