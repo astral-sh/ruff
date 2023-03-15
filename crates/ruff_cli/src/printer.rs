@@ -1,6 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::io::{BufWriter, Write};
@@ -224,24 +224,19 @@ impl Printer {
                     for message in messages {
                         let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                         status.set_message(message.kind.body.clone());
-                        let description = if let Some(jupyter_index) =
-                            diagnostics.jupyter_index.get(&message.filename)
-                        {
-                            format!(
-                                "cell {}, line {}, col {}, {}",
-                                jupyter_index.row_to_cell[message.location.row()],
-                                jupyter_index.row_to_row_in_cell[message.location.row()],
-                                message.location.column(),
-                                message.kind.body
-                            )
-                        } else {
-                            format!(
-                                "line {}, col {}, {}",
-                                message.location.row(),
-                                message.location.column(),
-                                message.kind.body
-                            )
-                        };
+                        let description =
+                            if diagnostics.jupyter_index.contains_key(&message.filename) {
+                                // We can't give a reasonable location for the structured formats,
+                                // so we show one that's clearly a fallback
+                                format!("line 1, col 0, {}", message.kind.body)
+                            } else {
+                                format!(
+                                    "line {}, col {}, {}",
+                                    message.location.row(),
+                                    message.location.column(),
+                                    message.kind.body
+                                )
+                            };
                         status.set_description(description);
                         let mut case = TestCase::new(
                             format!("org.ruff.{}", message.kind.rule().noqa_code()),
@@ -328,13 +323,23 @@ impl Printer {
                 // Generate error workflow command in GitHub Actions format.
                 // See: https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message
                 for message in &diagnostics.messages {
+                    let row_column = if diagnostics.jupyter_index.contains_key(&message.filename) {
+                        // We can't give a reasonable location for the structured formats,
+                        // so we show one that's clearly a fallback
+                        "1:0".to_string()
+                    } else {
+                        format!(
+                            "{}{}{}",
+                            message.location.row(),
+                            ":",
+                            message.location.column(),
+                        )
+                    };
                     let label = format!(
-                        "{}{}{}{}{}{} {} {}",
+                        "{}{}{}{} {} {}",
                         relativize_path(&message.filename),
                         ":",
-                        message.location.row(),
-                        ":",
-                        message.location.column(),
+                        row_column,
                         ":",
                         message.kind.rule().noqa_code(),
                         message.kind.body,
@@ -364,6 +369,19 @@ impl Printer {
                             .messages
                             .iter()
                             .map(|message| {
+                                let lines = if diagnostics.jupyter_index.contains_key(&message.filename) {
+                                    // We can't give a reasonable location for the structured formats,
+                                    // so we show one that's clearly a fallback
+                                    json!({
+                                        "begin": 1,
+                                        "end": 1
+                                    })
+                                } else {
+                                    json!({
+                                        "begin": message.location.row(),
+                                        "end": message.end_location.row()
+                                    })
+                                };
                                 json!({
                                     "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body),
                                     "severity": "major",
@@ -373,10 +391,7 @@ impl Printer {
                                             || relativize_path(&message.filename),
                                             |project_dir| relativize_path_to(&message.filename, project_dir),
                                         ),
-                                        "lines": {
-                                            "begin": message.location.row(),
-                                            "end": message.end_location.row()
-                                        }
+                                        "lines": lines
                                     }
                                 })
                             }
@@ -389,10 +404,17 @@ impl Printer {
                 // Generate violations in Pylint format.
                 // See: https://flake8.pycqa.org/en/latest/internal/formatters.html#pylint-formatter
                 for message in &diagnostics.messages {
+                    let row = if diagnostics.jupyter_index.contains_key(&message.filename) {
+                        // We can't give a reasonable location for the structured formats,
+                        // so we show one that's clearly a fallback
+                        1
+                    } else {
+                        message.location.row()
+                    };
                     let label = format!(
                         "{}:{}: [{}] {}",
                         relativize_path(&message.filename),
-                        message.location.row(),
+                        row,
                         message.kind.rule().noqa_code(),
                         message.kind.body,
                     );
@@ -403,13 +425,23 @@ impl Printer {
                 // Generate error logging commands for Azure Pipelines format.
                 // See https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
                 for message in &diagnostics.messages {
+                    let row_column = if diagnostics.jupyter_index.contains_key(&message.filename) {
+                        // We can't give a reasonable location for the structured formats,
+                        // so we show one that's clearly a fallback
+                        "linenumber=1;columnnumber=0".to_string()
+                    } else {
+                        format!(
+                            "linenumber={};columnnumber={}",
+                            message.location.row(),
+                            message.location.column(),
+                        )
+                    };
                     writeln!(
                         writer,
                         "##vso[task.logissue type=error\
-                        ;sourcepath={};linenumber={};columnnumber={};code={};]{}",
+                        ;sourcepath={};{};code={};]{}",
                         message.filename,
-                        message.location.row(),
-                        message.location.column(),
+                        row_column,
                         message.kind.rule().noqa_code(),
                         message.kind.body,
                     )?;
@@ -628,7 +660,7 @@ fn print_message<T: Write>(
     stdout: &mut T,
     message: &Message,
     autofix_level: fix::FixMode,
-    jupyter_index: &HashMap<String, JupyterIndex>,
+    jupyter_index: &FxHashMap<String, JupyterIndex>,
 ) -> Result<()> {
     // Check if we're working on a jupyter notebook and translate positions with cell accordingly
     let pos_label = if let Some(jupyter_index) = jupyter_index.get(&message.filename) {

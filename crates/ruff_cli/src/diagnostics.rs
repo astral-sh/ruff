@@ -1,6 +1,5 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
-use std::collections::HashMap;
 use std::fs::write;
 use std::io;
 use std::io::Write;
@@ -13,14 +12,14 @@ use log::{debug, error};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
-use ruff::jupyter::{read_jupyter_notebook, JupyterIndex, JupyterNotebook};
+use ruff::jupyter::is_jupyter_notebook;
+use ruff::jupyter::{read_jupyter_notebook, JupyterIndex};
 use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff::{fix, fs, jupyter};
 
 use crate::cache;
-use ruff::jupyter::is_jupyter_notebook;
 
 #[derive(Debug, Default)]
 pub struct Diagnostics {
@@ -28,7 +27,7 @@ pub struct Diagnostics {
     pub fixed: FxHashMap<String, FixTable>,
     /// Jupyter notebook indexing table for each input file that is a jupyter notebook
     /// so we can rewrite the diagnostics in the end
-    pub jupyter_index: HashMap<String, JupyterIndex>,
+    pub jupyter_index: FxHashMap<String, JupyterIndex>,
 }
 
 impl Diagnostics {
@@ -36,7 +35,7 @@ impl Diagnostics {
         Self {
             messages,
             fixed: FxHashMap::default(),
-            jupyter_index: HashMap::new(),
+            jupyter_index: FxHashMap::default(),
         }
     }
 }
@@ -55,7 +54,7 @@ impl AddAssign for Diagnostics {
                 }
             }
         }
-        self.jupyter_index.extend(other.jupyter_index)
+        self.jupyter_index.extend(other.jupyter_index);
     }
 }
 
@@ -93,21 +92,35 @@ pub fn lint_path(
     debug!("Checking: {}", path.display());
 
     // Read the file from disk.
-    let (contents, jupyter_index) = if is_jupyter_notebook(&path) {
+    let (contents, jupyter_index) = if is_jupyter_notebook(path) {
         // See also the black implementation
         // <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
-        let notebook: JupyterNotebook = if let Some(notebook) = read_jupyter_notebook(path)? {
-            notebook
-        } else {
-            // Not a python notebook
-            return Ok(Diagnostics {
-                messages: vec![],
-                fixed: Default::default(),
-                jupyter_index: HashMap::new(),
-            });
+        let notebook = match read_jupyter_notebook(path) {
+            Ok(Some(notebook)) => notebook,
+            Ok(None) => {
+                // Not a python notebook, this could e.g. be an R notebook which we want to just skip
+                return Ok(Diagnostics {
+                    messages: vec![],
+                    fixed: FxHashMap::default(),
+                    jupyter_index: FxHashMap::default(),
+                });
+            }
+            Err(diagnostic) => {
+                // Failed to read the jupyter notebook
+                return Ok(Diagnostics {
+                    messages: vec![Message::from_diagnostic(
+                        *diagnostic,
+                        path.to_string_lossy().to_string(),
+                        None,
+                        1,
+                    )],
+                    fixed: FxHashMap::default(),
+                    jupyter_index: FxHashMap::default(),
+                });
+            }
         };
 
-        let (contents, jupyter_index) = jupyter::concat_notebook(notebook);
+        let (contents, jupyter_index) = jupyter::concat_notebook(&notebook);
         (contents, Some(jupyter_index))
     } else {
         (std::fs::read_to_string(path)?, None)
@@ -192,9 +205,9 @@ pub fn lint_path(
     }
 
     let jupyter_index = match jupyter_index {
-        None => HashMap::new(),
+        None => FxHashMap::default(),
         Some(jupyter_index) => {
-            let mut index = HashMap::new();
+            let mut index = FxHashMap::default();
             index.insert(
                 path.to_str()
                     .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
@@ -302,6 +315,6 @@ pub fn lint_stdin(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
         )]),
-        jupyter_index: HashMap::new(),
+        jupyter_index: FxHashMap::default(),
     })
 }

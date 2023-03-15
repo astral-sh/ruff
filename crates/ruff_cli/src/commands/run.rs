@@ -89,7 +89,7 @@ pub fn run(
                         (Some(path.to_owned()), {
                             let mut error = e.to_string();
                             for cause in e.chain() {
-                                error += &format!("\n  Caused by: {}", cause.to_string());
+                                error += &format!("\n  Caused by: {cause}");
                             }
                             error
                         })
@@ -182,12 +182,12 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 }
 
 #[cfg(test)]
+#[cfg(feature = "jupyter_notebook")]
 mod test {
     use std::path::PathBuf;
     use std::str::FromStr;
 
     use anyhow::Result;
-    use indoc::formatdoc;
     use path_absolutize::Absolutize;
 
     use ruff::fix::FixMode;
@@ -206,11 +206,13 @@ mod test {
 
     #[test]
     fn test_jupyter_notebook_integration() -> Result<()> {
-        let mut overrides: Overrides = Default::default();
-        overrides.select = Some(vec![
-            RuleSelector::from_str("B")?,
-            RuleSelector::from_str("F")?,
-        ]);
+        let overrides: Overrides = Overrides {
+            select: Some(vec![
+                RuleSelector::from_str("B")?,
+                RuleSelector::from_str("F")?,
+            ]),
+            ..Default::default()
+        };
 
         let mut configuration = Configuration::default();
         configuration.rule_selections.push(RuleSelection {
@@ -245,17 +247,18 @@ mod test {
             Flags::SHOW_VIOLATIONS,
         );
         let mut writer: Vec<u8> = Vec::new();
+        // Mute the terminal color codes
+        colored::control::set_override(false);
         printer.write_once(&diagnostics, &mut writer)?;
-        // TODO: Set jupyter notebooks as none-fixable for now
-        // TODO 2: Make jupyter notebooks fixable
-        let expected = formatdoc! {
-            r#"{root_path}/valid.ipynb:cell 1:2:5: F841 [*] Local variable `x` is assigned to but never used
-            {root_path}/valid.ipynb:cell 3:1:24: B006 Do not use mutable data structures for argument defaults
-            Found 2 errors.
-            [*] 1 potentially fixable with the --fix option.
-            "#,
+        // TODO(konstin): Set jupyter notebooks as none-fixable for now
+        // TODO(konstin) 2: Make jupyter notebooks fixable
+        let expected = format!("{root_path}/valid.ipynb:cell 1:2:5: F841 [*] Local variable `x` is assigned to but never used
+{root_path}/valid.ipynb:cell 3:1:24: B006 Do not use mutable data structures for argument defaults
+Found 2 errors.
+[*] 1 potentially fixable with the --fix option.
+",
             root_path = root_path.absolutize()?.display()
-        };
+        );
 
         assert_eq!(expected, String::from_utf8(writer)?);
 
