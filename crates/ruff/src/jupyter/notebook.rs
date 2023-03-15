@@ -3,7 +3,6 @@ use std::io::{BufReader, BufWriter};
 use std::iter;
 use std::path::Path;
 
-use log::debug;
 use serde::Serialize;
 use serde_json::error::Category;
 
@@ -23,9 +22,9 @@ pub const JUPYTER_NOTEBOOK_EXT: &str = "ipynb";
 #[derive(Debug, Eq, PartialEq)]
 pub struct JupyterIndex {
     /// Enter a row (1-based), get back the cell (1-based)
-    pub row_to_cell: Vec<usize>,
+    pub row_to_cell: Vec<u32>,
     /// Enter a row (1-based), get back the cell (1-based)
-    pub row_to_row_in_cell: Vec<usize>,
+    pub row_to_row_in_cell: Vec<u32>,
 }
 
 /// Return `true` if the [`Path`] appears to be that of a jupyter notebook file (`.ipynb`).
@@ -37,7 +36,9 @@ pub fn is_jupyter_notebook(path: &Path) -> bool {
         && cfg!(feature = "jupyter_notebook")
 }
 
-pub fn read_jupyter_notebook(path: &Path) -> Result<Option<JupyterNotebook>, Box<Diagnostic>> {
+/// See also the black implementation
+/// <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
+pub fn read_jupyter_notebook(path: &Path) -> Result<JupyterNotebook, Box<Diagnostic>> {
     let reader = BufReader::new(File::open(path).map_err(|err| {
         Diagnostic::new(
             IOError {
@@ -126,25 +127,13 @@ pub fn read_jupyter_notebook(path: &Path) -> Result<Option<JupyterNotebook>, Box
             Range::default(),
         )));
     }
-    if !notebook
-        .metadata
-        .language_info
-        .as_ref()
-        .map_or(true, |language| language.name == "python")
-    {
-        debug!(
-            "Skipping {} because it's not a python notebook",
-            path.display()
-        );
-        return Ok(None);
-    }
 
-    Ok(Some(notebook))
+    Ok(notebook)
 }
 
 /// Concatenates all cells into a single virtual file and builds an index that maps the content
 /// to notebook cell locations
-pub fn concat_notebook(notebook: &JupyterNotebook) -> (String, JupyterIndex) {
+pub fn index_notebook(notebook: &JupyterNotebook) -> (String, JupyterIndex) {
     let mut jupyter_index = JupyterIndex {
         // Enter a line number (1-based), get back the cell (1-based)
         // 0 index is just padding
@@ -171,20 +160,20 @@ pub fn concat_notebook(notebook: &JupyterNotebook) -> (String, JupyterIndex) {
             SourceValue::String(string) => {
                 // TODO(konstin): is or isn't there a trailing newline per cell?
                 // i've only seen these as array and never as string
-                let line_count = string.lines().count();
-                jupyter_index
-                    .row_to_cell
-                    .extend(iter::repeat(pos + 1).take(line_count));
+                let line_count = u32::try_from(string.lines().count()).unwrap();
+                jupyter_index.row_to_cell.extend(
+                    iter::repeat(u32::try_from(pos + 1).unwrap()).take(line_count as usize),
+                );
                 jupyter_index.row_to_row_in_cell.extend(1..=line_count);
                 string.clone()
             }
             SourceValue::StringArray(string_array) => {
                 jupyter_index
                     .row_to_cell
-                    .extend(iter::repeat(pos + 1).take(string_array.len()));
+                    .extend(iter::repeat(u32::try_from(pos + 1).unwrap()).take(string_array.len()));
                 jupyter_index
                     .row_to_row_in_cell
-                    .extend(1..=string_array.len());
+                    .extend(1..=u32::try_from(string_array.len()).unwrap());
                 // lines already end in a newline character
                 string_array.join("")
             }
@@ -211,19 +200,20 @@ mod test {
 
     #[cfg(feature = "jupyter_notebook")]
     use super::is_jupyter_notebook;
-    use super::{concat_notebook, read_jupyter_notebook};
+    use super::{index_notebook, read_jupyter_notebook};
     use crate::jupyter::JupyterIndex;
 
     #[test]
     fn test_valid() {
         let path = Path::new("resources/test/fixtures/jupyter/valid.ipynb");
-        assert!(read_jupyter_notebook(path).unwrap().is_some());
+        assert!(read_jupyter_notebook(path).is_ok());
     }
 
     #[test]
     fn test_r() {
+        // We can load this, it will be filtered out later
         let path = Path::new("resources/test/fixtures/jupyter/R.ipynb");
-        assert!(read_jupyter_notebook(path).unwrap().is_none());
+        assert!(read_jupyter_notebook(path).is_ok());
     }
 
     #[test]
@@ -258,14 +248,14 @@ mod test {
         assert!(!is_jupyter_notebook(path));
 
         let path = Path::new("foo/bar/baz.ipynb");
-        assert!(!is_jupyter_notebook(path));
+        assert!(is_jupyter_notebook(path));
     }
 
     #[test]
     fn test_concat_notebook() {
         let path = Path::new("resources/test/fixtures/jupyter/valid.ipynb");
-        let notebook = read_jupyter_notebook(path).unwrap().unwrap();
-        let (contents, index) = concat_notebook(&notebook);
+        let notebook = read_jupyter_notebook(path).unwrap();
+        let (contents, index) = index_notebook(&notebook);
         assert_eq!(
             contents,
             r#"def unused_variable():

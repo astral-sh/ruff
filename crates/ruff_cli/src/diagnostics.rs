@@ -12,16 +12,15 @@ use log::{debug, error};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
-use ruff::jupyter::is_jupyter_notebook;
-use ruff::jupyter::{read_jupyter_notebook, JupyterIndex};
+use ruff::jupyter::{index_notebook, is_jupyter_notebook, read_jupyter_notebook, JupyterIndex};
 use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
-use ruff::{fix, fs, jupyter};
+use ruff::{fix, fs};
 
 use crate::cache;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Diagnostics {
     pub messages: Vec<Message>,
     pub fixed: FxHashMap<String, FixTable>,
@@ -58,6 +57,43 @@ impl AddAssign for Diagnostics {
     }
 }
 
+/// Returns either an indexed python jupyter notebook or a diagnostic (which is empty if we skip)
+fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnostics> {
+    let notebook = match read_jupyter_notebook(path) {
+        Ok(notebook) => {
+            if !notebook
+                .metadata
+                .language_info
+                .as_ref()
+                .map_or(true, |language| language.name == "python")
+            {
+                // Not a python notebook, this could e.g. be an R notebook which we want to just skip
+                debug!(
+                    "Skipping {} because it's not a python notebook",
+                    path.display()
+                );
+                return Err(Diagnostics::default());
+            }
+            notebook
+        }
+        Err(diagnostic) => {
+            // Failed to read the jupyter notebook
+            return Err(Diagnostics {
+                messages: vec![Message::from_diagnostic(
+                    *diagnostic,
+                    path.to_string_lossy().to_string(),
+                    None,
+                    1,
+                )],
+                fixed: FxHashMap::default(),
+                jupyter_index: FxHashMap::default(),
+            });
+        }
+    };
+
+    Ok(index_notebook(&notebook))
+}
+
 /// Lint the source code at the given `Path`.
 pub fn lint_path(
     path: &Path,
@@ -91,37 +127,12 @@ pub fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    // Read the file from disk.
+    // Read the file from disk
     let (contents, jupyter_index) = if is_jupyter_notebook(path) {
-        // See also the black implementation
-        // <https://github.com/psf/black/blob/69ca0a4c7a365c5f5eea519a90980bab72cab764/src/black/__init__.py#L1017-L1046>
-        let notebook = match read_jupyter_notebook(path) {
-            Ok(Some(notebook)) => notebook,
-            Ok(None) => {
-                // Not a python notebook, this could e.g. be an R notebook which we want to just skip
-                return Ok(Diagnostics {
-                    messages: vec![],
-                    fixed: FxHashMap::default(),
-                    jupyter_index: FxHashMap::default(),
-                });
-            }
-            Err(diagnostic) => {
-                // Failed to read the jupyter notebook
-                return Ok(Diagnostics {
-                    messages: vec![Message::from_diagnostic(
-                        *diagnostic,
-                        path.to_string_lossy().to_string(),
-                        None,
-                        1,
-                    )],
-                    fixed: FxHashMap::default(),
-                    jupyter_index: FxHashMap::default(),
-                });
-            }
-        };
-
-        let (contents, jupyter_index) = jupyter::concat_notebook(&notebook);
-        (contents, Some(jupyter_index))
+        match load_jupyter_notebook(path) {
+            Ok((contents, jupyter_index)) => (contents, Some(jupyter_index)),
+            Err(diagnostics) => return Ok(diagnostics),
+        }
     } else {
         (std::fs::read_to_string(path)?, None)
     };
@@ -317,4 +328,21 @@ pub fn lint_stdin(
         )]),
         jupyter_index: FxHashMap::default(),
     })
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+
+    use crate::diagnostics::{load_jupyter_notebook, Diagnostics};
+
+    #[test]
+    fn test_r() {
+        let path = Path::new("../ruff/resources/test/fixtures/jupyter/R.ipynb");
+        // No diagnostics is used as skip signal
+        assert_eq!(
+            load_jupyter_notebook(path).unwrap_err(),
+            Diagnostics::default()
+        );
+    }
 }
