@@ -1,5 +1,5 @@
-use libcst_native::Pass;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator, Stmt, StmtKind};
+
+use rustpython_parser::ast::{Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
