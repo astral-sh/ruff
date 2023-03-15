@@ -2984,15 +2984,7 @@ where
                     flake8_pie::rules::no_unnecessary_spread(self, keys, values);
                 }
             }
-            ExprKind::Yield { .. } => {
-                if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
-                    pyflakes::rules::yield_outside_function(self, expr);
-                }
-                if self.settings.rules.enabled(&Rule::YieldInInit) {
-                    pylint::rules::yield_in_init(self, expr);
-                }
-            }
-            ExprKind::YieldFrom { .. } => {
+            ExprKind::Yield { .. } | ExprKind::YieldFrom { .. } => {
                 if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }

@@ -1,0 +1,25 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: InvalidCharacterZeroWidthSpace
+    body: "Invalid unescaped character zero-width-space, use \"\\u200B\" instead"
+    suggestion: Replace with escape sequence
+    fixable: true
+  location:
+    row: 34
+    column: 12
+  end_location:
+    row: 34
+    column: 13
+  fix:
+    content: "\\u200b"
+    location:
+      row: 34
+      column: 12
+    end_location:
+      row: 34
+      column: 13
+  parent: ~
+

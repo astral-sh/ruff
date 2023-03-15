@@ -150,6 +150,11 @@ ruff_macros::register_rules!(
     rules::pylint::rules::InvalidEnvvarValue,
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
+    rules::pylint::rules::InvalidCharacterBackspace,
+    rules::pylint::rules::InvalidCharacterSub,
+    rules::pylint::rules::InvalidCharacterEsc,
+    rules::pylint::rules::InvalidCharacterNul,
+    rules::pylint::rules::InvalidCharacterZeroWidthSpace,
     rules::pylint::rules::BadStrStripCall,
     rules::pylint::rules::CollapsibleElseIf,
     rules::pylint::rules::UselessImportAlias,
@@ -848,6 +853,11 @@ impl Rule {
             | Rule::BadQuotesMultilineString
             | Rule::CommentedOutCode
             | Rule::MultiLineImplicitStringConcatenation
+            | Rule::InvalidCharacterBackspace
+            | Rule::InvalidCharacterSub
+            | Rule::InvalidCharacterEsc
+            | Rule::InvalidCharacterNul
+            | Rule::InvalidCharacterZeroWidthSpace
             | Rule::ExtraneousParentheses
             | Rule::InvalidEscapeSequence
             | Rule::SingleLineImplicitStringConcatenation
