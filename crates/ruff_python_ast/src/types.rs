@@ -2,6 +2,7 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arguments, Expr, Keyword, Located, Location, Stmt};
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 fn id() -> usize {
@@ -287,4 +288,19 @@ pub struct Import {
     pub name: String,
     pub location: Location,
     pub end_location: Location,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Imports {
+    inner: FxHashMap<PathBuf, Vec<Import>>,
+}
+
+impl Imports {
+    pub fn insert(&mut self, module: PathBuf, imports_vec: Vec<Import>) {
+        self.inner.insert(module, imports_vec);
+    }
+
+    pub fn extend(&mut self, other: Self) {
+        self.inner.extend(other.inner);
+    }
 }

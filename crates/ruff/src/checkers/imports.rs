@@ -1,12 +1,12 @@
 //! Lint rules based on import analysis.
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 
-use rustc_hash::FxHashMap;
+
 use rustpython_parser::ast::{StmtKind, Suite};
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::types::Import;
+use ruff_python_ast::types::{Import, Imports};
 use ruff_python_ast::visitor::Visitor;
 
 use crate::directives::IsortDirectives;
@@ -26,7 +26,7 @@ pub fn check_imports(
     autofix: flags::Autofix,
     path: &Path,
     package: Option<&Path>,
-) -> (Vec<Diagnostic>, FxHashMap<PathBuf, Vec<Import>>) {
+) -> (Vec<Diagnostic>, Imports) {
     // Extract all imports from the AST.
     let tracker = {
         let mut tracker = ImportTracker::new(locator, directives, path);
@@ -55,7 +55,7 @@ pub fn check_imports(
             &blocks, python_ast, locator, stylist, settings, autofix,
         ));
     }
-    let mut imports: FxHashMap<PathBuf, Vec<Import>> = FxHashMap::default();
+    let mut imports = Imports::default();
     let mut imports_vec = vec![];
     for &block in &blocks {
         block.imports.iter().for_each(|&stmt| match &stmt.node {

@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
@@ -10,7 +10,7 @@ use rustpython_parser::ParseError;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::types::Import;
+use ruff_python_ast::types::Imports;
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::autofix::fix_file;
@@ -51,8 +51,8 @@ impl<T> LinterResult<T> {
     }
 }
 
-pub type DiagnosticsAndImports = (Vec<Diagnostic>, FxHashMap<PathBuf, Vec<Import>>);
-pub type MessagesAndImports = (Vec<Message>, FxHashMap<PathBuf, Vec<Import>>);
+pub type DiagnosticsAndImports = (Vec<Diagnostic>, Imports);
+pub type MessagesAndImports = (Vec<Message>, Imports);
 pub type FixTable = FxHashMap<&'static Rule, usize>;
 
 /// Generate `Diagnostic`s from the source code contents at the
@@ -73,7 +73,7 @@ pub fn check_path(
 ) -> LinterResult<DiagnosticsAndImports> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
-    let mut imports: FxHashMap<PathBuf, Vec<Import>> = FxHashMap::default();
+    let mut imports = Imports::default();
     let mut error = None;
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST

@@ -4,7 +4,7 @@ use std::fs::write;
 use std::io;
 use std::io::Write;
 use std::ops::AddAssign;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Result;
 use colored::Colorize;
@@ -16,7 +16,7 @@ use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff::{fix, fs};
-use ruff_python_ast::types::Import;
+use ruff_python_ast::types::Imports;
 
 use crate::cache;
 
@@ -24,11 +24,11 @@ use crate::cache;
 pub struct Diagnostics {
     pub messages: Vec<Message>,
     pub fixed: FxHashMap<String, FixTable>,
-    pub imports: FxHashMap<PathBuf, Vec<Import>>,
+    pub imports: Imports,
 }
 
 impl Diagnostics {
-    pub fn new(messages: Vec<Message>, imports: FxHashMap<PathBuf, Vec<Import>>) -> Self {
+    pub fn new(messages: Vec<Message>, imports: Imports) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),
