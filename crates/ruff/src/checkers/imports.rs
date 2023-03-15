@@ -1,6 +1,5 @@
 //! Lint rules based on import analysis.
-use std::path::{Path};
-
+use std::path::Path;
 
 use rustpython_parser::ast::{StmtKind, Suite};
 
@@ -78,6 +77,7 @@ pub fn check_imports(
                     end_location: name.end_location.unwrap(),
                 }));
             }
+            // ImportTracker guarantees that we will only have import statements
             _ => unreachable!("Should only have import statements"),
         });
     }
