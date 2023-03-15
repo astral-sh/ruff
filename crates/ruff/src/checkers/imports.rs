@@ -73,26 +73,16 @@ pub fn check_imports(
                     .map(|name| Import {
                         name: format!(
                             "{}.{}",
-                            {
-                                if let Some(n) = module {
-                                    n
-                                } else {
-                                    ""
-                                }
-                            },
+                            module.as_ref().unwrap_or(&String::new()),
                             name.node.name
                         ),
                         location: name.location,
                         end_location: name.end_location.unwrap(),
                     })
-                    .collect::<Vec<Import>>(),
             ),
             _ => unreachable!("Should only have import statements"),
         });
     }
-
-    // to avoid depedence on ref to python_ast
-    // let package = package.map(std::path::Path::to_path_buf);
 
     imports.insert(path.to_owned(), imports_vec);
     (diagnostics, imports)

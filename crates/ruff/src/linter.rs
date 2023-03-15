@@ -58,16 +58,16 @@ pub type FixTable = FxHashMap<&'static Rule, usize>;
 /// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
 #[allow(clippy::too_many_arguments)]
-pub fn check_path<'a>(
-    path: &'a Path,
-    package: Option<&'a Path>,
-    contents: &'a str,
+pub fn check_path(
+    path: &Path,
+    package: Option<&Path>,
+    contents: &str,
     tokens: Vec<LexResult>,
-    locator: &'a Locator,
-    stylist: &'a Stylist,
-    indexer: &'a Indexer,
-    directives: &'a Directives,
-    settings: &'a Settings,
+    locator: &Locator,
+    stylist: &Stylist,
+    indexer: &Indexer,
+    directives: &Directives,
+    settings: &Settings,
     noqa: flags::Noqa,
     autofix: flags::Autofix,
 ) -> LinterResult<DiagnosticsAndImports> {
