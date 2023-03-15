@@ -37,6 +37,7 @@ mod tests {
     #[test_case(Rule::ConsiderUsingSysExit, Path::new("consider_using_sys_exit_4.py"); "PLR1722_4")]
     #[test_case(Rule::ConsiderUsingSysExit, Path::new("consider_using_sys_exit_5.py"); "PLR1722_5")]
     #[test_case(Rule::ConsiderUsingSysExit, Path::new("consider_using_sys_exit_6.py"); "PLR1722_6")]
+    #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"); "PLE0116")]
     #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]

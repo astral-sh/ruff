@@ -166,6 +166,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "C3002") => Rule::UnnecessaryDirectLambdaCall,
         (Pylint, "E0100") => Rule::YieldInInit,
         (Pylint, "E0101") => Rule::ReturnInInit,
+        (Pylint, "E0116") => Rule::ContinueInFinally,
         (Pylint, "E0117") => Rule::NonlocalWithoutBinding,
         (Pylint, "E0118") => Rule::UsedPriorGlobalDeclaration,
         (Pylint, "E0604") => Rule::InvalidAllObject,
