@@ -143,7 +143,7 @@ pub fn format_imports(
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
-    let block = normalize_imports(block, combine_as_imports);
+    let block = normalize_imports(block, combine_as_imports, force_single_line);
 
     let mut output = String::new();
 
