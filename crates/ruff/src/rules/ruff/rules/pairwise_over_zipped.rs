@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Stylist;
@@ -21,12 +23,16 @@ impl Violation for PairwiseOverZipped {
 #[derive(Debug)]
 struct SliceInfo {
     arg_name: String,
-    slice_start: i32,
-    slice_end: i32,
+    slice_start: Result<i64, ParseIntError>,
+    slice_end: Result<i64, ParseIntError>,
 }
 
 impl SliceInfo {
-    pub fn new(arg_name: String, slice_start: i32, slice_end: i32) -> Self {
+    pub fn new(
+        arg_name: String,
+        slice_start: Result<i64, ParseIntError>,
+        slice_end: Result<i64, ParseIntError>,
+    ) -> Self {
         Self {
             arg_name,
             slice_start,
@@ -45,17 +51,15 @@ fn get_slice_info(expr: &Expr, stylist: &Stylist) -> Option<SliceInfo> {
         return None;
     };
 
-    let mut lower_bound = 0;
-    let mut upper_bound = 0;
+    let mut lower_bound = Ok(0i64);
+    let mut upper_bound = Ok(0i64);
     if let ExprKind::Slice { lower, upper, .. } = &slice.node {
         if lower.is_some() {
             if let ExprKind::Constant {
                 value: lower_value, ..
             } = &lower.as_ref().unwrap().node
             {
-                lower_bound = unparse_constant(lower_value, stylist)
-                    .parse::<i32>()
-                    .unwrap_or(0);
+                lower_bound = unparse_constant(lower_value, stylist).parse::<i64>();
             }
         }
 
@@ -64,9 +68,7 @@ fn get_slice_info(expr: &Expr, stylist: &Stylist) -> Option<SliceInfo> {
                 value: upper_value, ..
             } = &upper.as_ref().unwrap().node
             {
-                upper_bound = unparse_constant(upper_value, stylist)
-                    .parse::<i32>()
-                    .unwrap_or(0);
+                upper_bound = unparse_constant(upper_value, stylist).parse::<i64>();
             }
         }
     };
@@ -76,33 +78,34 @@ fn get_slice_info(expr: &Expr, stylist: &Stylist) -> Option<SliceInfo> {
 
 pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
     if let ExprKind::Name { id, .. } = &func.node {
-        // Ensure that the checker settings are valid for the rule to apply
-        let valid_checker =
-            checker.ctx.is_builtin(id) && checker.settings.target_version >= PythonVersion::Py310;
-
-        if valid_checker && id == "zip" && args.len() > 1 {
+        if checker.settings.target_version >= PythonVersion::Py310
+            && args.len() > 1
+            && id == "zip"
+            && checker.ctx.is_builtin(id)
+        {
             // First arg can be a Name or a Subscript
             let first_arg_info_opt = match &args[0].node {
-                ExprKind::Name { id: arg_id, .. } => Some(SliceInfo::new(arg_id.to_string(), 0, 0)),
+                ExprKind::Name { id: arg_id, .. } => {
+                    Some(SliceInfo::new(arg_id.to_string(), Ok(0i64), Ok(0i64)))
+                }
                 ExprKind::Subscript { .. } => get_slice_info(&args[0], checker.stylist),
                 _ => None,
             };
 
             // If it's not one of those, return
-            if first_arg_info_opt.is_none() {
-                return;
-            }
+            let Some(first_arg_info) = first_arg_info_opt else { return; };
 
             // Second arg can only be a subscript
             let ExprKind::Subscript { .. } = &args[1].node else {
                 return;
             };
-            let second_arg_info = get_slice_info(&args[1], checker.stylist).unwrap();
 
-            let first_arg_info = first_arg_info_opt.unwrap();
-            let args_are_successive = (first_arg_info.slice_start == 0
-                || first_arg_info.slice_end == -1)
-                && second_arg_info.slice_start == 1;
+            let Some(second_arg_info) = get_slice_info(&args[1], checker.stylist) else { return; };
+
+            // unwrap_or forces no diagnostic if there was a parsing error
+            let args_are_successive = (first_arg_info.slice_start.unwrap_or(1) == 0
+                || first_arg_info.slice_end.unwrap_or(1) == -1)
+                && second_arg_info.slice_start.unwrap_or(0) == 1;
 
             if first_arg_info.arg_name == second_arg_info.arg_name && args_are_successive {
                 checker
