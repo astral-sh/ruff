@@ -88,11 +88,37 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
+    row: 45
+    column: 4
+  end_location:
+    row: 48
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    name: NeedlessBool
+    body: "Return the condition `a` directly"
+    suggestion: ~
+    fixable: false
+  location:
     row: 57
     column: 4
   end_location:
     row: 60
     column: 19
+  fix: ~
+  parent: ~
+- kind:
+    name: NeedlessBool
+    body: "Return the condition `a` directly"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 71
+    column: 4
+  end_location:
+    row: 74
+    column: 20
   fix: ~
   parent: ~
 - kind:

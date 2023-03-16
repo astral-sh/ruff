@@ -23,6 +23,9 @@ pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 /// asserts that autofixes converge after 10 iterations.
 pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
+    let package = path
+        .parent()
+        .and_then(|parent| detect_package_root(parent, &settings.namespace_packages));
     let contents = std::fs::read_to_string(&path)?;
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
     let locator = Locator::new(&contents);
@@ -31,12 +34,10 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
     let LinterResult {
-        data: mut diagnostics,
-        ..
+        data: diagnostics, ..
     } = check_path(
         &path,
-        path.parent()
-            .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
+        package,
         &contents,
         tokens,
         &locator,
@@ -49,6 +50,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
     );
 
     // Detect autofixes that don't converge after multiple iterations.
+    let mut all_diagnostics = diagnostics.clone();
     if diagnostics
         .iter()
         .any(|diagnostic| diagnostic.fix.is_some())
@@ -58,6 +60,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
         let mut contents = contents.clone();
         let mut iterations = 0;
 
+        all_diagnostics = vec![];
         loop {
             let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
             let locator = Locator::new(&contents);
@@ -69,7 +72,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
                 data: diagnostics, ..
             } = check_path(
                 &path,
-                None,
+                package,
                 &contents,
                 tokens,
                 &locator,
@@ -80,6 +83,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
                 flags::Noqa::Enabled,
                 flags::Autofix::Enabled,
             );
+            all_diagnostics.extend(diagnostics.clone());
             if let Some((fixed_contents, _)) = fix_file(&diagnostics, &locator) {
                 if iterations < max_iterations {
                     iterations += 1;
@@ -95,7 +99,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
             }
         }
     }
-
-    diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-    Ok(diagnostics)
+    all_diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+    all_diagnostics.dedup();
+    Ok(all_diagnostics)
 }

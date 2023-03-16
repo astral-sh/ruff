@@ -148,6 +148,32 @@ expression: diagnostics
     suggestion: "Replace with `return any(check(x) for x in iterable)`"
     fixable: true
   location:
+    row: 99
+    column: 4
+  end_location:
+    row: 101
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    name: ReimplementedBuiltin
+    body: "Use `return all(not check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return all(not check(x) for x in iterable)`"
+    fixable: true
+  location:
+    row: 109
+    column: 4
+  end_location:
+    row: 111
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    name: ReimplementedBuiltin
+    body: "Use `return any(check(x) for x in iterable)` instead of `for` loop"
+    suggestion: "Replace with `return any(check(x) for x in iterable)`"
+    fixable: true
+  location:
     row: 124
     column: 4
   end_location:

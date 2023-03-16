@@ -49,6 +49,26 @@ expression: diagnostics
     fixable: true
   location:
     row: 7
+    column: 9
+  end_location:
+    row: 7
+    column: 13
+  fix:
+    content: "True"
+    location:
+      row: 7
+      column: 3
+    end_location:
+      row: 7
+      column: 14
+  parent: ~
+- kind:
+    name: ExprOrTrue
+    body: "Use `True` instead of `... or True`"
+    suggestion: "Replace with `True`"
+    fixable: true
+  location:
+    row: 7
     column: 14
   end_location:
     row: 7

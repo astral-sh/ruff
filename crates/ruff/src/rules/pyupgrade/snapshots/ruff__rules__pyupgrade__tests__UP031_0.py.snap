@@ -128,6 +128,26 @@ expression: diagnostics
     suggestion: Replace with format specifiers
     fixable: true
   location:
+    row: 12
+    column: 18
+  end_location:
+    row: 12
+    column: 36
+  fix:
+    content: "\"{}\".format(\"nested\")"
+    location:
+      row: 12
+      column: 18
+    end_location:
+      row: 12
+      column: 36
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
     row: 14
     column: 6
   end_location:

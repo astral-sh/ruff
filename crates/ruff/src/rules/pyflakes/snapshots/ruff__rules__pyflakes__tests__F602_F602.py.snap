@@ -67,6 +67,19 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
+    row: 17
+    column: 4
+  end_location:
+    row: 17
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    suggestion: ~
+    fixable: false
+  location:
     row: 18
     column: 4
   end_location:
@@ -123,6 +136,32 @@ expression: diagnostics
 - kind:
     name: MultiValueRepeatedKeyVariable
     body: "Dictionary key `a` repeated"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 24
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 25
+    column: 4
+  end_location:
+    row: 25
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
     suggestion: "Remove repeated key `a`"
     fixable: true
   location:
@@ -146,6 +185,19 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
+    row: 26
+    column: 4
+  end_location:
+    row: 26
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    suggestion: ~
+    fixable: false
+  location:
     row: 27
     column: 4
   end_location:
@@ -176,6 +228,19 @@ expression: diagnostics
     column: 4
   end_location:
     row: 29
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 33
+    column: 4
+  end_location:
+    row: 33
     column: 5
   fix: ~
   parent: ~
@@ -198,6 +263,19 @@ expression: diagnostics
     end_location:
       row: 35
       column: 8
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyVariable
+    body: "Dictionary key `a` repeated"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 35
+    column: 4
+  end_location:
+    row: 35
+    column: 5
+  fix: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable

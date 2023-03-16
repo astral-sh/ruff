@@ -68,6 +68,26 @@ expression: diagnostics
     suggestion: Remove extraneous parentheses
     fixable: true
   location:
+    row: 8
+    column: 6
+  end_location:
+    row: 8
+    column: 13
+  fix:
+    content: "\"foo\""
+    location:
+      row: 8
+      column: 6
+    end_location:
+      row: 8
+      column: 13
+  parent: ~
+- kind:
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    suggestion: Remove extraneous parentheses
+    fixable: true
+  location:
     row: 11
     column: 6
   end_location:
@@ -81,6 +101,46 @@ expression: diagnostics
     end_location:
       row: 11
       column: 13
+  parent: ~
+- kind:
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    suggestion: Remove extraneous parentheses
+    fixable: true
+  location:
+    row: 11
+    column: 6
+  end_location:
+    row: 11
+    column: 11
+  fix:
+    content: (1)
+    location:
+      row: 11
+      column: 6
+    end_location:
+      row: 11
+      column: 11
+  parent: ~
+- kind:
+    name: ExtraneousParentheses
+    body: Avoid extraneous parentheses
+    suggestion: Remove extraneous parentheses
+    fixable: true
+  location:
+    row: 11
+    column: 6
+  end_location:
+    row: 11
+    column: 9
+  fix:
+    content: "1"
+    location:
+      row: 11
+      column: 6
+    end_location:
+      row: 11
+      column: 9
   parent: ~
 - kind:
     name: ExtraneousParentheses

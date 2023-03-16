@@ -68,11 +68,37 @@ expression: diagnostics
     suggestion: Reformat to one line
     fixable: true
   location:
+    row: 609
+    column: 4
+  end_location:
+    row: 611
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: FitsOnOneLine
+    body: One-line docstring should fit on one line
+    suggestion: Reformat to one line
+    fixable: true
+  location:
     row: 615
     column: 4
   end_location:
     row: 617
     column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: FitsOnOneLine
+    body: One-line docstring should fit on one line
+    suggestion: Reformat to one line
+    fixable: true
+  location:
+    row: 618
+    column: 4
+  end_location:
+    row: 620
+    column: 14
   fix: ~
   parent: ~
 - kind:

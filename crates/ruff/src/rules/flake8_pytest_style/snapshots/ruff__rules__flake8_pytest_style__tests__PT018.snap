@@ -68,6 +68,26 @@ expression: diagnostics
     suggestion: Break down assertion into multiple parts
     fixable: true
   location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 39
+  fix:
+    content: "    assert something\n    assert something_else\n"
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 17
+      column: 0
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
+  location:
     row: 17
     column: 4
   end_location:
@@ -251,6 +271,136 @@ expression: diagnostics
     column: 4
   end_location:
     row: 41
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
+  location:
+    row: 37
+    column: 4
+  end_location:
+    row: 37
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
+  location:
+    row: 38
+    column: 4
+  end_location:
+    row: 38
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: ~
+    fixable: false
+  location:
+    row: 40
+    column: 4
+  end_location:
+    row: 40
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: ~
+    fixable: false
+  location:
+    row: 41
+    column: 4
+  end_location:
+    row: 41
+    column: 80
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: ~
+    fixable: false
+  location:
+    row: 41
+    column: 4
+  end_location:
+    row: 41
+    column: 56
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: ~
+    fixable: false
+  location:
+    row: 42
+    column: 4
+  end_location:
+    row: 42
+    column: 80
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: ~
+    fixable: false
+  location:
+    row: 43
+    column: 4
+  end_location:
+    row: 43
+    column: 64
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: ~
+    fixable: false
+  location:
+    row: 44
+    column: 4
+  end_location:
+    row: 44
+    column: 64
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
+  location:
+    row: 45
+    column: 4
+  end_location:
+    row: 51
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: PytestCompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
+  location:
+    row: 46
+    column: 4
+  end_location:
+    row: 52
     column: 5
   fix: ~
   parent: ~

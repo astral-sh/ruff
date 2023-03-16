@@ -164,6 +164,26 @@ expression: diagnostics
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
+    body: "Consider `[\"a\", \"b\", \"c\", *eggs, *list((\"yes\", \"no\", \"pants\", *zoob))]` instead of concatenation"
+    suggestion: "Replace with `[\"a\", \"b\", \"c\", *eggs, *list((\"yes\", \"no\", \"pants\", *zoob))]`"
+    fixable: true
+  location:
+    row: 20
+    column: 8
+  end_location:
+    row: 20
+    column: 68
+  fix:
+    content: "[\"a\", \"b\", \"c\", *eggs, *list((\"yes\", \"no\", \"pants\", *zoob))]"
+    location:
+      row: 20
+      column: 8
+    end_location:
+      row: 20
+      column: 68
+  parent: ~
+- kind:
+    name: CollectionLiteralConcatenation
     body: "Consider `(\"yes\", \"no\", \"pants\", *zoob)` instead of concatenation"
     suggestion: "Replace with `(\"yes\", \"no\", \"pants\", *zoob)`"
     fixable: true

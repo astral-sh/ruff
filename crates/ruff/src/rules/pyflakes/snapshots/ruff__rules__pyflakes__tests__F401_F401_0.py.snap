@@ -46,6 +46,26 @@ expression: diagnostics
     column: 0
 - kind:
     name: UnusedImport
+    body: "`logging.config` imported but unused"
+    suggestion: "Remove unused import: `logging.config`"
+    fixable: true
+  location:
+    row: 10
+    column: 7
+  end_location:
+    row: 10
+    column: 21
+  fix:
+    content: ""
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 11
+      column: 0
+  parent: ~
+- kind:
+    name: UnusedImport
     body: "`logging.handlers` imported but unused"
     suggestion: "Remove unused import: `logging.handlers`"
     fixable: true

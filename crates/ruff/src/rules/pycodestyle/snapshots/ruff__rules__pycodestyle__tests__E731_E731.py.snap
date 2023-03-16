@@ -115,4 +115,17 @@ expression: diagnostics
     column: 23
   fix: ~
   parent: ~
+- kind:
+    name: LambdaAssignment
+    body: "Do not assign a `lambda` expression, use a `def`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 23
+  fix: ~
+  parent: ~
 

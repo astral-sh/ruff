@@ -93,6 +93,19 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
+    row: 22
+    column: 4
+  end_location:
+    row: 22
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    suggestion: ~
+    fixable: false
+  location:
     row: 23
     column: 4
   end_location:
@@ -149,6 +162,32 @@ expression: diagnostics
 - kind:
     name: MultiValueRepeatedKeyLiteral
     body: "Dictionary key literal `\"a\"` repeated"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 29
+    column: 4
+  end_location:
+    row: 29
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 30
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
     suggestion: "Remove repeated key literal `\"a\"`"
     fixable: true
   location:
@@ -172,6 +211,19 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
+    row: 31
+    column: 4
+  end_location:
+    row: 31
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    suggestion: ~
+    fixable: false
+  location:
     row: 32
     column: 4
   end_location:
@@ -202,6 +254,32 @@ expression: diagnostics
     column: 4
   end_location:
     row: 34
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 38
+    column: 4
+  end_location:
+    row: 38
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: MultiValueRepeatedKeyLiteral
+    body: "Dictionary key literal `\"a\"` repeated"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 40
+    column: 4
+  end_location:
+    row: 40
     column: 7
   fix: ~
   parent: ~

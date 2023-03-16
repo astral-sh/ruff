@@ -6,7 +6,7 @@ use ruff_python_ast::types::Range;
 
 use crate::fix::Fix;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DiagnosticKind {
     /// The identifier of the diagnostic, used to align the diagnostic with a rule.
@@ -19,7 +19,7 @@ pub struct DiagnosticKind {
     pub fixable: bool,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Diagnostic {
     pub kind: DiagnosticKind,

@@ -23,6 +23,26 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
+    name: UnusedVariable
+    body: "Local variable `d` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `d`"
+    fixable: true
+  location:
+    row: 13
+    column: 4
+  end_location:
+    row: 13
+    column: 5
+  fix:
+    content: ""
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 14
+      column: 0
+  parent: ~
+- kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `E501`)"
     suggestion: "Remove unused `noqa` directive"
@@ -41,6 +61,26 @@ expression: diagnostics
     end_location:
       row: 13
       column: 23
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `d` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `d`"
+    fixable: true
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 5
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 17
+      column: 0
   parent: ~
 - kind:
     name: UnusedNOQA
@@ -63,6 +103,26 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
+    name: UnusedVariable
+    body: "Local variable `d` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `d`"
+    fixable: true
+  location:
+    row: 19
+    column: 4
+  end_location:
+    row: 19
+    column: 5
+  fix:
+    content: ""
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 20
+      column: 0
+  parent: ~
+- kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `F841`, `W191`; non-enabled: `F821`)"
     suggestion: "Remove unused `noqa` directive"
@@ -83,6 +143,26 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
+    name: UnusedVariable
+    body: "Local variable `d` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `d`"
+    fixable: true
+  location:
+    row: 22
+    column: 4
+  end_location:
+    row: 22
+    column: 5
+  fix:
+    content: ""
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 23
+      column: 0
+  parent: ~
+- kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (unused: `F841`; unknown: `V101`)"
     suggestion: "Remove unused `noqa` directive"
@@ -101,6 +181,26 @@ expression: diagnostics
     end_location:
       row: 22
       column: 29
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `d` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `d`"
+    fixable: true
+  location:
+    row: 26
+    column: 4
+  end_location:
+    row: 26
+    column: 5
+  fix:
+    content: ""
+    location:
+      row: 26
+      column: 0
+    end_location:
+      row: 27
+      column: 0
   parent: ~
 - kind:
     name: UnusedNOQA
@@ -223,6 +323,32 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
+    name: LineTooLong
+    body: Line too long (89 > 88 characters)
+    suggestion: ~
+    fixable: false
+  location:
+    row: 83
+    column: 88
+  end_location:
+    row: 83
+    column: 89
+  fix: ~
+  parent: ~
+- kind:
+    name: LineTooLong
+    body: Line too long (89 > 88 characters)
+    suggestion: ~
+    fixable: false
+  location:
+    row: 84
+    column: 88
+  end_location:
+    row: 84
+    column: 89
+  fix: ~
+  parent: ~
+- kind:
     name: UnusedImport
     body: "`shelve` imported but unused"
     suggestion: "Remove unused import: `shelve`"
@@ -241,6 +367,58 @@ expression: diagnostics
     end_location:
       row: 86
       column: 0
+  parent: ~
+- kind:
+    name: LineTooLong
+    body: Line too long (89 > 88 characters)
+    suggestion: ~
+    fixable: false
+  location:
+    row: 85
+    column: 88
+  end_location:
+    row: 85
+    column: 89
+  fix: ~
+  parent: ~
+- kind:
+    name: LineTooLong
+    body: Line too long (89 > 88 characters)
+    suggestion: ~
+    fixable: false
+  location:
+    row: 86
+    column: 88
+  end_location:
+    row: 86
+    column: 89
+  fix: ~
+  parent: ~
+- kind:
+    name: LineTooLong
+    body: Line too long (89 > 88 characters)
+    suggestion: ~
+    fixable: false
+  location:
+    row: 87
+    column: 88
+  end_location:
+    row: 87
+    column: 89
+  fix: ~
+  parent: ~
+- kind:
+    name: LineTooLong
+    body: Line too long (89 > 88 characters)
+    suggestion: ~
+    fixable: false
+  location:
+    row: 88
+    column: 88
+  end_location:
+    row: 88
+    column: 89
+  fix: ~
   parent: ~
 - kind:
     name: LineTooLong

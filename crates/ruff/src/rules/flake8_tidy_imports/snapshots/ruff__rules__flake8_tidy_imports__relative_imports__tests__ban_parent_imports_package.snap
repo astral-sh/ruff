@@ -41,46 +41,6 @@ expression: diagnostics
     suggestion: Replace relative imports from parent modules with absolute imports
     fixable: true
   location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 55
-  fix:
-    content: "from my_package.sublib.protocol import commands, definitions, responses"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 55
-  parent: ~
-- kind:
-    name: RelativeImports
-    body: Relative imports from parent modules are banned
-    suggestion: Replace relative imports from parent modules with absolute imports
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 55
-  fix:
-    content: "from my_package.sublib.protocol import commands, definitions, responses"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 55
-  parent: ~
-- kind:
-    name: RelativeImports
-    body: Relative imports from parent modules are banned
-    suggestion: Replace relative imports from parent modules with absolute imports
-    fixable: true
-  location:
     row: 7
     column: 0
   end_location:

@@ -30,6 +30,19 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
+    row: 25
+    column: 18
+  end_location:
+    row: 25
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    name: UndefinedName
+    body: "Undefined name `Bar`"
+    suggestion: ~
+    fixable: false
+  location:
     row: 26
     column: 18
   end_location:

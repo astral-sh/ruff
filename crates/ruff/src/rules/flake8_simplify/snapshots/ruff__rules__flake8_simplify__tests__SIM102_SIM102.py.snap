@@ -28,6 +28,26 @@ expression: diagnostics
     suggestion: "Combine `if` statements using `and`"
     fixable: true
   location:
+    row: 6
+    column: 0
+  end_location:
+    row: 7
+    column: 9
+  fix:
+    content: "if a and b and c:\n    d\n"
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 9
+      column: 0
+  parent: ~
+- kind:
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    suggestion: "Combine `if` statements using `and`"
+    fixable: true
+  location:
     row: 7
     column: 0
   end_location:
@@ -61,6 +81,32 @@ expression: diagnostics
     end_location:
       row: 18
       column: 0
+  parent: ~
+- kind:
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 18
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 19
+    column: 9
+  fix: ~
   parent: ~
 - kind:
     name: CollapsibleIf

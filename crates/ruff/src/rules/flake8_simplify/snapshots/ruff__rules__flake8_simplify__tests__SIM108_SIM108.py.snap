@@ -28,6 +28,19 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
+    row: 55
+    column: 0
+  end_location:
+    row: 60
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    name: IfElseBlockInsteadOfIfExp
+    body: "Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block"
+    suggestion: ~
+    fixable: false
+  location:
     row: 58
     column: 0
   end_location:
@@ -61,11 +74,50 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
+    row: 91
+    column: 0
+  end_location:
+    row: 94
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: IfElseBlockInsteadOfIfExp
+    body: "Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block"
+    suggestion: ~
+    fixable: false
+  location:
     row: 97
     column: 0
   end_location:
     row: 100
     column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: IfElseBlockInsteadOfIfExp
+    body: "Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 98
+    column: 0
+  end_location:
+    row: 99
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    name: IfElseBlockInsteadOfIfExp
+    body: "Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 103
+    column: 0
+  end_location:
+    row: 106
+    column: 9
   fix: ~
   parent: ~
 - kind:

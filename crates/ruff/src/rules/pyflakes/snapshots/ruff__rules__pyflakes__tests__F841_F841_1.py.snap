@@ -30,6 +30,32 @@ expression: diagnostics
   parent: ~
 - kind:
     name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `x`"
+    fixable: true
+  location:
+    row: 16
+    column: 5
+  end_location:
+    row: 16
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `y`"
+    fixable: true
+  location:
+    row: 16
+    column: 8
+  end_location:
+    row: 16
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: UnusedVariable
     body: "Local variable `coords` is assigned to but never used"
     suggestion: "Remove assignment to unused variable `coords`"
     fixable: true
@@ -67,6 +93,32 @@ expression: diagnostics
     end_location:
       row: 20
       column: 13
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `x`"
+    fixable: true
+  location:
+    row: 20
+    column: 5
+  end_location:
+    row: 20
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `y`"
+    fixable: true
+  location:
+    row: 20
+    column: 8
+  end_location:
+    row: 20
+    column: 9
+  fix: ~
   parent: ~
 - kind:
     name: UnusedVariable

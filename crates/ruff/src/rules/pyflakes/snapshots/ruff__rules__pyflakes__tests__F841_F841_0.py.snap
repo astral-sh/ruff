@@ -24,6 +24,46 @@ expression: diagnostics
   parent: ~
 - kind:
     name: UnusedVariable
+    body: "Local variable `x` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `x`"
+    fixable: true
+  location:
+    row: 14
+    column: 4
+  end_location:
+    row: 14
+    column: 5
+  fix:
+    content: ""
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 15
+      column: 0
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `y`"
+    fixable: true
+  location:
+    row: 15
+    column: 4
+  end_location:
+    row: 15
+    column: 5
+  fix:
+    content: pass
+    location:
+      row: 15
+      column: 4
+    end_location:
+      row: 15
+      column: 9
+  parent: ~
+- kind:
+    name: UnusedVariable
     body: "Local variable `z` is assigned to but never used"
     suggestion: "Remove assignment to unused variable `z`"
     fixable: true
@@ -41,6 +81,58 @@ expression: diagnostics
     end_location:
       row: 17
       column: 0
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `a` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `a`"
+    fixable: true
+  location:
+    row: 18
+    column: 5
+  end_location:
+    row: 18
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `b` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `b`"
+    fixable: true
+  location:
+    row: 18
+    column: 8
+  end_location:
+    row: 18
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `a` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `a`"
+    fixable: true
+  location:
+    row: 19
+    column: 5
+  end_location:
+    row: 19
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `b` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `b`"
+    fixable: true
+  location:
+    row: 19
+    column: 8
+  end_location:
+    row: 19
+    column: 9
+  fix: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -207,6 +299,32 @@ expression: diagnostics
     end_location:
       row: 115
       column: 10
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `y`"
+    fixable: true
+  location:
+    row: 118
+    column: 13
+  end_location:
+    row: 118
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    name: UnusedVariable
+    body: "Local variable `y` is assigned to but never used"
+    suggestion: "Remove assignment to unused variable `y`"
+    fixable: true
+  location:
+    row: 119
+    column: 13
+  end_location:
+    row: 119
+    column: 14
+  fix: ~
   parent: ~
 - kind:
     name: UnusedVariable
