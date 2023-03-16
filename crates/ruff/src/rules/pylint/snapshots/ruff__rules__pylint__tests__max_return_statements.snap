@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: TooManyReturnStatements
-    body: Too many return statements (2/1)
+    body: Too many return statements (2 > 1)
     suggestion: ~
     fixable: false
   location:
