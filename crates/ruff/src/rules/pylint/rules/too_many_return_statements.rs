@@ -19,7 +19,7 @@ impl Violation for TooManyReturnStatements {
             returns,
             max_returns,
         } = self;
-        format!("Too many return statements ({returns}/{max_returns})")
+        format!("Too many return statements ({returns} > {max_returns})")
     }
 }
 
