@@ -138,10 +138,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 84
+    row: 85
     column: 12
   end_location:
-    row: 84
+    row: 85
     column: 20
   fix: ~
   parent: ~
@@ -151,10 +151,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 86
+    row: 87
     column: 12
   end_location:
-    row: 86
+    row: 87
     column: 20
   fix: ~
   parent: ~
@@ -164,10 +164,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 90
+    row: 91
     column: 16
   end_location:
-    row: 90
+    row: 91
     column: 24
   fix: ~
   parent: ~
