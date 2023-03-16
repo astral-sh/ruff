@@ -1,32 +1,36 @@
-try:
-    pass
-finally:
-    continue  # [continue-in-finally]
-
-try:
-    pass
-except Exception:
-    continue
-finally:
+while True:
     try:
         pass
     finally:
         continue  # [continue-in-finally]
-    pass
 
-try:
-    pass
-finally:
-    test = "aa"
-    match test:
-        case "aa":
+while True:
+    try:
+        pass
+    except Exception:
+        continue
+    finally:
+        try:
+            pass
+        finally:
             continue  # [continue-in-finally]
+        pass
 
-try:
-    pass
-finally:
-    with "aa" as f:
-        continue  # [continue-in-finally]
+while True:
+    try:
+        pass
+    finally:
+        test = "aa"
+        match test:
+            case "aa":
+                continue  # [continue-in-finally]
+
+while True:
+    try:
+        pass
+    finally:
+        with "aa" as f:
+            continue  # [continue-in-finally]
 
 while True:
     try:

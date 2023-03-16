@@ -8,23 +8,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside a `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
+    row: 5
     column: 8
   end_location:
-    row: 14
+    row: 5
     column: 16
   fix: ~
   parent: ~
@@ -34,10 +21,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 23
+    row: 16
     column: 12
   end_location:
-    row: 23
+    row: 16
     column: 20
   fix: ~
   parent: ~
@@ -47,49 +34,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 29
-    column: 8
-  end_location:
-    row: 29
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside a `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 12
-  end_location:
-    row: 36
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside a `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 37
-    column: 8
-  end_location:
-    row: 37
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside a `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
+    row: 26
     column: 16
   end_location:
-    row: 45
+    row: 26
     column: 24
   fix: ~
   parent: ~
@@ -99,36 +47,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 52
-    column: 8
-  end_location:
-    row: 52
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside a `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 65
-    column: 8
-  end_location:
-    row: 65
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside a `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 70
+    row: 33
     column: 12
   end_location:
-    row: 70
+    row: 33
     column: 20
   fix: ~
   parent: ~
@@ -138,10 +60,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 85
+    row: 40
     column: 12
   end_location:
-    row: 85
+    row: 40
     column: 20
   fix: ~
   parent: ~
@@ -151,10 +73,75 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 87
+    row: 41
+    column: 8
+  end_location:
+    row: 41
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 49
+    column: 16
+  end_location:
+    row: 49
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 56
+    column: 8
+  end_location:
+    row: 56
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 69
+    column: 8
+  end_location:
+    row: 69
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 74
     column: 12
   end_location:
-    row: 87
+    row: 74
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 89
+    column: 12
+  end_location:
+    row: 89
     column: 20
   fix: ~
   parent: ~
@@ -165,9 +152,22 @@ expression: diagnostics
     fixable: false
   location:
     row: 91
-    column: 16
+    column: 12
   end_location:
     row: 91
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside a `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 95
+    column: 16
+  end_location:
+    row: 95
     column: 24
   fix: ~
   parent: ~
