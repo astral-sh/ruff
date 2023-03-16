@@ -22,15 +22,13 @@ impl Violation for PairwiseOverZipped {
 struct SliceInfo {
     arg_name: String,
     slice_start: Option<i64>,
-    slice_end: Option<i64>,
 }
 
 impl SliceInfo {
-    pub fn new(arg_name: String, slice_start: Option<i64>, slice_end: Option<i64>) -> Self {
+    pub fn new(arg_name: String, slice_start: Option<i64>) -> Self {
         Self {
             arg_name,
             slice_start,
-            slice_end,
         }
     }
 }
@@ -46,18 +44,13 @@ fn get_slice_info(expr: &Expr, stylist: &Stylist) -> Option<SliceInfo> {
     };
 
     let mut lower_bound = None;
-    let mut upper_bound = None;
-    if let ExprKind::Slice { lower, upper, .. } = &slice.node {
+    if let ExprKind::Slice { lower, .. } = &slice.node {
         if lower.is_some() {
             lower_bound = get_bound(&lower.as_ref().unwrap().node, stylist);
         }
-
-        if upper.is_some() {
-            upper_bound = get_bound(&upper.as_ref().unwrap().node, stylist);
-        }
     };
 
-    Some(SliceInfo::new(arg_id.to_string(), lower_bound, upper_bound))
+    Some(SliceInfo::new(arg_id.to_string(), lower_bound))
 }
 
 fn get_bound(expr: &ExprKind, stylist: &Stylist) -> Option<i64> {
@@ -93,7 +86,7 @@ pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
             // default to 0
             let first_arg_info_opt = match &args[0].node {
                 ExprKind::Name { id: arg_id, .. } => {
-                    Some(SliceInfo::new(arg_id.to_string(), Some(0i64), None))
+                    Some(SliceInfo::new(arg_id.to_string(), Some(0i64)))
                 }
                 ExprKind::Subscript { .. } => get_slice_info(&args[0], checker.stylist),
                 _ => None,
