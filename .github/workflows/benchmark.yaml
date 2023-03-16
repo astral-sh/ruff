@@ -91,7 +91,7 @@ jobs:
     - name: "Linux | Compare benchmark results"
       shell: bash
       run: |
-        echo "### Benchmark Results" >> summary.md
+        echo "### Benchmark" >> summary.md
         echo "#### Linux" >> summary.md
         echo "\`\`\`" >> summary.md
         critcmp main pr >> summary.md

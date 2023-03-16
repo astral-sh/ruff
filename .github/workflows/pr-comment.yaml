@@ -63,6 +63,7 @@ jobs:
 
           if [[ -f pr/ecosystem/ecosystem-result ]]
           then
+            echo "### Ecosystem" >> $GITHUB_OUTPUT
             cat pr/ecosystem/ecosystem-result >> $GITHUB_OUTPUT
           fi
 
