@@ -61,6 +61,7 @@ REPOSITORIES = {
     "zulip": Repository("zulip", "zulip", "main"),
     "bokeh": Repository("bokeh", "bokeh", "branch-3.2"),
     "scikit-build": Repository("scikit-build", "scikit-build", "main"),
+    "scikit-build-core": Repository("scikit-build", "scikit-build-core", "main"),
     "airflow": Repository("apache", "airflow", "main"),
     "typeshed": Repository("python", "typeshed", "main", select="PYI"),
 }
