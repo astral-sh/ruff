@@ -2858,7 +2858,7 @@ where
                     flake8_pytest_style::rules::fail_call(self, func, args, keywords);
                 }
 
-                if self.settings.rules.enabled(&Rule::PairwiseOverZipped) {
+                if self.settings.rules.enabled(Rule::PairwiseOverZipped) {
                     ruff::rules::pairwise_over_zipped(self, func, args);
                 }
 
