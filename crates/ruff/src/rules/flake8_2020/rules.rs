@@ -140,7 +140,7 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                         && checker
                             .settings
                             .rules
-                            .enabled(&Rule::SysVersionSlice1Referenced)
+                            .enabled(Rule::SysVersionSlice1Referenced)
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SysVersionSlice1Referenced,
@@ -150,7 +150,7 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                         && checker
                             .settings
                             .rules
-                            .enabled(&Rule::SysVersionSlice3Referenced)
+                            .enabled(Rule::SysVersionSlice3Referenced)
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SysVersionSlice3Referenced,
@@ -165,13 +165,13 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 ..
             } => {
                 if *i == BigInt::from(2)
-                    && checker.settings.rules.enabled(&Rule::SysVersion2Referenced)
+                    && checker.settings.rules.enabled(Rule::SysVersion2Referenced)
                 {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(SysVersion2Referenced, Range::from(value)));
                 } else if *i == BigInt::from(0)
-                    && checker.settings.rules.enabled(&Rule::SysVersion0Referenced)
+                    && checker.settings.rules.enabled(Rule::SysVersion0Referenced)
                 {
                     checker
                         .diagnostics
@@ -210,7 +210,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                             && checker
                                 .settings
                                 .rules
-                                .enabled(&Rule::SysVersionInfo0Eq3Referenced)
+                                .enabled(Rule::SysVersionInfo0Eq3Referenced)
                         {
                             checker.diagnostics.push(Diagnostic::new(
                                 SysVersionInfo0Eq3Referenced,
@@ -231,7 +231,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                         }],
                     ) = (ops, comparators)
                     {
-                        if checker.settings.rules.enabled(&Rule::SysVersionInfo1CmpInt) {
+                        if checker.settings.rules.enabled(Rule::SysVersionInfo1CmpInt) {
                             checker
                                 .diagnostics
                                 .push(Diagnostic::new(SysVersionInfo1CmpInt, Range::from(left)));
@@ -259,7 +259,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                 if checker
                     .settings
                     .rules
-                    .enabled(&Rule::SysVersionInfoMinorCmpInt)
+                    .enabled(Rule::SysVersionInfoMinorCmpInt)
                 {
                     checker.diagnostics.push(Diagnostic::new(
                         SysVersionInfoMinorCmpInt,
@@ -286,12 +286,12 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
         ) = (ops, comparators)
         {
             if s.len() == 1 {
-                if checker.settings.rules.enabled(&Rule::SysVersionCmpStr10) {
+                if checker.settings.rules.enabled(Rule::SysVersionCmpStr10) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(SysVersionCmpStr10, Range::from(left)));
                 }
-            } else if checker.settings.rules.enabled(&Rule::SysVersionCmpStr3) {
+            } else if checker.settings.rules.enabled(Rule::SysVersionCmpStr3) {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(SysVersionCmpStr3, Range::from(left)));

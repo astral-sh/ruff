@@ -168,7 +168,7 @@ fn add_required_import(
         MissingRequiredImport(required_import.clone()),
         Range::new(Location::default(), Location::default()),
     );
-    if autofix.into() && settings.rules.should_fix(&Rule::MissingRequiredImport) {
+    if autofix.into() && settings.rules.should_fix(Rule::MissingRequiredImport) {
         // Determine the location at which the import should be inserted.
         let splice = helpers::find_splice_location(python_ast, locator);
 

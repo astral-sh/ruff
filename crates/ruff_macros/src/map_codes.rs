@@ -167,7 +167,7 @@ pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     });
 
     #[allow(clippy::type_complexity)]
-    let mut rule_to_codes: HashMap<&Path, Vec<(&Ident, &String, &Vec<Attribute>)>> = HashMap::new();
+    let mut rule_to_codes: HashMap<&Path, Vec<(&Ident, &str, &Vec<Attribute>)>> = HashMap::new();
     let mut linter_code_for_rule_match_arms = quote!();
 
     for (linter, map) in &linters {
@@ -227,7 +227,7 @@ pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
 
         impl crate::registry::Linter {
-            pub fn code_for_rule(&self, rule: &Rule) -> Option<&'static str> {
+            pub fn code_for_rule(&self, rule: Rule) -> Option<&'static str> {
                 match (self, rule) {
                     #linter_code_for_rule_match_arms
                     _ => None,

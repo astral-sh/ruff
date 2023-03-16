@@ -118,7 +118,7 @@ pub fn unrecognized_platform(
         && checker
             .settings
             .rules
-            .enabled(&Rule::UnrecognizedPlatformCheck)
+            .enabled(Rule::UnrecognizedPlatformCheck)
     {
         checker
             .diagnostics
@@ -137,7 +137,7 @@ pub fn unrecognized_platform(
                 && checker
                     .settings
                     .rules
-                    .enabled(&Rule::UnrecognizedPlatformName)
+                    .enabled(Rule::UnrecognizedPlatformName)
             {
                 checker.diagnostics.push(Diagnostic::new(
                     UnrecognizedPlatformName {
@@ -151,7 +151,7 @@ pub fn unrecognized_platform(
             if checker
                 .settings
                 .rules
-                .enabled(&Rule::UnrecognizedPlatformCheck)
+                .enabled(Rule::UnrecognizedPlatformCheck)
             {
                 checker
                     .diagnostics

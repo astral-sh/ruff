@@ -23,7 +23,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
         table_out.push_str(&format!(
             "| {}{} | {} | {} | {} |",
             linter.common_prefix(),
-            linter.code_for_rule(&rule).unwrap(),
+            linter.code_for_rule(rule).unwrap(),
             rule.explanation()
                 .is_some()
                 .then_some(format_args!("[{rule_name}](rules/{rule_name}.md)"))

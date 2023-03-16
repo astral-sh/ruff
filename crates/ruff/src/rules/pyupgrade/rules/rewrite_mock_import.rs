@@ -262,7 +262,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| name.node.name == "mock" || name.node.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(&Rule::RewriteMockImport) {
+                let content = if checker.patch(Rule::RewriteMockImport) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         match format_import(stmt, indent, checker.locator, checker.stylist) {
                             Ok(content) => Some(content),
