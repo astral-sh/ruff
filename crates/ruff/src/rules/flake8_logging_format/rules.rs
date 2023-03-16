@@ -43,14 +43,14 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         // Check for string concatenation and percent format.
         ExprKind::BinOp { op, .. } => match op {
             Operator::Add => {
-                if checker.settings.rules.enabled(&Rule::LoggingStringConcat) {
+                if checker.settings.rules.enabled(Rule::LoggingStringConcat) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(LoggingStringConcat, Range::from(msg)));
                 }
             }
             Operator::Mod => {
-                if checker.settings.rules.enabled(&Rule::LoggingPercentFormat) {
+                if checker.settings.rules.enabled(Rule::LoggingPercentFormat) {
                     checker
                         .diagnostics
                         .push(Diagnostic::new(LoggingPercentFormat, Range::from(msg)));
@@ -60,7 +60,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         },
         // Check for f-strings.
         ExprKind::JoinedStr { .. } => {
-            if checker.settings.rules.enabled(&Rule::LoggingFString) {
+            if checker.settings.rules.enabled(Rule::LoggingFString) {
                 checker
                     .diagnostics
                     .push(Diagnostic::new(LoggingFString, Range::from(msg)));
@@ -68,7 +68,7 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         }
         // Check for .format() calls.
         ExprKind::Call { func, .. } => {
-            if checker.settings.rules.enabled(&Rule::LoggingStringFormat) {
+            if checker.settings.rules.enabled(Rule::LoggingStringFormat) {
                 if let ExprKind::Attribute { value, attr, .. } = &func.node {
                     if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
                         checker
@@ -151,7 +151,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             }
 
             // G010
-            if checker.settings.rules.enabled(&Rule::LoggingWarn)
+            if checker.settings.rules.enabled(Rule::LoggingWarn)
                 && matches!(logging_level, LoggingLevel::Warn)
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
@@ -166,18 +166,18 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             }
 
             // G101
-            if checker.settings.rules.enabled(&Rule::LoggingExtraAttrClash) {
+            if checker.settings.rules.enabled(Rule::LoggingExtraAttrClash) {
                 if let Some(extra) = find_keyword(keywords, "extra") {
                     check_log_record_attr_clash(checker, extra);
                 }
             }
 
             // G201, G202
-            if checker.settings.rules.enabled(&Rule::LoggingExcInfo)
+            if checker.settings.rules.enabled(Rule::LoggingExcInfo)
                 || checker
                     .settings
                     .rules
-                    .enabled(&Rule::LoggingRedundantExcInfo)
+                    .enabled(Rule::LoggingRedundantExcInfo)
             {
                 if !checker.ctx.in_exception_handler() {
                     return;
@@ -206,7 +206,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
 
                     match logging_level {
                         LoggingLevel::Error => {
-                            if checker.settings.rules.enabled(&Rule::LoggingExcInfo) {
+                            if checker.settings.rules.enabled(Rule::LoggingExcInfo) {
                                 checker
                                     .diagnostics
                                     .push(Diagnostic::new(LoggingExcInfo, level_call_range));
@@ -216,7 +216,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                             if checker
                                 .settings
                                 .rules
-                                .enabled(&Rule::LoggingRedundantExcInfo)
+                                .enabled(Rule::LoggingRedundantExcInfo)
                             {
                                 checker.diagnostics.push(Diagnostic::new(
                                     LoggingRedundantExcInfo,

@@ -162,7 +162,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                     value: Constant::Str(string),
                     ..
                 } => {
-                    if checker.settings.rules.enabled(&Rule::RawStringInException) {
+                    if checker.settings.rules.enabled(Rule::RawStringInException) {
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
                             checker
                                 .diagnostics
@@ -172,7 +172,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                 }
                 // Check for f-strings
                 ExprKind::JoinedStr { .. } => {
-                    if checker.settings.rules.enabled(&Rule::FStringInException) {
+                    if checker.settings.rules.enabled(Rule::FStringInException) {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(FStringInException, Range::from(first)));
@@ -180,7 +180,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                 }
                 // Check for .format() calls
                 ExprKind::Call { func, .. } => {
-                    if checker.settings.rules.enabled(&Rule::DotFormatInException) {
+                    if checker.settings.rules.enabled(Rule::DotFormatInException) {
                         if let ExprKind::Attribute { value, attr, .. } = &func.node {
                             if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
                                 checker.diagnostics.push(Diagnostic::new(

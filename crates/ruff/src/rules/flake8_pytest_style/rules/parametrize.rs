@@ -380,7 +380,7 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
                 if checker
                     .settings
                     .rules
-                    .enabled(&Rule::ParametrizeNamesWrongType)
+                    .enabled(Rule::ParametrizeNamesWrongType)
                 {
                     if let Some(names) = args.get(0) {
                         check_names(checker, names);
@@ -389,7 +389,7 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
                 if checker
                     .settings
                     .rules
-                    .enabled(&Rule::ParametrizeValuesWrongType)
+                    .enabled(Rule::ParametrizeValuesWrongType)
                 {
                     if let Some(names) = args.get(0) {
                         if let Some(values) = args.get(1) {

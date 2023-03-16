@@ -38,7 +38,7 @@ pub fn check_imports(
 
     // Enforce import rules.
     let mut diagnostics = vec![];
-    if settings.rules.enabled(&Rule::UnsortedImports) {
+    if settings.rules.enabled(Rule::UnsortedImports) {
         for block in &blocks {
             if !block.imports.is_empty() {
                 if let Some(diagnostic) = isort::rules::organize_imports(
@@ -49,7 +49,7 @@ pub fn check_imports(
             }
         }
     }
-    if settings.rules.enabled(&Rule::MissingRequiredImport) {
+    if settings.rules.enabled(Rule::MissingRequiredImport) {
         diagnostics.extend(isort::rules::add_required_imports(
             &blocks, python_ast, locator, stylist, settings, autofix,
         ));

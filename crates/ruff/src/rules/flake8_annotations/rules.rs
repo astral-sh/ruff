@@ -492,7 +492,7 @@ pub fn definition(
             // ANN401 for dynamically typed arguments
             if let Some(annotation) = &arg.node.annotation {
                 has_any_typed_arg = true;
-                if checker.settings.rules.enabled(&Rule::AnyType) {
+                if checker.settings.rules.enabled(Rule::AnyType) {
                     check_dynamically_typed(
                         checker,
                         annotation,
@@ -507,7 +507,7 @@ pub fn definition(
                     if checker
                         .settings
                         .rules
-                        .enabled(&Rule::MissingTypeFunctionArgument)
+                        .enabled(Rule::MissingTypeFunctionArgument)
                     {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeFunctionArgument {
@@ -525,7 +525,7 @@ pub fn definition(
             if let Some(expr) = &arg.node.annotation {
                 has_any_typed_arg = true;
                 if !checker.settings.flake8_annotations.allow_star_arg_any {
-                    if checker.settings.rules.enabled(&Rule::AnyType) {
+                    if checker.settings.rules.enabled(Rule::AnyType) {
                         let name = &arg.node.arg;
                         check_dynamically_typed(
                             checker,
@@ -539,7 +539,7 @@ pub fn definition(
                 if !(checker.settings.flake8_annotations.suppress_dummy_args
                     && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                 {
-                    if checker.settings.rules.enabled(&Rule::MissingTypeArgs) {
+                    if checker.settings.rules.enabled(Rule::MissingTypeArgs) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeArgs {
                                 name: arg.node.arg.to_string(),
@@ -556,7 +556,7 @@ pub fn definition(
             if let Some(expr) = &arg.node.annotation {
                 has_any_typed_arg = true;
                 if !checker.settings.flake8_annotations.allow_star_arg_any {
-                    if checker.settings.rules.enabled(&Rule::AnyType) {
+                    if checker.settings.rules.enabled(Rule::AnyType) {
                         let name = &arg.node.arg;
                         check_dynamically_typed(
                             checker,
@@ -570,7 +570,7 @@ pub fn definition(
                 if !(checker.settings.flake8_annotations.suppress_dummy_args
                     && checker.settings.dummy_variable_rgx.is_match(&arg.node.arg))
                 {
-                    if checker.settings.rules.enabled(&Rule::MissingTypeKwargs) {
+                    if checker.settings.rules.enabled(Rule::MissingTypeKwargs) {
                         diagnostics.push(Diagnostic::new(
                             MissingTypeKwargs {
                                 name: arg.node.arg.to_string(),
@@ -587,7 +587,7 @@ pub fn definition(
             if let Some(arg) = args.posonlyargs.first().or_else(|| args.args.first()) {
                 if arg.node.annotation.is_none() {
                     if visibility::is_classmethod(&checker.ctx, cast::decorator_list(stmt)) {
-                        if checker.settings.rules.enabled(&Rule::MissingTypeCls) {
+                        if checker.settings.rules.enabled(Rule::MissingTypeCls) {
                             diagnostics.push(Diagnostic::new(
                                 MissingTypeCls {
                                     name: arg.node.arg.to_string(),
@@ -596,7 +596,7 @@ pub fn definition(
                             ));
                         }
                     } else {
-                        if checker.settings.rules.enabled(&Rule::MissingTypeSelf) {
+                        if checker.settings.rules.enabled(Rule::MissingTypeSelf) {
                             diagnostics.push(Diagnostic::new(
                                 MissingTypeSelf {
                                     name: arg.node.arg.to_string(),
@@ -614,7 +614,7 @@ pub fn definition(
         // ANN201, ANN202, ANN401
         if let Some(expr) = &returns {
             has_typed_return = true;
-            if checker.settings.rules.enabled(&Rule::AnyType) {
+            if checker.settings.rules.enabled(Rule::AnyType) {
                 check_dynamically_typed(checker, expr, || name.to_string(), &mut diagnostics);
             }
         } else if !(
@@ -626,7 +626,7 @@ pub fn definition(
                 if checker
                     .settings
                     .rules
-                    .enabled(&Rule::MissingReturnTypeClassMethod)
+                    .enabled(Rule::MissingReturnTypeClassMethod)
                 {
                     diagnostics.push(Diagnostic::new(
                         MissingReturnTypeClassMethod {
@@ -641,7 +641,7 @@ pub fn definition(
                 if checker
                     .settings
                     .rules
-                    .enabled(&Rule::MissingReturnTypeStaticMethod)
+                    .enabled(Rule::MissingReturnTypeStaticMethod)
                 {
                     diagnostics.push(Diagnostic::new(
                         MissingReturnTypeStaticMethod {
@@ -656,7 +656,7 @@ pub fn definition(
                 if checker
                     .settings
                     .rules
-                    .enabled(&Rule::MissingReturnTypeSpecialMethod)
+                    .enabled(Rule::MissingReturnTypeSpecialMethod)
                 {
                     if !(checker.settings.flake8_annotations.mypy_init_return && has_any_typed_arg)
                     {
@@ -681,7 +681,7 @@ pub fn definition(
                 if checker
                     .settings
                     .rules
-                    .enabled(&Rule::MissingReturnTypeSpecialMethod)
+                    .enabled(Rule::MissingReturnTypeSpecialMethod)
                 {
                     diagnostics.push(Diagnostic::new(
                         MissingReturnTypeSpecialMethod {
@@ -696,7 +696,7 @@ pub fn definition(
                         if checker
                             .settings
                             .rules
-                            .enabled(&Rule::MissingReturnTypePublicFunction)
+                            .enabled(Rule::MissingReturnTypePublicFunction)
                         {
                             diagnostics.push(Diagnostic::new(
                                 MissingReturnTypePublicFunction {
@@ -710,7 +710,7 @@ pub fn definition(
                         if checker
                             .settings
                             .rules
-                            .enabled(&Rule::MissingReturnTypePrivateFunction)
+                            .enabled(Rule::MissingReturnTypePrivateFunction)
                         {
                             diagnostics.push(Diagnostic::new(
                                 MissingReturnTypePrivateFunction {

@@ -193,7 +193,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         &keyword.node.value,
                         mode.replacement_value(),
                         checker.locator,
-                        checker.patch(&Rule::RedundantOpenModes),
+                        checker.patch(Rule::RedundantOpenModes),
                     ));
                 }
             }
@@ -210,7 +210,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(&Rule::RedundantOpenModes),
+                    checker.patch(Rule::RedundantOpenModes),
                 ));
             }
         }

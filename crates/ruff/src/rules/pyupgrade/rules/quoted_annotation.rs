@@ -22,7 +22,7 @@ impl AlwaysAutofixableViolation for QuotedAnnotation {
 /// UP037
 pub fn quoted_annotation(checker: &mut Checker, annotation: &str, range: Range) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotation, range);
-    if checker.patch(&Rule::QuotedAnnotation) {
+    if checker.patch(Rule::QuotedAnnotation) {
         diagnostic.amend(Fix::replacement(
             annotation.to_string(),
             range.location,

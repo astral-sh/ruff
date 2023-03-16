@@ -166,7 +166,7 @@ pub fn check_logical_lines(
             }
 
             #[cfg(feature = "logical_lines")]
-            let should_fix = autofix.into() && settings.rules.should_fix(&Rule::MissingWhitespace);
+            let should_fix = autofix.into() && settings.rules.should_fix(Rule::MissingWhitespace);
 
             #[cfg(not(feature = "logical_lines"))]
             let should_fix = false;
@@ -181,7 +181,7 @@ pub fn check_logical_lines(
         if line.flags.contains(TokenFlags::BRACKET) {
             #[cfg(feature = "logical_lines")]
             let should_fix =
-                autofix.into() && settings.rules.should_fix(&Rule::WhitespaceBeforeParameters);
+                autofix.into() && settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
 
             #[cfg(not(feature = "logical_lines"))]
             let should_fix = false;

@@ -610,6 +610,10 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
 
+pub trait AsRule {
+    fn rule(&self) -> Rule;
+}
+
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
@@ -916,6 +920,7 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
 
 #[cfg(test)]
 mod tests {
+    use std::mem::size_of;
     use strum::IntoEnumIterator;
 
     use super::{Linter, Rule, RuleNamespace};
@@ -960,5 +965,10 @@ mod tests {
                 Linter::parse_code(&code).unwrap_or_else(|| panic!("couldn't parse {code:?}"));
             assert_eq!(code, format!("{}{rest}", linter.common_prefix()));
         }
+    }
+
+    #[test]
+    fn rule_size() {
+        assert_eq!(2, size_of::<Rule>());
     }
 }

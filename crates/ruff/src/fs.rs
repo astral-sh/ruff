@@ -22,11 +22,12 @@ pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
 }
 
 /// Create a set with codes matching the pattern/code pairs.
-pub(crate) fn ignores_from_path<'a>(
+pub(crate) fn ignores_from_path(
     path: &Path,
-    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, FxHashSet<Rule>)],
-) -> FxHashSet<&'a Rule> {
+    pattern_code_pairs: &[(GlobMatcher, GlobMatcher, FxHashSet<Rule>)],
+) -> FxHashSet<Rule> {
     let (file_path, file_basename) = extract_path_names(path).expect("Unable to parse filename");
+
     pattern_code_pairs
         .iter()
         .filter_map(|(absolute, basename, codes)| {
@@ -37,20 +38,21 @@ pub(crate) fn ignores_from_path<'a>(
                     basename.glob().regex(),
                     codes
                 );
-                return Some(codes.iter());
-            }
-            if absolute.is_match(file_path) {
+                Some(codes)
+            } else if absolute.is_match(file_path) {
                 debug!(
                     "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
                     path,
                     absolute.glob().regex(),
                     codes
                 );
-                return Some(codes.iter());
+                Some(codes)
+            } else {
+                None
             }
-            None
         })
         .flatten()
+        .copied()
         .collect()
 }
 

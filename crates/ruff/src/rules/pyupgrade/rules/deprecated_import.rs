@@ -550,7 +550,7 @@ pub fn deprecated_import(
             },
             Range::from(stmt),
         );
-        if checker.patch(&Rule::DeprecatedImport) {
+        if checker.patch(Rule::DeprecatedImport) {
             if let Some(content) = fix {
                 diagnostic.amend(Fix::replacement(
                     content,

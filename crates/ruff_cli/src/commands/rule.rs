@@ -16,7 +16,7 @@ struct Explanation<'a> {
 }
 
 /// Explain a `Rule` to the user.
-pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
+pub fn rule(rule: Rule, format: HelpFormat) -> Result<()> {
     let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
     let mut stdout = BufWriter::new(io::stdout().lock());
     let mut output = String::new();
