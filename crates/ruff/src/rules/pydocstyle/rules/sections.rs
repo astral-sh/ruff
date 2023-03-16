@@ -353,7 +353,7 @@ fn blanks_and_section_underline(
         if checker
             .settings
             .rules
-            .enabled(&Rule::DashedUnderlineAfterSection)
+            .enabled(Rule::DashedUnderlineAfterSection)
         {
             let mut diagnostic = Diagnostic::new(
                 DashedUnderlineAfterSection {
@@ -379,7 +379,7 @@ fn blanks_and_section_underline(
             }
             checker.diagnostics.push(diagnostic);
         }
-        if checker.settings.rules.enabled(&Rule::EmptyDocstringSection) {
+        if checker.settings.rules.enabled(Rule::EmptyDocstringSection) {
             checker.diagnostics.push(Diagnostic::new(
                 EmptyDocstringSection {
                     name: context.section_name.to_string(),
@@ -400,7 +400,7 @@ fn blanks_and_section_underline(
             if checker
                 .settings
                 .rules
-                .enabled(&Rule::SectionUnderlineAfterName)
+                .enabled(Rule::SectionUnderlineAfterName)
             {
                 let mut diagnostic = Diagnostic::new(
                     SectionUnderlineAfterName {
@@ -438,7 +438,7 @@ fn blanks_and_section_underline(
             if checker
                 .settings
                 .rules
-                .enabled(&Rule::SectionUnderlineMatchesSectionLength)
+                .enabled(Rule::SectionUnderlineMatchesSectionLength)
             {
                 let mut diagnostic = Diagnostic::new(
                     SectionUnderlineMatchesSectionLength {
@@ -480,7 +480,7 @@ fn blanks_and_section_underline(
         if checker
             .settings
             .rules
-            .enabled(&Rule::SectionUnderlineNotOverIndented)
+            .enabled(Rule::SectionUnderlineNotOverIndented)
         {
             let leading_space = whitespace::leading_space(non_empty_line);
             if leading_space.len() > docstring.indentation.len() {
@@ -525,7 +525,7 @@ fn blanks_and_section_underline(
                     .take_while(|line| line.trim().is_empty())
                     .count();
                 if blank_lines_after_dashes == rest_of_lines.len() {
-                    if checker.settings.rules.enabled(&Rule::EmptyDocstringSection) {
+                    if checker.settings.rules.enabled(Rule::EmptyDocstringSection) {
                         checker.diagnostics.push(Diagnostic::new(
                             EmptyDocstringSection {
                                 name: context.section_name.to_string(),
@@ -537,7 +537,7 @@ fn blanks_and_section_underline(
                     if checker
                         .settings
                         .rules
-                        .enabled(&Rule::NoBlankLinesBetweenHeaderAndContent)
+                        .enabled(Rule::NoBlankLinesBetweenHeaderAndContent)
                     {
                         let mut diagnostic = Diagnostic::new(
                             NoBlankLinesBetweenHeaderAndContent {
@@ -570,7 +570,7 @@ fn blanks_and_section_underline(
                 }
             }
         } else {
-            if checker.settings.rules.enabled(&Rule::EmptyDocstringSection) {
+            if checker.settings.rules.enabled(Rule::EmptyDocstringSection) {
                 checker.diagnostics.push(Diagnostic::new(
                     EmptyDocstringSection {
                         name: context.section_name.to_string(),
@@ -583,7 +583,7 @@ fn blanks_and_section_underline(
         if checker
             .settings
             .rules
-            .enabled(&Rule::DashedUnderlineAfterSection)
+            .enabled(Rule::DashedUnderlineAfterSection)
         {
             let mut diagnostic = Diagnostic::new(
                 DashedUnderlineAfterSection {
@@ -613,7 +613,7 @@ fn blanks_and_section_underline(
             if checker
                 .settings
                 .rules
-                .enabled(&Rule::NoBlankLinesBetweenHeaderAndContent)
+                .enabled(Rule::NoBlankLinesBetweenHeaderAndContent)
             {
                 let mut diagnostic = Diagnostic::new(
                     NoBlankLinesBetweenHeaderAndContent {
@@ -644,7 +644,7 @@ fn blanks_and_section_underline(
 }
 
 fn common_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
-    if checker.settings.rules.enabled(&Rule::CapitalizeSectionName) {
+    if checker.settings.rules.enabled(Rule::CapitalizeSectionName) {
         let capitalized_section_name = context.kind.as_str();
         if context.section_name != capitalized_section_name {
             let mut diagnostic = Diagnostic::new(
@@ -677,11 +677,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
         }
     }
 
-    if checker
-        .settings
-        .rules
-        .enabled(&Rule::SectionNotOverIndented)
-    {
+    if checker.settings.rules.enabled(Rule::SectionNotOverIndented) {
         let leading_space = whitespace::leading_space(context.line);
         if leading_space.len() > docstring.indentation.len() {
             let mut diagnostic = Diagnostic::new(
@@ -715,7 +711,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
             if checker
                 .settings
                 .rules
-                .enabled(&Rule::BlankLineAfterLastSection)
+                .enabled(Rule::BlankLineAfterLastSection)
             {
                 let mut diagnostic = Diagnostic::new(
                     BlankLineAfterLastSection {
@@ -739,7 +735,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                 checker.diagnostics.push(diagnostic);
             }
         } else {
-            if checker.settings.rules.enabled(&Rule::BlankLineAfterSection) {
+            if checker.settings.rules.enabled(Rule::BlankLineAfterSection) {
                 let mut diagnostic = Diagnostic::new(
                     BlankLineAfterSection {
                         name: context.section_name.to_string(),
@@ -764,11 +760,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
         }
     }
 
-    if checker
-        .settings
-        .rules
-        .enabled(&Rule::BlankLineBeforeSection)
-    {
+    if checker.settings.rules.enabled(Rule::BlankLineBeforeSection) {
         if !context.previous_line.is_empty() {
             let mut diagnostic = Diagnostic::new(
                 BlankLineBeforeSection {
@@ -959,7 +951,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
     if checker
         .settings
         .rules
-        .enabled(&Rule::NewLineAfterSectionName)
+        .enabled(Rule::NewLineAfterSectionName)
     {
         let suffix = context
             .line
@@ -997,7 +989,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
         }
     }
 
-    if checker.settings.rules.enabled(&Rule::UndocumentedParam) {
+    if checker.settings.rules.enabled(Rule::UndocumentedParam) {
         if matches!(context.kind, SectionKind::Parameters) {
             parameters_section(checker, docstring, context);
         }
@@ -1007,11 +999,7 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
 fn google_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     common_section(checker, docstring, context);
 
-    if checker
-        .settings
-        .rules
-        .enabled(&Rule::SectionNameEndsInColon)
-    {
+    if checker.settings.rules.enabled(Rule::SectionNameEndsInColon) {
         let suffix = context
             .line
             .trim()
@@ -1049,7 +1037,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
         }
     }
 
-    if checker.settings.rules.enabled(&Rule::UndocumentedParam) {
+    if checker.settings.rules.enabled(Rule::UndocumentedParam) {
         if matches!(context.kind, SectionKind::Args | SectionKind::Arguments) {
             args_section(checker, docstring, context);
         }

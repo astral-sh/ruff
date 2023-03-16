@@ -52,10 +52,10 @@ impl Violation for UseOfDotValues {
 pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &Expr) {
     let rules = &checker.settings.rules;
     let violation: DiagnosticKind = match attr {
-        "ix" if rules.enabled(&Rule::UseOfDotIx) => UseOfDotIx.into(),
-        "at" if rules.enabled(&Rule::UseOfDotAt) => UseOfDotAt.into(),
-        "iat" if rules.enabled(&Rule::UseOfDotIat) => UseOfDotIat.into(),
-        "values" if rules.enabled(&Rule::UseOfDotValues) => UseOfDotValues.into(),
+        "ix" if rules.enabled(Rule::UseOfDotIx) => UseOfDotIx.into(),
+        "at" if rules.enabled(Rule::UseOfDotAt) => UseOfDotAt.into(),
+        "iat" if rules.enabled(Rule::UseOfDotIat) => UseOfDotIat.into(),
+        "values" if rules.enabled(Rule::UseOfDotValues) => UseOfDotValues.into(),
         _ => return,
     };
 

@@ -386,16 +386,16 @@ impl From<&Configuration> for RuleTable {
             .and_then(|pydocstyle| pydocstyle.convention)
         {
             for rule in convention.rules_to_be_ignored() {
-                rules.disable(rule);
+                rules.disable(*rule);
             }
         }
 
         // Validate that we didn't enable any incompatible rules. Use this awkward
         // approach to give each pair it's own `warn_user_once`.
         for (preferred, expendable, message) in INCOMPATIBLE_CODES {
-            if rules.enabled(preferred) && rules.enabled(expendable) {
+            if rules.enabled(*preferred) && rules.enabled(*expendable) {
                 warn_user_once_by_id!(expendable.as_ref(), "{}", message);
-                rules.disable(expendable);
+                rules.disable(*expendable);
             }
         }
 
@@ -440,7 +440,7 @@ mod tests {
             ..Configuration::default()
         })
         .iter_enabled()
-        .cloned()
+        .copied()
         .collect()
     }
 

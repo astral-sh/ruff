@@ -277,7 +277,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
             if checker
                 .settings
                 .rules
-                .enabled(&Rule::IncorrectFixtureParenthesesStyle)
+                .enabled(Rule::IncorrectFixtureParenthesesStyle)
                 && !checker.settings.flake8_pytest_style.fixture_parentheses
                 && args.is_empty()
                 && keywords.is_empty()
@@ -287,7 +287,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 pytest_fixture_parentheses(checker, decorator, fix, "", "()");
             }
 
-            if checker.settings.rules.enabled(&Rule::FixturePositionalArgs) && !args.is_empty() {
+            if checker.settings.rules.enabled(Rule::FixturePositionalArgs) && !args.is_empty() {
                 checker.diagnostics.push(Diagnostic::new(
                     FixturePositionalArgs {
                         function: func_name.to_string(),
@@ -299,7 +299,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
             if checker
                 .settings
                 .rules
-                .enabled(&Rule::ExtraneousScopeFunction)
+                .enabled(Rule::ExtraneousScopeFunction)
             {
                 let scope_keyword = keywords
                     .iter()
@@ -333,7 +333,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
             if checker
                 .settings
                 .rules
-                .enabled(&Rule::IncorrectFixtureParenthesesStyle)
+                .enabled(Rule::IncorrectFixtureParenthesesStyle)
                 && checker.settings.flake8_pytest_style.fixture_parentheses
             {
                 let fix = Fix::insertion("()".to_string(), decorator.end_location.unwrap());
@@ -354,7 +354,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
     if checker
         .settings
         .rules
-        .enabled(&Rule::IncorrectFixtureNameUnderscore)
+        .enabled(Rule::IncorrectFixtureNameUnderscore)
         && visitor.has_return_with_value
         && func_name.starts_with('_')
     {
@@ -367,7 +367,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
     } else if checker
         .settings
         .rules
-        .enabled(&Rule::MissingFixtureNameUnderscore)
+        .enabled(Rule::MissingFixtureNameUnderscore)
         && !visitor.has_return_with_value
         && !visitor.has_yield_from
         && !func_name.starts_with('_')
@@ -380,7 +380,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         ));
     }
 
-    if checker.settings.rules.enabled(&Rule::UselessYieldFixture) {
+    if checker.settings.rules.enabled(Rule::UselessYieldFixture) {
         if let Some(stmt) = body.last() {
             if let StmtKind::Expr { value, .. } = &stmt.node {
                 if let ExprKind::Yield { .. } = value.node {
@@ -462,7 +462,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
         if checker
             .settings
             .rules
-            .enabled(&Rule::UnnecessaryAsyncioMarkOnFixture)
+            .enabled(Rule::UnnecessaryAsyncioMarkOnFixture)
         {
             if name == "asyncio" {
                 let mut diagnostic =
@@ -479,7 +479,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
         if checker
             .settings
             .rules
-            .enabled(&Rule::ErroneousUseFixturesOnFixture)
+            .enabled(Rule::ErroneousUseFixturesOnFixture)
         {
             if name == "usefixtures" {
                 let mut diagnostic =
@@ -508,20 +508,17 @@ pub fn fixture(
         if checker
             .settings
             .rules
-            .enabled(&Rule::IncorrectFixtureParenthesesStyle)
-            || checker.settings.rules.enabled(&Rule::FixturePositionalArgs)
+            .enabled(Rule::IncorrectFixtureParenthesesStyle)
+            || checker.settings.rules.enabled(Rule::FixturePositionalArgs)
             || checker
                 .settings
                 .rules
-                .enabled(&Rule::ExtraneousScopeFunction)
+                .enabled(Rule::ExtraneousScopeFunction)
         {
             check_fixture_decorator(checker, func_name, decorator);
         }
 
-        if checker
-            .settings
-            .rules
-            .enabled(&Rule::DeprecatedYieldFixture)
+        if checker.settings.rules.enabled(Rule::DeprecatedYieldFixture)
             && checker.settings.flake8_pytest_style.fixture_parentheses
         {
             check_fixture_decorator_name(checker, decorator);
@@ -530,12 +527,12 @@ pub fn fixture(
         if (checker
             .settings
             .rules
-            .enabled(&Rule::MissingFixtureNameUnderscore)
+            .enabled(Rule::MissingFixtureNameUnderscore)
             || checker
                 .settings
                 .rules
-                .enabled(&Rule::IncorrectFixtureNameUnderscore)
-            || checker.settings.rules.enabled(&Rule::UselessYieldFixture))
+                .enabled(Rule::IncorrectFixtureNameUnderscore)
+            || checker.settings.rules.enabled(Rule::UselessYieldFixture))
             && !has_abstractmethod_decorator(decorators, checker)
         {
             check_fixture_returns(checker, func, func_name, body);
@@ -544,7 +541,7 @@ pub fn fixture(
         if checker
             .settings
             .rules
-            .enabled(&Rule::FixtureFinalizerCallback)
+            .enabled(Rule::FixtureFinalizerCallback)
         {
             check_fixture_addfinalizer(checker, args, body);
         }
@@ -552,11 +549,11 @@ pub fn fixture(
         if checker
             .settings
             .rules
-            .enabled(&Rule::UnnecessaryAsyncioMarkOnFixture)
+            .enabled(Rule::UnnecessaryAsyncioMarkOnFixture)
             || checker
                 .settings
                 .rules
-                .enabled(&Rule::ErroneousUseFixturesOnFixture)
+                .enabled(Rule::ErroneousUseFixturesOnFixture)
         {
             check_fixture_marks(checker, decorators);
         }
@@ -565,7 +562,7 @@ pub fn fixture(
     if checker
         .settings
         .rules
-        .enabled(&Rule::FixtureParamWithoutValue)
+        .enabled(Rule::FixtureParamWithoutValue)
         && func_name.starts_with("test_")
     {
         check_test_function_args(checker, args);

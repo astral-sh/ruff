@@ -24,7 +24,7 @@ pub fn check_noqa(
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<usize> {
-    let enforce_noqa = settings.rules.enabled(&Rule::UnusedNOQA);
+    let enforce_noqa = settings.rules.enabled(Rule::UnusedNOQA);
 
     // Whether the file is exempted from all checks.
     let mut file_exempted = false;
@@ -188,7 +188,7 @@ pub fn check_noqa(
                             valid_codes.push(code);
                         } else {
                             if let Ok(rule) = Rule::from_code(code) {
-                                if settings.rules.enabled(&rule) {
+                                if settings.rules.enabled(rule) {
                                     unmatched_codes.push(code);
                                 } else {
                                     disabled_codes.push(code);

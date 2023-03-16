@@ -29,6 +29,9 @@ class Repository(NamedTuple):
     org: str
     repo: str
     ref: str
+    select: str = "ALL"
+    ignore: str = ""
+    exclude: str = ""
 
     @asynccontextmanager
     async def clone(self: Self) -> "AsyncIterator[Path]":
@@ -59,6 +62,7 @@ REPOSITORIES = {
     "bokeh": Repository("bokeh", "bokeh", "branch-3.2"),
     "scikit-build": Repository("scikit-build", "scikit-build", "main"),
     "airflow": Repository("apache", "airflow", "main"),
+    "typeshed": Repository("python", "typeshed", "main", select="PYI"),
 }
 
 SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.*potentially fixable with.*)$")
@@ -68,15 +72,23 @@ class RuffError(Exception):
     """An error reported by ruff."""
 
 
-async def check(*, ruff: Path, path: Path) -> "Sequence[str]":
+async def check(
+    *,
+    ruff: Path,
+    path: Path,
+    select: str,
+    ignore: str = "",
+    exclude: str = "",
+) -> "Sequence[str]":
     """Run the given ruff binary against the specified path."""
+    ruff_args = ["check", "--no-cache", "--exit-zero", "--select", select]
+    if ignore:
+        ruff_args.extend(["--ignore", ignore])
+    if exclude:
+        ruff_args.extend(["--exclude", exclude])
     proc = await create_subprocess_exec(
         ruff.absolute(),
-        "check",
-        "--no-cache",
-        "--exit-zero",
-        "--select",
-        "ALL",
+        *ruff_args,
         ".",
         stdout=PIPE,
         stderr=PIPE,
@@ -123,8 +135,24 @@ async def compare(ruff1: Path, ruff2: Path, repo: Repository) -> Diff | None:
     async with repo.clone() as path:
         try:
             async with asyncio.TaskGroup() as tg:
-                check1 = tg.create_task(check(ruff=ruff1, path=path))
-                check2 = tg.create_task(check(ruff=ruff2, path=path))
+                check1 = tg.create_task(
+                    check(
+                        ruff=ruff1,
+                        path=path,
+                        select=repo.select,
+                        ignore=repo.ignore,
+                        exclude=repo.exclude,
+                    ),
+                )
+                check2 = tg.create_task(
+                    check(
+                        ruff=ruff2,
+                        path=path,
+                        select=repo.select,
+                        ignore=repo.ignore,
+                        exclude=repo.exclude,
+                    ),
+                )
         except ExceptionGroup as e:
             raise e.exceptions[0] from e
 

@@ -88,22 +88,20 @@ pub fn trailing_whitespace(
         let end = Location::new(lineno + 1, line_char_count);
 
         if whitespace_count == line_char_count {
-            if settings.rules.enabled(&Rule::BlankLineContainsWhitespace) {
+            if settings.rules.enabled(Rule::BlankLineContainsWhitespace) {
                 let mut diagnostic =
                     Diagnostic::new(BlankLineContainsWhitespace, Range::new(start, end));
                 if matches!(autofix, flags::Autofix::Enabled)
-                    && settings
-                        .rules
-                        .should_fix(&Rule::BlankLineContainsWhitespace)
+                    && settings.rules.should_fix(Rule::BlankLineContainsWhitespace)
                 {
                     diagnostic.amend(Fix::deletion(start, end));
                 }
                 return Some(diagnostic);
             }
-        } else if settings.rules.enabled(&Rule::TrailingWhitespace) {
+        } else if settings.rules.enabled(Rule::TrailingWhitespace) {
             let mut diagnostic = Diagnostic::new(TrailingWhitespace, Range::new(start, end));
             if matches!(autofix, flags::Autofix::Enabled)
-                && settings.rules.should_fix(&Rule::TrailingWhitespace)
+                && settings.rules.should_fix(Rule::TrailingWhitespace)
             {
                 diagnostic.amend(Fix::deletion(start, end));
             }

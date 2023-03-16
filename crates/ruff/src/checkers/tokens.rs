@@ -24,42 +24,42 @@ pub fn check_tokens(
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     let enforce_ambiguous_unicode_character = settings.rules.any_enabled(&[
-        &Rule::AmbiguousUnicodeCharacterString,
-        &Rule::AmbiguousUnicodeCharacterDocstring,
-        &Rule::AmbiguousUnicodeCharacterComment,
+        Rule::AmbiguousUnicodeCharacterString,
+        Rule::AmbiguousUnicodeCharacterDocstring,
+        Rule::AmbiguousUnicodeCharacterComment,
     ]);
     let enforce_invalid_string_character = settings.rules.any_enabled(&[
-        &Rule::InvalidCharacterBackspace,
-        &Rule::InvalidCharacterSub,
-        &Rule::InvalidCharacterEsc,
-        &Rule::InvalidCharacterNul,
-        &Rule::InvalidCharacterZeroWidthSpace,
+        Rule::InvalidCharacterBackspace,
+        Rule::InvalidCharacterSub,
+        Rule::InvalidCharacterEsc,
+        Rule::InvalidCharacterNul,
+        Rule::InvalidCharacterZeroWidthSpace,
     ]);
     let enforce_quotes = settings.rules.any_enabled(&[
-        &Rule::BadQuotesInlineString,
-        &Rule::BadQuotesMultilineString,
-        &Rule::BadQuotesDocstring,
-        &Rule::AvoidableEscapedQuote,
+        Rule::BadQuotesInlineString,
+        Rule::BadQuotesMultilineString,
+        Rule::BadQuotesDocstring,
+        Rule::AvoidableEscapedQuote,
     ]);
-    let enforce_commented_out_code = settings.rules.enabled(&Rule::CommentedOutCode);
+    let enforce_commented_out_code = settings.rules.enabled(Rule::CommentedOutCode);
     let enforce_compound_statements = settings.rules.any_enabled(&[
-        &Rule::MultipleStatementsOnOneLineColon,
-        &Rule::MultipleStatementsOnOneLineSemicolon,
-        &Rule::UselessSemicolon,
+        Rule::MultipleStatementsOnOneLineColon,
+        Rule::MultipleStatementsOnOneLineSemicolon,
+        Rule::UselessSemicolon,
     ]);
-    let enforce_invalid_escape_sequence = settings.rules.enabled(&Rule::InvalidEscapeSequence);
+    let enforce_invalid_escape_sequence = settings.rules.enabled(Rule::InvalidEscapeSequence);
     let enforce_implicit_string_concatenation = settings.rules.any_enabled(&[
-        &Rule::SingleLineImplicitStringConcatenation,
-        &Rule::MultiLineImplicitStringConcatenation,
+        Rule::SingleLineImplicitStringConcatenation,
+        Rule::MultiLineImplicitStringConcatenation,
     ]);
 
     let enforce_trailing_comma = settings.rules.any_enabled(&[
-        &Rule::TrailingCommaMissing,
-        &Rule::TrailingCommaOnBareTupleProhibited,
-        &Rule::TrailingCommaProhibited,
+        Rule::TrailingCommaMissing,
+        Rule::TrailingCommaOnBareTupleProhibited,
+        Rule::TrailingCommaProhibited,
     ]);
-    let enforce_extraneous_parenthesis = settings.rules.enabled(&Rule::ExtraneousParentheses);
-    let enforce_type_comment_in_stub = settings.rules.enabled(&Rule::TypeCommentInStub);
+    let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
+    let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
 
     // RUF001, RUF002, RUF003
     if enforce_ambiguous_unicode_character {
@@ -113,7 +113,7 @@ pub fn check_tokens(
                     locator,
                     *start,
                     *end,
-                    autofix.into() && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
+                    autofix.into() && settings.rules.should_fix(Rule::InvalidEscapeSequence),
                 ));
             }
         }

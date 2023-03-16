@@ -56,7 +56,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
         if checker
             .settings
             .rules
-            .enabled(&Rule::MultiLineSummaryFirstLine)
+            .enabled(Rule::MultiLineSummaryFirstLine)
         {
             let mut diagnostic =
                 Diagnostic::new(MultiLineSummaryFirstLine, Range::from(docstring.expr));
@@ -81,7 +81,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
         if checker
             .settings
             .rules
-            .enabled(&Rule::MultiLineSummarySecondLine)
+            .enabled(Rule::MultiLineSummarySecondLine)
         {
             let mut diagnostic =
                 Diagnostic::new(MultiLineSummarySecondLine, Range::from(docstring.expr));
