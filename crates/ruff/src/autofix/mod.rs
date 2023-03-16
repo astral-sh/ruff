@@ -9,7 +9,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
 use crate::linter::FixTable;
-use crate::registry::AsRule;
+use crate::registry::{AsRule, Rule};
 
 pub mod helpers;
 
@@ -19,6 +19,17 @@ pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String
         None
     } else {
         Some(apply_fixes(diagnostics.iter(), locator))
+    }
+}
+
+pub fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
+    match fix1.location.cmp(&fix2.location) {
+        std::cmp::Ordering::Equal => match (rule1, rule2) {
+            (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
+            (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        },
+        other => other,
     }
 }
 
@@ -39,7 +50,7 @@ fn apply_fixes<'a>(
                 .as_ref()
                 .map(|fix| (diagnostic.kind.rule(), fix))
         })
-        .sorted_by_key(|(.., fix)| fix.location)
+        .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
         // If we already applied an identical fix as part of another correction, skip
         // any re-application.

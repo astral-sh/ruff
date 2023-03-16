@@ -42,24 +42,4 @@ expression: diagnostics
       row: 3
       column: 69
   parent: ~
-- kind:
-    name: NewLineAfterLastParagraph
-    body: Multi-line docstring closing quotes should be on a separate line
-    suggestion: Move closing quotes to new line
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 4
-    column: 8
-  fix:
-    content: "\n    "
-    location:
-      row: 4
-      column: 5
-    end_location:
-      row: 4
-      column: 5
-  parent: ~
 
