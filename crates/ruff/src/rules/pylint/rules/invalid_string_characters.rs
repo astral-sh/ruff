@@ -54,7 +54,6 @@ impl AlwaysAutofixableViolation for InvalidCharacterBackspace {
 /// ```python
 /// x = '\x1A'
 /// ```
-
 #[violation]
 pub struct InvalidCharacterSub;
 
@@ -85,7 +84,6 @@ impl AlwaysAutofixableViolation for InvalidCharacterSub {
 /// ```python
 /// x = '\x1B'
 /// ```
-
 #[violation]
 pub struct InvalidCharacterEsc;
 
@@ -116,7 +114,6 @@ impl AlwaysAutofixableViolation for InvalidCharacterEsc {
 /// ```python
 /// x = '\0'
 /// ```
-
 #[violation]
 pub struct InvalidCharacterNul;
 
@@ -147,7 +144,6 @@ impl AlwaysAutofixableViolation for InvalidCharacterNul {
 /// ```python
 /// x = 'Dear Sir\u200B/\u200BMadam'  # zero width space
 /// ```
-
 #[violation]
 pub struct InvalidCharacterZeroWidthSpace;
 
@@ -172,7 +168,7 @@ pub fn invalid_string_characters(
     let mut diagnostics = Vec::new();
     let text = locator.slice(Range::new(start, end));
 
-    for (row_offset, line) in text.lines().enumerate() {
+    for (row_offset, line) in UniversalNewlineIterator::from(text).enumerate() {
         for (col_offset, m) in line.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}']) {
             let col = if row_offset == 0 {
                 start.column() + col_offset
