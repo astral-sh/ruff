@@ -1,20 +1,18 @@
-while True:
+try:
+    pass
+finally:
+    continue  # [continue-in-finally]
+
+try:
+    pass
+except Exception:
+    continue
+finally:
     try:
         pass
     finally:
         continue  # [continue-in-finally]
-
-while True:
-    try:
-        pass
-    except Exception:
-        continue
-    finally:
-        try:
-            pass
-        finally:
-            continue  # [continue-in-finally]
-        pass
+    pass
 
 try:
     pass
@@ -65,8 +63,28 @@ while True:
         for i in range(12):
             continue
         continue  # [continue-in-finally]
+        
+        while True:
+            pass
+        else:
+            continue # [continue-in-finally]
 
         def test():
             continue
             while True:
                 continue
+
+while True:
+    try: 
+        pass
+    finally:
+        if True:
+            pass
+        elif False:
+            continue # [continue-in-finally]
+        else:
+            continue # [continue-in-finally]
+            for i in range(10):
+                pass
+            else:
+                continue # [continue-in-finally]

@@ -51,9 +51,16 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
         }
 
         match &stmt.node {
-            StmtKind::If { body, .. }
-            | StmtKind::With { body, .. }
-            | StmtKind::AsyncWith { body, .. } => {
+            StmtKind::If { body, orelse, .. }
+            | StmtKind::Try { body, orelse, .. }
+            | StmtKind::TryStar { body, orelse, .. } => {
+                traverse_body(checker, body);
+                traverse_body(checker, orelse);
+            }
+            StmtKind::For { orelse, .. }
+            | StmtKind::AsyncFor { orelse, .. }
+            | StmtKind::While { orelse, .. } => traverse_body(checker, orelse),
+            StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => {
                 traverse_body(checker, body);
             }
             StmtKind::Match { cases, .. } => {
