@@ -50,13 +50,18 @@ use ruff_python_ast::source_code::Locator;
 pub struct ComplexStructure {
     pub name: String,
     pub complexity: usize,
+    pub max_complexity: usize,
 }
 
 impl Violation for ComplexStructure {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ComplexStructure { name, complexity } = self;
-        format!("`{name}` is too complex ({complexity})")
+        let ComplexStructure {
+            name,
+            complexity,
+            max_complexity,
+        } = self;
+        format!("`{name}` is too complex ({complexity} > {max_complexity})")
     }
 }
 
@@ -135,6 +140,7 @@ pub fn function_is_too_complex(
             ComplexStructure {
                 name: name.to_string(),
                 complexity,
+                max_complexity,
             },
             identifier_range(stmt, locator),
         ))

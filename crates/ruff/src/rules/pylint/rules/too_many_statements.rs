@@ -18,7 +18,7 @@ impl Violation for TooManyStatements {
             statements,
             max_statements,
         } = self;
-        format!("Too many statements ({statements}/{max_statements})")
+        format!("Too many statements ({statements} > {max_statements})")
     }
 }
 

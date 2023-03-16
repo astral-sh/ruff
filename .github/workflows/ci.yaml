@@ -80,6 +80,7 @@ jobs:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
       - uses: actions/upload-artifact@v3
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         with:
           name: ruff
           path: target/debug/ruff
@@ -139,27 +140,39 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+
       - uses: actions/download-artifact@v3
+        name: Download Ruff binary
         id: ruff-target
         with:
           name: ruff
           path: target/debug
+
       - uses: dawidd6/action-download-artifact@v2
+        name: Download base results
         with:
           name: ruff
           branch: ${{ github.event.pull_request.base.ref }}
           check_artifacts: true
+
       - name: Run ecosystem check
         run: |
           # Make executable, since artifact download doesn't preserve this
           chmod +x ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
 
           scripts/check_ecosystem.py ruff ${{ steps.ruff-target.outputs.download-path }}/ruff | tee ecosystem-result
+          cat ecosystem-result > $GITHUB_STEP_SUMMARY
 
           echo ${{ github.event.number }} > pr-number
+
       - uses: actions/upload-artifact@v3
+        name: Upload PR Number
+        with:
+          name: pr-number
+          path: pr-number
+
+      - uses: actions/upload-artifact@v3
+        name: Upload Results
         with:
           name: ecosystem-result
-          path: |
-            ecosystem-result
-            pr-number
+          path: ecosystem-result
