@@ -309,6 +309,7 @@ Ruff is used in a number of major open-source projects, including:
 - [Starlite](https://github.com/starlite-api/starlite)
 - [telemetry-airflow (Mozilla)](https://github.com/mozilla/telemetry-airflow)
 - [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
+- [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
 
 ## License
 
