@@ -48,12 +48,10 @@ pub fn check_tokens(
         &Rule::UselessSemicolon,
     ]);
     let enforce_invalid_escape_sequence = settings.rules.enabled(&Rule::InvalidEscapeSequence);
-    let enforce_implicit_string_concatenation = settings
-        .rules
-        .enabled(&Rule::SingleLineImplicitStringConcatenation)
-        || settings
-            .rules
-            .enabled(&Rule::MultiLineImplicitStringConcatenation);
+    let enforce_implicit_string_concatenation = settings.rules.any_enabled(&[
+        &Rule::SingleLineImplicitStringConcatenation,
+        &Rule::MultiLineImplicitStringConcatenation,
+    ]);
 
     let enforce_trailing_comma = settings.rules.any_enabled(&[
         &Rule::TrailingCommaMissing,

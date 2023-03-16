@@ -1,3 +1,4 @@
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 use rustpython_parser::ast::Location;
 
 use ruff_macros::{derive_message_formats, violation};
