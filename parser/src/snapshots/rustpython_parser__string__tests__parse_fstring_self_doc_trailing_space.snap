@@ -1,6 +1,5 @@
 ---
 source: compiler/parser/src/string.rs
-assertion_line: 773
 expression: parse_ast
 ---
 [
@@ -18,7 +17,7 @@ expression: parse_ast
         custom: (),
         node: Constant {
             value: Str(
-                "x   =",
+                "x=",
             ),
             kind: None,
         },
@@ -37,7 +36,7 @@ expression: parse_ast
         custom: (),
         node: Constant {
             value: Str(
-                "",
+                "   ",
             ),
             kind: None,
         },

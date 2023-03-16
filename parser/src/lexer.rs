@@ -241,6 +241,7 @@ where
         lxr.window.slide();
         lxr.window.slide();
         // TODO: Handle possible mismatch between BOM and explicit encoding declaration.
+        // spell-checker:ignore feff
         if let Some('\u{feff}') = lxr.window[0] {
             lxr.window.slide();
         }
@@ -1085,7 +1086,7 @@ where
                 }
             }
             ' ' | '\t' | '\x0C' => {
-                // Skip whitespaces
+                // Skip white-spaces
                 self.next_char();
                 while let Some(' ' | '\t' | '\x0C') = self.window[0] {
                     self.next_char();
@@ -1327,7 +1328,7 @@ mod tests {
         lexer.map(|x| x.unwrap().1).collect()
     }
 
-    fn stok(s: &str) -> Tok {
+    fn str_tok(s: &str) -> Tok {
         Tok::String {
             value: s.to_owned(),
             kind: StringKind::String,
@@ -1335,7 +1336,7 @@ mod tests {
         }
     }
 
-    fn raw_stok(s: &str) -> Tok {
+    fn raw_str_tok(s: &str) -> Tok {
         Tok::String {
             value: s.to_owned(),
             kind: StringKind::RawString,
@@ -1434,13 +1435,13 @@ mod tests {
 
     #[test]
     fn test_assignment() {
-        let source = r"avariable = 99 + 2-0";
+        let source = r"a_variable = 99 + 2-0";
         let tokens = lex_source(source);
         assert_eq!(
             tokens,
             vec![
                 Tok::Name {
-                    name: String::from("avariable"),
+                    name: String::from("a_variable"),
                 },
                 Tok::Equal,
                 Tok::Int {
@@ -1663,13 +1664,13 @@ mod tests {
             vec![
                 Tok::Lpar,
                 Tok::NonLogicalNewline,
-                stok("a"),
+                str_tok("a"),
                 Tok::NonLogicalNewline,
-                stok("b"),
+                str_tok("b"),
                 Tok::NonLogicalNewline,
                 Tok::NonLogicalNewline,
-                stok("c"),
-                stok("d"),
+                str_tok("c"),
+                str_tok("d"),
                 Tok::NonLogicalNewline,
                 Tok::Rpar,
                 Tok::Newline,
@@ -1716,15 +1717,15 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                stok("double"),
-                stok("single"),
-                stok(r"can\'t"),
-                stok(r#"\\\""#),
-                stok(r"\t\r\n"),
-                stok(r"\g"),
-                raw_stok(r"raw\'"),
-                stok(r"\420"),
-                stok(r"\200\0a"),
+                str_tok("double"),
+                str_tok("single"),
+                str_tok(r"can\'t"),
+                str_tok(r#"\\\""#),
+                str_tok(r"\t\r\n"),
+                str_tok(r"\g"),
+                raw_str_tok(r"raw\'"),
+                str_tok(r"\420"),
+                str_tok(r"\200\0a"),
                 Tok::Newline,
             ]
         );
@@ -1740,7 +1741,7 @@ mod tests {
                 assert_eq!(
                     tokens,
                     vec![
-                        stok("abc\\\ndef"),
+                        str_tok("abc\\\ndef"),
                         Tok::Newline,
                     ]
                 )
@@ -1759,7 +1760,7 @@ mod tests {
     fn test_escape_unicode_name() {
         let source = r#""\N{EN SPACE}""#;
         let tokens = lex_source(source);
-        assert_eq!(tokens, vec![stok(r"\N{EN SPACE}"), Tok::Newline])
+        assert_eq!(tokens, vec![str_tok(r"\N{EN SPACE}"), Tok::Newline])
     }
 
     macro_rules! test_triple_quoted {

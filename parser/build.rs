@@ -112,7 +112,7 @@ fn gen_phf(out_dir: &Path) {
         .entry("False", "Tok::False")
         .entry("None", "Tok::None")
         .entry("True", "Tok::True")
-        // moreso "standard" keywords
+        // more so "standard" keywords
         .entry("and", "Tok::And")
         .entry("as", "Tok::As")
         .entry("assert", "Tok::Assert")

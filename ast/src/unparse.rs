@@ -48,10 +48,10 @@ impl<'a> Unparser<'a> {
     }
 
     fn unparse_expr<U>(&mut self, ast: &Expr<U>, level: u8) -> fmt::Result {
-        macro_rules! opprec {
-            ($opty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
+        macro_rules! op_prec {
+            ($op_ty:ident, $x:expr, $enu:path, $($var:ident($op:literal, $prec:ident)),*$(,)?) => {
                 match $x {
-                    $(<$enu>::$var => (opprec!(@space $opty, $op), precedence::$prec),)*
+                    $(<$enu>::$var => (op_prec!(@space $op_ty, $op), precedence::$prec),)*
                 }
             };
             (@space bin, $op:literal) => {
@@ -72,7 +72,7 @@ impl<'a> Unparser<'a> {
         }
         match &ast.node {
             ExprKind::BoolOp { op, values } => {
-                let (op, prec) = opprec!(bin, op, Boolop, And("and", AND), Or("or", OR));
+                let (op, prec) = op_prec!(bin, op, Boolop, And("and", AND), Or("or", OR));
                 group_if!(prec, {
                     let mut first = true;
                     for val in values {
@@ -89,8 +89,8 @@ impl<'a> Unparser<'a> {
                 })
             }
             ExprKind::BinOp { left, op, right } => {
-                let rassoc = matches!(op, Operator::Pow);
-                let (op, prec) = opprec!(
+                let right_associative = matches!(op, Operator::Pow);
+                let (op, prec) = op_prec!(
                     bin,
                     op,
                     Operator,
@@ -109,13 +109,13 @@ impl<'a> Unparser<'a> {
                     FloorDiv("//", TERM),
                 );
                 group_if!(prec, {
-                    self.unparse_expr(left, prec + rassoc as u8)?;
+                    self.unparse_expr(left, prec + right_associative as u8)?;
                     self.p(op)?;
-                    self.unparse_expr(right, prec + !rassoc as u8)?;
+                    self.unparse_expr(right, prec + !right_associative as u8)?;
                 })
             }
             ExprKind::UnaryOp { op, operand } => {
-                let (op, prec) = opprec!(
+                let (op, prec) = op_prec!(
                     un,
                     op,
                     crate::Unaryop,
@@ -131,8 +131,8 @@ impl<'a> Unparser<'a> {
             }
             ExprKind::Lambda { args, body } => {
                 group_if!(precedence::TEST, {
-                    let npos = args.args.len() + args.posonlyargs.len();
-                    self.p(if npos > 0 { "lambda " } else { "lambda" })?;
+                    let pos = args.args.len() + args.posonlyargs.len();
+                    self.p(if pos > 0 { "lambda " } else { "lambda" })?;
                     self.unparse_args(args)?;
                     write!(self, ": {}", **body)?;
                 })
@@ -260,7 +260,7 @@ impl<'a> Unparser<'a> {
                     [],
                 ) = (&**args, &**keywords)
                 {
-                    // make sure a single genexp doesn't get double parens
+                    // make sure a single genexpr doesn't get double parens
                     self.unparse_expr(elt, precedence::TEST)?;
                     self.unparse_comp(generators)?;
                 } else {
@@ -287,7 +287,7 @@ impl<'a> Unparser<'a> {
                 conversion,
                 format_spec,
             } => self.unparse_formatted(value, *conversion, format_spec.as_deref())?,
-            ExprKind::JoinedStr { values } => self.unparse_joinedstr(values, false)?,
+            ExprKind::JoinedStr { values } => self.unparse_joined_str(values, false)?,
             ExprKind::Constant { value, kind } => {
                 if let Some(kind) = kind {
                     self.p(kind)?;
@@ -490,7 +490,7 @@ impl<'a> Unparser<'a> {
                     unreachable!()
                 }
             }
-            ExprKind::JoinedStr { values } => self.unparse_joinedstr(values, is_spec),
+            ExprKind::JoinedStr { values } => self.unparse_joined_str(values, is_spec),
             ExprKind::FormattedValue {
                 value,
                 conversion,
@@ -505,7 +505,7 @@ impl<'a> Unparser<'a> {
         self.p(&s)
     }
 
-    fn unparse_joinedstr<U>(&mut self, values: &[Expr<U>], is_spec: bool) -> fmt::Result {
+    fn unparse_joined_str<U>(&mut self, values: &[Expr<U>], is_spec: bool) -> fmt::Result {
         if is_spec {
             self.unparse_fstring_body(values, is_spec)
         } else {

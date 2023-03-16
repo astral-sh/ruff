@@ -27,7 +27,7 @@ where
 {
     pub fn new(lexer: I, mode: Mode) -> Self {
         Self {
-            underlying: lexer.multipeek(),
+            underlying: lexer.multipeek(), // spell-checker:ignore multipeek
             start_of_line: matches!(mode, Mode::Interactive | Mode::Module),
         }
     }

@@ -1,6 +1,5 @@
 ---
 source: compiler/parser/src/string.rs
-assertion_line: 685
 expression: parse_ast
 ---
 [

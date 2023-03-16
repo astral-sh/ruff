@@ -1,6 +1,5 @@
 ---
 source: compiler/parser/src/string.rs
-assertion_line: 780
 expression: parse_ast
 ---
 [
@@ -18,7 +17,7 @@ expression: parse_ast
         custom: (),
         node: Constant {
             value: Str(
-                "x=",
+                "user=",
             ),
             kind: None,
         },
@@ -37,7 +36,7 @@ expression: parse_ast
         custom: (),
         node: Constant {
             value: Str(
-                "   ",
+                "",
             ),
             kind: None,
         },
@@ -63,12 +62,12 @@ expression: parse_ast
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 4,
+                        column: 7,
                     },
                 ),
                 custom: (),
                 node: Name {
-                    id: "x",
+                    id: "user",
                     ctx: Load,
                 },
             },

@@ -179,7 +179,7 @@ impl<'a> StringParser<'a> {
 
         let mut expression = String::new();
         let mut spec = None;
-        let mut delims = Vec::new();
+        let mut delimiters = Vec::new();
         let mut conversion = ConversionFlag::None;
         let mut self_documenting = false;
         let mut trailing_seq = String::new();
@@ -194,7 +194,7 @@ impl<'a> StringParser<'a> {
                     expression.push('=');
                     self.next_char();
                 }
-                '!' if delims.is_empty() && self.peek() != Some(&'=') => {
+                '!' if delimiters.is_empty() && self.peek() != Some(&'=') => {
                     if expression.trim().is_empty() {
                         return Err(FStringError::new(EmptyExpression, self.get_pos()).into());
                     }
@@ -223,11 +223,11 @@ impl<'a> StringParser<'a> {
 
                 // match a python 3.8 self documenting expression
                 // format '{' PYTHON_EXPRESSION '=' FORMAT_SPECIFIER? '}'
-                '=' if self.peek() != Some(&'=') && delims.is_empty() => {
+                '=' if self.peek() != Some(&'=') && delimiters.is_empty() => {
                     self_documenting = true;
                 }
 
-                ':' if delims.is_empty() => {
+                ':' if delimiters.is_empty() => {
                     let parsed_spec = self.parse_spec(nested)?;
 
                     spec = Some(Box::new(self.expr(ExprKind::JoinedStr {
@@ -236,10 +236,10 @@ impl<'a> StringParser<'a> {
                 }
                 '(' | '{' | '[' => {
                     expression.push(ch);
-                    delims.push(ch);
+                    delimiters.push(ch);
                 }
                 ')' => {
-                    let last_delim = delims.pop();
+                    let last_delim = delimiters.pop();
                     match last_delim {
                         Some('(') => {
                             expression.push(ch);
@@ -257,7 +257,7 @@ impl<'a> StringParser<'a> {
                     }
                 }
                 ']' => {
-                    let last_delim = delims.pop();
+                    let last_delim = delimiters.pop();
                     match last_delim {
                         Some('[') => {
                             expression.push(ch);
@@ -274,8 +274,8 @@ impl<'a> StringParser<'a> {
                         }
                     }
                 }
-                '}' if !delims.is_empty() => {
-                    let last_delim = delims.pop();
+                '}' if !delimiters.is_empty() => {
+                    let last_delim = delimiters.pop();
                     match last_delim {
                         Some('{') => {
                             expression.push(ch);
@@ -800,7 +800,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fstring_parse_selfdocumenting_base() {
+    fn test_fstring_parse_self_documenting_base() {
         let src = "{user=}";
         let parse_ast = parse_fstring(src).unwrap();
 
@@ -808,7 +808,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fstring_parse_selfdocumenting_base_more() {
+    fn test_fstring_parse_self_documenting_base_more() {
         let src = "mix {user=} with text and {second=}";
         let parse_ast = parse_fstring(src).unwrap();
 
@@ -816,7 +816,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fstring_parse_selfdocumenting_format() {
+    fn test_fstring_parse_self_documenting_format() {
         let src = "{user=:>10}";
         let parse_ast = parse_fstring(src).unwrap();
 
@@ -877,14 +877,14 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_fstring_selfdoc_prec_space() {
+    fn test_parse_fstring_self_doc_prec_space() {
         let source = "{x   =}";
         let parse_ast = parse_fstring(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
-    fn test_parse_fstring_selfdoc_trailing_space() {
+    fn test_parse_fstring_self_doc_trailing_space() {
         let source = "{x=   }";
         let parse_ast = parse_fstring(source).unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -979,7 +979,7 @@ mod tests {
     #[test]
     fn test_escape_char_in_byte_literal() {
         // backslash does not escape
-        let source = r##"b"omkmok\Xaa""##;
+        let source = r##"b"omkmok\Xaa""##; // spell-checker:ignore omkmok
         let parse_ast = parse_program(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }

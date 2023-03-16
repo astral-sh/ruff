@@ -433,14 +433,14 @@ class Foo(A, B):
     }
 
     #[test]
-    fn test_parse_boolop_or() {
+    fn test_parse_bool_op_or() {
         let source = "x or y";
         let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
     }
 
     #[test]
-    fn test_parse_boolop_and() {
+    fn test_parse_bool_op_and() {
         let source = "x and y";
         let parse_ast = parse_expression(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);
@@ -513,10 +513,10 @@ with (0 as a, 1 as b,): pass
     #[test]
     fn test_star_index() {
         let source = "\
-array_slice = array[0, *idxs, -1]
-array[0, *idxs, -1] = array_slice
-array[*idxs_to_select, *idxs_to_select]
-array[3:5, *idxs_to_select]
+array_slice = array[0, *indexes, -1]
+array[0, *indexes, -1] = array_slice
+array[*indexes_to_select, *indexes_to_select]
+array[3:5, *indexes_to_select]
 ";
         let parse_ast = parse_program(source, "<test>").unwrap();
         insta::assert_debug_snapshot!(parse_ast);

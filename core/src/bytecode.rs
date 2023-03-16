@@ -1,4 +1,4 @@
-//! Implement python as a virtual machine with bytecodes. This module
+//! Implement python as a virtual machine with bytecode. This module
 //! implements bytecode structure.
 
 use crate::{marshal, Location};
@@ -85,7 +85,7 @@ impl ConstantBag for BasicBag {
 }
 
 /// Primary container of a single code object. Each python function has
-/// a codeobject. Also a module has a codeobject.
+/// a code object. Also a module has a code object.
 #[derive(Clone)]
 pub struct CodeObject<C: Constant = ConstantData> {
     pub instructions: Box<[CodeUnit]>,
@@ -147,7 +147,7 @@ impl fmt::Debug for OpArgByte {
     }
 }
 
-/// a full 32-bit oparg, including any possible ExtendedArg extension
+/// a full 32-bit op_arg, including any possible ExtendedArg extension
 #[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
 pub struct OpArg(pub u32);
@@ -156,7 +156,7 @@ impl OpArg {
         OpArg(0)
     }
 
-    /// Returns how many CodeUnits a instruction with this oparg will be encoded as
+    /// Returns how many CodeUnits a instruction with this op_arg will be encoded as
     #[inline]
     pub fn instr_size(self) -> usize {
         (self.0 > 0xff) as usize + (self.0 > 0xff_ff) as usize + (self.0 > 0xff_ff_ff) as usize + 1
@@ -204,46 +204,46 @@ impl OpArgState {
 }
 
 pub trait OpArgType: Copy {
-    fn from_oparg(x: u32) -> Option<Self>;
-    fn to_oparg(self) -> u32;
+    fn from_op_arg(x: u32) -> Option<Self>;
+    fn to_op_arg(self) -> u32;
 }
 
 impl OpArgType for u32 {
     #[inline(always)]
-    fn from_oparg(x: u32) -> Option<Self> {
+    fn from_op_arg(x: u32) -> Option<Self> {
         Some(x)
     }
     #[inline(always)]
-    fn to_oparg(self) -> u32 {
+    fn to_op_arg(self) -> u32 {
         self
     }
 }
 
 impl OpArgType for bool {
     #[inline(always)]
-    fn from_oparg(x: u32) -> Option<Self> {
+    fn from_op_arg(x: u32) -> Option<Self> {
         Some(x != 0)
     }
     #[inline(always)]
-    fn to_oparg(self) -> u32 {
+    fn to_op_arg(self) -> u32 {
         self as u32
     }
 }
 
-macro_rules! oparg_enum {
-    ($(#[$attr:meta])* $vis:vis enum $name:ident { $($(#[$var_attr:meta])* $var:ident = $discr:literal,)* }) => {
+macro_rules! op_arg_enum {
+    ($(#[$attr:meta])* $vis:vis enum $name:ident { $($(#[$var_attr:meta])* $var:ident = $value:literal,)* }) => {
         $(#[$attr])*
         $vis enum $name {
-            $($(#[$var_attr])* $var = $discr,)*
+            $($(#[$var_attr])* $var = $value,)*
         }
 
         impl OpArgType for $name {
-            fn to_oparg(self) -> u32 {
+            fn to_op_arg(self) -> u32 {
                 self as u32
             }
-            fn from_oparg(x: u32) -> Option<Self> {
+            fn from_op_arg(x: u32) -> Option<Self> {
                 Some(match u8::try_from(x).ok()? {
-                    $($discr => Self::$var,)*
+                    $($value => Self::$var,)*
                     _ => return None,
                 })
             }
@@ -261,7 +261,7 @@ impl<T: OpArgType> Arg<T> {
     }
     #[inline]
     pub fn new(arg: T) -> (Self, OpArg) {
-        (Self(PhantomData), OpArg(arg.to_oparg()))
+        (Self(PhantomData), OpArg(arg.to_op_arg()))
     }
     #[inline]
     pub fn new_single(arg: T) -> (Self, OpArgByte)
@@ -276,13 +276,13 @@ impl<T: OpArgType> Arg<T> {
     }
     #[inline(always)]
     pub fn try_get(self, arg: OpArg) -> Option<T> {
-        T::from_oparg(arg.0)
+        T::from_op_arg(arg.0)
     }
     #[inline(always)]
     /// # Safety
-    /// T::from_oparg(self) must succeed
+    /// T::from_op_arg(self) must succeed
     pub unsafe fn get_unchecked(self, arg: OpArg) -> T {
-        match T::from_oparg(arg.0) {
+        match T::from_op_arg(arg.0) {
             Some(t) => t,
             None => std::hint::unreachable_unchecked(),
         }
@@ -310,11 +310,11 @@ pub struct Label(pub u32);
 
 impl OpArgType for Label {
     #[inline(always)]
-    fn from_oparg(x: u32) -> Option<Self> {
+    fn from_op_arg(x: u32) -> Option<Self> {
         Some(Label(x))
     }
     #[inline(always)]
-    fn to_oparg(self) -> u32 {
+    fn to_op_arg(self) -> u32 {
         self.0
     }
 }
@@ -325,7 +325,7 @@ impl fmt::Display for Label {
     }
 }
 
-oparg_enum!(
+op_arg_enum!(
     /// Transforms a value prior to formatting it.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     #[repr(u8)]
@@ -344,11 +344,11 @@ oparg_enum!(
 impl TryFrom<usize> for ConversionFlag {
     type Error = usize;
     fn try_from(b: usize) -> Result<Self, Self::Error> {
-        u32::try_from(b).ok().and_then(Self::from_oparg).ok_or(b)
+        u32::try_from(b).ok().and_then(Self::from_op_arg).ok_or(b)
     }
 }
 
-oparg_enum!(
+op_arg_enum!(
     /// The kind of Raise that occurred.
     #[derive(Copy, Clone, Debug, PartialEq, Eq)]
     #[repr(u8)]
@@ -634,11 +634,11 @@ bitflags! {
 }
 impl OpArgType for MakeFunctionFlags {
     #[inline(always)]
-    fn from_oparg(x: u32) -> Option<Self> {
+    fn from_op_arg(x: u32) -> Option<Self> {
         Some(unsafe { MakeFunctionFlags::from_bits_unchecked(x as u8) })
     }
     #[inline(always)]
-    fn to_oparg(self) -> u32 {
+    fn to_op_arg(self) -> u32 {
         self.bits().into()
     }
 }
@@ -793,7 +793,7 @@ impl<C: Constant> BorrowedConstant<'_, C> {
     }
 }
 
-oparg_enum!(
+op_arg_enum!(
     /// The possible comparison operators
     #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     #[repr(u8)]
@@ -809,7 +809,7 @@ oparg_enum!(
     }
 );
 
-oparg_enum!(
+op_arg_enum!(
     #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     #[repr(u8)]
     pub enum TestOperator {
@@ -822,7 +822,7 @@ oparg_enum!(
     }
 );
 
-oparg_enum!(
+op_arg_enum!(
     /// The possible Binary operators
     /// # Examples
     ///
@@ -850,7 +850,7 @@ oparg_enum!(
     }
 );
 
-oparg_enum!(
+op_arg_enum!(
     /// The possible unary operators
     #[derive(Debug, Copy, Clone, PartialEq, Eq)]
     #[repr(u8)]
@@ -870,12 +870,12 @@ pub struct UnpackExArgs {
 
 impl OpArgType for UnpackExArgs {
     #[inline(always)]
-    fn from_oparg(x: u32) -> Option<Self> {
+    fn from_op_arg(x: u32) -> Option<Self> {
         let [before, after, ..] = x.to_le_bytes();
         Some(Self { before, after })
     }
     #[inline(always)]
-    fn to_oparg(self) -> u32 {
+    fn to_op_arg(self) -> u32 {
         u32::from_le_bytes([self.before, self.after, 0, 0])
     }
 }
@@ -925,20 +925,20 @@ impl<C: Constant> CodeObject<C> {
     pub fn arg_names(&self) -> Arguments<C::Name> {
         let nargs = self.arg_count as usize;
         let nkwargs = self.kwonlyarg_count as usize;
-        let mut varargspos = nargs + nkwargs;
+        let mut varargs_pos = nargs + nkwargs;
         let posonlyargs = &self.varnames[..self.posonlyarg_count as usize];
         let args = &self.varnames[..nargs];
-        let kwonlyargs = &self.varnames[nargs..varargspos];
+        let kwonlyargs = &self.varnames[nargs..varargs_pos];
 
         let vararg = if self.flags.contains(CodeFlags::HAS_VARARGS) {
-            let vararg = &self.varnames[varargspos];
-            varargspos += 1;
+            let vararg = &self.varnames[varargs_pos];
+            varargs_pos += 1;
             Some(vararg)
         } else {
             None
         };
         let varkwarg = if self.flags.contains(CodeFlags::HAS_VARKEYWORDS) {
-            Some(&self.varnames[varargspos])
+            Some(&self.varnames[varargs_pos])
         } else {
             None
         };
@@ -968,7 +968,7 @@ impl<C: Constant> CodeObject<C> {
     fn display_inner(
         &self,
         f: &mut fmt::Formatter,
-        expand_codeobjects: bool,
+        expand_code_objects: bool,
         level: usize,
     ) -> fmt::Result {
         let label_targets = self.label_targets();
@@ -1007,14 +1007,14 @@ impl<C: Constant> CodeObject<C> {
             write!(f, "{arrow} {offset:offset_digits$} ")?;
 
             // instruction
-            instruction.fmt_dis(arg, f, self, expand_codeobjects, 21, level)?;
+            instruction.fmt_dis(arg, f, self, expand_code_objects, 21, level)?;
             writeln!(f)?;
         }
         Ok(())
     }
 
     /// Recursively display this CodeObject
-    pub fn display_expand_codeobjects(&self) -> impl fmt::Display + '_ {
+    pub fn display_expand_code_objects(&self) -> impl fmt::Display + '_ {
         struct Display<'a, C: Constant>(&'a CodeObject<C>);
         impl<C: Constant> fmt::Display for Display<'_, C> {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1287,7 +1287,7 @@ impl Instruction {
         arg: OpArg,
         f: &mut fmt::Formatter,
         ctx: &impl InstrDisplayContext,
-        expand_codeobjects: bool,
+        expand_code_objects: bool,
         pad: usize,
         level: usize,
     ) -> fmt::Result {
@@ -1295,26 +1295,26 @@ impl Instruction {
             ($variant:ident) => {
                 write!(f, stringify!($variant))
             };
-            ($variant:ident, $map:ident = $argmarker:expr) => {{
-                let arg = $argmarker.get(arg);
+            ($variant:ident, $map:ident = $arg_marker:expr) => {{
+                let arg = $arg_marker.get(arg);
                 write!(f, "{:pad$}({}, {})", stringify!($variant), arg, $map(arg))
             }};
-            ($variant:ident, $argmarker:expr) => {
-                write!(f, "{:pad$}({})", stringify!($variant), $argmarker.get(arg))
+            ($variant:ident, $arg_marker:expr) => {
+                write!(f, "{:pad$}({})", stringify!($variant), $arg_marker.get(arg))
             };
-            ($variant:ident, ?$argmarker:expr) => {
+            ($variant:ident, ?$arg_marker:expr) => {
                 write!(
                     f,
                     "{:pad$}({:?})",
                     stringify!($variant),
-                    $argmarker.get(arg)
+                    $arg_marker.get(arg)
                 )
             };
         }
 
         let varname = |i: u32| ctx.get_varname(i as usize);
         let name = |i: u32| ctx.get_name(i as usize);
-        let cellname = |i: u32| ctx.get_cellname(i as usize);
+        let cell_name = |i: u32| ctx.get_cell_name(i as usize);
 
         match self {
             ImportName { idx } => w!(ImportName, name = idx),
@@ -1324,17 +1324,17 @@ impl Instruction {
             LoadFast(idx) => w!(LoadFast, varname = idx),
             LoadNameAny(idx) => w!(LoadNameAny, name = idx),
             LoadGlobal(idx) => w!(LoadGlobal, name = idx),
-            LoadDeref(idx) => w!(LoadDeref, cellname = idx),
-            LoadClassDeref(idx) => w!(LoadClassDeref, cellname = idx),
+            LoadDeref(idx) => w!(LoadDeref, cell_name = idx),
+            LoadClassDeref(idx) => w!(LoadClassDeref, cell_name = idx),
             StoreFast(idx) => w!(StoreFast, varname = idx),
             StoreLocal(idx) => w!(StoreLocal, name = idx),
             StoreGlobal(idx) => w!(StoreGlobal, name = idx),
-            StoreDeref(idx) => w!(StoreDeref, cellname = idx),
+            StoreDeref(idx) => w!(StoreDeref, cell_name = idx),
             DeleteFast(idx) => w!(DeleteFast, varname = idx),
             DeleteLocal(idx) => w!(DeleteLocal, name = idx),
             DeleteGlobal(idx) => w!(DeleteGlobal, name = idx),
-            DeleteDeref(idx) => w!(DeleteDeref, cellname = idx),
-            LoadClosure(i) => w!(LoadClosure, cellname = i),
+            DeleteDeref(idx) => w!(DeleteDeref, cell_name = idx),
+            LoadClosure(i) => w!(LoadClosure, cell_name = i),
             Subscript => w!(Subscript),
             StoreSubscript => w!(StoreSubscript),
             DeleteSubscript => w!(DeleteSubscript),
@@ -1343,7 +1343,7 @@ impl Instruction {
             LoadConst { idx } => {
                 let value = ctx.get_constant(idx.get(arg) as usize);
                 match value.borrow_constant() {
-                    BorrowedConstant::Code { code } if expand_codeobjects => {
+                    BorrowedConstant::Code { code } if expand_code_objects => {
                         write!(f, "{:pad$}({:?}):", "LoadConst", code)?;
                         code.display_inner(f, true, level + 1)?;
                         Ok(())
@@ -1434,7 +1434,7 @@ pub trait InstrDisplayContext {
     fn get_constant(&self, i: usize) -> &Self::Constant;
     fn get_name(&self, i: usize) -> &str;
     fn get_varname(&self, i: usize) -> &str;
-    fn get_cellname(&self, i: usize) -> &str;
+    fn get_cell_name(&self, i: usize) -> &str;
 }
 
 impl<C: Constant> InstrDisplayContext for CodeObject<C> {
@@ -1448,7 +1448,7 @@ impl<C: Constant> InstrDisplayContext for CodeObject<C> {
     fn get_varname(&self, i: usize) -> &str {
         self.varnames[i].as_ref()
     }
-    fn get_cellname(&self, i: usize) -> &str {
+    fn get_cell_name(&self, i: usize) -> &str {
         self.cellvars
             .get(i)
             .unwrap_or_else(|| &self.freevars[i - self.cellvars.len()])
@@ -1491,7 +1491,7 @@ pub mod frozen_lib {
     }
 
     impl<B: AsRef<[u8]>> FrozenCodeObject<B> {
-        /// Decode a frozen codeobject
+        /// Decode a frozen code object
         #[inline]
         pub fn decode<Bag: AsBag>(
             &self,

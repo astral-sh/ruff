@@ -1,6 +1,5 @@
 ---
 source: compiler/parser/src/function.rs
-assertion_line: 165
 expression: parse_ast
 ---
 Ok(

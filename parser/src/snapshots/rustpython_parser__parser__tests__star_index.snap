@@ -11,7 +11,7 @@ expression: parse_ast
         end_location: Some(
             Location {
                 row: 1,
-                column: 33,
+                column: 36,
             },
         ),
         custom: (),
@@ -43,7 +43,7 @@ expression: parse_ast
                 end_location: Some(
                     Location {
                         row: 1,
-                        column: 33,
+                        column: 36,
                     },
                 ),
                 custom: (),
@@ -73,7 +73,7 @@ expression: parse_ast
                         end_location: Some(
                             Location {
                                 row: 1,
-                                column: 32,
+                                column: 35,
                             },
                         ),
                         custom: (),
@@ -106,7 +106,7 @@ expression: parse_ast
                                     end_location: Some(
                                         Location {
                                             row: 1,
-                                            column: 28,
+                                            column: 31,
                                         },
                                     ),
                                     custom: (),
@@ -119,12 +119,12 @@ expression: parse_ast
                                             end_location: Some(
                                                 Location {
                                                     row: 1,
-                                                    column: 28,
+                                                    column: 31,
                                                 },
                                             ),
                                             custom: (),
                                             node: Name {
-                                                id: "idxs",
+                                                id: "indexes",
                                                 ctx: Load,
                                             },
                                         },
@@ -134,12 +134,12 @@ expression: parse_ast
                                 Located {
                                     location: Location {
                                         row: 1,
-                                        column: 30,
+                                        column: 33,
                                     },
                                     end_location: Some(
                                         Location {
                                             row: 1,
-                                            column: 32,
+                                            column: 35,
                                         },
                                     ),
                                     custom: (),
@@ -148,12 +148,12 @@ expression: parse_ast
                                         operand: Located {
                                             location: Location {
                                                 row: 1,
-                                                column: 31,
+                                                column: 34,
                                             },
                                             end_location: Some(
                                                 Location {
                                                     row: 1,
-                                                    column: 32,
+                                                    column: 35,
                                                 },
                                             ),
                                             custom: (),
@@ -184,7 +184,7 @@ expression: parse_ast
         end_location: Some(
             Location {
                 row: 2,
-                column: 33,
+                column: 36,
             },
         ),
         custom: (),
@@ -198,7 +198,7 @@ expression: parse_ast
                     end_location: Some(
                         Location {
                             row: 2,
-                            column: 19,
+                            column: 22,
                         },
                     ),
                     custom: (),
@@ -228,7 +228,7 @@ expression: parse_ast
                             end_location: Some(
                                 Location {
                                     row: 2,
-                                    column: 18,
+                                    column: 21,
                                 },
                             ),
                             custom: (),
@@ -261,7 +261,7 @@ expression: parse_ast
                                         end_location: Some(
                                             Location {
                                                 row: 2,
-                                                column: 14,
+                                                column: 17,
                                             },
                                         ),
                                         custom: (),
@@ -274,12 +274,12 @@ expression: parse_ast
                                                 end_location: Some(
                                                     Location {
                                                         row: 2,
-                                                        column: 14,
+                                                        column: 17,
                                                     },
                                                 ),
                                                 custom: (),
                                                 node: Name {
-                                                    id: "idxs",
+                                                    id: "indexes",
                                                     ctx: Load,
                                                 },
                                             },
@@ -289,12 +289,12 @@ expression: parse_ast
                                     Located {
                                         location: Location {
                                             row: 2,
-                                            column: 16,
+                                            column: 19,
                                         },
                                         end_location: Some(
                                             Location {
                                                 row: 2,
-                                                column: 18,
+                                                column: 21,
                                             },
                                         ),
                                         custom: (),
@@ -303,12 +303,12 @@ expression: parse_ast
                                             operand: Located {
                                                 location: Location {
                                                     row: 2,
-                                                    column: 17,
+                                                    column: 20,
                                                 },
                                                 end_location: Some(
                                                     Location {
                                                         row: 2,
-                                                        column: 18,
+                                                        column: 21,
                                                     },
                                                 ),
                                                 custom: (),
@@ -332,12 +332,12 @@ expression: parse_ast
             value: Located {
                 location: Location {
                     row: 2,
-                    column: 22,
+                    column: 25,
                 },
                 end_location: Some(
                     Location {
                         row: 2,
-                        column: 33,
+                        column: 36,
                     },
                 ),
                 custom: (),
@@ -357,7 +357,7 @@ expression: parse_ast
         end_location: Some(
             Location {
                 row: 3,
-                column: 39,
+                column: 45,
             },
         ),
         custom: (),
@@ -370,7 +370,7 @@ expression: parse_ast
                 end_location: Some(
                     Location {
                         row: 3,
-                        column: 39,
+                        column: 45,
                     },
                 ),
                 custom: (),
@@ -400,7 +400,7 @@ expression: parse_ast
                         end_location: Some(
                             Location {
                                 row: 3,
-                                column: 38,
+                                column: 44,
                             },
                         ),
                         custom: (),
@@ -414,7 +414,7 @@ expression: parse_ast
                                     end_location: Some(
                                         Location {
                                             row: 3,
-                                            column: 21,
+                                            column: 24,
                                         },
                                     ),
                                     custom: (),
@@ -427,12 +427,12 @@ expression: parse_ast
                                             end_location: Some(
                                                 Location {
                                                     row: 3,
-                                                    column: 21,
+                                                    column: 24,
                                                 },
                                             ),
                                             custom: (),
                                             node: Name {
-                                                id: "idxs_to_select",
+                                                id: "indexes_to_select",
                                                 ctx: Load,
                                             },
                                         },
@@ -442,12 +442,12 @@ expression: parse_ast
                                 Located {
                                     location: Location {
                                         row: 3,
-                                        column: 23,
+                                        column: 26,
                                     },
                                     end_location: Some(
                                         Location {
                                             row: 3,
-                                            column: 38,
+                                            column: 44,
                                         },
                                     ),
                                     custom: (),
@@ -455,17 +455,17 @@ expression: parse_ast
                                         value: Located {
                                             location: Location {
                                                 row: 3,
-                                                column: 24,
+                                                column: 27,
                                             },
                                             end_location: Some(
                                                 Location {
                                                     row: 3,
-                                                    column: 38,
+                                                    column: 44,
                                                 },
                                             ),
                                             custom: (),
                                             node: Name {
-                                                id: "idxs_to_select",
+                                                id: "indexes_to_select",
                                                 ctx: Load,
                                             },
                                         },
@@ -489,7 +489,7 @@ expression: parse_ast
         end_location: Some(
             Location {
                 row: 4,
-                column: 27,
+                column: 30,
             },
         ),
         custom: (),
@@ -502,7 +502,7 @@ expression: parse_ast
                 end_location: Some(
                     Location {
                         row: 4,
-                        column: 27,
+                        column: 30,
                     },
                 ),
                 custom: (),
@@ -532,7 +532,7 @@ expression: parse_ast
                         end_location: Some(
                             Location {
                                 row: 4,
-                                column: 26,
+                                column: 29,
                             },
                         ),
                         custom: (),
@@ -604,7 +604,7 @@ expression: parse_ast
                                     end_location: Some(
                                         Location {
                                             row: 4,
-                                            column: 26,
+                                            column: 29,
                                         },
                                     ),
                                     custom: (),
@@ -617,12 +617,12 @@ expression: parse_ast
                                             end_location: Some(
                                                 Location {
                                                     row: 4,
-                                                    column: 26,
+                                                    column: 29,
                                                 },
                                             ),
                                             custom: (),
                                             node: Name {
-                                                id: "idxs_to_select",
+                                                id: "indexes_to_select",
                                                 ctx: Load,
                                             },
                                         },
