@@ -338,14 +338,14 @@ impl<'a> Scopes<'a> {
     /// Pushes a new scope and returns its unique id
     fn push_scope(&mut self, kind: ScopeKind<'a>) -> ScopeId {
         let next_id = ScopeId::try_from(self.0.len()).unwrap();
-        self.0.push(Scope::new(next_id, kind));
+        self.0.push(Scope::local(next_id, kind));
         next_id
     }
 }
 
 impl Default for Scopes<'_> {
     fn default() -> Self {
-        Self(vec![Scope::new(ScopeId::global(), ScopeKind::Module)])
+        Self(vec![Scope::global(ScopeKind::Module)])
     }
 }
 

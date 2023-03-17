@@ -81,9 +81,9 @@ pub enum ScopeKind<'a> {
 
 /// Id uniquely identifying a scope in a program.
 ///
-/// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max `u32::max`:
-/// A new scope requires a statement with a block body (and the right indention). That means, the upper bound of
-/// scopes is defined by `u32::max / 8` (`if 1:\n x`)
+/// Using a `u32` is sufficient because Ruff only supports parsing documents with a size of max `u32::max`
+/// and it is impossible to have more scopes than characters in the file (because defining a function or class
+/// requires more than one character).
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct ScopeId(u32);
 
@@ -129,7 +129,11 @@ pub struct Scope<'a> {
 }
 
 impl<'a> Scope<'a> {
-    pub fn new(id: ScopeId, kind: ScopeKind<'a>) -> Self {
+    pub fn global(kind: ScopeKind<'a>) -> Self {
+        Self::local(ScopeId::global(), kind)
+    }
+
+    pub fn local(id: ScopeId, kind: ScopeKind<'a>) -> Self {
         Scope {
             id,
             kind,
